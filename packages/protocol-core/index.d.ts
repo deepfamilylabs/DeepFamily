@@ -563,6 +563,9 @@ export interface LineageTree {
   insert(leaf: BigNumberish): void;
   update(index: BigNumberish, leaf: BigNumberish): void;
   indexOf(leaf: bigint): number | bigint;
+  getNode(level: BigNumberish, index: BigNumberish): bigint | undefined;
+  /** All slots, or only changed slots relative to an immutable previous clone. */
+  exportNodes(previous?: LineageTree): IterableIterator<LineageTreeNode>;
   generateProof(index: BigNumberish): {
     root: bigint;
     leaf: bigint;
@@ -570,6 +573,18 @@ export interface LineageTree {
     siblings: bigint[];
   };
 }
+export interface LineageTreeNode {
+  readonly level: number;
+  readonly index: bigint;
+  readonly value: bigint;
+}
+export function verifyLineageTreeNode(input: {
+  level: BigNumberish; index: BigNumberish; value: BigNumberish;
+}): LineageTreeNode;
+export function createLineageTreeFromNodes(
+  input: {size: BigNumberish; root: BigNumberish},
+  nodes: Iterable<{level: BigNumberish; index: BigNumberish; value: BigNumberish}>,
+): LineageTree;
 export interface LineageMerklePathInput {
   root: BigNumberish;
   leaf: BigNumberish;
@@ -1324,7 +1339,21 @@ export interface ShieldedIdentityAuthorizationTree {
   ): void;
   clone(): ShieldedIdentityAuthorizationTree;
   snapshot(): ShieldedIdentityAuthorizationState;
+  /** Content-addressed nodes; a previous clone prunes unchanged subtrees. */
+  exportNodes(previous?: ShieldedIdentityAuthorizationTree): IterableIterator<ShieldedIdentityAuthorizationNode>;
 }
+export type ShieldedIdentityAuthorizationNode =
+  | Readonly<{kind: "empty"; hash: bigint}>
+  | Readonly<{kind: "leaf"; hash: bigint; key: bigint; value: bigint}>
+  | Readonly<{kind: "branch"; hash: bigint; leftHash: bigint; rightHash: bigint}>;
+export function verifyShieldedIdentityAuthorizationNode(
+  input: unknown,
+  expectedHash?: BigNumberish,
+): ShieldedIdentityAuthorizationNode;
+export function createShieldedIdentityAuthorizationTreeFromNodes(
+  root: BigNumberish,
+  nodes: Iterable<unknown>,
+): ShieldedIdentityAuthorizationTree;
 export function createShieldedIdentityAuthorizationTree(
   entries?: Iterable<readonly [BigNumberish, BigNumberish]>,
 ): ShieldedIdentityAuthorizationTree;

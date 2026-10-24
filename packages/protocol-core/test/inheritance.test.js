@@ -6,6 +6,8 @@ import {
   buildLineageMerkleProof,
   buildLineageMerkleProofFromPath,
   createLineageTree,
+  createLineageTreeFromNodes,
+  verifyLineageTreeNode,
   packLineageEndorserAndTime,
   replayLineageTree,
   wrapIdentityCommitmentAsPersonHash,
@@ -86,6 +88,109 @@ test("replayed lineage trees match an independent LeanIMT for appends, updates a
       }
     }
   }
+});
+
+test("persistent duplicate-leaf indices retain the earliest slot through rewrites and clears", () => {
+  const tree = createLineageTree([0n, 7n, 7n, 0n, 7n]);
+  const previous = tree.clone();
+  tree.update(1, 9n);
+  assert.equal(tree.indexOf(7n), 2);
+  tree.update(2, 0n);
+  assert.equal(tree.indexOf(7n), 4);
+  tree.update(4, 9n);
+  assert.equal(tree.indexOf(7n), -1);
+  tree.update(0, 9n);
+  assert.equal(tree.indexOf(0n), 2);
+  tree.update(2, 9n);
+  assert.equal(tree.indexOf(0n), 3);
+  tree.update(3, 9n);
+  assert.equal(tree.indexOf(0n), -1);
+  tree.insert(0n);
+  assert.equal(tree.indexOf(0n), 5);
+  assert.equal(tree.indexOf(9n), 0);
+  assert.equal(previous.indexOf(0n), 0);
+  assert.equal(previous.indexOf(7n), 1);
+  assert.deepEqual(previous.leaves, [0n, 7n, 7n, 0n, 7n]);
+  assert.equal(tree.indexOf(9), -1);
+});
+
+test("persistent lineage indices match first-occurrence scans after deterministic mixed writes", () => {
+  const tree = createLineageTree();
+  const leaves = [];
+  const historical = [];
+  let seed = 71n;
+  const random = (limit) => {
+    seed = (seed * 6364136223846793005n + 1442695040888963407n) % (1n << 64n);
+    return Number(seed % BigInt(limit));
+  };
+  for (let step = 0; step < 180; step++) {
+    const leaf = BigInt(random(13));
+    if (!leaves.length || random(3) === 0) { tree.insert(leaf); leaves.push(leaf); }
+    else { const index = random(leaves.length); tree.update(index, leaf); leaves[index] = leaf; }
+    for (let value = 0n; value < 15n; value++) assert.equal(tree.indexOf(value), leaves.indexOf(value));
+    assert.equal(tree.root, referenceRoot(leaves));
+    if (step % 29 === 0) historical.push({ tree: tree.clone(), leaves: [...leaves], root: tree.root });
+  }
+  for (const previous of historical) {
+    assert.equal(previous.tree.root, previous.root);
+    assert.deepEqual(previous.tree.leaves, previous.leaves);
+    for (let value = 0n; value < 15n; value++) assert.equal(previous.tree.indexOf(value), previous.leaves.indexOf(value));
+  }
+});
+
+test("lineage node streams preserve zero slots, promotions and immutable dirty exports", () => {
+  for (const leaves of [[], [0n], [7n, 0n, 9n], [1n, 2n, 3n, 4n, 5n]]) {
+    const tree = createLineageTree(leaves);
+    const records = [...tree.exportNodes()];
+    const restored = createLineageTreeFromNodes({ size: tree.sizeBigInt, root: tree.root }, records);
+    assert.deepEqual(restored.leaves, leaves);
+    for (const record of records) {
+      assert.deepEqual(verifyLineageTreeNode(record), record);
+      assert.equal(tree.getNode(record.level, record.index), record.value);
+      assert.ok(Object.isFrozen(record));
+    }
+    for (let index = 0; index < leaves.length; index++) {
+      const proof = restored.generateProof(index);
+      assert.deepEqual({ ...proof, index: BigInt(proof.index) }, referenceProof(leaves, index));
+    }
+    assert.equal(tree.getNode(0, leaves.length), undefined);
+    assert.equal(tree.getNode(tree.depth + 1, 0), undefined);
+  }
+  const tree = createLineageTree(Array.from({ length: 16 }, (_, i) => BigInt(i)));
+  const previous = tree.clone();
+  const cache = new Map([...previous.exportNodes()].map((node) => [`${node.level}:${node.index}`, node]));
+  assert.deepEqual([...tree.exportNodes(previous)], []);
+  tree.update(3, 99n);
+  const root = tree.root;
+  const captured = tree.exportNodes(previous);
+  tree.update(3, 101n);
+  const changed = [...captured];
+  assert.equal(changed.length, tree.depth + 1);
+  for (const node of changed) cache.set(`${node.level}:${node.index}`, node);
+  const restored = createLineageTreeFromNodes({ size: 16, root }, cache.values());
+  assert.equal(restored.indexOf(99n), 3);
+  assert.equal(previous.indexOf(3n), 3);
+  const beforeExpansion = previous.clone();
+  beforeExpansion.insert(17n);
+  assert.equal([...beforeExpansion.exportNodes(previous)].length, beforeExpansion.depth + 1);
+  assert.equal(previous.size, 16);
+});
+
+test("lineage imports and failed writes reject corruption without changing existing clones", () => {
+  const tree = createLineageTree([0n, 7n, 7n]);
+  const records = [...tree.exportNodes()];
+  const clone = tree.clone();
+  for (const input of [records.slice(1), [...records, records[0]], records.map((node, i) => i === 0 ? { ...node, value: node.value + 1n } : node), [...records, { level: 0, index: 3n, value: 0n }]])
+    assert.throws(() => createLineageTreeFromNodes({ size: tree.size, root: tree.root }, input));
+  assert.throws(() => createLineageTreeFromNodes({ size: tree.size, root: tree.root + 1n }, records));
+  for (const update of [[3n, 1n], [0n, -1n], [-1n, 0n]]) assert.throws(() => tree.update(...update));
+  assert.deepEqual([...tree.exportNodes(clone)], []);
+  assert.deepEqual(tree.leaves, [0n, 7n, 7n]);
+  assert.equal(tree.indexOf(7n), 1);
+  const leaves = tree.leaves;
+  leaves.fill(11n);
+  assert.deepEqual(clone.leaves, [0n, 7n, 7n]);
+  assert.equal(clone.root, tree.root);
 });
 
 test("circuit-ready proofs recompute the root and pad siblings to the maximum depth", () => {

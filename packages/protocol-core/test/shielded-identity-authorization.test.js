@@ -1,8 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { poseidon2, poseidon3 } from "poseidon-lite";
 import {
   buildShieldedIdentityAuthorizationState,
   createShieldedIdentityAuthorizationTree,
+  createShieldedIdentityAuthorizationTreeFromNodes,
+  verifyShieldedIdentityAuthorizationNode,
   getShieldedIdentityAuthorizationWitness,
   prepareShieldedIdentityAuthorizationIncrement,
   prepareShieldedIdentityAuthorizationIncrementFromWitness,
@@ -18,6 +21,75 @@ const scope = {
   identityCommitment: 19n,
   derivedSecretField: 13n,
 };
+
+test("authorization node streams round-trip empty, collision and full-depth trees", () => {
+  for (const entries of [[], [[11n, 2n]], [[11n, 2n], [12n, 3n]], [[11n, 2n], [11n ^ (1n << 63n), 3n]]]) {
+    const tree = createShieldedIdentityAuthorizationTree(entries);
+    const records = [...tree.exportNodes()];
+    const restored = createShieldedIdentityAuthorizationTreeFromNodes(tree.root, records);
+    assert.deepEqual(restored.snapshot(), tree.snapshot());
+    for (const alias of [11n, 12n, 13n, 11n ^ (1n << 63n)]) {
+      assert.equal(restored.getCounter(alias), tree.getCounter(alias));
+      assert.deepEqual(restored.getWitness(alias), tree.getWitness(alias));
+    }
+    for (const record of records) {
+      assert.deepEqual(verifyShieldedIdentityAuthorizationNode(record, record.hash), record);
+      assert.ok(Object.isFrozen(record));
+      assert.throws(() => verifyShieldedIdentityAuthorizationNode(record, record.hash + 1n));
+    }
+  }
+});
+
+test("authorization exports capture immutable roots and emit only changed paths", () => {
+  const tree = createShieldedIdentityAuthorizationTree(Array.from({ length: 64 }, (_, i) => [BigInt(i + 1), 1n]));
+  const previous = tree.clone();
+  assert.deepEqual([...tree.exportNodes(previous)], []);
+  const cache = new Map([...previous.exportNodes()].map((record) => [record.hash, record]));
+  const oldWitness = previous.getWitness(17n);
+  tree.increment(17n, 1n, 2n);
+  const root = tree.root;
+  const captured = tree.exportNodes(previous);
+  tree.increment(17n, 2n, 3n);
+  const changed = [...captured];
+  assert.equal(changed[0].hash, root);
+  assert.equal(changed.length, Number(oldWitness.depth) + 1);
+  for (const record of changed) cache.set(record.hash, record);
+  const reachable = [];
+  const visit = (hash) => {
+    if (hash === 0n) return;
+    const record = cache.get(hash);
+    assert.ok(record);
+    reachable.push(record);
+    if (record.kind === "branch") { visit(record.leftHash); visit(record.rightHash); }
+  };
+  visit(root);
+  const restored = createShieldedIdentityAuthorizationTreeFromNodes(root, reachable);
+  assert.equal(restored.getCounter(17n), 2n);
+  assert.equal(tree.getCounter(17n), 3n);
+  assert.equal(previous.getCounter(17n), 1n);
+  assert.deepEqual(previous.getWitness(17n), oldWitness);
+  const singleton = createShieldedIdentityAuthorizationTree([[11n, 1n]]);
+  const beforeSplit = singleton.clone();
+  singleton.increment(11n ^ (1n << 63n), 0n, 1n);
+  const split = [...singleton.exportNodes(beforeSplit)];
+  assert.equal(split.length, 65);
+  assert.ok(!split.some((record) => record.hash === beforeSplit.root));
+});
+
+test("authorization node import rejects missing, duplicate, misplaced and uncompressed records", () => {
+  const tree = createShieldedIdentityAuthorizationTree([[11n, 1n], [12n, 2n]]);
+  const records = [...tree.exportNodes()];
+  for (const input of [records.slice(1), [...records, records[0]], records.map((node, i) => i === 0 ? { ...node, hash: node.hash + 1n } : node)])
+    assert.throws(() => createShieldedIdentityAuthorizationTreeFromNodes(tree.root, input));
+  const leaf = { kind: "leaf", key: 11n, value: 1n, hash: poseidon3([11n, 1n, 1n]) };
+  const wrongSide = { kind: "branch", leftHash: leaf.hash, rightHash: 0n, hash: poseidon2([leaf.hash, 0n]) };
+  assert.throws(() => createShieldedIdentityAuthorizationTreeFromNodes(wrongSide.hash, [wrongSide, leaf]));
+  const redundant = { kind: "branch", leftHash: 0n, rightHash: leaf.hash, hash: poseidon2([0n, leaf.hash]) };
+  assert.throws(() => createShieldedIdentityAuthorizationTreeFromNodes(redundant.hash, [redundant, leaf]), /compressed/u);
+  for (const node of [{ kind: "empty", hash: 1n }, { ...leaf, value: 0n }, { ...leaf, hash: 0n }, { ...leaf, key: SNARK_SCALAR_FIELD }, { kind: "branch", hash: poseidon2([0n, 0n]), leftHash: 0n, rightHash: 0n }])
+    assert.throws(() => verifyShieldedIdentityAuthorizationNode(node));
+  assert.throws(() => createShieldedIdentityAuthorizationTreeFromNodes(0n, [leaf]), /Unreachable/u);
+});
 
 test("public dictionary distinguishes genuine absence, collisions and membership", () => {
   const state = buildShieldedIdentityAuthorizationState([

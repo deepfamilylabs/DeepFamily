@@ -8,6 +8,8 @@ import {
 import { isError, type ethers } from "ethers";
 import { getEventScanConfig } from "../../../shared/config/env";
 import { InheritanceError } from "../model/inheritanceErrors";
+import { hasPersistentPublicStateStorage } from "../../../shared/clients/publicStateStore";
+import { loadPersistedLineageSnapshot, type LocalLineageRequest } from "./persistedLineageSnapshot";
 
 export { loadTargetedLineageSnapshot, LineageSnapshotLimitError } from "./targetedInheritanceChain";
 export type { TargetedLineageRequest } from "./targetedInheritanceChain";
@@ -15,7 +17,7 @@ export type { TargetedLineageRequest } from "./targetedInheritanceChain";
 export const ENDORSEMENT_TREE = 0;
 export const TRUSTED_TREE = 1;
 
-type ScanOptions = { fromBlock?: number; blockChunk?: number };
+type ScanOptions = { fromBlock?: number; toBlock?: number; blockChunk?: number; selection?: LocalLineageRequest };
 
 type ScannedEvent = {
   name: string;
@@ -205,6 +207,14 @@ export async function loadLineageSnapshot(
   deepFamily: ethers.Contract,
   options: ScanOptions = {},
 ): Promise<LineageSnapshot> {
+  if (options.selection && hasPersistentPublicStateStorage()) {
+    return loadPersistedLineageSnapshot(lineageIndex, deepFamily, {
+      ...options.selection, blockNumber: options.toBlock ?? options.selection.blockNumber,
+    });
+  }
+  if (options.toBlock !== undefined && (!Number.isSafeInteger(options.toBlock) || options.toBlock < 0)) {
+    throw new InheritanceError("snapshotMismatch", "Lineage snapshot block is invalid");
+  }
   const provider = providerOf(lineageIndex);
   const familyProvider = providerOf(deepFamily);
   const requestId = ++nextRequestId;
@@ -214,7 +224,7 @@ export async function loadLineageSnapshot(
     familyProvider === provider ? undefined : familyProvider.getNetwork(),
     lineageIndex.getAddress(),
     deepFamily.getAddress(),
-    provider.getBlockNumber(),
+    options.toBlock ?? provider.getBlockNumber(),
   ]);
   if (familyNetwork && familyNetwork.chainId !== network.chainId) {
     throw new InheritanceError("snapshotMismatch", "Family history provider uses another chain");

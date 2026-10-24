@@ -23,7 +23,12 @@ import {
   verifyShieldedReceiveCode,
 } from "./shieldedReceiveCode";
 
-const mocks = vi.hoisted(() => ({ deriveIdentityMaterial: vi.fn(), authorizationState: vi.fn(), providerDestroy: vi.fn() }));
+const mocks = vi.hoisted(() => ({
+  deriveIdentityMaterial: vi.fn(),
+  authorizationState: vi.fn(),
+  authorizationMode: vi.fn(),
+  providerDestroy: vi.fn(),
+}));
 vi.mock("@deepfamily/protocol-core", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@deepfamily/protocol-core")>()),
   deriveIdentityMaterial: mocks.deriveIdentityMaterial,
@@ -36,18 +41,39 @@ vi.mock("ethers", async (importOriginal) => ({
   },
 }));
 vi.mock("../clients/contractFactory", () => ({
-  createShieldedPoolFactoryContract: () => ({ AUTHORIZATION_STATE: async () => "0x2222222222222222222222222222222222222222" }),
+  createShieldedPoolFactoryContract: () => ({
+    AUTHORIZATION_STATE: async () => "0x2222222222222222222222222222222222222222",
+  }),
 }));
 vi.mock("../clients/shieldedIdentityAuthorizationChain", () => ({
   createIdentityAuthorizationContract: () => ({}),
-  loadShieldedIdentityAuthorizationWitness: async (_contract: unknown, alias: bigint) => {
-    const { getShieldedIdentityAuthorizationWitness } = await vi.importActual<typeof import("@deepfamily/protocol-core")>("@deepfamily/protocol-core");
+  loadShieldedIdentityAuthorizationWitnessForMode: async (
+    _contract: unknown,
+    alias: bigint,
+    mode: unknown,
+    scope: unknown,
+  ) => {
+    mocks.authorizationMode(mode, scope);
+    const { getShieldedIdentityAuthorizationWitness } = await vi.importActual<
+      typeof import("@deepfamily/protocol-core")
+    >("@deepfamily/protocol-core");
     const result = await mocks.authorizationState();
-    return { ...result, stateRoot: result.state.root, witness: getShieldedIdentityAuthorizationWitness(result.state, alias) };
+    return {
+      ...result,
+      stateRoot: result.state.root,
+      witness: getShieldedIdentityAuthorizationWitness(result.state, alias),
+    };
   },
 }));
 
-const receiveOptions = { context: { rpcUrl: "http://localhost:8545", chainId: "31337", factoryAddress: "0x1111111111111111111111111111111111111111" }, expiresAt: "2000000000" };
+const receiveOptions = {
+  context: {
+    rpcUrl: "http://localhost:8545",
+    chainId: "31337",
+    factoryAddress: "0x1111111111111111111111111111111111111111",
+  },
+  expiresAt: "2000000000",
+};
 
 const PUBLIC_DIRECTORY = fileURLToPath(new URL("../../../public", import.meta.url));
 
@@ -63,19 +89,30 @@ const identity = {
   identitySuiteId: 1,
   derivedSecretField: 123456789n,
   keyMode: 0 as const,
-  disclosure: "fund" as const, authorizationCounter: 0n, expiresAt: 2_000_000_000n,
+  disclosure: "fund" as const,
+  authorizationCounter: 0n,
+  expiresAt: 2_000_000_000n,
   keyMaterial: deriveShieldedHeirKeyMaterial(123456789n),
 };
 
-
 describe("explicit receive-code spending material", () => {
   it.each([
-    ["missing authorization mode", { ...identity, keyMode: undefined }, "Unsupported receive authorization mode"],
-    ["missing spending material", { ...identity, keyMaterial: undefined }, "requires explicit spending material"],
+    [
+      "missing authorization mode",
+      { ...identity, keyMode: undefined },
+      "Unsupported receive authorization mode",
+    ],
+    [
+      "missing spending material",
+      { ...identity, keyMaterial: undefined },
+      "requires explicit spending material",
+    ],
   ])("rejects %s instead of deriving fallback keys", async (_label, input, message) => {
-    await expect(createShieldedReceiveCode(
-      input as unknown as Parameters<typeof createShieldedReceiveCode>[0],
-    )).rejects.toThrow(message);
+    await expect(
+      createShieldedReceiveCode(
+        input as unknown as Parameters<typeof createShieldedReceiveCode>[0],
+      ),
+    ).rejects.toThrow(message);
   });
 });
 
@@ -89,7 +126,11 @@ describe("recipient empty-passphrase protection inside the ZK worker", () => {
     ["control character", "\t", "passphraseDisallowed"],
   ])("rejects %s before deriving identity material", async (_label, rawPassphrase, code) => {
     await expect(
-      createShieldedReceiveCodeFromCredentials({ identity: identity.identity, rawPassphrase, ...receiveOptions }),
+      createShieldedReceiveCodeFromCredentials({
+        identity: identity.identity,
+        rawPassphrase,
+        ...receiveOptions,
+      }),
     ).rejects.toThrow(code);
     expect(mocks.deriveIdentityMaterial).not.toHaveBeenCalled();
   });
@@ -147,7 +188,8 @@ describe("receive code proofs", () => {
       ok: true,
       disclosure: "fund",
       authorizationAlias: String(decodeShieldedReceiveCredential(code).authorizationAlias),
-      authorizationCounter: "0", expiresAt: "2000000000",
+      authorizationCounter: "0",
+      expiresAt: "2000000000",
       identityCommitment: material.identityCommitment.toString(),
       ownerCommitment: keys.ownerCommitment.toString(),
       viewingKey: hexlify(viewingKey),
@@ -164,17 +206,65 @@ describe("receive code proofs", () => {
     const material = computeIdentityFromDerivedSecret(identity);
     mocks.deriveIdentityMaterial.mockResolvedValueOnce(material);
     const alias = computeShieldedAuthorizationAlias(material);
-    mocks.authorizationState.mockResolvedValueOnce({ state: buildShieldedIdentityAuthorizationState([[alias, 5n]]) });
-    const result = await createShieldedReceiveCodeFromCredentials({ identity: identity.identity, rawPassphrase: "recipient passphrase", ...receiveOptions });
+    mocks.authorizationState.mockResolvedValueOnce({
+      state: buildShieldedIdentityAuthorizationState([[alias, 5n]]),
+    });
+    const result = await createShieldedReceiveCodeFromCredentials({
+      identity: identity.identity,
+      rawPassphrase: "recipient passphrase",
+      ...receiveOptions,
+    });
     expect(decodeShieldedReceiveCredential(result.code).authorizationCounter).toBe(5n);
+    expect(mocks.authorizationMode).toHaveBeenLastCalledWith("rebuild", {
+      chainId: "31337",
+      authorizationStateAddress: "0x2222222222222222222222222222222222222222",
+    });
     expect(mocks.providerDestroy).toHaveBeenCalled();
   }, 60_000);
+
+  it("passes only an explicitly selected chain mode to recipient state reading", async () => {
+    mocks.deriveIdentityMaterial.mockResolvedValueOnce(computeIdentityFromDerivedSecret(identity));
+    mocks.authorizationState.mockRejectedValueOnce(new Error("Stop before proving"));
+    await expect(
+      createShieldedReceiveCodeFromCredentials({
+        identity: identity.identity,
+        rawPassphrase: "recipient passphrase",
+        ...receiveOptions,
+        context: { ...receiveOptions.context, stateReadMode: "chain" },
+      }),
+    ).rejects.toThrow("could not be created");
+    expect(mocks.authorizationMode).toHaveBeenLastCalledWith("chain", {
+      chainId: "31337",
+      authorizationStateAddress: "0x2222222222222222222222222222222222222222",
+    });
+  });
+
+  it("rejects an unknown read mode before deriving credentials or querying state", async () => {
+    const derivations = mocks.deriveIdentityMaterial.mock.calls.length;
+    const queries = mocks.authorizationMode.mock.calls.length;
+    await expect(
+      createShieldedReceiveCodeFromCredentials({
+        identity: identity.identity,
+        rawPassphrase: "recipient passphrase",
+        ...receiveOptions,
+        context: { ...receiveOptions.context, stateReadMode: "unknown" as "chain" },
+      }),
+    ).rejects.toThrow("could not be created");
+    expect(mocks.deriveIdentityMaterial.mock.calls.length).toBe(derivations);
+    expect(mocks.authorizationMode.mock.calls.length).toBe(queries);
+  });
 
   it("does not substitute counter zero when a recipient's chain state cannot be read", async () => {
     mocks.deriveIdentityMaterial.mockResolvedValueOnce(computeIdentityFromDerivedSecret(identity));
     mocks.authorizationState.mockRejectedValueOnce(new Error("RPC unavailable"));
-    const credentials = { identity: identity.identity, rawPassphrase: "recipient passphrase", ...receiveOptions };
-    await expect(createShieldedReceiveCodeFromCredentials(credentials)).rejects.toThrow("Receive code could not be created");
+    const credentials = {
+      identity: identity.identity,
+      rawPassphrase: "recipient passphrase",
+      ...receiveOptions,
+    };
+    await expect(createShieldedReceiveCodeFromCredentials(credentials)).rejects.toThrow(
+      "Receive code could not be created",
+    );
     expect(credentials.rawPassphrase).toBe("");
     expect(mocks.providerDestroy).toHaveBeenCalled();
   });
@@ -209,7 +299,10 @@ describe("receive code proofs", () => {
 
   it("rejects a well-formed code whose identity was swapped", async () => {
     const decoded = decodeShieldedReceiveCredential(code);
-    const otherIdentity = encodeShieldedReceiveCredential({ ...decoded, identityCommitment: decoded.identityCommitment! + 1n });
+    const otherIdentity = encodeShieldedReceiveCredential({
+      ...decoded,
+      identityCommitment: decoded.identityCommitment! + 1n,
+    });
     await expect(verifyShieldedReceiveCode(otherIdentity)).resolves.toEqual({
       ok: false,
       reason: "invalid",
@@ -218,7 +311,10 @@ describe("receive code proofs", () => {
 
   it("rejects a well-formed code whose owner key was swapped", async () => {
     const decoded = decodeShieldedReceiveCredential(code);
-    const otherOwner = encodeShieldedReceiveCredential({ ...decoded, ownerCommitment: decoded.ownerCommitment + 1n });
+    const otherOwner = encodeShieldedReceiveCredential({
+      ...decoded,
+      ownerCommitment: decoded.ownerCommitment + 1n,
+    });
     await expect(verifyShieldedReceiveCode(otherOwner)).resolves.toEqual({
       ok: false,
       reason: "invalid",

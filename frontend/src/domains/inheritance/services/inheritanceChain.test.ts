@@ -172,6 +172,41 @@ describe("loadLineageSnapshot", () => {
     ).rejects.toMatchObject({ code: "snapshotMismatch" });
   });
 
+  it("rebuilds at an explicit wallet anchor without reading later history", async () => {
+    const chain = chainStub(logs, 10);
+    const index = chain.contract(INDEX, indexIface, {
+      root: vi.fn(async (treeId: number) => expectedRoots(treeId)),
+    });
+    const snapshot = await loadLineageSnapshot(
+      index as any,
+      chain.contract(FAMILY, familyIface) as any,
+      { fromBlock: 0, toBlock: 6, blockChunk: 3 },
+    );
+    expect(snapshot.blockNumber).toBe(6);
+    expect(snapshot.endorsements.get(HEIR.toLowerCase())?.get(A)?.versionIndex).toBe(1);
+    expect(index.currentCheckpointId).toHaveBeenCalledWith({ blockTag: 6 });
+    expect(index.root).toHaveBeenCalledWith(0, { blockTag: 6 });
+    expect(chain.provider.getBlockNumber).not.toHaveBeenCalled();
+    for (const [filter] of chain.provider.getLogs.mock.calls) {
+      expect(filter.toBlock).toBeLessThanOrEqual(6);
+      expect(filter.topics).toHaveLength(1);
+    }
+  });
+
+  it.each([-1, 1.5, Number.NaN, Number.MAX_SAFE_INTEGER + 1])(
+    "rejects invalid explicit block %s before reading the chain",
+    async (toBlock) => {
+      const chain = chainStub([]);
+      await expect(loadLineageSnapshot(
+        chain.contract(INDEX, indexIface) as any,
+        chain.contract(FAMILY, familyIface) as any,
+        { toBlock },
+      )).rejects.toMatchObject({ code: "snapshotMismatch" });
+      expect(chain.provider.getNetwork).not.toHaveBeenCalled();
+      expect(chain.provider.getLogs).not.toHaveBeenCalled();
+    },
+  );
+
   it.each(["currentCheckpointId", "getCheckpoint"])(
     "recognizes an older deployment that does not implement %s",
     async (method) => {

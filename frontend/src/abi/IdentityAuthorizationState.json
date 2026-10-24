@@ -46,6 +46,11 @@
     },
     {
       "inputs": [],
+      "name": "InvalidSnapshotPage",
+      "type": "error"
+    },
+    {
+      "inputs": [],
       "name": "InvalidStateTime",
       "type": "error"
     },
@@ -116,6 +121,19 @@
     {
       "inputs": [],
       "name": "CHECKPOINT_RETIREMENT_WINDOW",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "MAX_SNAPSHOT_PAGE_SIZE",
       "outputs": [
         {
           "internalType": "uint256",
@@ -339,6 +357,97 @@
           ],
           "internalType": "struct IIdentityAuthorizationState.CounterProof",
           "name": "result",
+          "type": "tuple"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "startId",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "limit",
+          "type": "uint256"
+        }
+      ],
+      "name": "getNodePage",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "uint256",
+              "name": "hash",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "key",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint64",
+              "name": "counter",
+              "type": "uint64"
+            },
+            {
+              "internalType": "uint64",
+              "name": "left",
+              "type": "uint64"
+            },
+            {
+              "internalType": "uint64",
+              "name": "right",
+              "type": "uint64"
+            }
+          ],
+          "internalType": "struct IIdentityAuthorizationState.NodeSnapshot[]",
+          "name": "page",
+          "type": "tuple[]"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "getStateSnapshotHeader",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "uint256",
+              "name": "formatVersion",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint64",
+              "name": "rootNodeId",
+              "type": "uint64"
+            },
+            {
+              "internalType": "uint64",
+              "name": "nodeCount",
+              "type": "uint64"
+            },
+            {
+              "internalType": "uint256",
+              "name": "root",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "checkpointId",
+              "type": "uint256"
+            }
+          ],
+          "internalType": "struct IIdentityAuthorizationState.StateSnapshotHeader",
+          "name": "",
           "type": "tuple"
         }
       ],

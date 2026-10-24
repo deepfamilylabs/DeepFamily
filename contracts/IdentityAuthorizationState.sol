@@ -23,10 +23,12 @@ contract IdentityAuthorizationState is IIdentityAuthorizationState {
   error InvalidStateTime();
   error CheckpointExpired();
   error AuthorizationPathCollision();
+  error InvalidSnapshotPage();
 
   uint256 public constant SNARK_SCALAR_FIELD =
     21888242871839275222246405745257275088548364400416034343698204186575808495617;
   uint256 public constant CHECKPOINT_RETIREMENT_WINDOW = 15 minutes;
+  uint256 public constant MAX_SNAPSHOT_PAGE_SIZE = 256;
   IIdentityCounterUpdateVerifier public immutable VERIFIER;
   uint256 public creationBlock;
   uint256 public override currentCheckpointId = 1;
@@ -74,6 +76,26 @@ contract IdentityAuthorizationState is IIdentityAuthorizationState {
 
   function getCheckpoint(uint256 checkpointId) external view override returns (Checkpoint memory) {
     return _checkpoints[checkpointId];
+  }
+
+  function getStateSnapshotHeader() external view override returns (StateSnapshotHeader memory) {
+    return StateSnapshotHeader(1, _rootNodeId, nodeCount, currentRoot(), currentCheckpointId);
+  }
+
+  function getNodePage(
+    uint256 startId,
+    uint256 limit
+  ) external view override returns (NodeSnapshot[] memory page) {
+    uint256 count = nodeCount;
+    if (startId == 0 || startId > count + 1 || limit == 0 || limit > MAX_SNAPSHOT_PAGE_SIZE)
+      revert InvalidSnapshotPage();
+    uint256 length = count + 1 - startId;
+    if (length > limit) length = limit;
+    page = new NodeSnapshot[](length);
+    for (uint256 offset; offset < length; ++offset) {
+      Node storage node = _nodes[uint64(startId + offset)];
+      page[offset] = NodeSnapshot(node.hash, node.key, node.counter, node.left, node.right);
+    }
   }
 
   /** @notice Fetch at one block tag alongside the checkpoint; no history replay is needed. */

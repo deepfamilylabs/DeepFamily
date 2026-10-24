@@ -15,6 +15,29 @@ interface IDeepFamilyLineageIndex is IERC165 {
     uint256 retiredAt;
   }
 
+  struct VersionSnapshot {
+    bytes32 personHash;
+    uint256 versionIndex;
+    uint256 identityCommitment;
+    uint256 fatherIdentityCommitment;
+    uint256 motherIdentityCommitment;
+  }
+
+  struct EndorsementSnapshot {
+    bytes32 personHash;
+    address endorser;
+    uint256 versionIndex;
+    uint64 writtenAt;
+    bool active;
+  }
+
+  struct TrustedSnapshot {
+    bytes32 personHash;
+    uint256 versionIndex;
+    address account;
+    bool active;
+  }
+
   event LeafWritten(uint8 indexed treeId, uint256 indexed leafIndex, uint256 leaf, uint256 root);
   event CheckpointCreated(
     uint256 indexed checkpointId,
@@ -55,6 +78,28 @@ interface IDeepFamilyLineageIndex is IERC165 {
   function root(uint8 treeId) external view returns (uint256);
   function size(uint8 treeId) external view returns (uint256);
   function depth(uint8 treeId) external view returns (uint256);
+  /** @notice Global pages use zero-based offsets and limits from 1 through 256.
+   *          Read all pages, sizes and roots at one block tag. start == count returns []. */
+  function getLeafPage(
+    uint8 treeId,
+    uint256 start,
+    uint256 limit
+  ) external view returns (uint256[] memory);
+  function versionMetadataCount() external view returns (uint256);
+  function getVersionPage(
+    uint256 start,
+    uint256 limit
+  ) external view returns (VersionSnapshot[] memory);
+  /** @notice Entries retain their physical endorsement slot after cancellation. */
+  function getEndorsementPage(
+    uint256 start,
+    uint256 limit
+  ) external view returns (EndorsementSnapshot[] memory);
+  /** @notice Entries retain their physical trusted slot after removal. */
+  function getTrustedPage(
+    uint256 start,
+    uint256 limit
+  ) external view returns (TrustedSnapshot[] memory);
   /// @notice Per-tree history. Pool eligibility uses paired checkpoints instead.
   function isKnownRoot(uint8 treeId, uint256 candidate) external view returns (bool);
   function CHECKPOINT_RETIREMENT_WINDOW() external view returns (uint256);

@@ -1220,8 +1220,8 @@ returned siblings: bit `k` is one when the running node is the right child of `s
 `proofIndex` can differ from `leafIndex`. An allocated leaf cleared to zero still occupies its slot
 and can be a sibling in another proof. The read visits at most 64 tree levels and does not write
 storage. A targeted RPC call reveals `treeId` and `leafIndex` to the RPC provider, which can
-correlate the index with public `LeafWritten` events. The current client instead rebuilds both
-trees from full event scans.
+correlate the index with public `LeafWritten` events. The client defaults to reconstructing current global pages and subsequent unfiltered updates.
+Users may explicitly select direct chain paths; a view read uses no transaction gas in either mode.
 
 Every actual root change creates a monotonically numbered checkpoint containing both roots and
 its creation timestamp, and retires the preceding checkpoint exactly once. `isKnownCheckpoint`
@@ -1239,10 +1239,19 @@ which could represent qualifications that never coexisted. `isKnownRoot` remains
 per-tree history view with a one-hour window; it does not authorize pool actions.
 
 Only the proxy may call the `on*` hooks. The index stores current tree nodes and exposes
-`getMerkleProof`, `versionParents` and `getEndorsementMetadata`. Clients read selected family
-records and paths at one fixed block, recompute their leaves and paths, and authenticate the
-paired checkpoint. Parent openings remain available even when a parent record is not registered.
-An explicit legacy replay API can still independently reconstruct the trees from `LeafWritten`. Proof preparation and submission recheck checkpoint acceptance, not equality
+`getMerkleProof`, `versionParents` and `getEndorsementMetadata`. Global reconstruction uses
+`getLeafPage(treeId,start,limit)`, `getVersionPage`, `getEndorsementPage` and `getTrustedPage`,
+with `versionMetadataCount` and `size(treeId)` defining their counts. All offsets are zero-based,
+limits are 1–256, and an offset equal to the count returns an empty page. All pages and roots
+must use one fixed block. Version pages retain every indexed version; endorsement/trust pages
+retain their physical slots and keys after cancellation/removal, with inactive entries flagged.
+Reverse slot keys are allocated only once; adding a version or a first slot now incurs extra
+index storage writes, while later updates reuse them. By default, clients rebuild these global
+current pages, authenticate the paired checkpoint, then apply unfiltered subsequent updates.
+Optional chain mode reads selected family records and paths at one fixed block and recomputes
+their leaves and paths locally. Parent openings remain available even when a parent record is
+not registered. Both read modes retain root, checkpoint and block-anchor verification, and neither
+fails over to the other. Proof preparation and submission recheck checkpoint acceptance, not equality
 with the latest roots, while retaining block-reorganization and spent-nullifier checks.
 
 The contract links the PoseidonT3–T6 libraries from `poseidon-solidity`. They are compiled without
@@ -1308,10 +1317,18 @@ different aliases without regenerating the existing proof keys. `CounterIncremen
 actual prior and resulting roots; receipt consumers must not substitute the proof-statement roots.
 Existing checkpoint creation/retirement and the 15-minute acceptance window are unchanged.
 
-This deployment change does not migrate immutable old state/pool instances. Old counters must not
-be reset, since doing so would re-enable old credentials. Direct path reads also expose the queried
-alias to a third-party RPC. Chain checkpoint/nullifier history still grows with updates; this change
-alone does not establish an unlimited write capacity or low transaction fees.
+The global snapshot API exposes `getStateSnapshotHeader()` (format version 1, root node ID,
+node count, root and checkpoint ID) and `getNodePage(startId,limit)` (current node hash, key,
+counter, left ID and right ID). Node IDs start at 1, page limits are 1–256, and `nodeCount + 1`
+returns an empty page. These views reuse existing nodes and add no authorization write storage.
+The frontend defaults to downloading all current nodes at one block, validating the complete
+canonical graph and persisting it locally. Subsequent `CounterIncremented` updates are processed
+without alias filters; witness paths are read from local nodes and checked against the chain root. Users can explicitly
+select direct paths; these calls expose the queried alias to their RPC operator. Both modes read
+the same state and preserve counter/revocation rules. Switching read modes does not change write
+gas or reset counters. The project is unpublished, so this selection requires no live-state
+migration. Chain checkpoint/nullifier history still grows with updates; this change alone does
+not establish an unlimited write capacity or low transaction fees.
 
 
 | Action            | Purpose | Signals | Public inputs, in order                                                                                                                                                                   |

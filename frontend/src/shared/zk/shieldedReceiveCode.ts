@@ -20,7 +20,14 @@ import { JsonRpcProvider, hexlify, getBigInt, getBytes, type BigNumberish } from
 // @ts-ignore snarkjs does not publish complete browser typings.
 import * as snarkjs from "snarkjs";
 import { getFundingPassphraseError } from "../crypto/passphraseStrength";
-import { createIdentityAuthorizationContract, loadShieldedIdentityAuthorizationWitness } from "../clients/shieldedIdentityAuthorizationChain";
+import {
+  createIdentityAuthorizationContract,
+  loadShieldedIdentityAuthorizationWitnessForMode,
+} from "../clients/shieldedIdentityAuthorizationChain";
+import {
+  normalizeShieldedStateReadMode,
+  type ShieldedStateReadMode,
+} from "../config/shieldedStateReadMode";
 import { createShieldedPoolFactoryContract } from "../clients/contractFactory";
 import { generateShieldedProof, SHIELDED_RECEIVE_CREDENTIAL_VERIFICATION_KEYS } from "./shieldedZk";
 
@@ -120,7 +127,10 @@ export async function createShieldedReceiveCode(input: ShieldedReceiveCodeIdenti
     expectedPublicSignals: publicSignals.map(String),
   });
   return {
-    code: encodeShieldedReceiveCredential({ ...statement, proof: proof as unknown as ShieldedReceiveCredentialProof }),
+    code: encodeShieldedReceiveCredential({
+      ...statement,
+      proof: proof as unknown as ShieldedReceiveCredentialProof,
+    }),
     personHash: material.personHash,
     fingerprint: computeShieldedReceiveCredentialFingerprint(statement),
   };
@@ -134,13 +144,19 @@ export async function createShieldedReceiveCodeFromCredentials(input: {
   identity: IdentityFields;
   rawPassphrase: string;
   disclosure?: "anonymous" | "fund";
-  context: { rpcUrl: string; chainId: string; factoryAddress: string };
+  context: {
+    rpcUrl: string;
+    chainId: string;
+    factoryAddress: string;
+    stateReadMode?: ShieldedStateReadMode;
+  };
   expiresAt: BigNumberish;
 }) {
   const passphraseError = getFundingPassphraseError(input.rawPassphrase);
   if (passphraseError) throw new Error(`Funding passphrase rejected: ${passphraseError}`);
   let material;
   try {
+    const stateReadMode = normalizeShieldedStateReadMode(input.context.stateReadMode);
     material = await deriveIdentityMaterial({
       identity: { ...input.identity, fullName: canonicalizeFullName(input.identity.fullName) },
       rawPassphrase: input.rawPassphrase,
@@ -150,20 +166,28 @@ export async function createShieldedReceiveCodeFromCredentials(input: {
     input.rawPassphrase = "";
     const provider = new JsonRpcProvider(input.context.rpcUrl);
     try {
-    if ((await provider.getNetwork()).chainId !== BigInt(input.context.chainId)) throw new Error("Receive code chain mismatch");
-    const factory = createShieldedPoolFactoryContract(input.context.factoryAddress, provider);
-    const alias = computeShieldedAuthorizationAlias(material);
-    const address = String(await factory.AUTHORIZATION_STATE());
-    const state = await loadShieldedIdentityAuthorizationWitness(createIdentityAuthorizationContract(address, provider), alias, { chainId: input.context.chainId, authorizationStateAddress: address });
-    return await createShieldedReceiveCode({
-      ...material,
-      keyMode: 0,
-      disclosure: input.disclosure,
-      authorizationCounter: state.witness.authorizationCounter,
-      expiresAt: input.expiresAt,
-      keyMaterial: deriveShieldedHeirKeyMaterial(material.derivedSecretField),
-    });
-    } finally { provider.destroy(); }
+      if ((await provider.getNetwork()).chainId !== BigInt(input.context.chainId))
+        throw new Error("Receive code chain mismatch");
+      const factory = createShieldedPoolFactoryContract(input.context.factoryAddress, provider);
+      const alias = computeShieldedAuthorizationAlias(material);
+      const address = String(await factory.AUTHORIZATION_STATE());
+      const state = await loadShieldedIdentityAuthorizationWitnessForMode(
+        createIdentityAuthorizationContract(address, provider),
+        alias,
+        stateReadMode,
+        { chainId: input.context.chainId, authorizationStateAddress: address },
+      );
+      return await createShieldedReceiveCode({
+        ...material,
+        keyMode: 0,
+        disclosure: input.disclosure,
+        authorizationCounter: state.witness.authorizationCounter,
+        expiresAt: input.expiresAt,
+        keyMaterial: deriveShieldedHeirKeyMaterial(material.derivedSecretField),
+      });
+    } finally {
+      provider.destroy();
+    }
   } catch {
     // Library failures can embed normalized/encoded credentials or witnesses.
     throw new Error("Receive code could not be created");
@@ -219,10 +243,14 @@ export async function verifyShieldedReceiveCode(code: string): Promise<ShieldedR
     authorizationAlias: String(decoded.authorizationAlias),
     authorizationCounter: String(decoded.authorizationCounter),
     expiresAt: String(decoded.expiresAt),
-    ...(decoded.identityCommitment === undefined ? {} : { identityCommitment: String(decoded.identityCommitment) }),
+    ...(decoded.identityCommitment === undefined
+      ? {}
+      : { identityCommitment: String(decoded.identityCommitment) }),
     ownerCommitment: decoded.ownerCommitment.toString(),
     viewingKey: hexlify(decoded.viewingKey),
-    ...(decoded.identityCommitment === undefined ? {} : { personHash: wrapIdentityCommitmentAsPersonHash(decoded.identityCommitment) }),
+    ...(decoded.identityCommitment === undefined
+      ? {}
+      : { personHash: wrapIdentityCommitmentAsPersonHash(decoded.identityCommitment) }),
     keyMode: decoded.keyMode as 0 | 1,
     identitySuiteId: decoded.identitySuiteId,
     independentKeySuiteId: decoded.independentKeySuiteId,

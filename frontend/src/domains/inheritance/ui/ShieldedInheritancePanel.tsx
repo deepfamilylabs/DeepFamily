@@ -26,6 +26,7 @@ import {
 } from "ethers";
 import { PersonHashCalculator, type PersonHashCalculatorHandle } from "../../person";
 import { useConfig } from "../../config";
+import { normalizeShieldedStateReadMode } from "../../../shared/config/shieldedStateReadMode";
 import { getWalletConnectionGeneration, subscribeWalletConnectionChange } from "../../wallet";
 import { useTreeGraphData } from "../../tree/context";
 import { getShieldedLocalRecipientLabels } from "../services/shieldedRecipientOptions";
@@ -93,6 +94,12 @@ import {
   shortHex,
 } from "./inheritanceControls";
 import { PrivateLettersPanel } from "./PrivateLettersPanel";
+import { ShieldedStateReadModeControl } from "./ShieldedStateReadModeControl";
+import { ShieldedPublicStateSyncStatus } from "./ShieldedPublicStateSyncStatus";
+import {
+  subscribePublicStateSyncProgress,
+  type PublicStateSyncProgress,
+} from "../../../shared/workers/publicStateSyncProgress";
 import { ShieldedTaskNavigation } from "./ShieldedTaskNavigation";
 import {
   ShieldedAssetOverview,
@@ -221,6 +228,9 @@ export function ShieldedInheritancePanel({
   const [busy, setBusy] = useState(false),
     [stage, setStage] = useState(""),
     [error, setError] = useState("");
+  const acceptPublicSyncProgress = useRef(false);
+  const [publicSyncProgress, setPublicSyncProgress] = useState<Partial<Record<PublicStateSyncProgress["domain"], PublicStateSyncProgress>>>({});
+  const [publicSyncPaused, setPublicSyncPaused] = useState(false);
   const [transactionHash, setTransactionHash] = useState(""),
     [transactionPending, setTransactionPending] = useState(false);
   const [transactionLabel, setTransactionLabel] = useState("");
@@ -370,6 +380,7 @@ export function ShieldedInheritancePanel({
   }, [modules.assetKind, modules.tokenDecimals, signer, allowanceSnapshot, allowanceScope, amount]);
   const context: ShieldedWorkerContext = {
     rpcUrl: config.rpcUrl,
+    stateReadMode: normalizeShieldedStateReadMode(config.stateReadMode),
     chainId: String(modules.chainId),
     factoryAddress: String(modules.factory.target),
     factoryDeploymentBlock: getShieldedPoolFactoryDeploymentBlock(Number(modules.chainId)),
@@ -582,6 +593,7 @@ export function ShieldedInheritancePanel({
     if (activeOperation.current?.scope !== "wallet") return;
     cancelSpendReview();
     activeOperation.current = null;
+    acceptPublicSyncProgress.current = false;
     setBusy(false);
     setStage("");
     setPlanCount(0);
@@ -612,6 +624,7 @@ export function ShieldedInheritancePanel({
       signatureRequest.current++;
       activeSignatureRequest.current = null;
       activeOperation.current = null;
+      acceptPublicSyncProgress.current = false;
       clear();
       if (mounted.current) {
         setBusy(false);
@@ -650,9 +663,19 @@ export function ShieldedInheritancePanel({
       void cancelShieldedAssetPreview().catch(() => undefined);
     };
   }, []);
+  useEffect(() => subscribePublicStateSyncProgress((event) => {
+    if (!mounted.current || !acceptPublicSyncProgress.current) return;
+    setPublicSyncProgress((previous) => ({
+      ...previous,
+      [event.domain]: { ...event, resumed: event.resumed || previous[event.domain]?.resumed },
+    }));
+    setPublicSyncPaused(false);
+  }), []);
   useEffect(() => {
     if (previousContextKey.current !== contextKey) {
       previousContextKey.current = contextKey;
+      setPublicSyncProgress({});
+      setPublicSyncPaused(false);
       lockRef.current();
       receiptTracking.current = null;
       setTransactionHash("");
@@ -873,6 +896,9 @@ export function ShieldedInheritancePanel({
     if (activeOperation.current) return;
     const operation = { scope: operationScope };
     activeOperation.current = operation;
+    acceptPublicSyncProgress.current = true;
+    setPublicSyncProgress({});
+    setPublicSyncPaused(false);
     const scope = contextKey;
     const generation = getShieldedAssetWorkerGeneration();
     const walletGeneration = getWalletConnectionGeneration();
@@ -918,6 +944,7 @@ export function ShieldedInheritancePanel({
     } finally {
       if (activeOperation.current === operation) {
         activeOperation.current = null;
+        acceptPublicSyncProgress.current = false;
         if (mounted.current) {
           setBusy(false);
           setStage("");
@@ -972,6 +999,7 @@ export function ShieldedInheritancePanel({
     signatureRequest.current++;
     activeSignatureRequest.current = null;
     activeOperation.current = null;
+    acceptPublicSyncProgress.current = false;
     setBusy(false);
     setStage("");
     setError("");
@@ -2739,11 +2767,44 @@ export function ShieldedInheritancePanel({
     </section>
   );
 
+  const stateReadModeControl = (
+    <ShieldedStateReadModeControl
+      value={normalizeShieldedStateReadMode(config.stateReadMode)}
+      disabled={busy || submissionPending || !!executingReview}
+      onChange={(stateReadMode) => {
+        if (busy || submissionPending || executingReview || stateReadMode === context.stateReadMode) return;
+        // Stop both secret-processing Workers synchronously before changing the
+        // mode, so queued old-mode work cannot start more identity-specific reads.
+        lock();
+        config.update({ stateReadMode });
+      }}
+    />
+  );
+  const publicSyncItems = (["authorization", "lineage"] as const)
+    .map((domain) => publicSyncProgress[domain])
+    .filter((item): item is PublicStateSyncProgress => !!item);
+  const publicSyncPauseDisabled = submissionPending || !!executingReview || session.isWalletRequestPending() ||
+    progress?.stage === "checkingGas" || progress?.stage === "submitting" || progress?.stage === "confirming";
+  const publicSyncStatus = publicSyncPaused || (busy && publicSyncItems.length > 0) ? (
+    <ShieldedPublicStateSyncStatus
+      progress={publicSyncItems}
+      paused={publicSyncPaused}
+      pauseDisabled={publicSyncPauseDisabled}
+      onPause={() => {
+        if (publicSyncPauseDisabled || !busy || !publicSyncItems.some((item) => item.phase !== "complete")) return;
+        lock();
+        setPublicSyncPaused(true);
+      }}
+    />
+  ) : null;
+
   return (
     <div className="min-w-0 space-y-6 break-normal">
       {!showWorkspace ? (
         <div className="mx-auto w-full max-w-[45rem] space-y-6">
           {head}
+          {stateReadModeControl}
+          {publicSyncStatus}
           <div
             ref={accessRegion}
             tabIndex={-1}
@@ -2755,6 +2816,8 @@ export function ShieldedInheritancePanel({
       ) : (
         <div className="space-y-6">
           {head}
+          {stateReadModeControl}
+          {publicSyncStatus}
           <ShieldedAssetOverview
             person={{
               name: session.identity?.identity.fullName ?? tr("independentKeyTitle"),
@@ -2844,7 +2907,7 @@ export function ShieldedInheritancePanel({
         </div>
       )}
       <div className={showWorkspace ? undefined : "mx-auto w-full max-w-[45rem]"}>
-        <PrivateLettersPanel context={context} signer={signer ?? null} disabled={busy || submissionPending} wallet={wallet} recoveryReady={!!session.identity || !!session.independentKey} sessionScope={JSON.stringify([session.credentials?.handle, session.identity?.handle, session.independentKey?.keyFingerprint])} budgetCommitment={letterBudget} composeRequest={letterComposeRequest} onBudgetChange={setLetterBudget} onBusyChange={(value) => { setBusy(value); latestSession.current.setBusy(value); }} beginWalletRequest={() => latestSession.current.beginWalletRequest()} />
+        <PrivateLettersPanel context={context} signer={signer ?? null} disabled={busy || submissionPending} wallet={wallet} recoveryReady={!!session.identity || !!session.independentKey} sessionScope={JSON.stringify([session.credentials?.handle, session.identity?.handle, session.independentKey?.keyFingerprint])} budgetCommitment={letterBudget} composeRequest={letterComposeRequest} onBudgetChange={setLetterBudget} onBusyChange={(value) => { acceptPublicSyncProgress.current = value; if (value) { setPublicSyncProgress({}); setPublicSyncPaused(false); } setBusy(value); latestSession.current.setBusy(value); }} beginWalletRequest={() => latestSession.current.beginWalletRequest()} />
       </div>
     </div>
   );

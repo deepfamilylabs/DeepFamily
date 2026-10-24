@@ -24,6 +24,10 @@ const mocks = vi.hoisted(() => ({
   knownCheckpoint: vi.fn(),
   proofLifetime: vi.fn(),
   fundingDestination: vi.fn(),
+  loadLineage: vi.fn(),
+  loadTargetedLineage: vi.fn(),
+  targetIdentity: vi.fn(),
+  authorizationMode: vi.fn(),
   notes: [] as Array<{
     commitment: bigint;
     note: { kind: "value"; amount: bigint; ownerCommitment: bigint };
@@ -63,7 +67,7 @@ vi.mock("@deepfamily/protocol-core", async (original) => ({
 }));
 vi.mock("../shared/clients/contractFactory", () => ({
   createDeepFamilyContract: () => ({ lineageIndex: async () => mocks.lineage }),
-  createLineageIndexContract: () => ({ root: mocks.lineageRoot, isKnownCheckpoint: mocks.knownCheckpoint, identityCommitmentOf: async () => 31n }),
+  createLineageIndexContract: () => ({ root: mocks.lineageRoot, isKnownCheckpoint: mocks.knownCheckpoint, identityCommitmentOf: mocks.targetIdentity }),
   createShieldedPoolFactoryContract: () => ({
     LINEAGE_INDEX: async () => mocks.lineage,
     VERIFIER: async () => mocks.verifier,
@@ -83,7 +87,8 @@ vi.mock("../shared/clients/contractFactory", () => ({
 vi.mock("../shared/zk/shieldedReceivePresentation", () => ({ proveShieldedReceivePresentation: mocks.receipt }));
 vi.mock("../domains/inheritance/services/shieldedIdentityAuthorizationChain", () => ({
   createIdentityAuthorizationContract: () => ({}),
-  loadShieldedIdentityAuthorizationWitness: async (_contract: unknown, alias: bigint) => {
+  loadShieldedIdentityAuthorizationWitnessForMode: async (_contract: unknown, alias: bigint, mode?: unknown) => {
+    mocks.authorizationMode(mode);
     const { createShieldedIdentityAuthorizationTree } = await import("@deepfamily/protocol-core");
     const tree = createShieldedIdentityAuthorizationTree();
     return { stateRoot: tree.root, witness: tree.getWitness(alias), checkpointId: 1n, asOf: 1000n, blockNumber: 12 };
@@ -117,7 +122,8 @@ vi.mock("../domains/inheritance/services/shieldedFundingPreparation", async (ori
   validateShieldedFundingDestination: mocks.fundingDestination,
 }));
 vi.mock("../domains/inheritance/services/inheritanceChain", () => ({
-  loadTargetedLineageSnapshot: async () => ({ timestamp: 1000n, checkpointId: 7n, versions: new Map(), endorsements: new Map(), trustedEndorsers: new Map() }),
+  loadTargetedLineageSnapshot: mocks.loadTargetedLineage,
+  loadLineageSnapshot: mocks.loadLineage,
   findHeirLegitimacy: () => [],
 }));
 const blockHash = `0x${"aa".repeat(32)}`;
@@ -192,6 +198,10 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.pool = context.poolAddress;
   mocks.notes = [];
+  const snapshot = { timestamp: 1000n, checkpointId: 7n, versions: new Map(), endorsements: new Map(), trustedEndorsers: new Map() };
+  mocks.loadLineage.mockReset().mockResolvedValue(snapshot);
+  mocks.loadTargetedLineage.mockReset().mockResolvedValue(snapshot);
+  mocks.targetIdentity.mockReset().mockResolvedValue(31n);
   mocks.transfer.mockImplementation(async ({ destinations }) =>
     preparedValueOutputs(
       destinations.map((destination: { amount: bigint }) => BigInt(destination.amount)),
@@ -274,7 +284,7 @@ async function withBothOwners() {
 function value(commitment: bigint, amount: bigint, ownerCommitment: bigint) {
   return { commitment, note: { kind: "value" as const, amount, ownerCommitment } };
 }
-async function timeBoundPreview(action: "fund" | "claim") {
+async function timeBoundPreview(action: "fund" | "claim", stateReadMode?: "rebuild" | "chain") {
   const session = await unlocked();
   const prepared = action === "fund" ? preparedPublicFundOutputs([10n, 0n]) : preparedValueOutputs([10n, 0n], 0n, 2);
   prepared.data.asOf = 1000n;
@@ -307,7 +317,7 @@ async function timeBoundPreview(action: "fund" | "claim") {
     }; });
   }
   const request = {
-    context,
+    context: { ...context, stateReadMode },
     slot: "identity" as const,
     action,
     amount: "10",
@@ -322,6 +332,37 @@ async function timeBoundPreview(action: "fund" | "claim") {
   return { session, prepared, request, preview: await session.call("preview", request) };
 }
 describe("asset Worker preview and proof boundary", () => {
+  describe.each(["fund", "claim"] as const)("%s state reading", (action) => {
+    it.each([undefined, "rebuild", "chain"] as const)(
+      "uses only the selected lineage mode %s for recovery and preparation",
+      async (stateReadMode) => {
+        if (stateReadMode !== "chain") {
+          mocks.targetIdentity.mockRejectedValue(new Error("Target identity must stay local"));
+        }
+        await timeBoundPreview(action, stateReadMode);
+        const selected = stateReadMode === "chain" ? mocks.loadTargetedLineage : mocks.loadLineage;
+        const other = stateReadMode === "chain" ? mocks.loadLineage : mocks.loadTargetedLineage;
+        expect(selected).toHaveBeenCalledTimes(2);
+        expect(other).not.toHaveBeenCalled();
+        if (stateReadMode !== "chain") expect(mocks.targetIdentity).not.toHaveBeenCalled();
+      },
+    );
+  });
+
+  it("rejects a preview from a different read mode before any proof RPC", async () => {
+    const { session, preview } = await timeBoundPreview("fund", "chain");
+    mocks.scan.mockClear();
+    mocks.getBlock.mockClear();
+    await expect(session.call("prove", {
+      context: { ...context, stateReadMode: "rebuild" },
+      handle: preview.handle,
+    })).rejects.toThrow("preview expired");
+    expect(mocks.scan).not.toHaveBeenCalled();
+    expect(mocks.getBlock).not.toHaveBeenCalled();
+    expect(mocks.proof).not.toHaveBeenCalled();
+    expect(mocks.authorizationMode).not.toHaveBeenCalled();
+  });
+
   describe.each(["privateTransfer", "unshield"] as const)("exact balance selection for %s", (action) => {
     it.each([true, false])("uses only permitted inputs when the exact pair is allowed: %s", async (allowPair) => {
       const session = await unlocked();

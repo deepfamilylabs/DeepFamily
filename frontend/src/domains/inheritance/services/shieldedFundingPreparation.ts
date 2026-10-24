@@ -241,7 +241,7 @@ function assertSnapshotBlock(
   }
 }
 
-async function currentContext(input: CommonFundingInput) {
+async function currentContext(input: PrepareShieldedFundInput) {
   const provider = input.pool.runner?.provider;
   if (!provider) throw new Error("Shielded pool has no provider");
   const [network, poolAddress, latestBlock, walletBlock] = await Promise.all([
@@ -280,9 +280,25 @@ async function currentContext(input: CommonFundingInput) {
       getAddress(await input.lineageIndex.getAddress())
     )
       throw new Error("Lineage index does not belong to this shielded pool");
-    const identityCommitment = getBigInt(
-      await input.lineageIndex.identityCommitmentOf(input.publicRecipientPersonHash),
-    );
+    // The verified public replay already contains the identity opening. A
+    // person-specific RPC here would reveal the selected child in rebuild mode.
+    // Refills use the original note, which templatePath authenticates below.
+    let identityCommitment: bigint;
+    if (input.fundMode === 0) {
+      const versions = input.lineage.versions.get(input.publicRecipientPersonHash.toLowerCase());
+      if (!versions?.length) throw new Error("Recipient identity is unknown");
+      identityCommitment = getBigInt(versions[0].identityCommitment);
+      if (
+        versions.some(
+          (version) =>
+            version.personHash.toLowerCase() !== input.publicRecipientPersonHash!.toLowerCase() ||
+            getBigInt(version.identityCommitment) !== identityCommitment,
+        )
+      )
+        throw new Error("Recipient identity does not match the lineage snapshot");
+    } else {
+      identityCommitment = getBigInt(input.budget.note.heirIdentityCommitment);
+    }
     if (identityCommitment === 0n) throw new Error("Recipient identity is unknown");
     heir = {
       personHash: input.publicRecipientPersonHash,
@@ -292,9 +308,20 @@ async function currentContext(input: CommonFundingInput) {
     };
   } else {
     const recipient = input.recipient;
-    if (!recipient || recipient.disclosure !== "fund" || !recipient.identityCommitment || !recipient.personHash || recipient.ownerCommitment === 0n)
+    if (
+      !recipient ||
+      recipient.disclosure !== "fund" ||
+      !recipient.identityCommitment ||
+      !recipient.personHash ||
+      recipient.ownerCommitment === 0n
+    )
       throw new Error("Private funding requires current Fund identity disclosure material");
-    heir = { ...recipient, identityCommitment: recipient.identityCommitment, personHash: recipient.personHash, keyMode: normalizeShieldedKeyMode(recipient.keyMode) };
+    heir = {
+      ...recipient,
+      identityCommitment: recipient.identityCommitment,
+      personHash: recipient.personHash,
+      keyMode: normalizeShieldedKeyMode(recipient.keyMode),
+    };
   }
   if (
     wrapIdentityCommitmentAsPersonHash(heir.identityCommitment).toLowerCase() !==
@@ -742,7 +769,8 @@ async function prepareInitialFunding(input: InitialFundingInput): Promise<Prepar
   const witness: ShieldedWitness = {
     ...publicInputs(SHIELDED_POOL_ACTION.Fund, ctx.chainId, ctx.poolAddress, data),
     receiveBindings: ["0", "0"],
-    receiveAuthorizationAlias: "0", receiveSalt: "0",
+    receiveAuthorizationAlias: "0",
+    receiveSalt: "0",
     ...ZERO_TEMPLATE_WITNESS,
     donorOwnerSecret: String(ctx.keys.ownerSecret),
     donorAmount: String(donor.note.amount),
@@ -935,7 +963,8 @@ async function prepareContinuationFunding(
   const witness: ShieldedWitness = {
     ...publicInputs(SHIELDED_POOL_ACTION.Fund, ctx.chainId, ctx.poolAddress, data),
     receiveBindings: ["0", "0"],
-    receiveAuthorizationAlias: "0", receiveSalt: "0",
+    receiveAuthorizationAlias: "0",
+    receiveSalt: "0",
     ...ZERO_LINEAGE_WITNESS,
     donorOwnerSecret: String(ctx.keys.ownerSecret),
     donorAmount: String(donor.note.amount),

@@ -31,6 +31,7 @@ contract DeepFamilyLineageIndex is ERC165, IDeepFamilyLineageIndex {
   error TreeCapacityExceeded();
   error InvalidLeafIndex();
   error EndorsementTimeOverflow();
+  error InvalidSnapshotPage();
 
   uint8 public constant ENDORSEMENT_TREE = 0;
   uint8 public constant TRUSTED_TREE = 1;
@@ -38,6 +39,7 @@ contract DeepFamilyLineageIndex is ERC165, IDeepFamilyLineageIndex {
   uint256 public constant ROOT_HISTORY_WINDOW = 1 hours;
   /// @notice Qualification changes take effect for all proofs within this retirement window.
   uint256 public constant override CHECKPOINT_RETIREMENT_WINDOW = 15 minutes;
+  uint256 public constant MAX_SNAPSHOT_PAGE_SIZE = 256;
 
   uint256 internal constant DOMAIN_ENDORSEMENT_LEAF = 1007;
   uint256 internal constant DOMAIN_TRUSTED_LEAF = 1008;
@@ -77,6 +79,23 @@ contract DeepFamilyLineageIndex is ERC165, IDeepFamilyLineageIndex {
     private _trustedSlots;
   uint256 public override currentCheckpointId;
   mapping(uint256 checkpointId => Checkpoint checkpoint) private _checkpoints;
+
+  struct VersionRef {
+    bytes32 personHash;
+    uint256 versionIndex;
+  }
+  struct EndorsementKey {
+    bytes32 personHash;
+    address endorser;
+  }
+  struct TrustedKey {
+    bytes32 personHash;
+    uint256 versionIndex;
+    address account;
+  }
+  VersionRef[] private _versionRefs;
+  mapping(uint256 leafIndex => EndorsementKey key) private _endorsementKeys;
+  mapping(uint256 leafIndex => TrustedKey key) private _trustedKeys;
 
   modifier onlyDeepFamily() {
     if (msg.sender != DEEP_FAMILY) revert UnauthorizedCaller();
@@ -121,6 +140,7 @@ contract DeepFamilyLineageIndex is ERC165, IDeepFamilyLineageIndex {
       fatherIdentityCommitment,
       motherIdentityCommitment
     );
+    _versionRefs.push(VersionRef(personHash, versionIndex));
     _parentsDigests[personHash][versionIndex] = PoseidonT4.hash(
       [DOMAIN_PARENTS, fatherIdentityCommitment, motherIdentityCommitment]
     );
@@ -149,7 +169,9 @@ contract DeepFamilyLineageIndex is ERC165, IDeepFamilyLineageIndex {
     if (slot != 0) {
       _write(TRUSTED_TREE, slot - 1, leaf);
     } else if (trusted) {
-      _trustedSlots[personHash][versionIndex][account] = _append(TRUSTED_TREE, leaf) + 1;
+      uint256 leafIndex = _append(TRUSTED_TREE, leaf);
+      _trustedSlots[personHash][versionIndex][account] = leafIndex + 1;
+      _trustedKeys[leafIndex] = TrustedKey(personHash, versionIndex, account);
     }
   }
 
@@ -174,7 +196,9 @@ contract DeepFamilyLineageIndex is ERC165, IDeepFamilyLineageIndex {
     if (slot != 0) {
       _write(ENDORSEMENT_TREE, slot - 1, leaf);
     } else {
-      _endorsementSlots[personHash][endorser] = _append(ENDORSEMENT_TREE, leaf) + 1;
+      uint256 leafIndex = _append(ENDORSEMENT_TREE, leaf);
+      _endorsementSlots[personHash][endorser] = leafIndex + 1;
+      _endorsementKeys[leafIndex] = EndorsementKey(personHash, endorser);
     }
   }
 
@@ -200,6 +224,80 @@ contract DeepFamilyLineageIndex is ERC165, IDeepFamilyLineageIndex {
 
   function depth(uint8 treeId) external view override returns (uint256) {
     return _tree(treeId).depth;
+  }
+
+  function getLeafPage(
+    uint8 treeId,
+    uint256 start,
+    uint256 limit
+  ) external view override returns (uint256[] memory page) {
+    Tree storage tree = _tree(treeId);
+    uint256 length = _pageLength(tree.size, start, limit);
+    page = new uint256[](length);
+    for (uint256 offset; offset < length; ++offset) page[offset] = tree.nodes[0][start + offset];
+  }
+
+  function versionMetadataCount() external view override returns (uint256) {
+    return _versionRefs.length;
+  }
+
+  function getVersionPage(
+    uint256 start,
+    uint256 limit
+  ) external view override returns (VersionSnapshot[] memory page) {
+    uint256 length = _pageLength(_versionRefs.length, start, limit);
+    page = new VersionSnapshot[](length);
+    for (uint256 offset; offset < length; ++offset) {
+      VersionRef storage ref = _versionRefs[start + offset];
+      VersionParents storage parents = _versionParents[ref.personHash][ref.versionIndex];
+      page[offset] = VersionSnapshot(
+        ref.personHash,
+        ref.versionIndex,
+        _identityCommitments[ref.personHash],
+        parents.fatherIdentityCommitment,
+        parents.motherIdentityCommitment
+      );
+    }
+  }
+
+  function getEndorsementPage(
+    uint256 start,
+    uint256 limit
+  ) external view override returns (EndorsementSnapshot[] memory page) {
+    Tree storage tree = _trees[ENDORSEMENT_TREE];
+    uint256 length = _pageLength(tree.size, start, limit);
+    page = new EndorsementSnapshot[](length);
+    for (uint256 offset; offset < length; ++offset) {
+      uint256 leafIndex = start + offset;
+      EndorsementKey storage key = _endorsementKeys[leafIndex];
+      EndorsementMetadata storage metadata = _endorsementMetadata[key.personHash][key.endorser];
+      page[offset] = EndorsementSnapshot(
+        key.personHash,
+        key.endorser,
+        metadata.versionIndex,
+        metadata.writtenAt,
+        tree.nodes[0][leafIndex] != 0
+      );
+    }
+  }
+
+  function getTrustedPage(
+    uint256 start,
+    uint256 limit
+  ) external view override returns (TrustedSnapshot[] memory page) {
+    Tree storage tree = _trees[TRUSTED_TREE];
+    uint256 length = _pageLength(tree.size, start, limit);
+    page = new TrustedSnapshot[](length);
+    for (uint256 offset; offset < length; ++offset) {
+      uint256 leafIndex = start + offset;
+      TrustedKey storage key = _trustedKeys[leafIndex];
+      page[offset] = TrustedSnapshot(
+        key.personHash,
+        key.versionIndex,
+        key.account,
+        tree.nodes[0][leafIndex] != 0
+      );
+    }
   }
 
   function isKnownRoot(uint8 treeId, uint256 candidate) external view override returns (bool) {
@@ -351,6 +449,16 @@ contract DeepFamilyLineageIndex is ERC165, IDeepFamilyLineageIndex {
   }
 
   // ========== Tree internals ==========
+
+  function _pageLength(
+    uint256 count,
+    uint256 start,
+    uint256 limit
+  ) private pure returns (uint256 length) {
+    if (start > count || limit == 0 || limit > MAX_SNAPSHOT_PAGE_SIZE) revert InvalidSnapshotPage();
+    length = count - start;
+    if (length > limit) length = limit;
+  }
 
   function _tree(uint8 treeId) private view returns (Tree storage) {
     if (treeId > TRUSTED_TREE) revert InvalidTreeId();

@@ -90,11 +90,9 @@ function writeNode(node, key, value, depth = 0) {
 
 class IdentityAuthorizationTree {
   #node;
-  #records;
 
   constructor(entries) {
-    this.#records = checkedRecords(entries);
-    this.#node = buildNode([...this.#records]);
+    this.#node = buildNode([...checkedRecords(entries)]);
   }
 
   get root() {
@@ -102,7 +100,11 @@ class IdentityAuthorizationTree {
   }
 
   getCounter(authorizationAlias) {
-    return this.#records.get(nonzeroAlias(authorizationAlias)) ?? 0n;
+    const alias = nonzeroAlias(authorizationAlias);
+    let node = this.#node;
+    let depth = 0n;
+    while (node.kind === "branch") node = (alias >> depth++) & 1n ? node.right : node.left;
+    return node.kind === "leaf" && node.key === alias ? node.value : 0n;
   }
 
   getWitness(authorizationAlias) {
@@ -114,25 +116,146 @@ class IdentityAuthorizationTree {
     const oldValue = bigintFrom(oldCounter, "oldCounter", MAX_UINT64);
     const newValue = bigintFrom(newCounter, "newCounter", MAX_UINT64);
     protocolAssert(
-      (this.#records.get(alias) ?? 0n) === oldValue && newValue === oldValue + 1n,
+      this.getCounter(alias) === oldValue && newValue === oldValue + 1n,
       "INVALID_SHIELDED_AUTHORIZATION_INCREMENT",
       "Authorization counter must match the current value and increment by one",
     );
     const next = writeNode(this.#node, alias, newValue);
-    this.#records.set(alias, newValue);
     this.#node = next;
   }
 
   clone() {
     const copy = new IdentityAuthorizationTree([]);
     copy.#node = this.#node;
-    copy.#records = new Map(this.#records);
     return copy;
   }
 
   snapshot() {
-    return { root: this.root, entries: new Map(this.#records) };
+    const entries = new Map();
+    const visit = (node) => {
+      if (node.kind === "leaf") entries.set(node.key, node.value);
+      else if (node.kind === "branch") {
+        visit(node.left);
+        visit(node.right);
+      }
+    };
+    visit(this.#node);
+    return { root: this.root, entries };
   }
+
+  /** Capture this root now; a previous immutable clone prunes unchanged subtrees. */
+  exportNodes(previous) {
+    protocolAssert(
+      previous === undefined || previous instanceof IdentityAuthorizationTree,
+      "INVALID_SHIELDED_AUTHORIZATION_NODE",
+      "Previous authorization tree must be a tree instance",
+    );
+    return exportAuthorizationNodes(this.#node, previous?.#node);
+  }
+
+  static fromNodes(root, records) {
+    const tree = new IdentityAuthorizationTree([]);
+    tree.#node = importAuthorizationNodes(root, records);
+    return tree;
+  }
+}
+
+function* exportAuthorizationNodes(node, previous, depth = 0) {
+  if (node === previous) return;
+  if (node.kind === "empty") {
+    if (depth === 0) yield Object.freeze({ kind: "empty", hash: 0n });
+    return;
+  }
+  if (node.kind === "leaf") {
+    yield Object.freeze({ kind: "leaf", hash: node.hash, key: node.key, value: node.value });
+    return;
+  }
+  yield Object.freeze({
+    kind: "branch", hash: node.hash, leftHash: node.left.hash, rightHash: node.right.hash,
+  });
+  const oldRight = previous?.kind === "leaf" && ((previous.key >> BigInt(depth)) & 1n);
+  yield* exportAuthorizationNodes(
+    node.left,
+    previous?.kind === "branch" ? previous.left : previous?.kind === "leaf" && !oldRight ? previous : undefined,
+    depth + 1,
+  );
+  yield* exportAuthorizationNodes(
+    node.right,
+    previous?.kind === "branch" ? previous.right : oldRight ? previous : undefined,
+    depth + 1,
+  );
+}
+
+/** Validate one content-addressed record; path placement is checked by the full importer/witness. */
+export function verifyShieldedIdentityAuthorizationNode(input, expectedHash) {
+  const valid = (condition, message) =>
+    protocolAssert(condition, "INVALID_SHIELDED_AUTHORIZATION_NODE", message);
+  valid(input && typeof input === "object", "Authorization node is required");
+  const hash = field(input.hash, "node.hash");
+  if (expectedHash !== undefined)
+    valid(hash === field(expectedHash, "expectedHash"), "Authorization node hash does not match");
+  if (input.kind === "empty") {
+    valid(hash === 0n, "Empty authorization node must have hash zero");
+    return Object.freeze({ kind: "empty", hash });
+  }
+  valid(hash !== 0n, "Nonempty authorization node cannot have hash zero");
+  if (input.kind === "leaf") {
+    const key = nonzeroAlias(input.key);
+    const value = bigintFrom(input.value, "node.value", MAX_UINT64);
+    valid(value !== 0n && poseidon3([key, value, 1n]) === hash, "Invalid authorization leaf hash");
+    return Object.freeze({ kind: "leaf", hash, key, value });
+  }
+  valid(input.kind === "branch", "Unknown authorization node kind");
+  const leftHash = field(input.leftHash, "node.leftHash");
+  const rightHash = field(input.rightHash, "node.rightHash");
+  valid(
+    (leftHash !== 0n || rightHash !== 0n) && poseidon2([leftHash, rightHash]) === hash,
+    "Invalid authorization branch hash",
+  );
+  return Object.freeze({ kind: "branch", hash, leftHash, rightHash });
+}
+
+function importAuthorizationNodes(expectedRoot, inputs) {
+  const root = field(expectedRoot, "root");
+  const records = new Map();
+  for (const input of inputs) {
+    const record = verifyShieldedIdentityAuthorizationNode(input);
+    protocolAssert(!records.has(record.hash), "INVALID_SHIELDED_AUTHORIZATION_NODE", "Duplicate authorization node");
+    records.set(record.hash, record);
+  }
+  const visited = new Set();
+  const read = (hash, depth, prefix) => {
+    if (hash === 0n) return EMPTY_NODE;
+    const record = records.get(hash);
+    protocolAssert(record && !visited.has(hash), "INVALID_SHIELDED_AUTHORIZATION_NODE", "Missing or repeated authorization node");
+    visited.add(hash);
+    if (record.kind === "leaf") {
+      protocolAssert(
+        (record.key & ((1n << BigInt(depth)) - 1n)) === prefix,
+        "INVALID_SHIELDED_AUTHORIZATION_NODE", "Authorization leaf is on the wrong path",
+      );
+      return leafNode(record.key, record.value);
+    }
+    assertSupportedDepth(depth);
+    const left = read(record.leftHash, depth + 1, prefix);
+    const right = read(record.rightHash, depth + 1, prefix | (1n << BigInt(depth)));
+    protocolAssert(
+      !((left.kind === "empty" && right.kind === "leaf") || (right.kind === "empty" && left.kind === "leaf")),
+      "INVALID_SHIELDED_AUTHORIZATION_NODE", "Authorization leaf must be compressed",
+    );
+    return branchNode(left, right);
+  };
+  const node = read(root, 0, 0n);
+  protocolAssert(
+    [...records.keys()].every((hash) => hash === 0n || visited.has(hash)),
+    "INVALID_SHIELDED_AUTHORIZATION_NODE", "Unreachable authorization node",
+  );
+  return node;
+}
+
+/** Import a complete untrusted node stream against a separately authenticated root. */
+export function createShieldedIdentityAuthorizationTreeFromNodes(root, nodes) {
+  return IdentityAuthorizationTree.fromNodes(root, nodes);
 }
 
 /** Public counter mirror with immutable nodes and path-only counter updates. */

@@ -7,6 +7,7 @@ import {
   subscribeShieldedAssetWorkerLock,
   terminateShieldedAssetWorker,
 } from "./shieldedAssetWorkerClient";
+import { subscribePublicStateSyncProgress } from "./publicStateSyncProgress";
 class FakeWorker {
   static instances: FakeWorker[] = [];
   requests: any[] = [];
@@ -50,12 +51,15 @@ function respond(worker: FakeWorker, result: unknown) {
   worker.emit("message", { id: worker.clones[worker.clones.length - 1].id, ok: true, result });
 }
 describe("asset Worker secret lifetime", () => {
+  let unsubscribeProgress: (() => void) | undefined;
   beforeEach(() => {
     terminateShieldedAssetWorker();
     FakeWorker.instances = [];
     vi.stubGlobal("Worker", FakeWorker);
   });
   afterEach(() => {
+    unsubscribeProgress?.();
+    unsubscribeProgress = undefined;
     terminateShieldedAssetWorker();
     vi.useRealTimers();
     vi.unstubAllGlobals();
@@ -78,6 +82,150 @@ describe("asset Worker secret lifetime", () => {
     expect(worker.terminate).not.toHaveBeenCalled();
     terminateShieldedAssetWorker();
     expect(worker.terminate).toHaveBeenCalledOnce();
+  });
+  it("publishes sync progress without completing the secret request or changing its realm", async () => {
+    const listener = vi.fn();
+    unsubscribeProgress = subscribePublicStateSyncProgress(listener);
+    const promise = shieldedAssetWorkerCall("unlockIdentity", { identity, rawPassphrase: "private-progress-secret" });
+    let settled = false;
+    void promise.then(() => { settled = true; });
+    const worker = FakeWorker.instances[0];
+    const progress = { domain: "authorization", phase: "download", completed: 1, total: 3, resumed: true };
+    const before = getShieldedAssetWorkerGeneration();
+    worker.emit("message", {
+      type: "publicStateSyncProgress", progress,
+      id: worker.clones[0].id, ok: true, result: { ignored: "not-a-secret-response" },
+    });
+    await Promise.resolve();
+
+    expect(listener).toHaveBeenCalledExactlyOnceWith(progress);
+    expect(settled).toBe(false);
+    expect(worker.terminate).not.toHaveBeenCalled();
+    expect(getShieldedAssetWorkerGeneration()).toBe(before);
+    expect(worker.requests).toHaveLength(1);
+    expect(worker.requests[0].params).toBeUndefined();
+    respond(worker, { identity: null, independentKey: null });
+    await expect(promise).resolves.toEqual({ identity: null, independentKey: null });
+    expect(worker.terminate).not.toHaveBeenCalled();
+  });
+  it("ignores malformed progress envelopes without consuming a matching pending request", async () => {
+    const listener = vi.fn();
+    unsubscribeProgress = subscribePublicStateSyncProgress(listener);
+    const promise = shieldedAssetWorkerCall("cancelPreview", {});
+    const worker = FakeWorker.instances[0];
+    let settled = false;
+    void promise.then(() => { settled = true; });
+    const valid = { domain: "lineage", phase: "verify", completed: 1, total: 2 };
+    for (const progress of [
+      undefined, null, {}, { ...valid, domain: "identity" }, { ...valid, phase: "proving" },
+      { ...valid, completed: -1 }, { ...valid, total: 0 }, { ...valid, completed: 0.5 },
+      { ...valid, total: Infinity }, { ...valid, total: "2" }, { ...valid, resumed: "yes" },
+    ]) worker.emit("message", { type: "publicStateSyncProgress", progress, id: worker.clones[0].id, ok: true, result: "malformed" });
+    await Promise.resolve();
+    expect(listener).not.toHaveBeenCalled();
+    expect(settled).toBe(false);
+    respond(worker, { done: true });
+    await expect(promise).resolves.toEqual({ done: true });
+  });
+  it("does not clear or extend a secret request timeout when progress arrives", async () => {
+    vi.useFakeTimers();
+    const promise = shieldedAssetWorkerCall("unlockIdentity", { identity, rawPassphrase: "timed-secret" }, { timeoutMs: 100 });
+    const rejected = expect(promise).rejects.toThrow("locked");
+    const worker = FakeWorker.instances[0];
+    vi.advanceTimersByTime(90);
+    worker.emit("message", { type: "publicStateSyncProgress", progress: { domain: "authorization", phase: "verify", completed: 7, total: 10 } });
+    expect(worker.terminate).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(10);
+    await rejected;
+    expect(worker.terminate).toHaveBeenCalledOnce();
+    expect(worker.requests[0].params).toBeUndefined();
+  });
+  it("renews default liveness deadlines for active and queued calls only while synchronization advances", async () => {
+    vi.useFakeTimers();
+    const active = shieldedAssetWorkerCall("recover", { context });
+    const queued = shieldedAssetWorkerCall("cancelPreview", {});
+    const rejected = Promise.all([expect(active).rejects.toThrow("locked"), expect(queued).rejects.toThrow("locked")]);
+    const worker = FakeWorker.instances[0];
+    for (const completed of [1, 2]) {
+      vi.advanceTimersByTime(239_000);
+      worker.emit("message", { type: "publicStateSyncProgress", progress: { domain: "authorization", phase: "download", completed, total: 4 } });
+      expect(worker.terminate).not.toHaveBeenCalled();
+    }
+    vi.advanceTimersByTime(239_999);
+    expect(worker.terminate).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(1);
+    await rejected;
+    expect(worker.terminate).toHaveBeenCalledOnce();
+  });
+  it("cannot keep a stalled default request alive with repeated or regressing progress", async () => {
+    vi.useFakeTimers();
+    const active = shieldedAssetWorkerCall("recover", { context });
+    const rejected = expect(active).rejects.toThrow("locked");
+    const worker = FakeWorker.instances[0];
+    vi.advanceTimersByTime(200_000);
+    const progress = { domain: "lineage", phase: "verify", completed: 2, total: 4 };
+    worker.emit("message", { type: "publicStateSyncProgress", progress });
+    vi.advanceTimersByTime(200_000);
+    for (const change of [{}, { completed: 1 }, { total: 5 }, { resumed: true }])
+      worker.emit("message", { type: "publicStateSyncProgress", progress: { ...progress, ...change } });
+    vi.advanceTimersByTime(39_999);
+    expect(worker.terminate).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(1);
+    await rejected;
+    expect(worker.terminate).toHaveBeenCalledOnce();
+  });
+  it("renews for a phase's first empty completion once, then times out if completion only repeats", async () => {
+    vi.useFakeTimers();
+    const active = shieldedAssetWorkerCall("recover", { context });
+    const rejected = expect(active).rejects.toThrow("locked");
+    const worker = FakeWorker.instances[0];
+    vi.advanceTimersByTime(200_000);
+    const progress = { domain: "authorization", phase: "catchup", completed: 0, total: 0 };
+    worker.emit("message", { type: "publicStateSyncProgress", progress });
+    vi.advanceTimersByTime(200_000);
+    worker.emit("message", { type: "publicStateSyncProgress", progress });
+    vi.advanceTimersByTime(39_999);
+    expect(worker.terminate).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(1);
+    await rejected;
+    expect(worker.terminate).toHaveBeenCalledOnce();
+  });
+  it("tracks fresh progress for the next queued operation after a response resets its counters", async () => {
+    vi.useFakeTimers();
+    const first = shieldedAssetWorkerCall("recover", { context });
+    const queued = shieldedAssetWorkerCall("recover", { context });
+    const rejected = expect(queued).rejects.toThrow("locked");
+    const worker = FakeWorker.instances[0];
+    worker.emit("message", { type: "publicStateSyncProgress", progress: { domain: "lineage", phase: "verify", completed: 100, total: 200 } });
+    worker.emit("message", { id: worker.clones[0].id, ok: true, result: {} });
+    await first;
+    vi.advanceTimersByTime(200_000);
+    worker.emit("message", { type: "publicStateSyncProgress", progress: { domain: "lineage", phase: "verify", completed: 1, total: 20 } });
+    vi.advanceTimersByTime(239_999);
+    expect(worker.terminate).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(1);
+    await rejected;
+    expect(worker.terminate).toHaveBeenCalledOnce();
+  });
+  it("rejects progress from a terminated realm before and after a replacement starts", async () => {
+    const listener = vi.fn();
+    unsubscribeProgress = subscribePublicStateSyncProgress(listener);
+    const promise = shieldedAssetWorkerCall("unlockIdentity", { identity, rawPassphrase: "old-secret" });
+    const old = FakeWorker.instances[0];
+    const rejected = expect(promise).rejects.toThrow("locked");
+    terminateShieldedAssetWorker();
+    await rejected;
+    const progress = { domain: "lineage", phase: "catchup", completed: 1, total: 2 };
+    old.emit("message", { type: "publicStateSyncProgress", progress });
+    expect(listener).not.toHaveBeenCalled();
+    const replacement = shieldedAssetWorkerCall("cancelPreview", {});
+    const next = FakeWorker.instances[1];
+    old.emit("message", { type: "publicStateSyncProgress", progress, id: next.clones[0].id });
+    expect(listener).not.toHaveBeenCalled();
+    next.emit("message", { type: "publicStateSyncProgress", progress });
+    expect(listener).toHaveBeenCalledExactlyOnceWith(progress);
+    respond(next, { done: true });
+    await expect(replacement).resolves.toEqual({ done: true });
   });
   it("lock rejects pending jobs and ignores late responses from the old realm", async () => {
     const promise = shieldedAssetWorkerCall("unlockIdentity", {

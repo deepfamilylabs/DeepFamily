@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { getAddress, type Signer } from "ethers";
 import type { ShieldedPageModules } from "../model/shieldedPageTypes";
 import { ShieldedInheritancePanel, type ShieldedPanelNavigation } from "./ShieldedInheritancePanel";
+import type { PublicStateSyncProgress } from "../../../shared/workers/publicStateSyncProgress";
 
 const mocks = vi.hoisted(() => ({
   call: vi.fn(),
@@ -32,6 +33,12 @@ const mocks = vi.hoisted(() => ({
   locked: null as (() => void) | null,
   revision: 0,
   listeners: new Set<() => void>(),
+  stateReadMode: "rebuild" as "rebuild" | "chain",
+  configRevision: 0,
+  configListeners: new Set<() => void>(),
+  configUpdate: vi.fn(),
+  createRecipientCode: vi.fn(),
+  syncListeners: new Set<(event: PublicStateSyncProgress) => void>(),
 }));
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({
@@ -45,13 +52,24 @@ vi.mock("react-i18next", () => ({
             ? `${key}:${JSON.stringify(options)}` : key,
   }),
 }));
-vi.mock("../../config", () => ({
-  useConfig: () => ({
-    rpcUrl: "https://rpc.example",
-    chainId: 31337,
-    tokenAddress: "0x0000000000000000000000000000000000000003",
-  }),
-}));
+vi.mock("../../config", async () => {
+  const React = await import("react");
+  return {
+    useConfig: () => {
+      React.useSyncExternalStore((listener) => {
+        mocks.configListeners.add(listener);
+        return () => { mocks.configListeners.delete(listener); };
+      }, () => mocks.configRevision);
+      return {
+        rpcUrl: "https://rpc.example",
+        chainId: 31337,
+        tokenAddress: "0x0000000000000000000000000000000000000003",
+        stateReadMode: mocks.stateReadMode,
+        update: mocks.configUpdate,
+      };
+    },
+  };
+});
 vi.mock("../../tree/context", () => ({ useTreeGraphData: () => ({ nodesData: {} }) }));
 vi.mock("../../transactions", () => ({ useTransactionCenter: () => mocks.center }));
 vi.mock("../../wallet", () => ({
@@ -76,6 +94,12 @@ vi.mock("../../../shared/workers/shieldedAssetWorkerClient", () => ({
     return () => {
       mocks.locked = null;
     };
+  },
+}));
+vi.mock("../../../shared/workers/publicStateSyncProgress", () => ({
+  subscribePublicStateSyncProgress: (listener: (event: PublicStateSyncProgress) => void) => {
+    mocks.syncListeners.add(listener);
+    return () => { mocks.syncListeners.delete(listener); };
   },
 }));
 vi.mock("./ShieldedIdentitySessionContext", async () => {
@@ -116,7 +140,7 @@ vi.mock("./ShieldedIdentitySessionContext", async () => {
 });
 vi.mock("../services/shieldedReceiveCode", () => ({
   verifyShieldedReceiveCode: mocks.verify,
-  createShieldedReceiveCodeForRecipient: vi.fn(),
+  createShieldedReceiveCodeForRecipient: mocks.createRecipientCode,
   peekShieldedReceiveCodePersonHash: (code: string) => code ? "0x" + "01".repeat(32) : null,
 }));
 vi.mock("../services/shieldedPoolFlows", () => ({
@@ -147,6 +171,7 @@ vi.mock("../../person", async () => {
           birthDay: 1,
           isBirthBC: false,
         }),
+        getPublicFormData: () => ({ fullName: "Child", gender: 1, birthYear: 2000, birthMonth: 1, birthDay: 1, isBirthBC: false }),
         getSecretInputs: () => ({ passphrase: input.current?.value ?? "" }),
         clearSecretInputs: () => {
           if (input.current) input.current.value = "";
@@ -514,6 +539,14 @@ function restorePendingSubmission(kind: "action" | "approval" = "action", hash: 
 describe("Worker-backed shielded wallet", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.stateReadMode = "rebuild";
+    mocks.configRevision = 0;
+    mocks.configUpdate.mockImplementation(({ stateReadMode }) => {
+      mocks.stateReadMode = stateReadMode;
+      mocks.configRevision++;
+      for (const listener of mocks.configListeners) listener();
+    });
+    mocks.createRecipientCode.mockResolvedValue("recipient-code");
     mocks.identity = null;
     mocks.credentials = null;
     mocks.lettersAddress = "";
@@ -563,6 +596,81 @@ describe("Worker-backed shielded wallet", () => {
     expect(screen.queryByLabelText(label("action"))).toBeNull();
     expect(screen.queryByRole("navigation", { name: "shielded.actionsTitle" })).toBeNull();
     expect(mocks.call).not.toHaveBeenCalled();
+    expect((screen.getByRole("radio", { name: "shielded.stateReadMode.rebuild" }) as HTMLInputElement).checked).toBe(true);
+    expect((screen.getByRole("radio", { name: "shielded.stateReadMode.chain" }) as HTMLInputElement).checked).toBe(false);
+  });
+  it("requires an explicit chain choice before unlock and forwards it to recovery", async () => {
+    await renderPanel();
+    fireEvent.click(screen.getByRole("radio", { name: "shielded.stateReadMode.chain" }));
+    expect(mocks.configUpdate).toHaveBeenCalledWith({ stateReadMode: "chain" });
+    expect(mocks.call).not.toHaveBeenCalled();
+    fireEvent.change(screen.getByLabelText("identity passphrase"), { target: { value: "secret" } });
+    fireEvent.click(screen.getByRole("button", { name: "shielded.unlock" }));
+    await waitFor(() => expect(mocks.call).toHaveBeenCalledWith("recover", {
+      context: expect.objectContaining({ stateReadMode: "chain" }),
+    }));
+  });
+  it("locks the unlocked session and invalidates recovery data when the read mode changes", async () => {
+    await renderUnlockedPanel();
+    expect(mocks.call).toHaveBeenCalledWith("recover", { context: expect.objectContaining({ stateReadMode: "rebuild" }) });
+    fireEvent.click(screen.getByRole("radio", { name: "shielded.stateReadMode.chain" }));
+    expect(mocks.lock).toHaveBeenCalled();
+    expect(mocks.identity).toBeNull();
+    expect(mocks.credentials).toBeNull();
+    expect(screen.queryByRole("navigation", { name: "shielded.actionsTitle" })).toBeNull();
+    expect(screen.getByRole("button", { name: "shielded.unlock" })).toBeTruthy();
+    expect((screen.getByRole("radio", { name: "shielded.stateReadMode.chain" }) as HTMLInputElement).checked).toBe(true);
+    expect(mocks.call.mock.calls.filter(([method]) => method === "recover")).toHaveLength(1);
+  });
+  it("forwards the selected read mode to the recipient code generator", async () => {
+    mocks.stateReadMode = "chain";
+    mocks.verify.mockResolvedValue({ personHash: identity.personHash, keyMode: 0, fingerprint: "recipient-fingerprint" });
+    await renderUnlockedPanel();
+    chooseAction("fund");
+    chooseFundingEntry("privateConvenient");
+    fireEvent.click(screen.getByRole("radio", { name: "shielded.recipientMethods.credentials" }));
+    fireEvent.change(screen.getByLabelText("identity passphrase"), { target: { value: "recipient-secret" } });
+    fireEvent.click(screen.getByRole("button", { name: "shielded.generateReceiveCode" }));
+    await waitFor(() => expect(mocks.createRecipientCode).toHaveBeenCalledWith(expect.objectContaining({
+      context: expect.objectContaining({ stateReadMode: "chain" }), disclosure: "fund",
+    })));
+  });
+  it("disables changing the read mode while recovering or tracking a submission", async () => {
+    let resolve!: (wallet: typeof emptyWallet) => void;
+    const pending = new Promise<typeof emptyWallet>((finish) => { resolve = finish; });
+    mocks.identity = identity;
+    mocks.call.mockImplementation(async (method) => method === "recover" ? pending : emptyDiscovery);
+    render(<ShieldedInheritancePanel modules={modules} signer={signer} account={address} />);
+    await waitFor(() => expect(mocks.call).toHaveBeenCalledWith("recover", expect.anything()));
+    const chain = screen.getByRole("radio", { name: "shielded.stateReadMode.chain" }) as HTMLInputElement;
+    expect(chain.disabled).toBe(true);
+    fireEvent.click(chain);
+    expect(mocks.configUpdate).not.toHaveBeenCalled();
+    await act(async () => resolve(emptyWallet));
+    await waitUntilIdle();
+    expect(chain.disabled).toBe(false);
+
+    cleanup();
+    restorePendingSubmission();
+    await renderUnlockedPanel();
+    expect((screen.getByRole("radio", { name: "shielded.stateReadMode.chain" }) as HTMLInputElement).disabled).toBe(true);
+  });
+  it("does not offer synchronization pause as a way to cancel an already pending transaction", async () => {
+    restorePendingSubmission();
+    mocks.identity = identity;
+    let finish!: (wallet: typeof emptyWallet) => void;
+    const recovering = new Promise<typeof emptyWallet>((resolve) => { finish = resolve; });
+    mocks.call.mockImplementation(async () => recovering);
+    render(<ShieldedInheritancePanel modules={modules} signer={signer} account={address} />);
+    await waitFor(() => expect(mocks.call).toHaveBeenCalledWith("recover", expect.anything()));
+    act(() => {
+      for (const listener of mocks.syncListeners) listener({ domain: "authorization", phase: "catchup", completed: 1, total: 2 });
+    });
+    const pause = screen.getByRole("button", { name: "shielded.publicStateSync.pause" }) as HTMLButtonElement;
+    expect(pause.disabled).toBe(true);
+    fireEvent.click(pause);
+    expect(mocks.lock).not.toHaveBeenCalled();
+    await act(async () => finish(emptyWallet));
   });
   it.each([
     ["native", "CFX"], ["erc20", "DEEP"], ["erc20", "TEST"],

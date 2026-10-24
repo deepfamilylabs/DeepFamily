@@ -1472,6 +1472,7 @@
       "InvalidTreeId": "Lineage tree identifier is invalid.",
       "TreeCapacityExceeded": "Lineage tree has reached its maximum leaf capacity.",
       "InvalidLeafIndex": "Lineage leaf index is invalid.",
+      "InvalidSnapshotPage": "The public state page range is invalid.",
       "IdentityCommitmentMismatch": "Identity commitment does not match the person hash.",
       "UnknownPerson": "The lineage index has no record of this person.",
       "UnknownVersion": "The lineage index has no record of this version.",
@@ -1596,6 +1597,31 @@
     "wrongNetwork": "Switch your wallet to network {{chainId}}.",
     "identityTitle": "Unlock identity",
     "identityDescription": "Use the parent's identity to fund budgets and the child's identity to claim. Keep your identity details and passphrase safe.",
+    "stateReadMode": {
+      "title": "State reading method",
+      "rebuild": "Rebuild locally (default)",
+      "rebuildDescription": "Download the complete public current authorization and endorsement state and calculate locally. This reduces identity-specific RPC queries, but takes longer and uses more data.",
+      "chain": "Read current paths from the chain",
+      "chainDescription": "Read only the short paths needed for the selected identity. Faster and less data, but the RPC provider can see the anonymous aliases and family objects you query."
+    },
+    "publicStateSync": {
+      "title": "Public state synchronization",
+      "domains": {
+        "authorization": "Receive authorization",
+        "lineage": "Family endorsements"
+      },
+      "phases": {
+        "download": "Downloading public state",
+        "downloaded": "Download complete; local verification still required",
+        "verify": "Verifying locally",
+        "catchup": "Applying newer public updates",
+        "complete": "State verified"
+      },
+      "count": "Processed {{completed}} / {{total}}",
+      "resumed": "Continuing from previously downloaded public pages.",
+      "pause": "Pause sync and lock",
+      "paused": "Synchronization paused. The unlocked session has been cleared."
+    },
     "actionsTitle": "Assets and budgets",
     "actions": {
       "recover": "Refresh",

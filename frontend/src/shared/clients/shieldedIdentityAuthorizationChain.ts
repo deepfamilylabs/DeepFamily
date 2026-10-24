@@ -14,6 +14,12 @@ import {
   type Provider,
 } from "ethers";
 import { getEventScanConfig } from "../config/env";
+import { hasPersistentPublicStateStorage } from "./publicStateStore";
+import { loadPersistedIdentityAuthorizationWitness } from "./persistedIdentityAuthorization";
+import {
+  normalizeShieldedStateReadMode,
+  type ShieldedStateReadMode,
+} from "../config/shieldedStateReadMode";
 
 export const IDENTITY_AUTHORIZATION_ABI = [
   "function creationBlock() view returns (uint256)",
@@ -22,6 +28,8 @@ export const IDENTITY_AUTHORIZATION_ABI = [
   "function getCheckpoint(uint256) view returns (tuple(uint256 root,uint64 createdAt,uint64 retiredAt))",
   "function validateCheckpoint(uint256,uint64) view returns (uint256)",
   "function getCounterProof(uint256 aliasR) view returns (tuple(uint64 authorizationCounter,uint256 stateRoot,uint256 depth,uint256[64] siblings,uint256 oldKey,uint64 oldValue,bool isOld0,bool absent))",
+  "function getStateSnapshotHeader() view returns (tuple(uint256 formatVersion,uint64 rootNodeId,uint64 nodeCount,uint256 root,uint256 checkpointId))",
+  "function getNodePage(uint256 startId,uint256 limit) view returns (tuple(uint256 hash,uint256 key,uint64 counter,uint64 left,uint64 right)[])",
   "function incrementCounter(uint256 authorizationNullifier,uint256 aliasR,uint256 oldRoot,uint256 newRoot,uint64 oldCounter,uint64 newCounter,bytes proof)",
   "event CounterIncremented(uint256 indexed checkpointId,uint256 indexed aliasR,uint64 oldCounter,uint64 newCounter,uint256 oldRoot,uint256 newRoot,uint256 authorizationNullifier)",
 ] as const;
@@ -39,6 +47,11 @@ type ReplayCache = { sequence: number; published: number; replay?: VerifiedRepla
 // on-chain root; returned snapshots never expose the cached mutable mirror.
 const replays = new WeakMap<Provider, Map<string, ReplayCache>>();
 
+export type ShieldedIdentityAuthorizationScope = {
+  chainId: BigNumberish;
+  authorizationStateAddress: string;
+};
+
 export function createIdentityAuthorizationContract(address: string, runner: ContractRunner) {
   return new Contract(address, IDENTITY_AUTHORIZATION_ABI, runner);
 }
@@ -47,7 +60,7 @@ export function createIdentityAuthorizationContract(address: string, runner: Con
 export async function loadShieldedIdentityAuthorizationWitness(
   contract: Contract,
   authorizationAlias: BigNumberish,
-  expectedScope?: { chainId: BigNumberish; authorizationStateAddress: string },
+  expectedScope?: ShieldedIdentityAuthorizationScope,
 ): Promise<{
   witness: ShieldedIdentityAuthorizationWitness;
   stateRoot: bigint;
@@ -131,16 +144,80 @@ export async function loadShieldedIdentityAuthorizationWitness(
   };
 }
 
-/** Incrementally replay every public update, without an identity or alias RPC filter. */
-export async function loadShieldedIdentityAuthorizationState(contract: Contract): Promise<{
+/** Default replay keeps the queried alias local; failures never switch read modes. */
+export async function loadShieldedIdentityAuthorizationWitnessForMode(
+  contract: Contract,
+  authorizationAlias: BigNumberish,
+  mode?: ShieldedStateReadMode,
+  expectedScope?: ShieldedIdentityAuthorizationScope,
+): ReturnType<typeof loadShieldedIdentityAuthorizationWitness> {
+  const selected = normalizeShieldedStateReadMode(mode);
+  if (selected === "chain")
+    return loadShieldedIdentityAuthorizationWitness(contract, authorizationAlias, expectedScope);
+  if (hasPersistentPublicStateStorage())
+    return loadPersistedIdentityAuthorizationWitness(contract, authorizationAlias, expectedScope);
+  const alias = bigintFrom(authorizationAlias, "authorizationAlias", SNARK_SCALAR_FIELD - 1n);
+  if (alias === 0n) throw new Error("Authorization alias must be nonzero");
+  const result = await loadVerifiedAuthorizationReplay(contract, expectedScope);
+  const tree = result.tree;
+  const witness = verifyShieldedIdentityAuthorizationWitness(
+    tree.getWitness(alias),
+    tree.root,
+    alias,
+  );
+  return {
+    witness,
+    stateRoot: tree.root,
+    checkpointId: result.checkpointId,
+    asOf: result.asOf,
+    blockNumber: result.blockNumber,
+    blockHash: result.blockHash,
+    chainId: result.chainId,
+    authorizationStateAddress: result.authorizationStateAddress,
+  };
+}
+
+/** Export a complete public state only when a caller explicitly requests it. */
+export async function loadShieldedIdentityAuthorizationState(
+  contract: Contract,
+  expectedScope?: ShieldedIdentityAuthorizationScope,
+): Promise<{
   state: ShieldedIdentityAuthorizationState;
   checkpointId: bigint;
   asOf: bigint;
   blockNumber: number;
+  blockHash: string;
+  chainId: bigint;
+  authorizationStateAddress: string;
+}> {
+  const { tree, ...checkpoint } = await loadVerifiedAuthorizationReplay(contract, expectedScope);
+  return { state: tree.snapshot(), ...checkpoint };
+}
+
+/** Keep the verified replay tree private so path readers never copy its full map. */
+async function loadVerifiedAuthorizationReplay(
+  contract: Contract,
+  expectedScope?: ShieldedIdentityAuthorizationScope,
+): Promise<{
+  tree: AuthorizationTree;
+  checkpointId: bigint;
+  asOf: bigint;
+  blockNumber: number;
+  blockHash: string;
+  chainId: bigint;
+  authorizationStateAddress: string;
 }> {
   const provider = contract.runner?.provider;
   if (!provider) throw new Error("Authorization state has no provider");
-  const [network, address] = await Promise.all([provider.getNetwork(), contract.getAddress()]);
+  const [network, rawAddress] = await Promise.all([provider.getNetwork(), contract.getAddress()]);
+  const chainId = BigInt(network.chainId);
+  const address = getAddress(rawAddress);
+  if (
+    expectedScope &&
+    (BigInt(expectedScope.chainId) !== chainId ||
+      getAddress(expectedScope.authorizationStateAddress) !== address)
+  )
+    throw new Error("Authorization path scope does not match");
   const blockNumber = await provider.getBlockNumber();
   if (!Number.isSafeInteger(blockNumber) || blockNumber < 0)
     throw new Error("Invalid authorization scan block");
@@ -162,7 +239,7 @@ export async function loadShieldedIdentityAuthorizationState(contract: Contract)
     chunk < 1
   )
     throw new Error("Invalid authorization replay block range");
-  const key = `${network.chainId}:${address.toLowerCase()}:${deploymentBlock}`;
+  const key = `${chainId}:${address.toLowerCase()}:${deploymentBlock}`;
   let byContract = replays.get(provider);
   if (!byContract) {
     byContract = new Map();
@@ -226,8 +303,15 @@ export async function loadShieldedIdentityAuthorizationState(contract: Contract)
     BigInt(checkpoint.retiredAt) !== 0n
   )
     throw new Error("Authorization checkpoint time is inconsistent");
-  if ((await provider.getBlock(blockNumber))?.hash !== anchor.hash)
+  const [finalAnchor, finalNetwork, finalAddress] = await Promise.all([
+    provider.getBlock(blockNumber),
+    provider.getNetwork(),
+    contract.getAddress(),
+  ]);
+  if (finalAnchor?.hash !== anchor.hash)
     throw new Error("Authorization checkpoint was reorganized");
+  if (BigInt(finalNetwork.chainId) !== chainId || getAddress(finalAddress) !== address)
+    throw new Error("Authorization path scope changed while reading");
   // An older concurrent load may return its verified block, but must not replace
   // a newer cache or publish over a later successful request at the same height.
   if (request >= cache.published && (!cache.replay || cache.replay.blockNumber <= blockNumber)) {
@@ -240,9 +324,12 @@ export async function loadShieldedIdentityAuthorizationState(contract: Contract)
     cache.published = request;
   }
   return {
-    state: mirror.snapshot(),
+    tree: mirror,
     checkpointId: BigInt(checkpointId),
     asOf: BigInt(anchor.timestamp),
     blockNumber,
+    blockHash: anchor.hash,
+    chainId,
+    authorizationStateAddress: address,
   };
 }

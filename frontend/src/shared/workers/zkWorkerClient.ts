@@ -1,5 +1,7 @@
+import type { ShieldedStateReadMode } from "../config/shieldedStateReadMode";
 import type { Groth16Proof } from "../zk/zk";
 import { serializeWorkerError } from "./workerErrors";
+import { isPublicStateSyncProgress, publishPublicStateSyncProgress, type PublicStateSyncProgress } from "./publicStateSyncProgress";
 import type { ShieldedReceiveCodeCheck } from "../zk/shieldedReceiveCode";
 import type { IdentityFields } from "@deepfamily/protocol-core";
 import type {
@@ -25,7 +27,7 @@ type ZkWorkerCallMap = {
     result: { ok: boolean };
   };
   createShieldedReceiveCodeFromCredentials: {
-    params: { identity: IdentityFields; rawPassphrase: string; disclosure?: "anonymous" | "fund"; context: { rpcUrl: string; chainId: string; factoryAddress: string }; expiresAt: string };
+    params: { identity: IdentityFields; rawPassphrase: string; disclosure?: "anonymous" | "fund"; context: { rpcUrl: string; chainId: string; factoryAddress: string; stateReadMode?: ShieldedStateReadMode }; expiresAt: string };
     result: { code: string; personHash: string };
   };
   verifyShieldedReceiveCode: {
@@ -43,6 +45,7 @@ interface PendingZkWorkerCall {
   resolve: (value: any) => void;
   reject: (error: Error) => void;
   timeoutId?: ReturnType<typeof setTimeout>;
+  renewTimeout?: () => void;
 }
 
 export class ZkWorkerTerminatedError extends Error {
@@ -55,6 +58,8 @@ export class ZkWorkerTerminatedError extends Error {
 let workerSingleton: Worker | null = null;
 let nextId = 1;
 const pending = new Map<number, PendingZkWorkerCall>();
+const DEFAULT_TIMEOUT_MS = 180_000;
+const progressWatermarks = new Map<string, { completed: number; finished: boolean }>();
 
 const rejectPending = (error: Error): void => {
   for (const [, entry] of pending) {
@@ -62,7 +67,19 @@ const rejectPending = (error: Error): void => {
     entry.reject(error);
   }
   pending.clear();
+  progressWatermarks.clear();
 };
+
+function publishProgress(progress: PublicStateSyncProgress) {
+  const key = `${progress.domain}:${progress.phase}`;
+  const previous = progressWatermarks.get(key);
+  const finished = progress.completed === progress.total || progress.phase === "complete";
+  const advanced = progress.completed > (previous?.completed ?? 0) || (finished && !previous?.finished);
+  progressWatermarks.set(key, { completed: Math.max(previous?.completed ?? 0, progress.completed),
+    finished: finished || !!previous?.finished });
+  if (advanced) for (const entry of pending.values()) entry.renewTimeout?.();
+  publishPublicStateSyncProgress(progress);
+}
 
 export function terminateZkWorker(reason: Error = new ZkWorkerTerminatedError()): void {
   const worker = workerSingleton;
@@ -88,10 +105,16 @@ const ensureWorker = (): Worker => {
   workerSingleton = worker;
   worker.addEventListener("message", (event: MessageEvent<ZkWorkerResponse>) => {
     if (workerSingleton !== worker) return;
+    const progressMessage = event.data as { type?: unknown; progress?: unknown } | null;
+    if (progressMessage?.type === "publicStateSyncProgress") {
+      if (isPublicStateSyncProgress(progressMessage.progress)) publishProgress(progressMessage.progress);
+      return;
+    }
     const msg = event.data;
-    const entry = pending.get(msg.id);
+    const entry = pending.get(msg?.id);
     if (!entry) return;
     pending.delete(msg.id);
+    progressWatermarks.clear();
     if (entry.timeoutId !== undefined) clearTimeout(entry.timeoutId);
     if (msg.ok) entry.resolve(msg.result);
     else
@@ -118,15 +141,21 @@ export function zkWorkerCall<M extends keyof ZkWorkerCallMap>(
 ): Promise<ZkWorkerCallMap[M]["result"]> {
   const worker = ensureWorker();
   const id = nextId++;
-  const timeoutMs = opts?.timeoutMs ?? 180_000;
+  const timeoutMs = opts?.timeoutMs ?? DEFAULT_TIMEOUT_MS;
 
   return new Promise<ZkWorkerCallMap[M]["result"]>((resolve, reject) => {
+    if (pending.size === 0) progressWatermarks.clear();
     const entry: PendingZkWorkerCall = { resolve, reject };
     if (timeoutMs > 0) {
-      entry.timeoutId = setTimeout(() => {
-        if (!pending.has(id)) return;
-        terminateZkWorker(new Error(`ZK worker timeout (${String(method)})`));
-      }, timeoutMs);
+      const startTimeout = () => {
+        if (entry.timeoutId !== undefined) clearTimeout(entry.timeoutId);
+        entry.timeoutId = setTimeout(() => {
+          if (!pending.has(id)) return;
+          terminateZkWorker(new Error(`ZK worker timeout (${String(method)})`));
+        }, timeoutMs);
+      };
+      if (opts?.timeoutMs === undefined) entry.renewTimeout = startTimeout;
+      startTimeout();
     }
     pending.set(id, entry);
     const request: ZkWorkerRequest = { id, method, params };

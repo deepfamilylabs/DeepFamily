@@ -1,3 +1,4 @@
+import type { ShieldedStateReadMode } from "../shared/config/shieldedStateReadMode";
 import type { Groth16Proof } from "../shared/zk/zk";
 import { serializeWorkerError } from "../shared/workers/workerErrors";
 import {
@@ -40,7 +41,7 @@ type ZkWorkerMethods = {
     result: { ok: boolean };
   };
   createShieldedReceiveCodeFromCredentials: {
-    params: { identity: IdentityFields; rawPassphrase: string; disclosure?: "anonymous" | "fund"; context: { rpcUrl: string; chainId: string; factoryAddress: string }; expiresAt: string };
+    params: { identity: IdentityFields; rawPassphrase: string; disclosure?: "anonymous" | "fund"; context: { rpcUrl: string; chainId: string; factoryAddress: string; stateReadMode?: ShieldedStateReadMode }; expiresAt: string };
     result: { code: string; personHash: string };
   };
   verifyShieldedReceiveCode: {

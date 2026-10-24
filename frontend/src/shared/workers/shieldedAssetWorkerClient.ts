@@ -2,16 +2,20 @@ import type {
   ShieldedAssetWorkerCallMap,
   ShieldedAssetSessionState,
 } from "./shieldedAssetWorkerTypes";
+import { isPublicStateSyncProgress, publishPublicStateSyncProgress, type PublicStateSyncProgress } from "./publicStateSyncProgress";
 
 type Pending = {
   resolve: (value: unknown) => void;
   reject: (error: Error) => void;
   timer: ReturnType<typeof setTimeout>;
+  defaultTimeout: boolean;
 };
 let worker: Worker | null = null;
 let sequence = 0;
 let generation = 0;
 const pending = new Map<number, Pending>();
+const DEFAULT_TIMEOUT_MS = 240_000;
+const progressWatermarks = new Map<string, { completed: number; finished: boolean }>();
 const lockListeners = new Set<() => void>();
 const BACKUP_CHALLENGES_KEY = "deepfamily:pending-independent-key-backups:v1";
 function readBackupChallenges(): Set<string> {
@@ -61,7 +65,26 @@ export function terminateShieldedAssetWorker(): void {
     entry.reject(new Error("Asset session locked. Unlock before continuing."));
   }
   pending.clear();
+  progressWatermarks.clear();
   for (const listener of lockListeners) listener();
+}
+
+function publishProgress(progress: PublicStateSyncProgress) {
+  const key = `${progress.domain}:${progress.phase}`;
+  const previous = progressWatermarks.get(key);
+  const finished = progress.completed === progress.total || progress.phase === "complete";
+  const advanced = progress.completed > (previous?.completed ?? 0) || (finished && !previous?.finished);
+  progressWatermarks.set(key, { completed: Math.max(previous?.completed ?? 0, progress.completed),
+    finished: finished || !!previous?.finished });
+  if (advanced) {
+    // A serial Worker may be making progress for the request ahead of queued
+    // calls. Renew all default liveness deadlines, preserving explicit limits.
+    for (const entry of pending.values()) if (entry.defaultTimeout) {
+      clearTimeout(entry.timer);
+      entry.timer = setTimeout(terminateShieldedAssetWorker, DEFAULT_TIMEOUT_MS);
+    }
+  }
+  publishPublicStateSyncProgress(progress);
 }
 
 function ensureWorker(): Worker {
@@ -73,9 +96,14 @@ function ensureWorker(): Worker {
   instance.addEventListener("message", (event: MessageEvent) => {
     if (worker !== instance) return;
     const message = event.data;
+    if (message?.type === "publicStateSyncProgress") {
+      if (isPublicStateSyncProgress(message.progress)) publishProgress(message.progress);
+      return;
+    }
     const entry = pending.get(message?.id);
     if (!entry) return;
     pending.delete(message.id);
+    progressWatermarks.clear();
     clearTimeout(entry.timer);
     if (message.ok) entry.resolve(message.result);
     else entry.reject(new Error(message.error?.message ?? "Asset operation failed"));
@@ -104,6 +132,7 @@ export function shieldedAssetWorkerCall<M extends keyof ShieldedAssetWorkerCallM
   }
   const id = ++sequence;
   return new Promise((resolve, reject) => {
+    if (pending.size === 0) progressWatermarks.clear();
     const abort = () => terminateShieldedAssetWorker();
     options?.signal?.addEventListener("abort", abort, { once: true });
     const finish = () => options?.signal?.removeEventListener("abort", abort);
@@ -127,7 +156,8 @@ export function shieldedAssetWorkerCall<M extends keyof ShieldedAssetWorkerCallM
         finish();
         reject(error);
       },
-      timer: setTimeout(terminateShieldedAssetWorker, options?.timeoutMs ?? 240_000),
+      timer: setTimeout(terminateShieldedAssetWorker, options?.timeoutMs ?? DEFAULT_TIMEOUT_MS),
+      defaultTimeout: options?.timeoutMs === undefined,
     });
     const request = {
       id,

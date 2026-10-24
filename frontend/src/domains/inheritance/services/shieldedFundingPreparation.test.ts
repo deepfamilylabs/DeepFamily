@@ -216,6 +216,9 @@ async function setup(periodDays = 30n) {
   } as unknown as Contract;
   const lineageIndex = {
     getAddress: async () => lineageAddress,
+    identityCommitmentOf: vi.fn(async () => {
+      throw new Error("Funding must not send a person-specific identity query");
+    }),
     root: async (which: number) => (which === 0 ? chainEndorsementRoot : chainTrustedRoot),
     isKnownCheckpoint: vi.fn(
       async (id: bigint, endorsement: bigint, trusted: bigint) =>
@@ -269,7 +272,6 @@ describe("funding destination validation before consolidation", () => {
         policy: fixture.policy,
         lineageIndex: {
           ...fixture.lineageIndex,
-          identityCommitmentOf: async () => heirIdentity,
           root: async (which: number) =>
             which === 0 ? fixture.lineage.endorsementTree.root : fixture.lineage.trustedTree.root,
           isKnownCheckpoint: async () => true,
@@ -279,6 +281,7 @@ describe("funding destination validation before consolidation", () => {
         budgetPeriods: 1n,
       };
       await expect(validateShieldedFundingDestination(input)).resolves.toBeUndefined();
+      expect(fixture.lineageIndex.identityCommitmentOf).not.toHaveBeenCalled();
       await expect(prepareShieldedFund(input)).rejects.toThrow("recovered value note");
       fixture.lineage.trustedTree.update(0n, 0n);
       await expect(validateShieldedFundingDestination(input)).rejects.toThrow(
@@ -287,27 +290,55 @@ describe("funding destination validation before consolidation", () => {
     },
   );
 
-  it("rejects an unregistered public recipient before needing a donor note", async () => {
-    const fixture = await setup();
-    const lookup = vi.fn(async () => 0n);
-    await expect(
-      validateShieldedFundingDestination({
-        ...fixture.common,
-        donorCommitment: 0n,
-        fundMode: 0,
-        budgetKind: 1,
-        policy: fixture.policy,
-        lineageIndex: {
-          ...fixture.lineageIndex,
-          identityCommitmentOf: lookup,
-        } as unknown as Contract,
-        lineage: fixture.lineage,
-        publicRecipientPersonHash: fixture.recipient.personHash,
-        budgetPeriods: 1n,
-      }),
-    ).rejects.toThrow("Recipient identity is unknown");
-    expect(lookup).toHaveBeenCalledWith(fixture.recipient.personHash);
-  });
+  it.each(["absent", "empty", "zero"] as const)(
+    "rejects a public recipient with %s local identity records before needing a donor note",
+    async (records) => {
+      const fixture = await setup();
+      const personHash = fixture.recipient.personHash!;
+      if (records === "absent") fixture.lineage.versions.delete(personHash);
+      else if (records === "empty") fixture.lineage.versions.set(personHash, []);
+      else fixture.lineage.versions.get(personHash)![0].identityCommitment = 0n;
+      await expect(
+        validateShieldedFundingDestination({
+          ...fixture.common,
+          donorCommitment: 0n,
+          fundMode: 0,
+          budgetKind: 1,
+          policy: fixture.policy,
+          lineageIndex: fixture.lineageIndex,
+          lineage: fixture.lineage,
+          publicRecipientPersonHash: fixture.recipient.personHash,
+          budgetPeriods: 1n,
+        }),
+      ).rejects.toThrow("Recipient identity is unknown");
+      expect(fixture.lineageIndex.identityCommitmentOf).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(["different identity", "different person", "inconsistent versions"] as const)(
+    "rejects %s in local public recipient records",
+    async (attack) => {
+      const fixture = await setup();
+      const versions = fixture.lineage.versions.get(fixture.recipient.personHash!)!;
+      if (attack === "different identity") versions[0].identityCommitment += 1n;
+      else if (attack === "different person")
+        versions[0].personHash = wrapIdentityCommitmentAsPersonHash(999n);
+      else versions.push({ ...versions[0], versionIndex: 1, identityCommitment: 999n });
+      await expect(
+        validateShieldedFundingDestination({
+          ...fixture.common,
+          fundMode: 0,
+          budgetKind: 1,
+          policy: fixture.policy,
+          lineageIndex: fixture.lineageIndex,
+          lineage: fixture.lineage,
+          publicRecipientPersonHash: fixture.recipient.personHash,
+          budgetPeriods: 1n,
+        }),
+      ).rejects.toThrow("Recipient identity does not match");
+      expect(fixture.lineageIndex.identityCommitmentOf).not.toHaveBeenCalled();
+    },
+  );
 
   it("checks the existing lineage snapshot once during direct funding", async () => {
     const fixture = await setup();
@@ -335,7 +366,6 @@ describe("funding destination validation before consolidation", () => {
       const fixture = await setup();
       const lineageIndex = {
         ...fixture.lineageIndex,
-        identityCommitmentOf: async () => heirIdentity,
       } as unknown as Contract;
       const initial = await prepareShieldedFund({
         ...fixture.common,
@@ -366,6 +396,7 @@ describe("funding destination validation before consolidation", () => {
         budgetPeriods: 1n,
       };
       await expect(validateShieldedFundingDestination(input)).resolves.toBeUndefined();
+      expect(fixture.lineageIndex.identityCommitmentOf).not.toHaveBeenCalled();
       await expect(
         validateShieldedFundingDestination({ ...input, budgetKind: budgetKind === 1 ? 0 : 1 }),
       ).rejects.toThrow("cannot change budget binding");
@@ -377,6 +408,12 @@ describe("funding destination validation before consolidation", () => {
           }),
         ).rejects.toThrow("cannot change recipient viewing material");
       } else {
+        await expect(
+          validateShieldedFundingDestination({
+            ...input,
+            publicRecipientPersonHash: wrapIdentityCommitmentAsPersonHash(999n),
+          }),
+        ).rejects.toThrow("Recipient identity does not match its person hash");
         await expect(
           validateShieldedFundingDestination({
             ...input,
@@ -434,7 +471,9 @@ describe("local unified funding preparation", () => {
       viewingKey: fixture.common.recipient.viewingKey,
     };
     const input = { ...fixture.common, fundMode: 1 as const, budget, budgetPeriods: 1n };
-    await expect(prepareShieldedFund({ ...input, recipient: undefined })).rejects.toThrow("current Fund identity disclosure material");
+    await expect(prepareShieldedFund({ ...input, recipient: undefined })).rejects.toThrow(
+      "current Fund identity disclosure material",
+    );
     const refill = await prepareShieldedFund(input);
     expect(refill.outputs[0].note.keyMode).toBe(1n);
     expect(refill.witness.oldKeyMode).toBe("1");
@@ -934,13 +973,25 @@ describe("local unified funding preparation", () => {
           const salt = 99102n;
           const expiresAt = BigInt(timestamp + 86_400);
           const binding = computeShieldedReceiveCredentialBinding({
-            credential: { ...fixture.common.recipient, authorizationAlias, authorizationCounter: 0n, expiresAt }, salt,
+            credential: {
+              ...fixture.common.recipient,
+              authorizationAlias,
+              authorizationCounter: 0n,
+              expiresAt,
+            },
+            salt,
           });
           witness.receiveAuthorizationAlias = String(authorizationAlias);
           witness.receiveSalt = String(salt);
           witness.receiveBindings = [String(binding), "0"];
           prepared.data.receiveAuthorizations = emptyShieldedReceiveAuthorizations();
-          prepared.data.receiveAuthorizations[0] = { checkpointId: 1n, asOf: BigInt(timestamp), expiresAt, recipientBinding: binding, proof: "0x" };
+          prepared.data.receiveAuthorizations[0] = {
+            checkpointId: 1n,
+            asOf: BigInt(timestamp),
+            expiresAt,
+            recipientBinding: binding,
+            proof: "0x",
+          };
           const inputPath = path.join(temporary, `${source}.input.json`);
           const proofPath = path.join(temporary, `${source}.proof.json`);
           const publicPath = path.join(temporary, `${source}.public.json`);

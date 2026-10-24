@@ -1,3 +1,4 @@
+import type { ShieldedStateReadMode } from "../../../shared/config/shieldedStateReadMode";
 import {
   decodeShieldedReceiveCredential,
   wrapIdentityCommitmentAsPersonHash,
@@ -97,7 +98,7 @@ export async function createShieldedReceiveCodeForRecipient(credentials: {
   identity: IdentityFields;
   rawPassphrase: string;
   disclosure?: "anonymous" | "fund";
-  context: { rpcUrl: string; chainId: string; factoryAddress: string };
+  context: { rpcUrl: string; chainId: string; factoryAddress: string; stateReadMode?: ShieldedStateReadMode };
   expiresAt: string;
 }): Promise<string> {
   const passphraseError = getFundingPassphraseError(credentials.rawPassphrase);

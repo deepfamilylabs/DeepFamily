@@ -1472,6 +1472,7 @@
       "InvalidTreeId": "世系树编号无效。",
       "TreeCapacityExceeded": "世系树已达到最大叶槽容量。",
       "InvalidLeafIndex": "世系叶槽索引无效。",
+      "InvalidSnapshotPage": "公开状态分页范围无效。",
       "IdentityCommitmentMismatch": "身份承诺与人物哈希不一致。",
       "UnknownPerson": "世系索引中没有该人物的记录。",
       "UnknownVersion": "世系索引中没有该版本的记录。",
@@ -1596,6 +1597,31 @@
     "wrongNetwork": "请将钱包切换至网络 {{chainId}}。",
     "identityTitle": "解锁身份",
     "identityDescription": "存入预算时使用父母身份，领取时使用子女身份。请妥善保存身份资料和口令。",
+    "stateReadMode": {
+      "title": "状态读取方式",
+      "rebuild": "本地重建（默认）",
+      "rebuildDescription": "下载完整的公开当前授权和背书状态，在本地计算。减少按身份查询 RPC，但耗时更长、流量更大。",
+      "chain": "从链上读取当前路径",
+      "chainDescription": "只读取当前身份需要的短路径，速度更快、流量更少，但 RPC 服务商可见所查询的匿名代号和族谱对象。"
+    },
+    "publicStateSync": {
+      "title": "公开状态同步",
+      "domains": {
+        "authorization": "收款授权",
+        "lineage": "族谱背书"
+      },
+      "phases": {
+        "download": "正在下载公开状态",
+        "downloaded": "下载完成，仍须在本地验证",
+        "verify": "正在本地验证",
+        "catchup": "正在追赶新增公开更新",
+        "complete": "状态已验证"
+      },
+      "count": "已处理 {{completed}} / {{total}}",
+      "resumed": "正在从已下载的公开页面断点继续。",
+      "pause": "暂停同步并锁定",
+      "paused": "同步已暂停，当前解锁会话已清除。"
+    },
     "actionsTitle": "资产与预算",
     "actions": {
       "recover": "刷新",

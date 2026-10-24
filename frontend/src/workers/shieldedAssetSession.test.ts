@@ -35,6 +35,7 @@ const mocks = vi.hoisted(() => ({
   independentKeyMaterial: vi.fn(),
   discoverPools: vi.fn(),
   loadLineage: vi.fn(),
+  loadTargetedLineage: vi.fn(),
   readLetters: vi.fn(),
   network: vi.fn(),
   providers: [] as object[],
@@ -86,9 +87,9 @@ vi.mock("../shared/clients/contractFactory", () => ({
 }));
 vi.mock("../domains/inheritance/services/shieldedIdentityAuthorizationChain", () => ({
   createIdentityAuthorizationContract: () => ({}),
-  loadShieldedIdentityAuthorizationWitness: async (_contract: unknown, alias: bigint) => {
+  loadShieldedIdentityAuthorizationWitnessForMode: async (_contract: unknown, alias: bigint, mode?: unknown, scope?: unknown) => {
     const { getShieldedIdentityAuthorizationWitness } = await vi.importActual<typeof import("@deepfamily/protocol-core")>("@deepfamily/protocol-core");
-    const result = await mocks.authorizationState();
+    const result = await mocks.authorizationState(mode, scope);
     return { ...result, stateRoot: result.state.root, witness: getShieldedIdentityAuthorizationWitness(result.state, alias) };
   },
 }));
@@ -114,7 +115,8 @@ vi.mock("../domains/inheritance/services/shieldedWalletRecovery", async (importO
   recoverLocalShieldedWallet: mocks.recover,
 }));
 vi.mock("../domains/inheritance/services/inheritanceChain", () => ({
-  loadTargetedLineageSnapshot: mocks.loadLineage,
+  loadTargetedLineageSnapshot: mocks.loadTargetedLineage,
+  loadLineageSnapshot: mocks.loadLineage,
   findHeirLegitimacy: () => [],
 }));
 
@@ -160,6 +162,7 @@ beforeEach(() => {
     return actual.deriveShieldedIndependentKeyMaterial(params);
   });
   mocks.loadLineage.mockReset().mockResolvedValue(null);
+  mocks.loadTargetedLineage.mockReset().mockResolvedValue(null);
   mocks.readLetters.mockReset().mockResolvedValue([]);
   mocks.canonicalPool = mocks.pool;
   mocks.receive.mockResolvedValue({ code: "public-code", fingerprint: "public-fingerprint" });
@@ -194,6 +197,32 @@ beforeEach(() => {
 });
 
 describe("receive-code current authorization state", () => {
+  it.each([undefined, "rebuild", "chain"] as const)(
+    "passes the selected read mode %s to receive-code authorization",
+    async (stateReadMode) => {
+      const session = new ShieldedAssetSession();
+      await session.unlockIdentity(identityParams());
+      await session.receiveCode({ slot: "identity", context: { ...context, stateReadMode }, expiresAt: "2000000000" });
+      expect(mocks.authorizationState).toHaveBeenCalledWith(stateReadMode, {
+        chainId: context.chainId,
+        authorizationStateAddress: mocks.verifier,
+      });
+    },
+  );
+
+  it("rejects unsupported read modes before contacting the RPC", async () => {
+    const session = new ShieldedAssetSession();
+    await session.unlockIdentity(identityParams());
+    await expect(session.receiveCode({
+      slot: "identity",
+      context: { ...context, stateReadMode: "unsupported" as "chain" },
+      expiresAt: "2000000000",
+    })).rejects.toThrow("Unsupported shielded state read mode");
+    expect(mocks.providers).toHaveLength(0);
+    expect(mocks.network).not.toHaveBeenCalled();
+    expect(mocks.authorizationState).not.toHaveBeenCalled();
+  });
+
   it("reads the current authorization state before issuing a new identity's code", async () => {
     const session = new ShieldedAssetSession();
     await session.unlockIdentity(identityParams());
@@ -245,6 +274,39 @@ describe("receive-code current authorization state", () => {
 });
 
 describe("verified event replay provider lifecycle", () => {
+  it.each(["rebuild", "chain"] as const)(
+    "requires a fresh secret session when switching from %s",
+    async (stateReadMode) => {
+      const session = new ShieldedAssetSession();
+      await session.unlockIdentity(identityParams());
+      await session.receiveCode({ slot: "identity", context: { ...context, stateReadMode }, expiresAt: "2000000000" });
+      const nextMode = stateReadMode === "chain" ? "rebuild" : "chain";
+      mocks.network.mockClear();
+      mocks.authorizationState.mockClear();
+      await expect(session.receiveCode({
+        slot: "identity", context: { ...context, stateReadMode: nextMode }, expiresAt: "2000000000",
+      })).rejects.toThrow("Protocol context changed");
+      expect(mocks.network).not.toHaveBeenCalled();
+      expect(mocks.authorizationState).not.toHaveBeenCalled();
+      session.clear();
+      await session.unlockIdentity(identityParams());
+      await expect(session.receiveCode({
+        slot: "identity", context: { ...context, stateReadMode: nextMode }, expiresAt: "2000000000",
+      })).resolves.toEqual({ code: "public-code" });
+      expect(mocks.authorizationState).toHaveBeenCalledWith(nextMode, expect.any(Object));
+    },
+  );
+
+  it("treats omitted and explicit rebuild as the same session mode", async () => {
+    const session = new ShieldedAssetSession();
+    await session.unlockIdentity(identityParams());
+    await session.receiveCode({ slot: "identity", context, expiresAt: "2000000000" });
+    await expect(session.receiveCode({
+      slot: "identity", context: { ...context, stateReadMode: "rebuild" }, expiresAt: "2000000000",
+    })).resolves.toEqual({ code: "public-code" });
+    expect(mocks.providers).toHaveLength(1);
+  });
+
   const issue = (session: ShieldedAssetSession) =>
     session.receiveCode({ slot: "identity", context, expiresAt: "2000000000" });
 
@@ -1206,6 +1268,40 @@ describe("restarting pending independent key setup", () => {
 });
 
 describe("ephemeral asset Worker independent key lifecycle", () => {
+  it.each([undefined, "rebuild", "chain"] as const)(
+    "uses only the selected lineage read mode %s during recovery",
+    async (stateReadMode) => {
+      const session = new ShieldedAssetSession();
+      await session.unlockIdentity(identityParams());
+      await session.recover({ context: { ...context, stateReadMode } });
+      if (stateReadMode === "chain") {
+        expect(mocks.loadLineage).not.toHaveBeenCalled();
+        expect(mocks.loadTargetedLineage).toHaveBeenCalledWith(expect.anything(), expect.anything(), expect.objectContaining({
+          blockNumber: 12,
+          parentIdentityCommitments: [31n],
+        }));
+      } else {
+        expect(mocks.loadTargetedLineage).not.toHaveBeenCalled();
+        expect(mocks.loadLineage).toHaveBeenCalledWith(expect.anything(), expect.anything(), expect.objectContaining({ toBlock: 12, selection: expect.objectContaining({ parentIdentityCommitments: [31n] }) }));
+      }
+    },
+  );
+
+  it.each(["rebuild", "chain"] as const)(
+    "keeps %s lineage failures in the selected mode",
+    async (stateReadMode) => {
+      const session = new ShieldedAssetSession();
+      await session.unlockIdentity(identityParams());
+      const selected = stateReadMode === "chain" ? mocks.loadTargetedLineage : mocks.loadLineage;
+      const other = stateReadMode === "chain" ? mocks.loadLineage : mocks.loadTargetedLineage;
+      selected.mockRejectedValueOnce(new Error("RPC unavailable"));
+      const result = await session.recover({ context: { ...context, stateReadMode } });
+      expect(result.familyRecordsAvailable).toBe(false);
+      expect(selected).toHaveBeenCalledOnce();
+      expect(other).not.toHaveBeenCalled();
+    },
+  );
+
   it("keeps VALUE recovery available when family records fail and restores parent versions on retry", async () => {
     const session = await unlockedSession();
     const keys = await deriveShieldedIndependentKeyMaterial({

@@ -41,6 +41,11 @@
     },
     {
       "inputs": [],
+      "name": "InvalidSnapshotPage",
+      "type": "error"
+    },
+    {
+      "inputs": [],
       "name": "InvalidTreeId",
       "type": "error"
     },
@@ -197,6 +202,19 @@
           "internalType": "uint8",
           "name": "",
           "type": "uint8"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "MAX_SNAPSHOT_PAGE_SIZE",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
         }
       ],
       "stateMutability": "view",
@@ -368,6 +386,86 @@
     {
       "inputs": [
         {
+          "internalType": "uint256",
+          "name": "start",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "limit",
+          "type": "uint256"
+        }
+      ],
+      "name": "getEndorsementPage",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "bytes32",
+              "name": "personHash",
+              "type": "bytes32"
+            },
+            {
+              "internalType": "address",
+              "name": "endorser",
+              "type": "address"
+            },
+            {
+              "internalType": "uint256",
+              "name": "versionIndex",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint64",
+              "name": "writtenAt",
+              "type": "uint64"
+            },
+            {
+              "internalType": "bool",
+              "name": "active",
+              "type": "bool"
+            }
+          ],
+          "internalType": "struct IDeepFamilyLineageIndex.EndorsementSnapshot[]",
+          "name": "page",
+          "type": "tuple[]"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint8",
+          "name": "treeId",
+          "type": "uint8"
+        },
+        {
+          "internalType": "uint256",
+          "name": "start",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "limit",
+          "type": "uint256"
+        }
+      ],
+      "name": "getLeafPage",
+      "outputs": [
+        {
+          "internalType": "uint256[]",
+          "name": "page",
+          "type": "uint256[]"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
           "internalType": "uint8",
           "name": "treeId",
           "type": "uint8"
@@ -404,6 +502,103 @@
           "internalType": "uint256[]",
           "name": "siblings",
           "type": "uint256[]"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "start",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "limit",
+          "type": "uint256"
+        }
+      ],
+      "name": "getTrustedPage",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "bytes32",
+              "name": "personHash",
+              "type": "bytes32"
+            },
+            {
+              "internalType": "uint256",
+              "name": "versionIndex",
+              "type": "uint256"
+            },
+            {
+              "internalType": "address",
+              "name": "account",
+              "type": "address"
+            },
+            {
+              "internalType": "bool",
+              "name": "active",
+              "type": "bool"
+            }
+          ],
+          "internalType": "struct IDeepFamilyLineageIndex.TrustedSnapshot[]",
+          "name": "page",
+          "type": "tuple[]"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "start",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "limit",
+          "type": "uint256"
+        }
+      ],
+      "name": "getVersionPage",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "bytes32",
+              "name": "personHash",
+              "type": "bytes32"
+            },
+            {
+              "internalType": "uint256",
+              "name": "versionIndex",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "identityCommitment",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "fatherIdentityCommitment",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "motherIdentityCommitment",
+              "type": "uint256"
+            }
+          ],
+          "internalType": "struct IDeepFamilyLineageIndex.VersionSnapshot[]",
+          "name": "page",
+          "type": "tuple[]"
         }
       ],
       "stateMutability": "view",
@@ -710,6 +905,19 @@
         {
           "internalType": "uint256",
           "name": "leafIndex",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "versionMetadataCount",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
           "type": "uint256"
         }
       ],

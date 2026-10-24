@@ -21,11 +21,34 @@ interface IIdentityAuthorizationState {
     bool absent;
   }
 
+  struct StateSnapshotHeader {
+    uint256 formatVersion;
+    uint64 rootNodeId;
+    uint64 nodeCount;
+    uint256 root;
+    uint256 checkpointId;
+  }
+
+  struct NodeSnapshot {
+    uint256 hash;
+    uint256 key;
+    uint64 counter;
+    uint64 left;
+    uint64 right;
+  }
+
   function currentCheckpointId() external view returns (uint256);
   function currentRoot() external view returns (uint256);
   function getCheckpoint(uint256 checkpointId) external view returns (Checkpoint memory);
   function authorizationCounter(uint256 aliasR) external view returns (uint64);
   function getCounterProof(uint256 aliasR) external view returns (CounterProof memory);
+  /** @notice Read the header and every page at the same block tag, then verify the root. */
+  function getStateSnapshotHeader() external view returns (StateSnapshotHeader memory);
+  /** @notice Node IDs start at one; startId == nodeCount + 1 returns an empty page. */
+  function getNodePage(
+    uint256 startId,
+    uint256 limit
+  ) external view returns (NodeSnapshot[] memory);
 
   /** @dev Reverts for unknown, mistimed or expired checkpoints; zero is the empty root. */
   function validateCheckpoint(uint256 checkpointId, uint64 asOf) external view returns (uint256);

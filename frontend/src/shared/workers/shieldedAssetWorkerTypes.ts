@@ -1,3 +1,4 @@
+import type { ShieldedStateReadMode } from "../config/shieldedStateReadMode";
 import type { IdentityFields } from "@deepfamily/protocol-core";
 import type { Groth16Proof } from "../zk/zk";
 import type { ShieldedPoolActionData } from "../zk/shieldedActionTypes";
@@ -29,6 +30,8 @@ export type ShieldedAssetSessionState = {
   independentKey: ShieldedPublicIndependentKey | null;
 };
 export type ShieldedWorkerContext = {
+  /** Omitted means privacy-preserving local history reconstruction. */
+  stateReadMode?: ShieldedStateReadMode;
   rpcUrl: string;
   chainId: string;
   factoryAddress: string;

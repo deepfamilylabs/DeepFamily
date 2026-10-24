@@ -2,13 +2,16 @@ import { describe, expect, it, vi } from "vitest";
 import { Contract, Interface } from "ethers";
 import {
   buildShieldedIdentityAuthorizationState,
+  createShieldedIdentityAuthorizationTree,
   getShieldedIdentityAuthorizationWitness,
 } from "@deepfamily/protocol-core";
 import {
   IDENTITY_AUTHORIZATION_ABI,
   loadShieldedIdentityAuthorizationState,
   loadShieldedIdentityAuthorizationWitness,
+  loadShieldedIdentityAuthorizationWitnessForMode,
 } from "./shieldedIdentityAuthorizationChain";
+import type { ShieldedStateReadMode } from "../config/shieldedStateReadMode";
 
 type Filter = { address: string; topics: unknown[]; fromBlock: number; toBlock: number };
 
@@ -257,6 +260,141 @@ describe("chain-native identity authorization paths", () => {
         loadShieldedIdentityAuthorizationWitness(f.contract as unknown as Contract, 17n, scope),
       ).rejects.toThrow("scope does not match");
     expect(f.contract.getCounterProof).not.toHaveBeenCalled();
+  });
+});
+
+describe("identity authorization read modes", () => {
+  it("reads a local path without exporting a complete public-state snapshot", async () => {
+    const f = fixture();
+    const expected = getShieldedIdentityAuthorizationWitness(f.after, 17n);
+    const prototype = Object.getPrototypeOf(createShieldedIdentityAuthorizationTree());
+    const snapshot = vi.spyOn(prototype, "snapshot").mockImplementation(() => {
+      throw new Error("Full state export is unavailable");
+    });
+    try {
+      const result = await loadShieldedIdentityAuthorizationWitnessForMode(
+        f.contract as unknown as Contract,
+        17n,
+      );
+      expect(result.witness).toEqual(expected);
+      expect(snapshot).not.toHaveBeenCalled();
+      await expect(f.load()).rejects.toThrow("Full state export is unavailable");
+    } finally {
+      snapshot.mockRestore();
+    }
+  });
+
+  it.each([undefined, "rebuild"] as const)(
+    "keeps alias queries local for mode %s",
+    async (mode) => {
+      const f = fixture();
+      const getCounterProof = vi.fn(async () => {
+        throw new Error("Target queries forbidden");
+      });
+      const contract = { ...f.contract, getCounterProof };
+      const scope = { chainId: 31337n, authorizationStateAddress: await f.contract.getAddress() };
+      const result = await loadShieldedIdentityAuthorizationWitnessForMode(
+        contract as unknown as Contract,
+        17n,
+        mode,
+        scope,
+      );
+      expect(result.witness).toEqual(getShieldedIdentityAuthorizationWitness(f.after, 17n));
+      expect(result.stateRoot).toBe(f.after.root);
+      expect(result.blockHash).toBe("0xblock-20");
+      expect(result.chainId).toBe(31337n);
+      expect(result.authorizationStateAddress).toBe(scope.authorizationStateAddress);
+      expect(getCounterProof).not.toHaveBeenCalled();
+      expect(f.provider.getLogs).toHaveBeenCalled();
+      for (const [filter] of f.provider.getLogs.mock.calls)
+        expect(filter.topics).toEqual([
+          f.contract.interface.getEvent("CounterIncremented")!.topicHash,
+        ]);
+    },
+  );
+
+  it("uses explicit chain mode even when historical logs cannot be read", async () => {
+    const f = pathFixture();
+    const result = await loadShieldedIdentityAuthorizationWitnessForMode(
+      f.contract as unknown as Contract,
+      17n,
+      "chain",
+      f.scope,
+    );
+    expect(result.witness.authorizationCounter).toBe(1n);
+    expect(f.contract.getCounterProof).toHaveBeenCalledExactlyOnceWith(17n, { blockTag: 20 });
+    expect(f.provider.getLogs).not.toHaveBeenCalled();
+  });
+
+  it("rejects unknown request modes before sending any chain requests", async () => {
+    const f = pathFixture();
+    await expect(
+      loadShieldedIdentityAuthorizationWitnessForMode(
+        f.contract as unknown as Contract,
+        17n,
+        "onchain" as ShieldedStateReadMode,
+        f.scope,
+      ),
+    ).rejects.toThrow("Unsupported shielded state read mode");
+    expect(f.provider.getNetwork).not.toHaveBeenCalled();
+    expect(f.contract.getCounterProof).not.toHaveBeenCalled();
+    expect(f.provider.getLogs).not.toHaveBeenCalled();
+  });
+
+  it("does not switch to a targeted query after a rebuild failure", async () => {
+    const f = fixture();
+    f.provider.getLogs.mockRejectedValueOnce(new Error("History unavailable"));
+    const getCounterProof = vi.fn();
+    await expect(
+      loadShieldedIdentityAuthorizationWitnessForMode(
+        { ...f.contract, getCounterProof } as unknown as Contract,
+        17n,
+      ),
+    ).rejects.toThrow("History unavailable");
+    expect(getCounterProof).not.toHaveBeenCalled();
+  });
+
+  it("does not switch to historical scans after a targeted-query failure", async () => {
+    const f = pathFixture();
+    f.contract.getCounterProof.mockRejectedValueOnce(new Error("Path unavailable"));
+    await expect(
+      loadShieldedIdentityAuthorizationWitnessForMode(
+        f.contract as unknown as Contract,
+        17n,
+        "chain",
+        f.scope,
+      ),
+    ).rejects.toThrow("Path unavailable");
+    expect(f.provider.getLogs).not.toHaveBeenCalled();
+  });
+
+  it("rejects replay root, scope and anchor mismatches without trying a targeted query", async () => {
+    for (const failure of ["root", "scope", "reorg", "switch"] as const) {
+      const f = fixture();
+      const getCounterProof = vi.fn();
+      if (failure === "root") f.contract.currentRoot.mockResolvedValueOnce(42n);
+      if (failure === "reorg")
+        f.provider.getBlock
+          .mockResolvedValueOnce({ hash: "0xblock-20", timestamp: 1200 })
+          .mockResolvedValueOnce({ hash: "0xreorg", timestamp: 1200 });
+      if (failure === "switch")
+        f.provider.getNetwork
+          .mockResolvedValueOnce({ chainId: 31337n })
+          .mockResolvedValueOnce({ chainId: 1030n });
+      const scope = {
+        chainId: failure === "scope" ? 1030n : 31337n,
+        authorizationStateAddress: await f.contract.getAddress(),
+      };
+      await expect(
+        loadShieldedIdentityAuthorizationWitnessForMode(
+          { ...f.contract, getCounterProof } as unknown as Contract,
+          17n,
+          "rebuild",
+          scope,
+        ),
+      ).rejects.toThrow();
+      expect(getCounterProof).not.toHaveBeenCalled();
+    }
   });
 });
 

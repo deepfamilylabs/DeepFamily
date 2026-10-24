@@ -55,8 +55,9 @@ const boundedInteger = (value: unknown, maximum: number, label: string, minimum 
 const copyPath = (path: Path): Path => ({ ...path, siblings: [...path.siblings] });
 
 /** Only authenticated, explicitly requested leaves exist in this local view of the global tree. */
-class RequestedLineagePaths implements LineageTree {
+export class RequestedLineagePaths implements LineageTree {
   readonly #paths = new Map<bigint, Path>();
+  readonly #indices = new Map<bigint, bigint>();
   constructor(
     readonly root: bigint,
     readonly sizeBigInt: bigint,
@@ -74,7 +75,7 @@ class RequestedLineagePaths implements LineageTree {
   }
   clone() {
     const clone = new RequestedLineagePaths(this.root, this.sizeBigInt);
-    for (const [index, path] of this.#paths) clone.#paths.set(index, copyPath(path));
+    for (const [index, path] of this.#paths) clone.add(index, path);
     return clone;
   }
   insert(): never {
@@ -84,8 +85,13 @@ class RequestedLineagePaths implements LineageTree {
     throw new Error("A requested lineage path snapshot is read-only");
   }
   indexOf(leaf: bigint) {
-    for (const [index, path] of this.#paths) if (path.leaf === leaf) return index;
-    return -1;
+    return this.#indices.get(leaf) ?? -1;
+  }
+  getNode(): never {
+    throw new Error("A requested lineage snapshot does not expose a complete node store");
+  }
+  exportNodes(): never {
+    throw new Error("A requested lineage snapshot cannot export a complete tree");
   }
   generateProof(index: BigNumberish): Path {
     const path = this.#paths.get(BigInt(index.toString()));
@@ -93,7 +99,11 @@ class RequestedLineagePaths implements LineageTree {
     return copyPath(path);
   }
   add(index: bigint, path: Path) {
+    const previous = this.#paths.get(index);
+    if (previous && previous.leaf !== path.leaf) throw new Error("Conflicting authenticated lineage paths");
     this.#paths.set(index, copyPath(path));
+    const found = this.#indices.get(path.leaf);
+    if (found === undefined || index < found) this.#indices.set(path.leaf, index);
   }
 }
 
