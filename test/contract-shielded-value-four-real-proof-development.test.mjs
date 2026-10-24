@@ -81,7 +81,7 @@ describe("development-key real proofs for four-input VALUE routes", function () 
         inputShardIds: [0n, 0n],
         inputRoots: [0n, 0n],
         inputNullifiers: [0n, 0n],
-        periodNullifiers: Array(12).fill(0n),
+        periodNullifiers: Array(3).fill(0n),
         outputCommitments: notes.map((note) => note.commitment),
         outputCiphertexts: notes.map((note) => note.ciphertext),
         relation0: 0n,

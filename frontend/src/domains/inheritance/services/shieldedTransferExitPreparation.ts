@@ -23,7 +23,7 @@ import { validateShieldedKeyMaterial, type ShieldedKeyMaterial } from "./shielde
 
 const MAX_UINT64 = (1n << 64n) - 1n;
 const MAX_UINT128 = (1n << 128n) - 1n;
-const ZERO_PERIOD_NULLIFIERS = Array<bigint>(12).fill(0n);
+const ZERO_PERIOD_NULLIFIERS = Array<bigint>(3).fill(0n);
 type ValueNote = { ownerCommitment: bigint; amount: bigint; nonce: bigint };
 
 export type ShieldedValueInput = {

@@ -67,7 +67,7 @@ const zeroData = () => ({
   inputShardIds: [0n, 0n],
   inputRoots: [0n, 0n],
   inputNullifiers: [0n, 0n],
-  periodNullifiers: Array(12).fill(0n),
+  periodNullifiers: Array(3).fill(0n),
   outputCommitments: [0n, 0n],
   outputCiphertexts: ["0x", "0x"],
   relation0: 0n,
@@ -1021,15 +1021,15 @@ export async function runShieldedAcceptanceSmoke({
       "Public funding spent its private read-only template",
     );
 
-    const claimAsOf = eligibleFrom + 12n * PERIOD;
-    const remainingBudget = await budgetNote(300n, "claim");
-    const payout = await valueNote(childKeys, 1200n);
+    const claimAsOf = eligibleFrom + 3n * PERIOD;
+    const remainingBudget = await budgetNote(1200n, "claim");
+    const payout = await valueNote(childKeys, 300n);
     const claimPaths = await Promise.all([notePath(budget), notePath(additionalFundingBudget)]);
     const [budgetClaimPath, secondClaimPath] = claimPaths;
     const claimData = {
       ...zeroData(),
       ...inputs(claimPaths, [spend(budget), spend(additionalFundingBudget)]),
-      periodNullifiers: Array.from({ length: 12 }, (_, periodIndex) =>
+      periodNullifiers: Array.from({ length: 3 }, (_, periodIndex) =>
         computeShieldedPeriodNullifier(
           {
             derivedSecretField: childMaterial.derivedSecretField,
@@ -1091,13 +1091,13 @@ export async function runShieldedAcceptanceSmoke({
         secondNoteDepth: secondClaimPath.depth,
         secondNoteIndex: secondClaimPath.index,
         secondNoteSiblings: secondClaimPath.siblings,
-        claimCount: "12",
-        periodIndices: Array.from({ length: 12 }, (_, index) => String(index)),
+        claimCount: "3",
+        periodIndices: Array.from({ length: 3 }, (_, index) => String(index)),
         newBudgetNonce: String(remainingBudget.nonce),
         payoutNonce: String(payout.nonce),
       },
       claimInputs.signals,
-      { execution: "verifier-call", claimCount: 12, asOf: String(claimAsOf) },
+      { execution: "verifier-call", claimCount: 3, asOf: String(claimAsOf) },
     );
     assert.equal(
       await pool.nullifierSpent(spend(budget)),
@@ -1110,8 +1110,8 @@ export async function runShieldedAcceptanceSmoke({
       "Verifier-only claim emitted a payout",
     );
 
-    const identityRemainder = await identityBudgetNote(300n);
-    const identityPayout = await valueNote(childKeys, 1200n);
+    const identityRemainder = await identityBudgetNote(1200n);
+    const identityPayout = await valueNote(childKeys, 300n);
     const publicClaimPath = await notePath(publicBudget);
     const identityClaimData = {
       ...zeroData(),
@@ -1119,7 +1119,7 @@ export async function runShieldedAcceptanceSmoke({
         [publicClaimPath, publicClaimPath],
         [spend(publicBudget), dummySpend(publicBudget)],
       ),
-      periodNullifiers: Array.from({ length: 12 }, (_, index) =>
+      periodNullifiers: Array.from({ length: 3 }, (_, index) =>
         computeShieldedPeriodNullifier(
           {
             derivedSecretField: childMaterial.derivedSecretField,
@@ -1181,13 +1181,13 @@ export async function runShieldedAcceptanceSmoke({
         secondNoteDepth: "0",
         secondNoteIndex: "0",
         secondNoteSiblings: Array(32).fill("0"),
-        claimCount: "12",
-        periodIndices: Array.from({ length: 12 }, (_, index) => String(index)),
+        claimCount: "3",
+        periodIndices: Array.from({ length: 3 }, (_, index) => String(index)),
         newBudgetNonce: String(identityRemainder.nonce),
         payoutNonce: String(identityPayout.nonce),
       },
       identityClaimInputs.signals,
-      { execution: "verifier-call", claimCount: 12, asOf: String(claimAsOf) },
+      { execution: "verifier-call", claimCount: 3, asOf: String(claimAsOf) },
     );
     assert.equal(
       await pool.nullifierSpent(spend(publicBudget)),
@@ -1335,7 +1335,7 @@ export async function runShieldedAcceptanceSmoke({
       scenario: {
         fundLabel: "shielded-action-fund",
         claimExecution: "verifier-call",
-        claimCount: 12,
+        claimCount: 3,
         claimAsOf: String(claimAsOf),
         periodDays: String(PERIOD_DAYS),
         eligibleFrom: String(eligibleFrom),

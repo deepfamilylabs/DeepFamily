@@ -169,9 +169,9 @@ const shieldedArtifactInspector = () => ({
     circuits: structuredClone(SHIELDED_MANIFEST_CIRCUITS),
     releaseCriteria: {
       fundMaxGas: 300_000,
-      claim12MaxGas: 300_000,
+      claim3MaxGas: 300_000,
       browserFundMaxMs: 60_000,
-      browserClaim12MaxMs: 60_000,
+      browserClaim3MaxMs: 60_000,
       recoveryMaxMs: 60_000,
       recoveryMinEvents: 1,
     },
@@ -335,7 +335,7 @@ const shieldedProofs = (chainId) =>
       signals[1] = BigInt(SHIELDED_ADDRESSES.shieldedErc20Pool).toString();
       // asOf closes the fund and claim inputs.
       if (action === "fund") signals[signals.length - 1] = "1000";
-      if (action === "claim") signals[signals.length - 1] = String(8200 + 12 * 2_592_000);
+      if (action === "claim") signals[signals.length - 1] = String(8200 + 3 * 2_592_000);
       return [
         action,
         {
@@ -350,7 +350,7 @@ const shieldedProofs = (chainId) =>
           publicSignalsSha256: createHash("sha256").update(JSON.stringify(signals)).digest("hex"),
           execution: action === "claim" ? "verifier-call" : "transaction",
           ...(action === "claim"
-            ? { claimCount: 12 }
+            ? { claimCount: 3 }
             : { transactionLabel: `shielded-action-${action}` }),
         },
       ];
@@ -526,7 +526,7 @@ const validReportTemplate = () => ({
       identityBudget: identityBudgetEvidence(CHAIN_ID),
       fundLabel: "shielded-action-fund",
       claimExecution: "verifier-call",
-      claimCount: 12,
+      claimCount: 3,
       receiveCode: {
         verificationKeySha256: SHIELDED_VERIFICATION_KEY_SHA256,
         proofSha256: SHIELDED_PROOF_SHA256,
@@ -538,7 +538,7 @@ const validReportTemplate = () => ({
       noteDepth: 1,
       eligibleFrom: "8200",
       periodDays: "30",
-      claimAsOf: String(8200 + 12 * 2_592_000),
+      claimAsOf: String(8200 + 3 * 2_592_000),
     },
     receipts: {
       rpcChecks: "passed",
@@ -795,7 +795,7 @@ describe("schema v1 initial-mainnet-release rehearsal evidence", function () {
     expect(result.publicSummary.shielded).to.deep.include({
       manifestSha256: SHIELDED_MANIFEST_SHA256,
       proofCount: 5,
-      claimCount: 12,
+      claimCount: 3,
       lineageDepth: 1,
       noteDepth: 1,
     });
@@ -1589,7 +1589,7 @@ describe("schema v1 initial-mainnet-release rehearsal evidence", function () {
         (report) => (report.zkCeremonyVerification.shielded.ptau.sha256 = "ff".repeat(32)),
         /zkCeremonyVerification\.shielded\.ptau\.sha256/iu,
       ],
-      [(report) => (report.shielded.scenario.claimCount = 11), /shielded\.scenario\.claimCount/iu],
+      [(report) => (report.shielded.scenario.claimCount = 2), /shielded\.scenario\.claimCount/iu],
       [
         (report) => (report.shielded.scenario.identityBudget.claimProof.execution = "transaction"),
         /shielded\.proofs\.claim\.execution/iu,

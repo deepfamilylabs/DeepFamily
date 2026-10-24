@@ -233,10 +233,10 @@ describe("shielded claim budget options", () => {
     ).toBe(result[1].key);
   });
 
-  it("combines compatible fragments with no more than two inputs or twelve periods", () => {
-    const first = budget(1n, { remaining: 600n });
-    const second = budget(2n, { remaining: 600n });
-    const third = budget(3n, { remaining: 600n });
+  it("combines compatible fragments with no more than two inputs or three periods", () => {
+    const first = budget(1n, { remaining: 100n });
+    const second = budget(2n, { remaining: 200n });
+    const third = budget(3n, { remaining: 300n });
     const result = listShieldedClaimBudgetOptions(
       [
         third,
@@ -254,12 +254,12 @@ describe("shielded claim budget options", () => {
 
     expect(result).toHaveLength(1);
     expect(result[0].notes).toEqual([first, second, third]);
-    expect(result[0].overview.totalRemaining).toBe(1_800n);
+    expect(result[0].overview.totalRemaining).toBe(600n);
     expect(result[0].overview.claim).toEqual({
       budget: first,
       secondBudget: second,
-      periodIndices: Array.from({ length: 12 }, (_, index) => BigInt(index)),
-      amount: 1_200n,
+      periodIndices: Array.from({ length: 3 }, (_, index) => BigInt(index)),
+      amount: 300n,
     });
   });
 

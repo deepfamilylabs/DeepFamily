@@ -42,9 +42,9 @@ const captureError = async (operation) => {
 };
 const criteria = {
   fundMaxGas: 3000000,
-  claim12MaxGas: 3000000,
+  claim3MaxGas: 3000000,
   browserFundMaxMs: 60000,
-  browserClaim12MaxMs: 60000,
+  browserClaim3MaxMs: 60000,
   recoveryMaxMs: 30000,
   recoveryMinEvents: 100,
 };

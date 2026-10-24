@@ -227,15 +227,15 @@ npm run zk:setup -- \
 
 To record shielded release thresholds, optionally pass
 `--shielded-release-criteria <reviewed-criteria.json>`. Supply a reviewed JSON file containing
-six positive integer limits: `fundMaxGas`, `claim12MaxGas`,
-`browserFundMaxMs`, `browserClaim12MaxMs`, `recoveryMaxMs`, and `recoveryMinEvents`.
+six positive integer limits: `fundMaxGas`, `claim3MaxGas`,
+`browserFundMaxMs`, `browserClaim3MaxMs`, `recoveryMaxMs`, and `recoveryMinEvents`.
 Key generation and cryptographic verification do not require these performance limits.
 `release:preflight` requires them alongside two independent audits and a hashed runtime benchmark
 report before publication. The benchmark report uses
 `deepfamily/shielded-runtime-benchmarks@1` and is referenced by
 `release-evidence/shielded/release-evidence.json` using
 `deepfamily/shielded-release-evidence@1`. Its full-depth result is a locally verified 64/32-depth
-cryptographic proof; initial fund and 12-period claim gas come from successful local pool
+cryptographic proof; initial fund and 3-period claim gas come from successful local pool
 transactions. Browser timing and public-event recovery are measured separately. The unified
 testnet acceptance command produces the on-chain deployment and receipt report after preflight;
 no separate shielded testnet report is required to start that command.

@@ -1262,9 +1262,9 @@ const requireShieldedAcceptanceEvidence = (report, repositoryRoot, expectedChain
     "shielded production releaseCriteria",
     [
       "fundMaxGas",
-      "claim12MaxGas",
+      "claim3MaxGas",
       "browserFundMaxMs",
-      "browserClaim12MaxMs",
+      "browserClaim3MaxMs",
       "recoveryMaxMs",
       "recoveryMinEvents",
     ],
@@ -1389,7 +1389,7 @@ const requireShieldedAcceptanceEvidence = (report, repositoryRoot, expectedChain
     );
     if (action === "claim") {
       requireExact(proof.execution, "verifier-call", `shielded.proofs.${action}.execution`);
-      requireExact(proof.claimCount, 12, `shielded.proofs.${action}.claimCount`);
+      requireExact(proof.claimCount, 3, `shielded.proofs.${action}.claimCount`);
       if (Object.hasOwn(proof, "transactionLabel"))
         throw new Error("Future-maturity claim proof must not claim an executed pool transaction");
     } else {
@@ -1406,7 +1406,7 @@ const requireShieldedAcceptanceEvidence = (report, repositoryRoot, expectedChain
   const scenario = requireRecord(evidence.scenario, "shielded.scenario");
   requireExact(scenario.fundLabel, "shielded-action-fund", "shielded.scenario.fundLabel");
   requireExact(scenario.claimExecution, "verifier-call", "shielded.scenario.claimExecution");
-  requireExact(scenario.claimCount, 12, "shielded.scenario.claimCount");
+  requireExact(scenario.claimCount, 3, "shielded.scenario.claimCount");
   const identityBudget = requireRecord(scenario.identityBudget, "shielded.scenario.identityBudget");
   requireExact(
     identityBudget.fundingLabel,
@@ -1444,9 +1444,9 @@ const requireShieldedAcceptanceEvidence = (report, repositoryRoot, expectedChain
   if (
     identityRate === 0n ||
     identityRate >= 1n << 128n ||
-    BigInt(identityBudget.remaining) < identityRate * 12n
+    BigInt(identityBudget.remaining) < identityRate * 3n
   )
-    throw new Error("identityBudget cannot cover twelve periods");
+    throw new Error("identityBudget cannot cover three periods");
   requireExact(identityBudget.eligibleFrom, scenario.eligibleFrom, "identityBudget.eligibleFrom");
   requireExact(identityBudget.periodDays, scenario.periodDays, "identityBudget.periodDays");
   requireExact(
@@ -1454,7 +1454,7 @@ const requireShieldedAcceptanceEvidence = (report, repositoryRoot, expectedChain
     proofs.claim.publicSignals.at(-1),
     "identityBudget claim maturity",
   );
-  for (let index = 8; index < 20; index++)
+  for (let index = 8; index < 11; index++)
     requireExact(
       identityClaimSignals[index],
       proofs.claim.publicSignals[index],
@@ -1507,8 +1507,8 @@ const requireShieldedAcceptanceEvidence = (report, repositoryRoot, expectedChain
     throw new Error("shielded.scenario.periodDays must be a positive canonical decimal");
   const periodDays = BigInt(scenario.periodDays);
   if (periodDays > MAX_UINT32) throw new Error("shielded.scenario.periodDays must fit in uint32");
-  if (BigInt(scenario.claimAsOf) < eligibleFrom + 12n * periodDays * SECONDS_PER_DAY)
-    throw new Error("shielded claim proof does not mature twelve periods");
+  if (BigInt(scenario.claimAsOf) < eligibleFrom + 3n * periodDays * SECONDS_PER_DAY)
+    throw new Error("shielded claim proof does not mature three periods");
   const receipts = requireRecord(evidence.receipts, "shielded.receipts");
   requireExact(receipts.rpcChecks, "passed", "shielded.receipts.rpcChecks");
   requireExact(receipts.chainId, expectedChainId, "shielded.receipts.chainId");
@@ -1554,7 +1554,7 @@ const requireShieldedAcceptanceEvidence = (report, repositoryRoot, expectedChain
     proofCount: actions.length,
     transactionActions: actions.filter((action) => proofs[action].execution === "transaction"),
     verifierCallActions: actions.filter((action) => proofs[action].execution === "verifier-call"),
-    claimCount: 12,
+    claimCount: 3,
     lineageDepth: scenario.lineageDepth,
     noteDepth: scenario.noteDepth,
   };

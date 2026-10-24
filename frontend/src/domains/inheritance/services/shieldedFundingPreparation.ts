@@ -48,7 +48,7 @@ const MAX_UINT64 = (1n << 64n) - 1n;
 const MAX_UINT32 = (1n << 32n) - 1n;
 const MAX_UINT128 = (1n << 128n) - 1n;
 const PROOF_LIFETIME = SHIELDED_FUNDING_START_DELAY_SECONDS;
-const ZERO_PERIODS = Array<bigint>(12).fill(0n);
+const ZERO_PERIODS = Array<bigint>(3).fill(0n);
 
 export type SavedTemplate<T> = {
   /** Locally saved plaintext and public envelope. Do not send plaintext to an RPC. */

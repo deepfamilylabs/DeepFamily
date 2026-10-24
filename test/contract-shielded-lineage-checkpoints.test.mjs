@@ -21,7 +21,7 @@ const actionData = (overrides = {}) => ({
   inputShardIds: [0n, 0n],
   inputRoots: [0n, 0n],
   inputNullifiers: [0n, 0n],
-  periodNullifiers: Array(12).fill(0n),
+  periodNullifiers: Array(3).fill(0n),
   outputCommitments: [101n, 102n],
   outputCiphertexts: [`0x${"01".repeat(512)}`, `0x${"02".repeat(512)}`],
   relation0: 0n,
@@ -117,7 +117,7 @@ describe("Shielded lineage checkpoint integration", function () {
     const claim = {
       ...data,
       receiveAuthorizations: emptyShieldedReceiveAuthorizations(),
-      periodNullifiers: Array.from({ length: 12 }, (_, i) => 500n + BigInt(i)),
+      periodNullifiers: Array.from({ length: 3 }, (_, i) => 500n + BigInt(i)),
     };
     await authorizeMockReceive(hre, pool, data, 3, [777n, 0n]);
     return {

@@ -383,14 +383,14 @@ describe("local shielded claim preparation", () => {
     expect(witness.secondNoteSiblings).toEqual(Array(32).fill("0"));
     const nullifiers = witness.inputNullifiers as string[];
     expect(nullifiers[0]).not.toBe(nullifiers[1]);
-    expect(witness.periodNullifiers).toHaveLength(12);
+    expect(witness.periodNullifiers).toHaveLength(3);
     expect(witness.endorsementRoot).toBe(String(input.lineage.endorsementTree.root));
     expect(witness.trustedRoot).toBe(String(input.lineage.trustedTree.root));
     expect(witness).not.toHaveProperty("amount");
     expect(witness).not.toHaveProperty("recipient");
     expect(prepared.amount).toBe(100n);
     expect(prepared.witness.remainingPeriods).toBe("12");
-    expect(prepared.witness.periodIndices).toEqual(["0", ...Array(11).fill("0")]);
+    expect(prepared.witness.periodIndices).toEqual(["0", ...Array(2).fill("0")]);
     expect(prepared.witness.endorsementSiblings).toHaveLength(64);
     expect(prepared.witness.trustedSiblings).toHaveLength(64);
     expect(prepared.witness.noteSiblings).toHaveLength(32);
@@ -482,19 +482,19 @@ describe("local shielded claim preparation", () => {
     }
   });
 
-  it("claims 12 whole matured periods while preserving the original enrollment", async () => {
+  it("claims 3 whole matured periods while preserving the original enrollment", async () => {
     const input = await fixture();
     const prepared = await prepareShieldedClaim({
       ...input,
-      periodIndices: Array.from({ length: 12 }, (_, index) => BigInt(index)),
+      periodIndices: Array.from({ length: 3 }, (_, index) => BigInt(index)),
     });
-    expect(prepared.amount).toBe(1_200n);
-    expect(prepared.outputs[0].note.remaining).toBe(0n);
+    expect(prepared.amount).toBe(300n);
+    expect(prepared.outputs[0].note.remaining).toBe(900n);
     expect(prepared.outputs[0].note.eligibleFrom).toBe(eligibleFrom);
     expect(prepared.outputs[0].note.binding).not.toBe("identity");
     if (prepared.outputs[0].note.binding !== "identity")
       expect(prepared.outputs[0].note.enrollmentSalt).toBe(444n);
-    expect(prepared.outputs[1].note.amount).toBe(1_200n);
+    expect(prepared.outputs[1].note.amount).toBe(300n);
     expect(prepared.data.periodNullifiers[0]).toBe(
       computeShieldedPeriodNullifier(
         {
@@ -505,12 +505,12 @@ describe("local shielded claim preparation", () => {
         { chainId, poolAddress },
       ),
     );
-    expect(prepared.data.periodNullifiers[11]).toBe(
+    expect(prepared.data.periodNullifiers[2]).toBe(
       computeShieldedPeriodNullifier(
         {
           derivedSecretField,
           policyCommitment: input.policyCommitment,
-          periodIndex: 11n,
+          periodIndex: 2n,
         },
         { chainId, poolAddress },
       ),
@@ -572,13 +572,13 @@ describe("local shielded claim preparation", () => {
 
   it("rejects missing, immature, duplicate, oversized, and unfunded period batches", async () => {
     const input = await fixture();
-    await expect(prepareShieldedClaim({ ...input, periodIndices: [] })).rejects.toThrow("1 to 12");
+    await expect(prepareShieldedClaim({ ...input, periodIndices: [] })).rejects.toThrow("1 to 3");
     await expect(
       prepareShieldedClaim({
         ...input,
-        periodIndices: Array.from({ length: 13 }, (_, index) => BigInt(index)),
+        periodIndices: Array.from({ length: 4 }, (_, index) => BigInt(index)),
       }),
-    ).rejects.toThrow("1 to 12");
+    ).rejects.toThrow("1 to 3");
     await expect(
       prepareShieldedClaim({ ...input, asOf: eligibleFrom + period - 1n }),
     ).rejects.toThrow("not yet due");
@@ -673,7 +673,7 @@ describe("local shielded claim preparation", () => {
           const prepared = await prepareShieldedClaim({
             ...input,
             secondBudgetCommitment,
-            periodIndices: Array.from({ length: 12 }, (_, index) => BigInt(index)),
+            periodIndices: Array.from({ length: 3 }, (_, index) => BigInt(index)),
           });
           fs.writeFileSync(inputPath, JSON.stringify(prepared.witness));
           execFileSync(

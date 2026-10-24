@@ -359,9 +359,9 @@
               "type": "uint256[]"
             },
             {
-              "internalType": "uint256[12]",
+              "internalType": "uint256[3]",
               "name": "periodNullifiers",
-              "type": "uint256[12]"
+              "type": "uint256[3]"
             },
             {
               "internalType": "uint256[2]",
@@ -516,9 +516,9 @@
               "type": "uint256[]"
             },
             {
-              "internalType": "uint256[12]",
+              "internalType": "uint256[3]",
               "name": "periodNullifiers",
-              "type": "uint256[12]"
+              "type": "uint256[3]"
             },
             {
               "internalType": "uint256[2]",
@@ -757,9 +757,9 @@
               "type": "uint256[]"
             },
             {
-              "internalType": "uint256[12]",
+              "internalType": "uint256[3]",
               "name": "periodNullifiers",
-              "type": "uint256[12]"
+              "type": "uint256[3]"
             },
             {
               "internalType": "uint256[2]",
@@ -882,9 +882,9 @@
               "type": "uint256[]"
             },
             {
-              "internalType": "uint256[12]",
+              "internalType": "uint256[3]",
               "name": "periodNullifiers",
-              "type": "uint256[12]"
+              "type": "uint256[3]"
             },
             {
               "internalType": "uint256[2]",
@@ -1000,9 +1000,9 @@
               "type": "uint256[]"
             },
             {
-              "internalType": "uint256[12]",
+              "internalType": "uint256[3]",
               "name": "periodNullifiers",
-              "type": "uint256[12]"
+              "type": "uint256[3]"
             },
             {
               "internalType": "uint256[2]",
@@ -1135,9 +1135,9 @@
               "type": "uint256[]"
             },
             {
-              "internalType": "uint256[12]",
+              "internalType": "uint256[3]",
               "name": "periodNullifiers",
-              "type": "uint256[12]"
+              "type": "uint256[3]"
             },
             {
               "internalType": "uint256[2]",

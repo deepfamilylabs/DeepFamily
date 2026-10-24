@@ -83,7 +83,7 @@ describe("integrated shielded acceptance smoke", function () {
     assert.equal(result.scenario.fundLabel, "shielded-action-fund");
     assert.equal(result.scenario.receiveCode.verified, true);
     assert.equal(result.proofs.claim.execution, "verifier-call");
-    assert.equal(result.scenario.claimCount, 12);
+    assert.equal(result.scenario.claimCount, 3);
     assert.equal(result.scenario.periodDays, "7");
     assert.equal(result.scenario.recoveredNotes, result.scenario.recoveryEventCount);
     assert.equal(result.scenario.totalShieldedAfter, "3400");
@@ -95,11 +95,11 @@ describe("integrated shielded acceptance smoke", function () {
     assert.equal(result.scenario.identityBudget.fundProof.publicSignals[13], "7");
     const publicPeriodNullifiers = result.scenario.identityBudget.claimProof.publicSignals.slice(
       8,
-      20,
+      11,
     );
-    const privatePeriodNullifiers = result.proofs.claim.publicSignals.slice(8, 20);
+    const privatePeriodNullifiers = result.proofs.claim.publicSignals.slice(8, 11);
     assert.notDeepEqual(publicPeriodNullifiers, privatePeriodNullifiers);
-    assert.equal(new Set(publicPeriodNullifiers).size, 12);
-    assert.equal(new Set(privatePeriodNullifiers).size, 12);
+    assert.equal(new Set(publicPeriodNullifiers).size, 3);
+    assert.equal(new Set(privatePeriodNullifiers).size, 3);
   });
 });

@@ -17,9 +17,9 @@ import {
 
 const criteria = {
   fundMaxGas: 3_000_000,
-  claim12MaxGas: 3_000_000,
+  claim3MaxGas: 3_000_000,
   browserFundMaxMs: 30_000,
-  browserClaim12MaxMs: 30_000,
+  browserClaim3MaxMs: 30_000,
   recoveryMaxMs: 30_000,
   recoveryMinEvents: 2,
 };
@@ -43,20 +43,20 @@ const benchmarkReport = (manifestSha256) => ({
       transactionGasLimit: 2_000_000,
       blockGasLimit: 30_000_000,
     },
-    claim12: {
+    claim3: {
       measurement: "local-pool-transaction",
       receiptStatus: 1,
       gasUsed: 1_000_000,
       transactionGasLimit: 2_000_000,
       blockGasLimit: 30_000_000,
-      claimedPeriods: 12,
+      claimedPeriods: 3,
     },
   },
   browserProof: {
     device: "test device",
     browser: "test browser",
     fundMs: 1_000,
-    claim12Ms: 1_000,
+    claim3Ms: 1_000,
   },
   recovery: {
     cacheCleared: true,
@@ -82,7 +82,7 @@ describe("unified shielded runtime benchmarks", function () {
       "Full 64/32-depth",
     );
     const noReceipt = report();
-    noReceipt.localPoolGas.claim12.measurement = "verifier-call";
+    noReceipt.localPoolGas.claim3.measurement = "verifier-call";
     expect(() => assertRuntimeBenchmarkReport(noReceipt, manifestSha256, criteria)).to.throw(
       "successful local pool transaction",
     );

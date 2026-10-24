@@ -526,7 +526,7 @@ test("shielded claim constraints", async (t) => {
         ).toString(),
         witness.periodNullifiers[0],
       );
-      assert.equal(witness.periodNullifiers.length, 12);
+      assert.equal(witness.periodNullifiers.length, 3);
       assert.equal(
         computeShieldedDummyPeriodNullifier(
           {
@@ -583,15 +583,15 @@ test("shielded claim constraints", async (t) => {
       );
       assert.match(check, /WITNESS IS CORRECT/u);
     });
-    await t.test("twelve full periods", async () => {
-      await valid(buildShieldedClaimFixture({ claimCount: 12, remainingPeriods: 12 }).witness);
+    await t.test("three full periods", async () => {
+      await valid(buildShieldedClaimFixture({ claimCount: 3, remainingPeriods: 3 }).witness);
     });
     await t.test(
       "two budgets jointly fund a claim exceeding either individual balance",
       async () => {
         await valid(
           buildShieldedClaimFixture({
-            claimCount: 4,
+            claimCount: 3,
             remainingPeriods: 2,
             secondRemainingPeriods: 2,
           }).witness,
@@ -800,10 +800,10 @@ test("shielded claim constraints", async (t) => {
     });
 
     const base = buildShieldedClaimFixture().witness;
-    await t.test("rejects 13 periods", async () => {
+    await t.test("rejects four periods", async () => {
       await invalid(
         mutate(base, (w) => {
-          w.claimCount = "13";
+          w.claimCount = "4";
         }),
       );
     });

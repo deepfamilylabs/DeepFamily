@@ -40,7 +40,7 @@ export const SHIELDED_INHERITANCE_DOMAINS = Object.freeze({
 });
 
 export const SHIELDED_POOL_PROTOCOL_VERSION = 1;
-export const SHIELDED_MAX_BATCH_PERIODS = 12;
+export const SHIELDED_MAX_BATCH_PERIODS = 3;
 export const SHIELDED_CIPHERTEXT_BYTES = 512;
 const MAX_FIELD = SNARK_SCALAR_FIELD - 1n;
 const field = (value, label) => bigintFrom(value, label, MAX_FIELD);
@@ -395,7 +395,7 @@ export function computeShieldedDummyInputNullifier(input, scope) {
   ]);
 }
 
-/** Validate a 1–12 period all-or-nothing claim before witness construction. */
+/** Validate a 1–3 period all-or-nothing claim before witness construction. */
 export function computeShieldedClaimBatch(input) {
   const rate = nonzeroAmount(input.amountPerPeriod, "amountPerPeriod");
   const remaining = uint128(input.remaining, "remaining");
@@ -417,7 +417,7 @@ export function computeShieldedClaimBatch(input) {
       input.periodIndices.length >= 1 &&
       input.periodIndices.length <= SHIELDED_MAX_BATCH_PERIODS,
     "INVALID_SHIELDED_BATCH_SIZE",
-    "Claim batch must contain 1 to 12 periods",
+    "Claim batch must contain 1 to 3 periods",
   );
   const periods = input.periodIndices.map((value, index) =>
     uint64(value, `periodIndices[${index}]`),

@@ -120,8 +120,8 @@ function copyActionData(data: ShieldedPoolActionData): ContractActionData {
   ) {
     throw new Error("Shielded action needs two or four matching input slots");
   }
-  if (data.periodNullifiers.length !== 12) {
-    throw new Error("Shielded action needs exactly 12 period nullifier slots");
+  if (data.periodNullifiers.length !== 3) {
+    throw new Error("Shielded action needs exactly 3 period nullifier slots");
   }
   if (data.outputCiphertexts.length !== 2) {
     throw new Error("Shielded action needs exactly two output ciphertexts");

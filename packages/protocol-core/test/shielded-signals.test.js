@@ -16,7 +16,7 @@ const ciphertextB = Uint8Array.from({ length: 512 }, () => 0x22);
 const hashA = computeShieldedCiphertextHashField(ciphertextA);
 const hashB = computeShieldedCiphertextHashField(ciphertextB);
 const pool = "0x0000000000000000000000000000000000000001";
-const zeroPeriods = Array(12).fill(0);
+const zeroPeriods = Array(3).fill(0);
 
 const base = {
   chainId: 1030,
@@ -47,7 +47,7 @@ test("each pool action has the verifier input count in ProofConstants.sol", () =
     {
       Shield: 7,
       Fund: 29,
-      Claim: 27,
+      Claim: 18,
       PrivateTransfer: 20,
       Unshield: 20,
     },
@@ -55,7 +55,7 @@ test("each pool action has the verifier input count in ProofConstants.sol", () =
 });
 
 test("claim signals follow the circuit's named public inputs", () => {
-  const periodNullifiers = Array.from({ length: 12 }, (_, i) => i + 15);
+  const periodNullifiers = Array.from({ length: 3 }, (_, i) => i + 15);
   const { signals, witness } = buildShieldedPoolPublicInputs({
     ...base,
     action: SHIELDED_POOL_ACTION.Claim,
@@ -247,7 +247,7 @@ test("data an action does not use must be zero, as the pool requires", () => {
     {
       ...base,
       action: SHIELDED_POOL_ACTION.Fund,
-      periodNullifiers: [1, ...Array(11).fill(0)],
+      periodNullifiers: [1, ...Array(2).fill(0)],
     },
     "fund period nullifier",
   );

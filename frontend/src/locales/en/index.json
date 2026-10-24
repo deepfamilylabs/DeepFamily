@@ -1638,7 +1638,7 @@
       "unshield": "Withdraw to an ordinary wallet"
     },
     "descriptions": {
-      "claim": "Claim up to 12 periods into your private balance.",
+      "claim": "Claim up to 3 periods into your private balance.",
       "fund": "For your confirmed direct children. Funds cannot be taken back; additional funding keeps the original schedule."
     },
     "fields": {
@@ -1773,7 +1773,7 @@
     "familyRecordsIncompatible": "Child budgets on this network require a service update. Contact the maintainer.",
     "transactionFailed": "Transaction success could not be confirmed: {{hash}}. Check its status before retrying.",
     "claimPeriodsLabel": "Periods to claim",
-    "claimPeriodsHint": "All selected by default, up to 12 periods per claim.",
+    "claimPeriodsHint": "All selected by default, up to 3 periods per claim.",
     "claimPeriodOption": "Period {{period}} · {{amount}} {{symbol}}",
     "claimPeriodDue": "Due: {{date}}",
     "selectAllClaimPeriods": "Select all",

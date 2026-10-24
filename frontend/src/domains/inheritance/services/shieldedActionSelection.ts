@@ -67,7 +67,7 @@ function findClaimPeriods(
   const periodSeconds = budget.periodDays * SECONDS_PER_DAY;
   if (elapsed < periodSeconds || budget.amountPerPeriod <= 0n) return [];
   const fundedCount = budget.remaining / budget.amountPerPeriod;
-  const target = Number(fundedCount < 12n ? fundedCount : 12n);
+  const target = Number(fundedCount < 3n ? fundedCount : 3n);
   if (target < 1) return [];
   const dueCount = elapsed / periodSeconds;
   const policyCommitment = getShieldedBudgetCommitments(budget, wallet).policyCommitment;
@@ -87,7 +87,7 @@ function findClaimPeriods(
   return result;
 }
 
-/** Select at most 12 earliest due periods, excluding locally replayed spent nullifiers. */
+/** Select at most 3 earliest due periods, excluding locally replayed spent nullifiers. */
 export function nextClaimPeriods(
   wallet: PeriodWallet,
   derivedSecretField: BigNumberish,
@@ -137,7 +137,7 @@ export function selectClaimBudget(
   for (const budget of budgets) {
     const periodIndices = findClaimPeriods(wallet, derivedSecretField, budget.note, now);
     if (!periodIndices.length) continue;
-    if (periodIndices.length < 12) {
+    if (periodIndices.length < 3) {
       for (const secondBudget of budgets) {
         if (
           secondBudget.commitment === budget.commitment ||

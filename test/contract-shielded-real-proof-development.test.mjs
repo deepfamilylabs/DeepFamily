@@ -73,7 +73,7 @@ const zeroData = () => ({
   inputShardIds: [0n, 0n],
   inputRoots: [0n, 0n],
   inputNullifiers: [0n, 0n],
-  periodNullifiers: Array(12).fill(0n),
+  periodNullifiers: Array(3).fill(0n),
   outputCommitments: [0n, 0n],
   outputCiphertexts: ["0x", "0x"],
   relation0: 0n,
@@ -717,7 +717,7 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
                   { chainId, poolAddress, viewingKey: heirView },
                 ),
           ],
-          periodNullifiers: Array.from({ length: 12 }, (_, slot) =>
+          periodNullifiers: Array.from({ length: 3 }, (_, slot) =>
             slot === 0
               ? computeShieldedPeriodNullifier(
                   {
@@ -744,7 +744,7 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
           lineageCheckpointId: await lineage.currentCheckpointId(),
         };
         const inputs = buildShieldedPoolPublicInputs({ action: 2, chainId, poolAddress, ...data });
-        assert.equal(inputs.signals.length, 27);
+        assert.equal(inputs.signals.length, 18);
         const base = buildShieldedClaimFixture({
           chainId,
           poolAddress,
@@ -897,7 +897,7 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
     });
   }
 
-  it("proves one synthetic full 64/32 path and twelve periods with current public keys", async function () {
+  it("proves one synthetic full 64/32 path and three periods with current public keys", async function () {
     const artifacts = checkedCurrentArtifacts(["claim"]);
     if (artifacts.missing) {
       console.log(
@@ -907,7 +907,7 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
     }
     const { witness, inputBudget, heirIdentityCommitment } = buildShieldedClaimFixture({
       periodDays: PERIOD_DAYS,
-      claimCount: 12,
+      claimCount: 3,
       remainingPeriods: 12,
     });
     const note = syntheticFullMerklePath(inputBudget, 32, (1n << 31n) | 5n, 1100);
@@ -960,7 +960,7 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
           proofEnvironment: "Node.js, not a target browser",
           lineageDepth: 64,
           noteDepth: 32,
-          claimedPeriods: 12,
+          claimedPeriods: 3,
           nodeProofMs,
         }),
       );
@@ -1246,7 +1246,7 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
       chainId,
       poolAddress,
       periodDays: PERIOD_DAYS,
-      claimCount: 12,
+      claimCount: 3,
       remainingPeriods: 12,
     });
     const heirKeys = deriveShieldedHeirKeyMaterial(claimFixture.witness.derivedSecretField);
@@ -1642,7 +1642,7 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
         amount: BigInt(count) * rate,
         nonce: payoutNonce,
       });
-      const periodNullifiers = Array.from({ length: 12 }, (_, slot) =>
+      const periodNullifiers = Array.from({ length: 3 }, (_, slot) =>
         slot < count
           ? computeShieldedPeriodNullifier(
               {
@@ -1661,7 +1661,7 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
               { chainId, poolAddress, viewingKey: heirViewingKey },
             ),
       );
-      assert.equal(new Set(periodNullifiers.map(String)).size, 12);
+      assert.equal(new Set(periodNullifiers.map(String)).size, 3);
       const claimData = {
         ...zeroData(),
         inputRoots: [preClaimRoot, preClaimRoot],
@@ -1741,7 +1741,7 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
     };
 
     const mergedBranch = await hre.networkHelpers.takeSnapshot();
-    const mergedClaim = await makeClaim(12, true);
+    const mergedClaim = await makeClaim(3, true);
     const mergedProof = await prove("claim", mergedClaim.witness, mergedClaim.claimSignals);
     await hre.networkHelpers.time.increaseTo(Number(mergedClaim.claimAsOf));
     await pool.claim(mergedClaim.claimData, mergedProof);
@@ -1762,7 +1762,7 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
         },
         { chainId, poolAddress, viewingKey: heirViewingKey },
       ).note.remaining,
-    ).to.equal(300n);
+    ).to.equal(1200n);
     await expect(pool.claim(mergedClaim.claimData, mergedProof)).to.be.revertedWithCustomError(
       pool,
       "NullifierAlreadySpent",
@@ -2002,40 +2002,42 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
     ).to.equal(1100n);
     await branch.restore();
 
-    // This additional budget contains only three whole periods. A four
-    // period claim is invalid even though all four periods are already due.
-    const fourPeriods = await makeClaim(4);
-    const additionalFundingClaimMembership = compactMembership(await pool.getNoteMerkleProof(0, 4));
+    // A synthetic budget contains only two whole periods. A three-period
+    // claim underflows even when all three periods are already due.
+    const threePeriods = await makeClaim(3);
+    const underfundedBudgetCommitment = poseidon8([
+      computeShieldedScopedPurpose(202610210301n, { chainId, poolAddress }),
+      policyCommitment,
+      enrollmentCommitment,
+      computeShieldedBudgetOwnerAuthorization(
+        { heirOwnerCommitment, viewingKey: heirViewingKey },
+        { chainId, poolAddress },
+      ),
+      rate,
+      200n,
+      additionalFundingBudgetNonce,
+      encryptedAdditionalFundingBudget.ciphertextHashField,
+    ]);
     const underfundedClaimData = {
-      ...fourPeriods.claimData,
+      ...threePeriods.claimData,
+      inputRoots: [underfundedBudgetCommitment, underfundedBudgetCommitment],
       inputNullifiers: [
         computeShieldedSpendNullifier(
           {
             ownerSecret: heirKeys.ownerSecret,
-            noteCommitment: additionalFundingBudgetCommitment,
+            noteCommitment: underfundedBudgetCommitment,
           },
           { chainId, poolAddress, viewingKey: heirViewingKey },
         ),
         computeShieldedDummyInputNullifier(
           {
             ownerSecret: heirKeys.ownerSecret,
-            noteCommitment: additionalFundingBudgetCommitment,
+            noteCommitment: underfundedBudgetCommitment,
           },
           { chainId, poolAddress, viewingKey: heirViewingKey },
         ),
       ],
-      periodNullifiers: Array.from({ length: 12 }, (_, slot) =>
-        slot < 4
-          ? fourPeriods.claimData.periodNullifiers[slot]
-          : computeShieldedDummyPeriodNullifier(
-              {
-                ownerSecret: heirKeys.ownerSecret,
-                budgetNoteCommitment: additionalFundingBudgetCommitment,
-                slotIndex: slot,
-              },
-              { chainId, poolAddress, viewingKey: heirViewingKey },
-            ),
-      ),
+      periodNullifiers: [...threePeriods.claimData.periodNullifiers],
       // Match the field arithmetic the circuit would perform without its
       // uint128/uint64 range checks. This isolates the underflow guard: all
       // input membership, note ownership, and output hashes still line up.
@@ -2051,9 +2053,9 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
           rate,
           FIELD - 100n,
           99999n,
-          fourPeriods.nextBudgetCiphertext.ciphertextHashField,
+          threePeriods.nextBudgetCiphertext.ciphertextHashField,
         ]),
-        fourPeriods.claimData.outputCommitments[1],
+        threePeriods.claimData.outputCommitments[1],
       ],
     };
     const { signals: underfundedClaimSignals, witness: underfundedClaimPublicInputs } =
@@ -2066,49 +2068,49 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
     assertInvalidCircuitWitness(
       "claim",
       {
-        ...fourPeriods.witness,
+        ...threePeriods.witness,
         ...underfundedClaimPublicInputs,
-        remaining: "300",
-        remainingPeriods: "3",
+        remaining: "200",
+        remainingPeriods: "2",
         budgetNonce: String(additionalFundingBudgetNonce),
         budgetCiphertextHash: String(encryptedAdditionalFundingBudget.ciphertextHashField),
-        noteDepth: additionalFundingClaimMembership.depth,
-        noteIndex: additionalFundingClaimMembership.index,
-        noteSiblings: additionalFundingClaimMembership.siblings,
+        noteDepth: "0",
+        noteIndex: "0",
+        noteSiblings: Array(32).fill("0"),
       },
       /ShieldedClaim/u,
     );
 
-    const twelvePeriods = await makeClaim(12);
-    const twelveProof = await prove("claim", twelvePeriods.witness, twelvePeriods.claimSignals);
+    const threePeriodsClaim = await makeClaim(3);
+    const threeProof = await prove("claim", threePeriodsClaim.witness, threePeriodsClaim.claimSignals);
     // The circuit's private count is range constrained even though all public
     // period slots have the same fixed shape.
     assertInvalidCircuitWitness(
       "claim",
-      { ...twelvePeriods.witness, claimCount: "13" },
+      { ...threePeriodsClaim.witness, claimCount: "4" },
       /ShieldedClaim/u,
     );
     expect(onePeriod.claimData.periodNullifiers[0]).to.equal(
-      twelvePeriods.claimData.periodNullifiers[0],
+      threePeriodsClaim.claimData.periodNullifiers[0],
     );
-    await hre.networkHelpers.time.increaseTo(Number(twelvePeriods.claimAsOf));
+    await hre.networkHelpers.time.increaseTo(Number(threePeriodsClaim.claimAsOf));
     await lineage.setRoot(1, trustedRoot + 1n);
-    await pool.claim.staticCall(twelvePeriods.claimData, twelveProof);
+    await pool.claim.staticCall(threePeriodsClaim.claimData, threeProof);
     await expect(
       pool.claim(
-        { ...twelvePeriods.claimData, lineageCheckpointId: await lineage.currentCheckpointId() },
-        twelveProof,
+        { ...threePeriodsClaim.claimData, lineageCheckpointId: await lineage.currentCheckpointId() },
+        threeProof,
       ),
     ).to.be.revertedWithCustomError(pool, "UnknownLineageRoot");
     await lineage.setRoot(1, trustedRoot);
-    const twelveReceipt = await (await pool.claim(twelvePeriods.claimData, twelveProof)).wait();
-    for (const periodTag of twelvePeriods.claimData.periodNullifiers) {
+    const threeReceipt = await (await pool.claim(threePeriodsClaim.claimData, threeProof)).wait();
+    for (const periodTag of threePeriodsClaim.claimData.periodNullifiers) {
       expect(await pool.nullifierSpent(periodTag)).to.equal(true);
     }
     expect(await pool.nullifierSpent(spendBudgetTag)).to.equal(true);
     expect(await pool.totalShielded()).to.equal(2000n);
     const payoutPayload = await decryptShieldedNote({
-      ciphertext: twelvePeriods.payoutNote.ciphertext,
+      ciphertext: threePeriodsClaim.payoutNote.ciphertext,
       hpkeIkm: heirKeys.hpkeIkm,
       chainId,
       poolAddress,
@@ -2117,13 +2119,13 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
       verifyShieldedNotePayload(
         {
           payload: payoutPayload,
-          ciphertext: twelvePeriods.payoutNote.ciphertext,
-          noteCommitment: twelvePeriods.payoutNote.commitment,
+          ciphertext: threePeriodsClaim.payoutNote.ciphertext,
+          noteCommitment: threePeriodsClaim.payoutNote.commitment,
         },
         { chainId, poolAddress, viewingKey: heirViewingKey },
       ).note.amount,
-    ).to.equal(1200n);
-    await expect(pool.claim(twelvePeriods.claimData, twelveProof)).to.be.revertedWithCustomError(
+    ).to.equal(300n);
+    await expect(pool.claim(threePeriodsClaim.claimData, threeProof)).to.be.revertedWithCustomError(
       pool,
       "NullifierAlreadySpent",
     );
@@ -2132,12 +2134,12 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
         chainId,
         poolAddress,
         periodDays: PERIOD_DAYS,
-        claimCount: 13,
+        claimCount: 4,
         remainingPeriods: 13,
       }),
     ).to.throw(RangeError);
     console.log(
-      `local Hardhat gas (not release evidence): fundInitial=${fundReceipt.gasUsed} fundContinuation=${additionalFundingReceipt.gasUsed} claim1=${oneReceipt.gasUsed} claim12=${twelveReceipt.gasUsed}`,
+      `local Hardhat gas (not release evidence): fundInitial=${fundReceipt.gasUsed} fundContinuation=${additionalFundingReceipt.gasUsed} claim1=${oneReceipt.gasUsed} claim3=${threeReceipt.gasUsed}`,
     );
   });
 

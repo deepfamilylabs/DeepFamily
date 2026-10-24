@@ -66,7 +66,7 @@ abstract contract ShieldedPoolCore is ReentrancyGuardTransient {
     uint256[] inputShardIds;
     uint256[] inputRoots;
     uint256[] inputNullifiers;
-    uint256[12] periodNullifiers;
+    uint256[3] periodNullifiers;
     uint256[2] outputCommitments;
     bytes[2] outputCiphertexts;
     // Initial Fund/Claim: endorsement/trusted roots from one accepted checkpoint.
@@ -458,7 +458,7 @@ abstract contract ShieldedPoolCore is ReentrancyGuardTransient {
     signals = new uint256[](
       6 +
         (inputs == 0 ? 0 : 2 * inputs + data.inputNullifiers.length) +
-        (isClaim ? 12 : 0) +
+        (isClaim ? data.periodNullifiers.length : 0) +
         (action == Action.Fund ? 12 : 0) +
         (hasAmount ? 1 : 0) +
         (hasRecipient ? 1 : 0) +
@@ -484,7 +484,9 @@ abstract contract ShieldedPoolCore is ReentrancyGuardTransient {
       }
     }
     if (isClaim) {
-      for (uint256 i = 0; i < 12; ++i) signals[n++] = data.periodNullifiers[i];
+      for (uint256 i = 0; i < data.periodNullifiers.length; ++i) {
+        signals[n++] = data.periodNullifiers[i];
+      }
     }
     signals[n++] = data.outputCommitments[0];
     signals[n++] = data.outputCommitments[1];
@@ -554,7 +556,7 @@ abstract contract ShieldedPoolCore is ReentrancyGuardTransient {
       _spendNullifier(data.inputNullifiers[i]);
     }
     if (isClaim) {
-      for (uint256 i = 0; i < 12; ++i) {
+      for (uint256 i = 0; i < data.periodNullifiers.length; ++i) {
         _spendNullifier(data.periodNullifiers[i]);
       }
     }

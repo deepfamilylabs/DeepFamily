@@ -100,7 +100,7 @@ function withClaimSource(witness, source) {
     poseidon3([scoped(1016n), ownerSecret, old]),
     poseidon3([scoped(1021n), ownerSecret, old]),
   ].map(String);
-  for (let slot = Number(updated.claimCount); slot < 12; slot++) {
+  for (let slot = Number(updated.claimCount); slot < 3; slot++) {
     updated.periodNullifiers[slot] = String(
       poseidon4([scoped(1019n), ownerSecret, old, BigInt(slot)]),
     );

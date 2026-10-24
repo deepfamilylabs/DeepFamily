@@ -36,8 +36,8 @@ export function buildShieldedClaimFixture({
   remainingPeriods = 3,
   secondRemainingPeriods = 0,
 } = {}) {
-  if (!Number.isInteger(claimCount) || claimCount < 1 || claimCount > 12) {
-    throw new RangeError("claimCount fixture must be 1..12");
+  if (!Number.isInteger(claimCount) || claimCount < 1 || claimCount > 3) {
+    throw new RangeError("claimCount fixture must be 1..3");
   }
   chainId = BigInt(chainId);
   pool = BigInt(poolAddress ?? pool);
@@ -166,7 +166,7 @@ export function buildShieldedClaimFixture({
     secondBudgetCiphertextHash,
   ]);
   const claimCountBigInt = BigInt(claimCount);
-  const periodIndices = Array.from({ length: 12 }, (_, slot) =>
+  const periodIndices = Array.from({ length: 3 }, (_, slot) =>
     slot < claimCount ? BigInt(slot) : 0n,
   );
   const asOf = eligibleFrom + claimCountBigInt * periodDays * SECONDS_PER_DAY;

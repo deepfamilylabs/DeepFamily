@@ -62,9 +62,9 @@ function assertCleanCheckout(root, env) {
 function assertReleaseCriteria(criteria) {
   for (const field of [
     "fundMaxGas",
-    "claim12MaxGas",
+    "claim3MaxGas",
     "browserFundMaxMs",
-    "browserClaim12MaxMs",
+    "browserClaim3MaxMs",
     "recoveryMaxMs",
     "recoveryMinEvents",
   ]) {
@@ -134,7 +134,7 @@ export function assertRuntimeBenchmarkReport(report, manifestSha256, criteria) {
   );
   for (const [name, limit, expectedPeriods] of [
     ["fund", "fundMaxGas", null],
-    ["claim12", "claim12MaxGas", 12],
+    ["claim3", "claim3MaxGas", 3],
   ]) {
     const tx = report.localPoolGas?.[name];
     requireValue(
@@ -150,7 +150,7 @@ export function assertRuntimeBenchmarkReport(report, manifestSha256, criteria) {
     );
     requireValue(used <= criteria[limit], `${name} exceeds the precommitted release gas threshold`);
     if (expectedPeriods !== null)
-      requireValue(tx.claimedPeriods === expectedPeriods, `${name} did not exercise 12 periods`);
+      requireValue(tx.claimedPeriods === expectedPeriods, `${name} did not exercise 3 periods`);
   }
   const browser = report.browserProof;
   requireValue(
@@ -166,9 +166,9 @@ export function assertRuntimeBenchmarkReport(report, manifestSha256, criteria) {
     "Browser fund proof exceeds precommitted time threshold",
   );
   requireValue(
-    positiveMeasure(browser.claim12Ms, "Browser 12-period proof time") <=
-      criteria.browserClaim12MaxMs,
-    "Browser 12-period proof exceeds precommitted time threshold",
+    positiveMeasure(browser.claim3Ms, "Browser 3-period proof time") <=
+      criteria.browserClaim3MaxMs,
+    "Browser 3-period proof exceeds precommitted time threshold",
   );
   const recovery = report.recovery;
   requireValue(

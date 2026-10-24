@@ -58,7 +58,7 @@ describe("ShieldedErc20Pool contract boundaries", function () {
     inputShardIds: [0n, 0n],
     inputRoots: [0n, 0n],
     inputNullifiers: [0n, 0n],
-    periodNullifiers: Array(12).fill(0n),
+    periodNullifiers: Array(3).fill(0n),
     outputCommitments: [101n, 102n],
     outputCiphertexts: [ciphertext("01"), ciphertext("02")],
     relation0: 0n,
@@ -545,7 +545,7 @@ describe("ShieldedErc20Pool contract boundaries", function () {
     const claim = actionData({
       inputRoots: [root, root],
       inputNullifiers: [401n, 402n],
-      periodNullifiers: Array.from({ length: 12 }, (_, i) => 500n + BigInt(i)),
+      periodNullifiers: Array.from({ length: 3 }, (_, i) => 500n + BigInt(i)),
       outputCommitments: [107n, 108n],
       outputCiphertexts: [ciphertext("07"), ciphertext("08")],
       relation0: 700n,
@@ -564,12 +564,12 @@ describe("ShieldedErc20Pool contract boundaries", function () {
     ).to.be.revertedWithCustomError(pool, "UnknownLineageRoot");
     await pool.claim(claim, claimProof);
     expect(await pool.nullifierSpent(500n)).to.equal(true);
-    expect(await pool.nullifierSpent(511n)).to.equal(true);
+    expect(await pool.nullifierSpent(502n)).to.equal(true);
 
     const nextClaim = actionData({
       inputRoots: [root, root],
       inputNullifiers: [403n, 404n],
-      periodNullifiers: Array.from({ length: 12 }, (_, i) => 600n + BigInt(i)),
+      periodNullifiers: Array.from({ length: 3 }, (_, i) => 600n + BigInt(i)),
       outputCommitments: [109n, 110n],
       outputCiphertexts: [ciphertext("09"), ciphertext("0a")],
       relation0: 701n,
@@ -819,7 +819,7 @@ describe("ShieldedErc20Pool contract boundaries", function () {
     const claim = actionData({
       inputRoots: [firstRoot, secondRoot],
       inputNullifiers: [901n, 902n],
-      periodNullifiers: Array.from({ length: 12 }, (_, index) => 1001n + BigInt(index)),
+      periodNullifiers: Array.from({ length: 3 }, (_, index) => 1001n + BigInt(index)),
       outputCommitments: [105n, 106n],
       relation0: 700n,
       relation1: 800n,
@@ -859,7 +859,7 @@ describe("ShieldedErc20Pool contract boundaries", function () {
     expect((await pool.noteShard(1)).size).to.equal(4n);
   });
 
-  it("measures synthetic 32-level append costs for funding and 12-slot claim", async () => {
+  it("measures synthetic 32-level append costs for funding and 3-slot claim", async () => {
     async function runCase(syntheticDepth32) {
       const { pool, lineage } = await setup(
         syntheticDepth32 ? "ShieldedPoolDepthHarness" : "ShieldedErc20Pool",
@@ -893,7 +893,7 @@ describe("ShieldedErc20Pool contract boundaries", function () {
       const claim = actionData({
         inputRoots: Array(2).fill((await pool.noteShard(0)).root),
         inputNullifiers: [301n, 302n],
-        periodNullifiers: Array.from({ length: 12 }, (_, index) => 401n + BigInt(index)),
+        periodNullifiers: Array.from({ length: 3 }, (_, index) => 401n + BigInt(index)),
         outputCommitments: [105n, 106n],
         outputCiphertexts: [ciphertext("05"), ciphertext("06")],
         relation0: 700n,

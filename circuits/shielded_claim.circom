@@ -9,7 +9,7 @@ include "shielded_funding_common.circom";
 
 // Claim consumes one or two distinct budgets with one policy/enrollment/owner.
 // An absent second input repeats the first root and has a bound dummy nullifier.
-// All twelve period nullifiers are public, and inactive slots carry
+// All three period nullifiers are public, and inactive slots carry
 // domain-separated dummies.
 template ShieldedClaim() {
     signal input chainId;
@@ -17,7 +17,7 @@ template ShieldedClaim() {
     signal input inputShardIds[2];
     signal input inputRoots[2];
     signal input inputNullifiers[2];
-    signal input periodNullifiers[12];
+    signal input periodNullifiers[3];
     signal input outputCommitments[2];
     signal input ciphertextHashes[2];
     signal input endorsementRoot;
@@ -85,10 +85,10 @@ template ShieldedClaim() {
     signal input secondNoteIndex;
     signal input secondNoteSiblings[32];
 
-    // All 12 slots are public nullifiers. claimCount is private; inactive slots
+    // All 3 slots are public nullifiers. claimCount is private; inactive slots
     // have domain-separated dummy nullifiers and zero periodIndex witnesses.
     signal input claimCount;
-    signal input periodIndices[12];
+    signal input periodIndices[3];
     signal input newBudgetNonce;
     signal input payoutNonce;
 
@@ -374,25 +374,25 @@ template ShieldedClaim() {
     totalPeriodsBits.in <== totalPeriods;
     totalRemaining === rate * totalPeriods;
 
-    component countBits = Num2Bits(4);
+    component countBits = Num2Bits(2);
     countBits.in <== claimCount;
-    component countPositive = LessThan(4);
+    component countPositive = LessThan(2);
     countPositive.in[0] <== 0;
     countPositive.in[1] <== claimCount;
     countPositive.out === 1;
-    component countAtMostTwelve = LessEqThan(4);
-    countAtMostTwelve.in[0] <== claimCount;
-    countAtMostTwelve.in[1] <== 12;
-    countAtMostTwelve.out === 1;
+    component countAtMostThree = LessEqThan(2);
+    countAtMostThree.in[0] <== claimCount;
+    countAtMostThree.in[1] <== 3;
+    countAtMostThree.out === 1;
 
-    component active[12];
-    component epochBits[12];
-    component epochMature[12];
-    component ascending[11];
-    component realPeriod[12];
-    component dummyPeriod[12];
-    for (var i = 0; i < 12; i++) {
-        active[i] = LessThan(4);
+    component active[3];
+    component epochBits[3];
+    component epochMature[3];
+    component ascending[2];
+    component realPeriod[3];
+    component dummyPeriod[3];
+    for (var i = 0; i < 3; i++) {
+        active[i] = LessThan(2);
         active[i].in[0] <== i;
         active[i].in[1] <== claimCount;
         epochBits[i] = Num2Bits(64);

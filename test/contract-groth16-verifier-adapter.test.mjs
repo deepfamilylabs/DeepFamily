@@ -5,7 +5,7 @@ import { deployUnifiedVerifierAdapter } from "./helpers/unifiedVerifierAdapter.m
 
 const ACTIONS = ["shield", "fund", "claim", "privateTransfer", "unshield"];
 // Mirrors ProofConstants.sol and SHIELDED_POOL_PUBLIC_SIGNAL_COUNTS.
-const SIGNAL_COUNTS = [7, 29, 27, 20, 20];
+const SIGNAL_COUNTS = [7, 29, 18, 20, 20];
 const PROOF = hre.ethers.AbiCoder.defaultAbiCoder().encode(
   ["uint256[2]", "uint256[2][2]", "uint256[2]"],
   [
@@ -75,6 +75,7 @@ describe("Unified Groth16 verifier adapter", function () {
       [2, 8],
       [3, 12],
       [4, 12],
+      [4, 27],
       [5, 30],
       [5, 12],
       [6, 11],
@@ -89,7 +90,7 @@ describe("Unified Groth16 verifier adapter", function () {
   it("allows isolated disabled routes but rejects their use and codeless verifier addresses", async function () {
     const adapter = await deployUnifiedVerifierAdapter(hre);
     expect(await adapter.verifierForPurpose(4)).to.equal(hre.ethers.ZeroAddress);
-    await expect(adapter.verifyProof(4, 1, PROOF, Array(27).fill(0n)))
+    await expect(adapter.verifyProof(4, 1, PROOF, Array(18).fill(0n)))
       .to.be.revertedWithCustomError(adapter, "VerifierNotConfigured")
       .withArgs(4);
     const [, eoa] = await hre.ethers.getSigners();

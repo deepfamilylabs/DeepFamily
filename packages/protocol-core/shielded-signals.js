@@ -78,7 +78,7 @@ const INPUT_WIDTHS = Object.freeze({
   inputShardIds: 2,
   inputRoots: 2,
   inputNullifiers: 2,
-  periodNullifiers: 12,
+  periodNullifiers: 3,
   outputCommitments: 2,
   ciphertextHashes: 2,
   amount: 1,
@@ -130,7 +130,7 @@ export function buildShieldedPoolPublicInputs(input) {
   const inputShardIds = values(input.inputShardIds, width, "inputShardIds");
   const inputRoots = values(input.inputRoots, width, "inputRoots");
   const inputNullifiers = values(input.inputNullifiers, width, "inputNullifiers");
-  const periodNullifiers = values(input.periodNullifiers, 12, "periodNullifiers");
+  const periodNullifiers = values(input.periodNullifiers, 3, "periodNullifiers");
   const outputCommitments = values(input.outputCommitments, 2, "outputCommitments");
   protocolAssert(
     Array.isArray(input.outputCiphertexts) && input.outputCiphertexts.length === 2,

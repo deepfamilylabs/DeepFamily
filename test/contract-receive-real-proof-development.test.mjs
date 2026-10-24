@@ -58,7 +58,7 @@ const zeroData = () => ({
   inputShardIds: [0n, 0n],
   inputRoots: [0n, 0n],
   inputNullifiers: [0n, 0n],
-  periodNullifiers: Array(12).fill(0n),
+  periodNullifiers: Array(3).fill(0n),
   outputCommitments: [0n, 0n],
   outputCiphertexts: ["0x", "0x"],
   relation0: 0n,
@@ -441,9 +441,9 @@ describe("Receive presentation real-proof canonical pool and letter integration"
         const selfChange = value(donor.amount - 100n, 202n, "d2");
         const transfer = {
           ...zeroData(),
-          inputShardIds: Array(8).fill(0n),
-          inputRoots: Array(8).fill(transferRoot),
-          inputNullifiers: Array.from({ length: 8 }, (_, slot) =>
+          inputShardIds: Array(4).fill(0n),
+          inputRoots: Array(4).fill(transferRoot),
+          inputNullifiers: Array.from({ length: 4 }, (_, slot) =>
             slot === 0
               ? computeShieldedSpendNullifier(
                   { ownerSecret: donorSecret, noteCommitment: donor.commitment },
@@ -476,7 +476,7 @@ describe("Receive presentation real-proof canonical pool and letter integration"
           proof: prover.presentation(transferPresentation),
         };
         const transferInputs = buildShieldedPoolPublicInputs({ action: 3, ...scope, ...transfer });
-        const first = (value) => [String(value), ...Array(7).fill("0")];
+        const first = (value) => [String(value), ...Array(3).fill("0")];
         const transferProof = prover.circom(
           "shielded_private_transfer",
           {
@@ -490,7 +490,7 @@ describe("Receive presentation real-proof canonical pool and letter integration"
             inputIndices: first(transferPath.index),
             inputSiblings: [
               transferPath.siblings,
-              ...Array.from({ length: 7 }, () => Array(32).fill("0")),
+              ...Array.from({ length: 3 }, () => Array(32).fill("0")),
             ],
             outputOwnerCommitments: [String(keys.ownerCommitment), String(donorOwner)],
             outputAmounts: ["100", String(selfChange.amount)],

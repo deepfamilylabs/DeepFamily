@@ -182,7 +182,7 @@ function preparedValueOutputs(amounts: bigint[], offset = 0n, capacity = 4) {
       inputShardIds: Array(capacity).fill(0n),
       inputRoots: Array(capacity).fill(17n),
       inputNullifiers: Array.from({ length: capacity }, (_, index) => BigInt(51 + index)),
-      periodNullifiers: Array(12).fill(0n),
+      periodNullifiers: Array(3).fill(0n),
       outputCommitments: [61n + offset, 62n + offset],
       outputCiphertexts: [`0x${"00".repeat(512)}`, `0x${"00".repeat(512)}`],
       relation0: 0n,

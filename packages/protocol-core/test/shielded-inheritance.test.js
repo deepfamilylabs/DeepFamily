@@ -279,7 +279,7 @@ test("funding uniqueness and read-only use tags keep separate purposes", () => {
 });
 
 test("only full 30-day periods from private eligibility count and batches are all-or-nothing", () => {
-  assert.equal(SHIELDED_MAX_BATCH_PERIODS, 12);
+  assert.equal(SHIELDED_MAX_BATCH_PERIODS, 3);
   const base = { amountPerPeriod: 100n, periodDays: 30n, remaining: 1200n, eligibleFrom: P + 1n };
   assert.deepEqual(computeShieldedClaimBatch({ ...base, now: 2n * P + 1n, periodIndices: [0n] }), {
     periodIndices: [0n],
@@ -294,18 +294,23 @@ test("only full 30-day periods from private eligibility count and batches are al
     () => computeShieldedClaimBatch({ ...base, now: 2n * P + 1n, periodIndices: [1n] }),
     (error) => error.code === "SHIELDED_PERIOD_NOT_DUE",
   );
-  const twelve = Array.from({ length: 12 }, (_, index) => BigInt(index));
+  // The per-proof cap does not expire older unpaid periods or limit their indices.
   assert.deepEqual(
-    computeShieldedClaimBatch({ ...base, now: 13n * P + 1n, periodIndices: twelve }),
+    computeShieldedClaimBatch({ ...base, now: 13n * P + 1n, periodIndices: [9n, 10n, 11n] }),
+    { periodIndices: [9n, 10n, 11n], amount: 300n, remaining: 900n },
+  );
+  const three = Array.from({ length: 3 }, (_, index) => BigInt(index));
+  assert.deepEqual(
+    computeShieldedClaimBatch({ ...base, now: 13n * P + 1n, periodIndices: three }),
     {
-      periodIndices: twelve,
-      amount: 1200n,
-      remaining: 0n,
+      periodIndices: three,
+      amount: 300n,
+      remaining: 900n,
     },
   );
   assert.throws(
     () =>
-      computeShieldedClaimBatch({ ...base, now: 14n * P + 1n, periodIndices: [...twelve, 12n] }),
+      computeShieldedClaimBatch({ ...base, now: 14n * P + 1n, periodIndices: [...three, 3n] }),
     (error) => error.code === "INVALID_SHIELDED_BATCH_SIZE",
   );
   assert.throws(

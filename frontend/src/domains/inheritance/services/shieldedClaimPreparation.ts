@@ -40,7 +40,7 @@ import {
 } from "./shieldedKeyAuthorization";
 
 const MAX_UINT64 = (1n << 64n) - 1n;
-const ZERO_PERIODS = Array<bigint>(12).fill(0n);
+const ZERO_PERIODS = Array<bigint>(3).fill(0n);
 
 type ClaimOutput<T> = {
   /** Plaintext stays on this device; only commitment and ciphertext are submitted. */
@@ -62,7 +62,7 @@ export type PrepareShieldedClaimInput = {
   secondBudgetCommitment?: BigNumberish;
   /** Defaults to the lineage snapshot timestamp; the pool enforces its recency. */
   asOf?: BigNumberish;
-  /** Strictly increasing, due period indices, with 1–12 entries. */
+  /** Strictly increasing, due period indices, with 1–3 entries. */
   periodIndices: readonly BigNumberish[];
   /** Optional choice when several current direct-child endorsements are valid. */
   source?: { endorser: string; versionIndex: number };
@@ -509,7 +509,7 @@ export async function prepareShieldedClaim(
     claimCount: String(batch.periodIndices.length),
     periodIndices: decimal([
       ...batch.periodIndices,
-      ...Array<bigint>(12 - batch.periodIndices.length).fill(0n),
+      ...Array<bigint>(3 - batch.periodIndices.length).fill(0n),
     ]),
     newBudgetNonce: String(budgetOutput.nonce),
     payoutNonce: String(payoutOutput.nonce),

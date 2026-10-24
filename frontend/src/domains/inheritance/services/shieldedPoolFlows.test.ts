@@ -42,7 +42,7 @@ function actionData(capacity = 2): ShieldedPoolActionData {
     inputShardIds: Array(capacity).fill(0n),
     inputRoots: Array(capacity).fill(0n),
     inputNullifiers: Array(capacity).fill(0n),
-    periodNullifiers: Array<bigint>(12).fill(0n),
+    periodNullifiers: Array<bigint>(3).fill(0n),
     outputCommitments: [123n, 456n],
     outputCiphertexts: [CIPHERTEXT, CIPHERTEXT],
     relation0: 0n,

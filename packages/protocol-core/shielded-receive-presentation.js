@@ -44,7 +44,7 @@ export function computeShieldedReceiveActionHash(data) {
         "uint256[]",
         "uint256[]",
         "uint256[]",
-        "uint256[12]",
+        "uint256[3]",
         "uint256[2]",
         "bytes[2]",
         "uint256",

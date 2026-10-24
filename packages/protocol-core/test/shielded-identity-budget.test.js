@@ -388,7 +388,7 @@ test("public fund signal fields come from the canonical output while claim expos
     inputShardIds: [2, 2],
     inputRoots: [11, 11],
     inputNullifiers: [13, 14],
-    periodNullifiers: Array(12).fill(0),
+    periodNullifiers: Array(3).fill(0),
     outputCommitments: [27, 28],
     outputCiphertexts: [envelope, privateEnvelope],
     relation0: 29,
@@ -426,7 +426,7 @@ test("public fund signal fields come from the canonical output while claim expos
     budgetKind: 0,
     outputCiphertexts: [privateEnvelope, privateEnvelope],
   });
-  assert.equal(claim.signals.length, 27);
+  assert.equal(claim.signals.length, 18);
   assert.equal("budgetKind" in claim.witness, false);
   assert.equal("publicBudget" in claim.witness, false);
 });

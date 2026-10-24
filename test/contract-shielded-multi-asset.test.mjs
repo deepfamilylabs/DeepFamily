@@ -9,7 +9,7 @@ const dataFor = (overrides = {}) => ({
   inputShardIds: [0n, 0n],
   inputRoots: [0n, 0n],
   inputNullifiers: [0n, 0n],
-  periodNullifiers: Array(12).fill(0n),
+  periodNullifiers: Array(3).fill(0n),
   outputCommitments: [101n, 102n],
   outputCiphertexts: [`0x${"01".repeat(512)}`, `0x${"02".repeat(512)}`],
   relation0: 0n,

@@ -1638,7 +1638,7 @@
       "unshield": "提现至普通钱包"
     },
     "descriptions": {
-      "claim": "每次最多领取 12 期，资金进入私密余额。",
+      "claim": "每次最多领取 3 期，资金进入私密余额。",
       "fund": "仅限本人已确认的直接子女。存入后不可取回，追加沿用原领取时间。"
     },
     "fields": {
@@ -1773,7 +1773,7 @@
     "familyRecordsIncompatible": "当前网络的子女预算服务版本不兼容，请联系维护者更新。",
     "transactionFailed": "交易未确认成功：{{hash}}。请核对状态后重试。",
     "claimPeriodsLabel": "领取期次",
-    "claimPeriodsHint": "默认全选，每次最多 12 期。",
+    "claimPeriodsHint": "默认全选，每次最多 3 期。",
     "claimPeriodOption": "第 {{period}} 期 · {{amount}} {{symbol}}",
     "claimPeriodDue": "到期：{{date}}",
     "selectAllClaimPeriods": "全选",

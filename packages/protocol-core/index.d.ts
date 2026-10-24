@@ -668,7 +668,7 @@ export const SHIELDED_INHERITANCE_DOMAINS: Readonly<{
   fundBudgetNote: bigint;
   claimBudgetNote: bigint;
 }>;
-export const SHIELDED_MAX_BATCH_PERIODS: 12;
+export const SHIELDED_MAX_BATCH_PERIODS: 3;
 export const SHIELDED_CIPHERTEXT_BYTES: 512;
 export function generateShieldedRandomField(): bigint;
 export function computeShieldedCiphertextHashField(ciphertext: BytesLike): bigint;

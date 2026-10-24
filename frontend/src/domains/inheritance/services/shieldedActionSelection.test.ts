@@ -175,7 +175,7 @@ describe("automatic shielded claim selection", () => {
     ).toBeUndefined();
   });
 
-  it("limits one automatic claim to the circuit's twelve period slots", () => {
+  it("limits one automatic claim to the circuit's three period slots", () => {
     const note = budget(1n, { remaining: 5_000n });
     expect(
       nextClaimPeriods(
@@ -184,7 +184,7 @@ describe("automatic shielded claim selection", () => {
         note.note,
         eligibleFrom + 50n * (DEFAULT_SHIELDED_PERIOD_DAYS * SECONDS_PER_DAY),
       ),
-    ).toEqual(Array.from({ length: 12 }, (_, index) => BigInt(index)));
+    ).toEqual(Array.from({ length: 3 }, (_, index) => BigInt(index)));
   });
 
   it("finds a payable rule after exhausted, immature and fully claimed budgets", () => {

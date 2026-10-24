@@ -35,9 +35,9 @@ const SHA256 = /^[0-9a-f]{64}$/u;
 const BLAKE2B512 = /^[0-9a-f]{128}$/u;
 const RELEASE_CRITERIA_FIELDS = Object.freeze([
   "fundMaxGas",
-  "claim12MaxGas",
+  "claim3MaxGas",
   "browserFundMaxMs",
-  "browserClaim12MaxMs",
+  "browserClaim3MaxMs",
   "recoveryMaxMs",
   "recoveryMinEvents",
 ]);

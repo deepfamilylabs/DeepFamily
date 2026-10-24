@@ -1333,13 +1333,13 @@ export class ShieldedAssetSession {
       const indices = request.periodIndices ?? claim.periodIndices;
       requireValue(
         indices.length >= 1 &&
-          indices.length <= 12 &&
+          indices.length <= 3 &&
           indices.every(
             (index, position) =>
               claim.periodIndices.includes(index) &&
               (position === 0 || BigInt(index) > BigInt(indices[position - 1])),
           ),
-        "Select 1 to 12 strictly increasing, due and unpaid periods from the preview.",
+        "Select 1 to 3 strictly increasing, due and unpaid periods from the preview.",
       );
       const budget = wallet.ownedNotes.get(BigInt(claim.budgets[0]))?.note;
       requireValue(budget?.kind === "budget", "The selected budget is unavailable.");

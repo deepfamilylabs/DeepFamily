@@ -18,7 +18,7 @@ import type { ShieldedWitness } from "../../../shared/zk/shieldedZk";
 import type { ShieldedPoolActionData } from "./shieldedPoolFlows";
 import { validateShieldedKeyMaterial, type ShieldedKeyMaterial } from "./shieldedKeyAuthorization";
 
-const ZERO_PERIOD_NULLIFIERS = Array<bigint>(12).fill(0n);
+const ZERO_PERIOD_NULLIFIERS = Array<bigint>(3).fill(0n);
 const MAX_UINT64 = (1n << 64n) - 1n;
 const MAX_UINT128 = (1n << 128n) - 1n;
 

@@ -306,7 +306,7 @@ The pool protocol, note payload, money HPKE envelope, receive credentials and pr
 
 Authorization reads, presentations and on-chain counter updates support full depth-64 paths. An owner authorization does not depend on that depth. Distinct authorization aliases with identical low 64 bits still exceed the dictionary's path capacity; insertion rejects without changing the current state. This capacity boundary is separate from the removed update-proof depth restriction.
 
-The five business circuits cover shield, fund, claim, privateTransfer and unshield. Fund and PrivateTransfer append two randomized receive commitments to their public statements, giving 29 and 20 signals; Claim remains at 27. Each required receipt is checked atomically by the pool against the same commitment. Zero commitments are permitted only for circuit-proven own outputs (or public identity funding). The shielded Circom catalog has eleven sets: five business actions, two credential issuers, three presentations and the owner update. With the two identity/disclosure circuits, the complete catalog has thirteen circuits.
+The five business circuits cover shield, fund, claim, privateTransfer and unshield. Fund and PrivateTransfer append two randomized receive commitments to their public statements, giving 29 and 20 signals; Claim uses 18. Each required receipt is checked atomically by the pool against the same commitment. Zero commitments are permitted only for circuit-proven own outputs (or public identity funding). The shielded Circom catalog has eleven sets: five business actions, two credential issuers, three presentations and the owner update. With the two identity/disclosure circuits, the complete catalog has thirteen circuits.
 
 The presentation's credential fields are public inputs only to the local Groth16 prover. The linked transport hides them; raw presentation proofs and their common input prefix must never be submitted on chain. Fixed Solidity verifiers bind both verification keys and the shared hidden inputs. `linkKeys` in the shielded manifest pins `shielded/receive-link-keys.json`, the verifier base and all three generated verifiers. First use requires no recipient registration or transaction; creation and payment read the latest chain authorization state.
 
@@ -339,7 +339,7 @@ The two private entries use the same owner-bound BUDGET format and HPKE encrypti
 
 Private kind-2 budgets are 284 bytes and authenticate owner, mode and complete viewing key with Poseidon5, plus distinct Fund/Claim origin tags. The two producer domains prevent a Claim continuation from masquerading as an original Fund attachment. Public kind-5 budgets retain the 218-byte identity/terms structure and implicit mode 0. Private donor memo payloads are 428/460 bytes without/with allocation key; public memos remain 400/432 bytes. Recovery reconstructs the producer-specific commitment and retains complete receiving keys.
 
-`claim` spends one or two budgets sharing binding kind, mode, owner and all policy/enrollment terms. It proves the identity, lineage from one accepted checkpoint, mature unpaid periods and the authorized owner secret. Mode 0 requires the identity-derived secret; mode 1 requires the independent key secret with no identity fallback. Owner-bound budgets require their rule openings; identity budgets do not. The remainder preserves binding/mode and the VALUE payout preserves the authorized owner; VALUE has no persistent keyMode. All 27 public signals exclude the private input identity, binding and mode. Period nullifiers remain `H(identitySecret, P, epoch, scope)` across entries and exclude owner/mode/root source. This prevents allowance resets but permits a funder knowing the complete identity secret and P to precompute real period markers and associate claims with epochs without knowing the independent key root.
+`claim` spends one or two budgets sharing binding kind, mode, owner and all policy/enrollment terms. It proves the identity, lineage from one accepted checkpoint, one to three mature unpaid periods and the authorized owner secret. Mode 0 requires the identity-derived secret; mode 1 requires the independent key secret with no identity fallback. Owner-bound budgets require their rule openings; identity budgets do not. The remainder preserves binding/mode and the VALUE payout preserves the authorized owner; VALUE has no persistent keyMode. All 18 public signals exclude the private input identity, binding and mode. Period nullifiers remain `H(identitySecret, P, epoch, scope)` across entries and exclude owner/mode/root source. This prevents allowance resets but permits a funder knowing the complete identity secret and P to precompute real period markers and associate claims with epochs without knowing the independent key root.
 
 Initial Fund and Claim include `lineageCheckpointId` in transaction data. The index authenticates its root pair and requires the proof-bound `asOf` to fall between checkpoint creation and retirement (inclusive). Retired checkpoints expire strictly 15 minutes after retirement, regardless of later writes or recurring roots. The ID is lookup metadata, not another circuit input: roots and `asOf` already bind the statement. The two-hour proof freshness and initial eligibility delay are unchanged. This gives an explicit maximum 15-minute qualification-revocation delay; independent historical roots are never combined.
 
@@ -377,7 +377,7 @@ struct ProofEnvelope {
   count or order of a published deployment requires a new purpose/entrypoint and protocol
   generation; it cannot be installed behind an old route contract ABI. Before initial publication,
   the contracts, circuits, verifiers, artifacts and client can instead be replaced together and
-  redeployed with the new ABI. The current unpublished fund protocol uses purpose 3 with 27 signals
+  redeployed with the new ABI. The current unpublished fund protocol uses purpose 3 with 29 signals
   and does not retain the previous development ABI.
 - A `circuitId` is not stored in `PersonVersion`, included in `personHash`, or used to infer any
   identity suite. Callers choose the route needed for each operation.
@@ -386,12 +386,12 @@ Current generated verifiers are:
 
 - `contracts/PersonCommitmentVerifier.sol` for 5 person-relation public signals;
 - `contracts/DisclosureBindingVerifier.sol` for 4 disclosure public signals;
-- five shielded verifier routes, with 7 to 32 public signals.
+- five shielded verifier routes, with 7 to 29 public signals.
 
 These seven verifiers share one `contracts/adapters/Groth16VerifierAdapter.sol` instance. The
 adapter accepts the same encoding-1, 256-byte ABC payload and routes purposes 0/1 to identity
 and disclosure, and purposes 2–6 to the five pool actions (pool action ID + 2). Transfer and
-withdrawal have 30/32 public signals. Each route fixes
+withdrawal each have 20 public signals. Each route fixes
 its verifier address and checks its expected public-signal length. The action is not a public
 signal: the pool picks the purpose for its action, and the adapter handles proof transport only.
 
