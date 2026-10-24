@@ -28,6 +28,7 @@ const mocks = vi.hoisted(() => ({
   submitUnshield: vi.fn(),
   preview: null as Record<string, unknown> | null,
   generation: 0,
+  stateReadMode: "rebuild" as "rebuild" | "chain",
   listeners: new Set<() => void>(),
   syncListeners: new Set<(event: PublicStateSyncProgress) => void>(),
   workerState: { credentials: null, identity: null, independentKey: null } as ShieldedAssetSessionState,
@@ -43,19 +44,12 @@ vi.mock("react-i18next", () => ({
           : key,
   }),
 }));
-vi.mock("../../config", async () => {
-  const React = await import("react");
-  return {
-    useConfig: () => {
-      const [stateReadMode, setStateReadMode] = React.useState<"rebuild" | "chain">("rebuild");
-      return {
-        rpcUrl: "https://rpc.example",
-        stateReadMode,
-        update: (partial: { stateReadMode: "rebuild" | "chain" }) => setStateReadMode(partial.stateReadMode),
-      };
-    },
-  };
-});
+vi.mock("../../config", () => ({
+  useConfig: () => ({
+    rpcUrl: "https://rpc.example",
+    stateReadMode: mocks.stateReadMode,
+  }),
+}));
 vi.mock("../../tree/context", () => ({ useTreeGraphData: () => ({ nodesData: {} }) }));
 vi.mock("../../transactions", () => ({ useTransactionCenter: () => null }));
 vi.mock("../../../shared/config/env", () => ({
@@ -426,6 +420,7 @@ describe("Shielded budget flow with a real identity session", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.generation = 0;
+    mocks.stateReadMode = "rebuild";
     mocks.listeners.clear();
     mocks.workerState = { credentials: null, identity: null, independentKey: null };
     mocks.preview = null;
@@ -518,39 +513,30 @@ describe("Shielded budget flow with a real identity session", () => {
     vi.restoreAllMocks();
   });
 
-  it("switches read modes in the unlocked workspace without terminating either Worker", async () => {
+  it.each(["rebuild", "chain"] as const)("uses configured %s reads for recovery and receive codes without a switch control", async (stateReadMode) => {
+    mocks.stateReadMode = stateReadMode;
     renderPanel();
+    expect(screen.queryByRole("group", { name: /stateReadMode/ })).toBeNull();
     await unlockIdentity();
     expect(mocks.call).toHaveBeenCalledWith("recover", {
-      context: expect.objectContaining({ stateReadMode: "rebuild" }),
+      context: expect.objectContaining({ stateReadMode }),
     });
+    expect(screen.queryByRole("group", { name: /stateReadMode/ })).toBeNull();
+    expect(screen.queryByRole("radio", { name: /stateReadMode/ })).toBeNull();
     const state = sessionState();
     const assetTerminations = mocks.terminate.mock.calls.length;
     const zkTerminations = mocks.terminateZk.mock.calls.length;
 
-    fireEvent.click(screen.getByRole("radio", { name: "shielded.stateReadMode.chain" }));
-
-    await waitFor(() => expect(mocks.call).toHaveBeenCalledWith("recover", {
-      context: expect.objectContaining({ stateReadMode: "chain" }),
-    }));
-    await waitFor(() => expect((screen.getByRole("button", { name: "shielded.actions.recover" }) as HTMLButtonElement).disabled).toBe(false));
+    openReceiveCode("identity");
+    await waitForReceiveCode("identity");
+    expect(mocks.call).toHaveBeenCalledWith("receiveCode", expect.objectContaining({
+      context: expect.objectContaining({ stateReadMode }),
+    }), expect.anything());
+    closeWalletSheet();
     expect(sessionState()).toEqual(state);
     expect(mocks.terminate).toHaveBeenCalledTimes(assetTerminations);
     expect(mocks.terminateZk).toHaveBeenCalledTimes(zkTerminations);
     expect(screen.queryByRole("button", { name: "shielded.unlock" })).toBeNull();
-    openReceiveCode("identity");
-    await waitForReceiveCode("identity");
-    expect(mocks.call).toHaveBeenCalledWith("receiveCode", expect.objectContaining({
-      context: expect.objectContaining({ stateReadMode: "chain" }),
-    }), expect.anything());
-    closeWalletSheet();
-    fireEvent.click(screen.getByRole("radio", { name: "shielded.stateReadMode.rebuild" }));
-    await waitFor(() => expect(mocks.call.mock.calls.filter(([method]) => method === "recover")).toHaveLength(3));
-    await waitFor(() => expect((screen.getByRole("button", { name: "shielded.actions.recover" }) as HTMLButtonElement).disabled).toBe(false));
-    expect(sessionState()).toEqual(state);
-    expect(mocks.terminate).toHaveBeenCalledTimes(assetTerminations);
-    expect(mocks.terminateZk).toHaveBeenCalledTimes(zkTerminations);
-    expect((screen.getByRole("radio", { name: "shielded.stateReadMode.rebuild" }) as HTMLInputElement).checked).toBe(true);
   });
 
   it("shows real sync phases, pauses both Workers, ignores late results, and resumes after unlock", async () => {
@@ -566,6 +552,8 @@ describe("Shielded budget flow with a real identity session", () => {
       for (const listener of mocks.syncListeners) listener({ domain: "authorization", phase: "download", completed: 3, total: 3 });
     });
     const status = screen.getByRole("region", { name: "shielded.publicStateSync.title" });
+    expect(within(status).queryByRole("progressbar")).toBeNull();
+    fireEvent.click(within(status).getByRole("button", { name: "shielded.publicStateSync.details" }));
     expect(within(status).getByText(/phases.downloaded/)).toBeTruthy();
     expect(within(status).queryByText(/phases.complete/)).toBeNull();
     act(() => {
@@ -599,6 +587,7 @@ describe("Shielded budget flow with a real identity session", () => {
       for (const listener of mocks.syncListeners) listener({ domain: "authorization", phase: "download", completed: 3, total: 3, resumed: true });
     });
     expect(screen.queryByText("shielded.publicStateSync.paused")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "shielded.publicStateSync.details" }));
     expect(screen.getByText("shielded.publicStateSync.resumed")).toBeTruthy();
     await act(async () => resumed.resolve(emptyWallet));
     await waitFor(() => expect((screen.getByRole("button", { name: "shielded.actions.recover" }) as HTMLButtonElement).disabled).toBe(false));

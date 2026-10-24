@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { StrictMode, useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Signer } from "ethers";
 import type { ShieldedWorkerContext } from "../../../shared/workers/shieldedAssetWorkerTypes";
@@ -25,16 +26,66 @@ const context: ShieldedWorkerContext = {
   poolDeploymentBlock: 1, assetKind: "native", lettersAddress: "0x5555555555555555555555555555555555555555",
 };
 const letter = { delivery: { messageId: "7", checkpointId: "1", asOf: "900", expiresAt: "1200", recipientBinding: "9" }, ciphertext: "0x010203", proof: "0x1234" };
+type InboxResult = { letters: { messageId: string; body: string; registeredAt: string; attachment: null }[]; unavailable: number };
 const tr = (key: string) => `shielded.privateLetters.${key}`;
 const props = () => ({ mode: "write" as const, context, signer: {} as Signer, disabled: false, wallet: null, recoveryReady: true, budgetCommitment: "", onBudgetChange: vi.fn() });
 function fillLetter() {
   fireEvent.change(screen.getByLabelText(tr("recipientCode")), { target: { value: "anonymous-code" } });
   fireEvent.change(screen.getByLabelText(tr("body")), { target: { value: "Private letter text" } });
 }
+function InboxPage({ sessionScope = "original", instance = "original" }: { sessionScope?: string; instance?: string }) {
+  const [busy, setBusy] = useState(false);
+  return <>
+    <button disabled={busy}>Another task</button>
+    <PrivateLettersPanel key={instance} {...props()} mode="inbox" sessionScope={sessionScope} disabled={busy} onBusyChange={setBusy} />
+  </>;
+}
 beforeEach(() => { vi.clearAllMocks(); mocks.walletGeneration = 0; mocks.worker.mockReset().mockResolvedValue(letter); mocks.submit.mockReset(); });
 afterEach(cleanup);
 
 describe("private letter composer", () => {
+  it("finishes the initial inbox read through StrictMode effect replay and releases the page", async () => {
+    let finish!: (value: InboxResult) => void;
+    mocks.worker.mockReturnValue(new Promise(resolve => { finish = resolve; }));
+    render(<StrictMode><InboxPage /></StrictMode>);
+    expect(mocks.worker).toHaveBeenCalledTimes(1);
+    expect((screen.getByRole("button", { name: "Another task" }) as HTMLButtonElement).disabled).toBe(true);
+    await act(async () => finish({ letters: [{ messageId: "7", body: "StrictMode recovered letter", registeredAt: "1000", attachment: null }], unavailable: 0 }));
+    expect(screen.getByText("StrictMode recovered letter")).toBeTruthy();
+    expect((screen.getByRole("button", { name: "Another task" }) as HTMLButtonElement).disabled).toBe(false);
+    expect((screen.getByRole("button", { name: tr("refresh") }) as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it.each(["session change", "component replacement"])("keeps a newer inbox read busy after a pending %s", async change => {
+    const finish: ((value: InboxResult) => void)[] = [];
+    mocks.worker.mockImplementation(() => new Promise(resolve => { finish.push(resolve); }));
+    const view = render(<StrictMode><InboxPage /></StrictMode>);
+    expect(mocks.worker).toHaveBeenCalledTimes(1);
+    view.rerender(<StrictMode><InboxPage
+      sessionScope={change === "session change" ? "replacement" : "original"}
+      instance={change === "component replacement" ? "replacement" : "original"}
+    /></StrictMode>);
+    expect(mocks.worker).toHaveBeenCalledTimes(2);
+    await act(async () => finish[0]({ letters: [{ messageId: "7", body: "Old inbox plaintext", registeredAt: "1000", attachment: null }], unavailable: 0 }));
+    expect(screen.queryByText("Old inbox plaintext")).toBeNull();
+    expect((screen.getByRole("button", { name: "Another task" }) as HTMLButtonElement).disabled).toBe(true);
+    await act(async () => finish[1]({ letters: [{ messageId: "8", body: "Current inbox plaintext", registeredAt: "1001", attachment: null }], unavailable: 0 }));
+    expect(screen.getByText("Current inbox plaintext")).toBeTruthy();
+    expect((screen.getByRole("button", { name: "Another task" }) as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it("releases a pending inbox read on lock and ignores its late plaintext", async () => {
+    let finish!: (value: InboxResult) => void;
+    mocks.worker.mockReturnValue(new Promise(resolve => { finish = resolve; }));
+    render(<StrictMode><InboxPage /></StrictMode>);
+    expect((screen.getByRole("button", { name: "Another task" }) as HTMLButtonElement).disabled).toBe(true);
+    act(() => mocks.lock?.());
+    expect((screen.getByRole("button", { name: "Another task" }) as HTMLButtonElement).disabled).toBe(false);
+    await act(async () => finish({ letters: [{ messageId: "7", body: "Locked inbox plaintext", registeredAt: "1000", attachment: null }], unavailable: 0 }));
+    expect(screen.queryByText("Locked inbox plaintext")).toBeNull();
+    expect(mocks.worker).toHaveBeenCalledTimes(1);
+    expect((screen.getByRole("button", { name: "Another task" }) as HTMLButtonElement).disabled).toBe(false);
+  });
   it("disables sending on a network without a letter archive", () => {
     render(<PrivateLettersPanel {...props()} context={{ ...context, lettersAddress: "" }} />);
     fillLetter();
@@ -97,7 +148,7 @@ describe("private letter composer", () => {
     expect((screen.getByLabelText(tr("recipientCode")) as HTMLTextAreaElement).value).toBe("");
     await act(async () => finish(letter));
     expect(mocks.submit).not.toHaveBeenCalled();
-    expect(initial.onBusyChange.mock.calls).toEqual([[true]]);
+    expect(initial.onBusyChange.mock.calls).toEqual([[true], [false]]);
   });
 
   it("removes recovered plaintext as soon as the secret session locks", async () => {

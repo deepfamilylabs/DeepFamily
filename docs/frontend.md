@@ -550,20 +550,24 @@ budget. Plaintext remains confined to the current session. Public budgets explai
 that attachments are unavailable. Letters for existing budgets are composed by selecting the budget in the Write a letter task; ordinary private-transfer
 attachments are outside this change. See [private letters](private-letters.md#budget-receive-codes-and-inline-letters).
 
-The locked page shows the unlock form; read-mode controls and private letters appear in the
-unlocked workspace. The task rail lists Private letters below Child budgets, with separate
+The locked page shows the unlock form; private letters appear in the unlocked workspace.
+The task rail lists Private letters below Child budgets, with separate
 Write a letter and Inbox entries that open in the shared task area. Entering the inbox reads
-letters once; its refresh button explicitly reads again. The write task lets users select an existing private budget for an attachment. Initial recovery uses local reconstruction unless
-a read preference was previously saved. Users may explicitly select chain paths (`stateReadMode: "chain"`) inside
-the workspace. The choice is persisted as a public preference, with a missing or invalid saved
-value defaulting to rebuild.
-Changing it preserves the unlocked identity, independent key and current task. The page drops
-old previews, codes and read results and refreshes through the selected mode without another
-unlock. The asset Worker reuses its provider and drops pool snapshots and policy drafts when
-the read mode changes. Switching is disabled while work or a transaction is pending.
-During a read-mode refresh, the last verified wallet and inbox views and available selections
-remain visible until the replacement is ready. Synchronization progress floats below the read-mode
-control so it does not move the wallet cards or task forms.
+letters once; its refresh button explicitly reads again. The write task lets users select an existing private budget for an attachment.
+`VITE_SHIELDED_STATE_READ_MODE` controls the read strategy at build time: `rebuild` keeps the
+existing local reconstruction behavior, and `chain` opts into direct chain paths. Missing,
+blank or unrecognized values use `rebuild`. Restart the dev server or rebuild the frontend
+after changing this variable. The page has no read-mode switch, and old browser preferences
+cannot override the deployment setting. While actual public-state synchronization is active,
+a compact status appears in the wallet overview's header. Its collapsed details show each
+authorization and lineage phase and count separately; the floating details do not move the
+wallet cards or task forms. Completed downloads still require local verification. The status
+disappears once synchronization completes, even if proof generation or transaction work continues.
+Initial balance reads show placeholders and a loading label; refreshes retain the last verified
+amounts with an updating label until the new wallet state is ready. Pausing synchronization
+still locks the session and clears both Workers, and is disabled during wallet requests and
+transaction submission or confirmation. Both read modes use actual synchronization events
+to decide whether to show progress.
 The mode is carried through recovery, receive-code creation (including convenient recipient
 codes), letters, funding, claims, receive presentations and revocation. Stale results and previews
 from another mode cannot be reused.

@@ -32,7 +32,7 @@ const wallets: ShieldedOverviewWallet[] = [
 type OverviewOptions = Partial<
   Pick<
     ComponentProps<typeof ShieldedAssetOverview>,
-    "selectionDisabled" | "busy" | "independentKeyState" | "onReceiveCode" | "onOpenIndependentKey"
+    "selectionDisabled" | "busy" | "independentKeyState" | "onReceiveCode" | "onOpenIndependentKey" | "syncStatus"
   >
 > & { initialWallets?: ShieldedOverviewWallet[] };
 
@@ -40,12 +40,13 @@ function renderOverview({
   initialWallets = wallets,
   selectionDisabled = false,
   busy = false,
+  syncStatus,
   independentKeyState = "setup",
   onReceiveCode = vi.fn(),
   onOpenIndependentKey = vi.fn(),
 }: OverviewOptions = {}) {
   const onSelectWallet = vi.fn();
-  function Overview() {
+  function Overview({ status = syncStatus }: { status?: OverviewOptions["syncStatus"] }) {
     const [currentWallets, setCurrentWallets] = useState(initialWallets);
     return (
       <ShieldedAssetOverview
@@ -58,6 +59,7 @@ function renderOverview({
           onCopy: vi.fn(),
         }}
         symbol="DEEP"
+        syncStatus={status}
         busy={busy}
         onRecover={vi.fn()}
         onLock={vi.fn()}
@@ -80,13 +82,18 @@ function renderOverview({
       />
     );
   }
-  render(
+  const view = render(
     <I18nextProvider i18n={i18n}>
       <Overview />
     </I18nextProvider>,
   );
   return {
     onSelectWallet,
+    rerenderSyncStatus: (status: OverviewOptions["syncStatus"]) => view.rerender(
+      <I18nextProvider i18n={i18n}>
+        <Overview status={status} />
+      </I18nextProvider>,
+    ),
     identityTab: screen.getByRole("tab", { name: "身份凭据" }),
     independentTab: screen.getByRole("tab", { name: "独立密钥" }),
   };
@@ -104,6 +111,60 @@ function cardSelectionLabel(name: string) {
   expect(label).toBeTruthy();
   return label!;
 }
+
+describe("ShieldedAssetOverview synchronization", () => {
+  it("keeps synchronization feedback in the overview without replacing wallet cards", () => {
+    const { rerenderSyncStatus } = renderOverview();
+    const identityCard = screen.getByRole("group", { name: "身份凭据" });
+    const available = within(identityCard).getByText("1");
+    rerenderSyncStatus(<span role="status">正在同步公开状态</span>);
+    const status = screen.getByText("正在同步公开状态");
+    const overview = screen.getByRole("region", { name: "资产概览" });
+    expect(overview.contains(status)).toBe(true);
+    expect(identityCard.contains(status)).toBe(false);
+    expect(screen.getByRole("group", { name: "身份凭据" })).toBe(identityCard);
+    expect(within(identityCard).getByText("1")).toBe(available);
+
+    rerenderSyncStatus(null);
+    expect(screen.queryByText("正在同步公开状态")).toBeNull();
+    expect(screen.getByRole("group", { name: "身份凭据" })).toBe(identityCard);
+  });
+
+  it("identifies initially loading balances without presenting an unverified zero", () => {
+    renderOverview({
+      initialWallets: wallets.map((wallet) => wallet.slot === "identity"
+        ? { ...wallet, available: "—", budget: "—", balanceState: "loading" }
+        : wallet),
+    });
+    const identityCard = screen.getByRole("group", { name: "身份凭据" });
+    expect(within(identityCard).getAllByText("—")).toHaveLength(2);
+    expect(within(identityCard).queryByText("DEEP")).toBeNull();
+    expect(within(identityCard).getByRole("status").textContent).toBe("正在读取余额…");
+    expect(identityCard.querySelector("dl")?.getAttribute("aria-busy")).toBe("true");
+    expect(within(screen.getByRole("group", { name: "独立密钥" })).queryByText("正在读取余额…")).toBeNull();
+  });
+
+  it("marks refreshed balances as updating while preserving their verified amounts", () => {
+    renderOverview({
+      initialWallets: wallets.map((wallet) => wallet.slot === "identity"
+        ? { ...wallet, available: "1.25", budget: "3", balanceState: "updating" }
+        : wallet),
+    });
+    const identityCard = screen.getByRole("group", { name: "身份凭据" });
+    expect(within(identityCard).getByText("1.25").closest("dd")?.textContent).toBe("1.25DEEP");
+    expect(within(identityCard).getByText("3").closest("dd")?.textContent).toBe("3DEEP");
+    expect(within(identityCard).getByRole("status").textContent).toBe("正在更新…");
+    expect(identityCard.querySelector("dl")?.getAttribute("aria-busy")).toBe("true");
+  });
+
+  it("does not describe unrelated busy work as a balance refresh", () => {
+    renderOverview({ busy: true });
+    const identityCard = screen.getByRole("group", { name: "身份凭据" });
+    expect(within(identityCard).queryByText("正在读取余额…")).toBeNull();
+    expect(within(identityCard).queryByText("正在更新…")).toBeNull();
+    expect(identityCard.querySelector("dl")?.hasAttribute("aria-busy")).toBe(false);
+  });
+});
 
 describe("ShieldedAssetOverview phone tabs", () => {
   it("switches the current wallet and visible card together with one tap", () => {

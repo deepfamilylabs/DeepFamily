@@ -94,7 +94,6 @@ import {
   shortHex,
 } from "./inheritanceControls";
 import { PrivateLettersPanel, type PrivateLetterView } from "./PrivateLettersPanel";
-import { ShieldedStateReadModeControl } from "./ShieldedStateReadModeControl";
 import { ShieldedPublicStateSyncStatus } from "./ShieldedPublicStateSyncStatus";
 import {
   subscribePublicStateSyncProgress,
@@ -289,6 +288,7 @@ export function ShieldedInheritancePanel({
   const [externalSaved, setExternalSaved] = useState(false),
     [restorePath, setRestorePath] = useState<RecoveryFormat | "signature">("mnemonic");
   const [wallet, setWallet] = useState<ShieldedWalletSummary | null>(null);
+  const [balancesRefreshing, setBalancesRefreshing] = useState(false);
   const [discovery, setDiscovery] = useState<
     ShieldedAssetWorkerCallMap["discover"]["result"] | null
   >(null);
@@ -613,6 +613,7 @@ export function ShieldedInheritancePanel({
     activeOperation.current = null;
     acceptPublicSyncProgress.current = false;
     setBusy(false);
+    setBalancesRefreshing(false);
     setStage("");
     setPlanCount(0);
     latestSession.current.setBusy(false);
@@ -648,6 +649,7 @@ export function ShieldedInheritancePanel({
       clear();
       if (mounted.current) {
         setBusy(false);
+        setBalancesRefreshing(false);
         setStage("");
         setError("");
         setCodeError("");
@@ -720,6 +722,7 @@ export function ShieldedInheritancePanel({
         }
         cancelSpendReview();
         activeOperation.current = null;
+        setBalancesRefreshing(false);
         acceptPublicSyncProgress.current = letterOperationPending.current;
         autoRecoveryBlocked.current = false;
         clearRef.current();
@@ -1014,6 +1017,7 @@ export function ShieldedInheritancePanel({
         acceptPublicSyncProgress.current = false;
         if (mounted.current) {
           setBusy(false);
+          setBalancesRefreshing(false);
           setStage("");
           setProgress(null);
           setExecutingReview(null);
@@ -1070,6 +1074,7 @@ export function ShieldedInheritancePanel({
     readModeRefreshScope.current = null;
     acceptPublicSyncProgress.current = false;
     setBusy(false);
+    setBalancesRefreshing(false);
     setStage("");
     setError("");
     setCodeError("");
@@ -1476,10 +1481,12 @@ export function ShieldedInheritancePanel({
     const refreshingReadMode = readModeRefreshScope.current === contextKey;
     try {
       await run(async (current) => {
+        setBalancesRefreshing(true);
         if (allPools) setDiscovery(null);
         const result = await shieldedAssetWorkerCall("recover", { context });
         let recoveredState = result.sessionState;
         if (current()) {
+          setBalancesRefreshing(false);
           if (result.sessionState) latestSession.current.update(result.sessionState);
           setWallet(result);
           setRecoveryScanned(true);
@@ -2322,6 +2329,7 @@ export function ShieldedInheritancePanel({
   ).map(({ slot: walletSlot, unlocked }) => ({
     slot: walletSlot,
     unlocked,
+    balanceState: unlocked && balancesRefreshing ? wallet ? "updating" : "loading" : undefined,
     available: wallet && unlocked ? formatShieldedAmount(valueTotals[walletSlot], decimals) : "—",
     budget:
       wallet && unlocked && session.identity
@@ -2933,24 +2941,12 @@ export function ShieldedInheritancePanel({
     </section>
   );
 
-  const stateReadModeControl = (
-    <ShieldedStateReadModeControl
-      value={normalizeShieldedStateReadMode(config.stateReadMode)}
-      disabled={busy || readModeRefreshing || submissionPending || !!executingReview || letterOperationPending.current}
-      onChange={(stateReadMode) => {
-        if (busy || readModeRefreshing || submissionPending || executingReview || letterOperationPending.current || stateReadMode === context.stateReadMode) return;
-        readModeRefreshScope.current = JSON.stringify({ ...context, stateReadMode });
-        setReadModeRefreshing(true);
-        config.update({ stateReadMode });
-      }}
-    />
-  );
   const publicSyncItems = (["authorization", "lineage"] as const)
     .map((domain) => publicSyncProgress[domain])
     .filter((item): item is PublicStateSyncProgress => !!item);
   const publicSyncPauseDisabled = submissionPending || !!executingReview || session.isWalletRequestPending() ||
     progress?.stage === "checkingGas" || progress?.stage === "submitting" || progress?.stage === "confirming";
-  const publicSyncStatus = publicSyncPaused || (busy && publicSyncItems.length > 0) ? (
+  const publicSyncStatus = publicSyncPaused || (busy && publicSyncItems.some((item) => item.phase !== "complete")) ? (
     <ShieldedPublicStateSyncStatus
       progress={publicSyncItems}
       paused={publicSyncPaused}
@@ -2980,16 +2976,8 @@ export function ShieldedInheritancePanel({
       ) : (
         <div className="space-y-6">
           {head}
-          <div className="relative" aria-busy={readModeRefreshing || undefined}>
-            {stateReadModeControl}
-            {readModeRefreshing && publicSyncStatus ? (
-              <div className="absolute inset-x-0 top-full z-20 mt-2 max-h-[60dvh] overflow-y-auto rounded-[20px] shadow-lg">
-                {publicSyncStatus}
-              </div>
-            ) : null}
-          </div>
-          {readModeRefreshing ? null : publicSyncStatus}
           <ShieldedAssetOverview
+            syncStatus={publicSyncStatus}
             person={{
               name: session.identity?.identity.fullName ?? tr("independentKeyTitle"),
               avatar: session.identity

@@ -29,6 +29,7 @@ export function PrivateLettersPanel(props: {
   const [inbox, setInbox] = useState<ShieldedAssetWorkerCallMap["recoverLetters"]["result"] | null>(null);
   const prepared = useRef<ProvenPrivateLetter | null>(null);
   const epoch = useRef(0);
+  const mounted = useRef(false);
   const activeOperation = useRef<"send" | "recover" | null>(null);
   const inboxScope = useRef<string | null>(null);
   const currentSigner = useRef(props.signer);
@@ -44,9 +45,22 @@ export function PrivateLettersPanel(props: {
   }, []);
   const contextKey = JSON.stringify([props.context, props.sessionScope]);
   const contentScope = JSON.stringify([{ ...props.context, stateReadMode: undefined }, props.sessionScope]);
+  const previousContextKey = useRef(contextKey);
   const previousContentScope = useRef(contentScope);
+  useEffect(() => {
+    mounted.current = true;
+    // StrictMode replays effects on the same instance. Its pending inbox read
+    // stays current, and reacquires the parent's busy state after cleanup.
+    if (activeOperation.current) busyChange.current?.(true);
+    return () => {
+      mounted.current = false;
+      if (activeOperation.current) busyChange.current?.(false);
+    };
+  }, []);
   useEffect(() => subscribeShieldedAssetWorkerLock(() => {
+    const wasWorking = activeOperation.current !== null;
     epoch.current++; activeOperation.current = null; setCode(""); setBody(""); setInbox(null); setError(""); setSent(""); prepared.current = null; setWorking(false);
+    if (wasWorking) busyChange.current?.(false);
   }), []);
   useEffect(() => subscribeWalletConnectionChange(invalidateSending), [invalidateSending]);
   useEffect(() => {
@@ -54,9 +68,11 @@ export function PrivateLettersPanel(props: {
     previousSigner.current = props.signer;
     invalidateSending();
   }, [props.signer, invalidateSending]);
-  useEffect(() => () => { epoch.current++; }, []);
   useEffect(() => { prepared.current = null; }, [props.budgetCommitment, props.composeRequest]);
   useEffect(() => {
+    if (previousContextKey.current === contextKey) return;
+    previousContextKey.current = contextKey;
+    const wasWorking = activeOperation.current !== null;
     epoch.current++;
     activeOperation.current = null;
     // The read strategy changes neither the recipient nor the unlocked keys.
@@ -67,6 +83,7 @@ export function PrivateLettersPanel(props: {
     previousContentScope.current = contentScope;
     prepared.current = null;
     setWorking(false);
+    if (wasWorking) busyChange.current?.(false);
   }, [contextKey, contentScope]);
   const budgets = props.wallet?.templates.filter(item => item.bindingKind === 0) ?? [];
   const busy = props.disabled || working;
@@ -74,7 +91,7 @@ export function PrivateLettersPanel(props: {
     if (props.mode !== "write" || !props.signer || !props.context.lettersAddress || busy) return;
     const version = epoch.current;
     const walletGeneration = getWalletConnectionGeneration();
-    const current = () => version === epoch.current && currentSigner.current === props.signer && walletGeneration === getWalletConnectionGeneration();
+    const current = () => mounted.current && version === epoch.current && currentSigner.current === props.signer && walletGeneration === getWalletConnectionGeneration();
     activeOperation.current = "send";
     setWorking(true); props.onBusyChange?.(true); setError("");
     try {
@@ -94,7 +111,7 @@ export function PrivateLettersPanel(props: {
         } else setError(tr("sendFailed"));
       }
     }
-    finally { if (version === epoch.current) { activeOperation.current = null; setWorking(false); props.onBusyChange?.(false); } }
+    finally { if (mounted.current && version === epoch.current) { activeOperation.current = null; setWorking(false); busyChange.current?.(false); } }
   }
   async function recover() {
     if (props.mode !== "inbox" || busy || !props.context.lettersAddress || !props.recoveryReady) return;
@@ -103,9 +120,9 @@ export function PrivateLettersPanel(props: {
     setWorking(true); props.onBusyChange?.(true); setError("");
     try {
       const result = await shieldedAssetWorkerCall("recoverLetters", { context: props.context }, { timeoutMs: 1_200_000 });
-      if (version === epoch.current) setInbox(result);
-    } catch { if (version === epoch.current) setError(tr("recoverFailed")); }
-    finally { if (version === epoch.current) { activeOperation.current = null; setWorking(false); props.onBusyChange?.(false); } }
+      if (mounted.current && version === epoch.current) setInbox(result);
+    } catch { if (mounted.current && version === epoch.current) setError(tr("recoverFailed")); }
+    finally { if (mounted.current && version === epoch.current) { activeOperation.current = null; setWorking(false); busyChange.current?.(false); } }
   }
   // Entering the inbox reads once for this key/context. Busy state changes and
   // the recovery result must not start another automatic read.

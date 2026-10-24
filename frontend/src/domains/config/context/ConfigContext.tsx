@@ -5,12 +5,10 @@ import {
   getDefaultRootVersionIndex,
   getDefaultRpcUrl,
   getDefaultReaderAddress,
+  getShieldedStateReadMode,
 } from "../../../shared/config/env";
 import { resolveEntryReaderForChain, resolveModuleAddresses } from "../services";
-import {
-  normalizeShieldedStateReadMode,
-  type ShieldedStateReadMode,
-} from "../../../shared/config/shieldedStateReadMode";
+import type { ShieldedStateReadMode } from "../../../shared/config/shieldedStateReadMode";
 
 type ConfigValues = {
   rpcUrl: string;
@@ -20,11 +18,13 @@ type ConfigValues = {
   rootHash: string;
   rootVersionIndex: number;
   chainId: number;
-  stateReadMode: ShieldedStateReadMode;
+  readonly stateReadMode: ShieldedStateReadMode;
 };
 
+type ConfigUpdates = Partial<Omit<ConfigValues, "stateReadMode">>;
+
 export type AppConfig = ConfigValues & {
-  update: (partial: Partial<ConfigValues>) => void;
+  update: (partial: ConfigUpdates) => void;
   reset: () => void;
   defaults: ConfigValues;
   moduleResolutionError: string | null;
@@ -60,7 +60,7 @@ function getEnvDefaults(): ConfigValues {
     rootHash,
     rootVersionIndex,
     chainId: inferChainId(),
-    stateReadMode: "rebuild",
+    stateReadMode: getShieldedStateReadMode(),
   };
 }
 
@@ -77,16 +77,11 @@ function normalizeStoredConfig(defaults: ConfigValues): ConfigValues {
   const stored = loadStoredConfig() || {};
   const merged = { ...defaults, ...stored };
   const chainId = Number(merged.chainId) || 0;
-  let stateReadMode: ShieldedStateReadMode = "rebuild";
-  try {
-    stateReadMode = normalizeShieldedStateReadMode(stored.stateReadMode);
-  } catch {
-    // A stale or damaged preference must never opt into identity-specific RPC reads.
-  }
 
   return {
     ...merged,
-    stateReadMode,
+    // The build's read strategy takes precedence over preferences from older builds.
+    stateReadMode: defaults.stateReadMode,
     // Worked out from the chain on every boot, so a redeployment that rewrites
     // the environment is picked up rather than lost behind a saved address.
     // Chain 0 means the RPC matched no known network, and then the unsuffixed
@@ -114,10 +109,10 @@ function normalizeStoredConfig(defaults: ConfigValues): ConfigValues {
  */
 function persistConfig(next: ConfigValues): void {
   try {
-    const { rpcUrl, rootHash, rootVersionIndex, chainId, stateReadMode } = next;
+    const { rpcUrl, rootHash, rootVersionIndex, chainId } = next;
     localStorage.setItem(
       STORAGE_KEY,
-      JSON.stringify({ rpcUrl, rootHash, rootVersionIndex, chainId, stateReadMode }),
+      JSON.stringify({ rpcUrl, rootHash, rootVersionIndex, chainId }),
     );
   } catch {}
 }
@@ -263,10 +258,10 @@ export function ConfigProvider({ children }: { children: React.ReactNode }) {
     saveRootHistory([]);
   };
 
-  const update = (partial: Partial<ConfigValues>) => {
+  const update = (partial: ConfigUpdates) => {
     if (partial.readerAddress != null) setModuleResolutionError(null);
     setState((prev) => {
-      const next = { ...prev, ...partial };
+      const next = { ...prev, ...partial, stateReadMode: defaults.stateReadMode };
       if (
         partial.readerAddress != null &&
         !sameAddress(partial.readerAddress, prev.readerAddress)

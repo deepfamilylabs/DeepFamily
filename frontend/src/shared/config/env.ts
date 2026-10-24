@@ -1,3 +1,5 @@
+import type { ShieldedStateReadMode } from "./shieldedStateReadMode";
+
 export function getViteEnv(): Record<string, unknown> {
   return (import.meta.env || {}) as Record<string, unknown>;
 }
@@ -132,6 +134,11 @@ export function getShieldedPoolFactoryAddress(chainId: number): string {
 export function getShieldedPoolFactoryDeploymentBlock(chainId: number): number {
   const block = Number(getPerChainEnv("VITE_SHIELDED_POOL_FACTORY_FROM_BLOCK", chainId));
   return Number.isSafeInteger(block) && block >= 0 ? block : 0;
+}
+
+/** Only an explicit deployment setting enables recipient-specific chain reads. */
+export function getShieldedStateReadMode(): ShieldedStateReadMode {
+  return getStringEnv("VITE_SHIELDED_STATE_READ_MODE").trim() === "chain" ? "chain" : "rebuild";
 }
 
 export function getDefaultRootHash(): string {

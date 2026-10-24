@@ -21,6 +21,8 @@ export type ShieldedOverviewWallet = {
   unlocked: boolean;
   available: string;
   budget: string;
+  /** Only an actual balance recovery marks a wallet as loading or updating. */
+  balanceState?: "loading" | "updating";
   /** The wallet every deposit, spend and claim uses. */
   current: boolean;
   /**
@@ -50,6 +52,7 @@ const WALLET_ACTION =
 export function ShieldedAssetOverview({
   person,
   assetControls,
+  syncStatus,
   symbol,
   busy,
   onRecover,
@@ -73,6 +76,7 @@ export function ShieldedAssetOverview({
     onCopy: () => void;
   };
   assetControls?: ReactNode;
+  syncStatus?: ReactNode;
   symbol: string;
   busy: boolean;
   onRecover: () => void;
@@ -156,6 +160,9 @@ export function ShieldedAssetOverview({
               <span className="sr-only sm:not-sr-only">{t("shielded.lock", { symbol })}</span>
             </button>
           </div>
+        </div>
+        <div className="flex h-8 w-full min-w-0 items-center justify-end">
+          {syncStatus}
         </div>
       </div>
       <div
@@ -328,44 +335,56 @@ export function ShieldedAssetOverview({
                   </p>
                 ) : null}
               </div>
-              <dl
-                className={`mt-auto flex min-w-0 gap-x-6 gap-y-3 ${
-                  longBalance ? "flex-col" : "flex-wrap items-end justify-between"
-                }`}
-              >
-                <div className="min-w-0">
-                  <dt className="text-xs text-ink-muted">
-                    {t("shielded.balanceAmount", { symbol })}
-                  </dt>
-                  <dd className="mt-1.5 flex min-w-0 flex-wrap items-baseline gap-x-1.5 tabular-nums">
-                    <span
-                      className={`min-w-0 break-all font-display font-bold leading-none text-ink ${
-                        longBalance ? "text-2xl sm:text-3xl" : "text-[34px] sm:text-[40px]"
-                      }`}
+              <div className="mt-auto min-w-0">
+                <dl
+                  aria-busy={wallet.balanceState ? true : undefined}
+                  className={`flex min-w-0 gap-x-6 gap-y-3 ${
+                    longBalance ? "flex-col" : "flex-wrap items-end justify-between"
+                  }`}
+                >
+                  <div className="min-w-0">
+                    <dt className="text-xs text-ink-muted">
+                      {t("shielded.balanceAmount", { symbol })}
+                    </dt>
+                    <dd className="mt-1.5 flex min-w-0 flex-wrap items-baseline gap-x-1.5 tabular-nums">
+                      <span
+                        className={`min-w-0 break-all font-display font-bold leading-none text-ink ${
+                          longBalance ? "text-2xl sm:text-3xl" : "text-[34px] sm:text-[40px]"
+                        }`}
+                      >
+                        {wallet.available}
+                      </span>
+                      {wallet.available !== "—" ? (
+                        <span className="text-[13px] text-ink-muted">{symbol}</span>
+                      ) : null}
+                    </dd>
+                  </div>
+                  <div className={`min-w-0 ${longBalance ? "" : "text-right"}`}>
+                    <dt className="text-xs text-ink-muted">
+                      {t("shielded.budgetAmount", { symbol })}
+                    </dt>
+                    <dd
+                      className={`mt-1.5 flex min-w-0 flex-wrap items-baseline gap-x-1 tabular-nums ${longBalance ? "" : "justify-end"}`}
                     >
-                      {wallet.available}
+                      <span className="min-w-0 break-all font-display text-[22px] font-bold leading-none text-ink/80">
+                        {wallet.budget}
+                      </span>
+                      {wallet.budget !== "—" ? (
+                        <span className="text-xs text-ink-muted">{symbol}</span>
+                      ) : null}
+                    </dd>
+                  </div>
+                </dl>
+                <div className="mt-2 min-h-4 text-xs leading-4 text-ink-muted">
+                  {wallet.balanceState ? (
+                    <span role="status">
+                      {t(wallet.balanceState === "loading"
+                        ? "shielded.publicStateSync.balanceLoading"
+                        : "shielded.publicStateSync.balanceUpdating")}
                     </span>
-                    {wallet.available !== "—" ? (
-                      <span className="text-[13px] text-ink-muted">{symbol}</span>
-                    ) : null}
-                  </dd>
+                  ) : null}
                 </div>
-                <div className={`min-w-0 ${longBalance ? "" : "text-right"}`}>
-                  <dt className="text-xs text-ink-muted">
-                    {t("shielded.budgetAmount", { symbol })}
-                  </dt>
-                  <dd
-                    className={`mt-1.5 flex min-w-0 flex-wrap items-baseline gap-x-1 tabular-nums ${longBalance ? "" : "justify-end"}`}
-                  >
-                    <span className="min-w-0 break-all font-display text-[22px] font-bold leading-none text-ink/80">
-                      {wallet.budget}
-                    </span>
-                    {wallet.budget !== "—" ? (
-                      <span className="text-xs text-ink-muted">{symbol}</span>
-                    ) : null}
-                  </dd>
-                </div>
-              </dl>
+              </div>
               <div className="flex flex-wrap gap-1 border-t border-hairline/70 pt-2.5">
                 {canReceive ? (
                   <>

@@ -1597,15 +1597,13 @@
     "wrongNetwork": "Switch your wallet to network {{chainId}}.",
     "identityTitle": "Unlock identity",
     "identityDescription": "Use the parent's identity to fund budgets and the child's identity to claim. Keep your identity details and passphrase safe.",
-    "stateReadMode": {
-      "title": "State reading method",
-      "rebuild": "Rebuild locally (default)",
-      "rebuildDescription": "Download the complete public current authorization and endorsement state and calculate locally. This reduces identity-specific RPC queries, but takes longer and uses more data.",
-      "chain": "Read current paths from the chain",
-      "chainDescription": "Read only the short paths needed for the selected identity. Faster and less data, but the RPC provider can see the anonymous aliases and family objects you query."
-    },
     "publicStateSync": {
       "title": "Public state synchronization",
+      "syncing": "Syncing…",
+      "verifying": "Verifying…",
+      "details": "Synchronization details",
+      "balanceLoading": "Loading balances…",
+      "balanceUpdating": "Updating…",
       "domains": {
         "authorization": "Receive authorization",
         "lineage": "Family endorsements"

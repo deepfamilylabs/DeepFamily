@@ -4,6 +4,7 @@ import {
   getDefaultReaderAddress,
   getShieldedPoolFactoryAddress,
   getShieldedPoolFactoryDeploymentBlock,
+  getShieldedStateReadMode,
   readBooleanEnv,
   readNumberEnv,
   readPositiveNumberEnv,
@@ -25,6 +26,24 @@ describe("shielded module addresses", () => {
     expect(getShieldedPoolFactoryAddress(71)).toBe(READER);
     expect(getShieldedPoolFactoryDeploymentBlock(31337)).toBe(42);
     expect(getShieldedPoolFactoryDeploymentBlock(71)).toBe(40);
+  });
+});
+
+describe("shielded state read mode", () => {
+  it.each([undefined, "", "rebuild", "invalid", "onchain", "CHAIN"])(
+    "keeps local rebuilding for environment value %j",
+    (value) => {
+      vi.stubEnv("VITE_SHIELDED_STATE_READ_MODE", value);
+      expect(getShieldedStateReadMode()).toBe("rebuild");
+    },
+  );
+
+  it("enables direct chain reads only when explicitly configured", () => {
+    vi.stubEnv("VITE_SHIELDED_STATE_READ_MODE", "chain");
+    expect(getShieldedStateReadMode()).toBe("chain");
+
+    vi.stubEnv("VITE_SHIELDED_STATE_READ_MODE", " chain ");
+    expect(getShieldedStateReadMode()).toBe("chain");
   });
 });
 

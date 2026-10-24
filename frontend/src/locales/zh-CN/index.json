@@ -1597,15 +1597,13 @@
     "wrongNetwork": "请将钱包切换至网络 {{chainId}}。",
     "identityTitle": "解锁身份",
     "identityDescription": "存入预算时使用父母身份，领取时使用子女身份。请妥善保存身份资料和口令。",
-    "stateReadMode": {
-      "title": "状态读取方式",
-      "rebuild": "本地重建（默认）",
-      "rebuildDescription": "下载完整的公开当前授权和背书状态，在本地计算。减少按身份查询 RPC，但耗时更长、流量更大。",
-      "chain": "从链上读取当前路径",
-      "chainDescription": "只读取当前身份需要的短路径，速度更快、流量更少，但 RPC 服务商可见所查询的匿名代号和族谱对象。"
-    },
     "publicStateSync": {
       "title": "公开状态同步",
+      "syncing": "正在同步…",
+      "verifying": "正在校验…",
+      "details": "同步详情",
+      "balanceLoading": "正在读取余额…",
+      "balanceUpdating": "正在更新…",
       "domains": {
         "authorization": "收款授权",
         "lineage": "族谱背书"
