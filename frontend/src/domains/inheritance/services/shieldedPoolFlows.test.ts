@@ -240,8 +240,8 @@ describe("shielded pool asset-worker proof submission", () => {
   it("does not query lineage or time for VALUE actions or budget refills", async () => {
     const f = fixture();
     await submitShield({ ...f.common, amount: 10n });
-    await submitPrivateTransfer({ ...f.common, data: actionData(8) });
-    await submitUnshield({ ...f.common, data: actionData(8), amount: 10n, recipient: RECIPIENT });
+    await submitPrivateTransfer({ ...f.common, data: actionData(4) });
+    await submitUnshield({ ...f.common, data: actionData(4), amount: 10n, recipient: RECIPIENT });
     await submitFund({ ...f.common, data: { ...f.common.data, fundMode: 1n } });
     expect(f.lineageIndex).not.toHaveBeenCalled();
     expect(f.proofLifetime).not.toHaveBeenCalled();
@@ -450,7 +450,7 @@ describe("shielded pool asset-worker proof submission", () => {
           continueReview = resolve;
         }),
     );
-    const pending = submitPrivateTransfer({ ...f.common, data: actionData(8), onGasEstimate });
+    const pending = submitPrivateTransfer({ ...f.common, data: actionData(4), onGasEstimate });
     while (!onGasEstimate.mock.calls.length) await new Promise((resolve) => setTimeout(resolve, 0));
     expect(onGasEstimate).toHaveBeenCalledWith({
       gasEstimate: 100_000n,
@@ -483,7 +483,7 @@ describe("shielded pool asset-worker proof submission", () => {
     });
     const pending = submitPrivateTransfer({
       ...f.common,
-      data: actionData(8),
+      data: actionData(4),
       onGasEstimate,
       onSubmitting,
       onStage: (stage) => {
@@ -523,7 +523,7 @@ describe("shielded pool asset-worker proof submission", () => {
     const onSubmitting = vi.fn();
     const pending = submitPrivateTransfer({
       ...f.common,
-      data: actionData(8),
+      data: actionData(4),
       onSubmitting,
       onStage: (stage) => {
         if (stage === "submitting" && locked)
@@ -552,7 +552,7 @@ describe("shielded pool asset-worker proof submission", () => {
 
   it("leaves nonce choice unchanged when submission tracking is not requested", async () => {
     const f = fixture();
-    await submitPrivateTransfer({ ...f.common, data: actionData(8) });
+    await submitPrivateTransfer({ ...f.common, data: actionData(4) });
     expect(f.provider.getTransactionCount).not.toHaveBeenCalled();
     expect(f.provider.getBlockNumber).not.toHaveBeenCalled();
     expect(
@@ -568,7 +568,7 @@ describe("shielded pool asset-worker proof submission", () => {
       new Error("Wallet disconnected before returning a hash"),
     );
     await expect(
-      submitPrivateTransfer({ ...f.common, data: actionData(8), onSubmitting, onBroadcast }),
+      submitPrivateTransfer({ ...f.common, data: actionData(4), onSubmitting, onBroadcast }),
     ).rejects.toThrow("disconnected");
     expect(onSubmitting).toHaveBeenCalledOnce();
     expect(onSubmitting).toHaveBeenCalledWith({
@@ -582,23 +582,23 @@ describe("shielded pool asset-worker proof submission", () => {
   it("submits only an asset-worker proof and reports broadcast immediately", async () => {
     const f = fixture();
     const onBroadcast = vi.fn();
-    await submitPrivateTransfer({ ...f.common, data: actionData(8), onBroadcast });
+    await submitPrivateTransfer({ ...f.common, data: actionData(4), onBroadcast });
     expect(onBroadcast).toHaveBeenCalledWith("0xprivateTransfer");
-    const witnessInput = { ...f.common, data: actionData(8), witness: { secret: "private" } };
+    const witnessInput = { ...f.common, data: actionData(4), witness: { secret: "private" } };
     await expect(submitPrivateTransfer(witnessInput)).rejects.toThrow("accepts no witness");
-    await expect(submitPrivateTransfer({ ...f.common, data: actionData(8), preparedProof: undefined! }))
+    await expect(submitPrivateTransfer({ ...f.common, data: actionData(4), preparedProof: undefined! }))
       .rejects.toThrow("requires an asset-worker proof");
     expect(f.methods.privateTransfer).toHaveBeenCalledOnce();
   });
 
-  it("routes canonical eight-input actions to their contract methods", async () => {
+  it("routes canonical four-input actions to their contract methods", async () => {
     for (const action of ["privateTransfer", "unshield"] as const) {
       const f = fixture();
       const data = {
         ...f.common.data,
-        inputShardIds: Array(8).fill(0n),
-        inputRoots: Array(8).fill(123n),
-        inputNullifiers: Array.from({ length: 8 }, (_, i) => BigInt(i + 1)),
+        inputShardIds: Array(4).fill(0n),
+        inputRoots: Array(4).fill(123n),
+        inputNullifiers: Array.from({ length: 4 }, (_, i) => BigInt(i + 1)),
       };
       if (action === "privateTransfer") await submitPrivateTransfer({ ...f.common, data });
       else await submitUnshield({ ...f.common, data, recipient: RECIPIENT, amount: 75n });
@@ -613,7 +613,7 @@ describe("shielded pool asset-worker proof submission", () => {
         action === "privateTransfer"
           ? submitPrivateTransfer(f.common)
           : submitUnshield({ ...f.common, recipient: RECIPIENT, amount: 75n });
-      await expect(pending).rejects.toThrow("inputShardIds must have 8 values");
+      await expect(pending).rejects.toThrow("inputShardIds must have 4 values");
       expect(f.methods[action]).not.toHaveBeenCalled();
       expect(f.estimateGas).not.toHaveBeenCalled();
     }
@@ -675,13 +675,13 @@ describe("shielded pool asset-worker proof submission", () => {
     ] as const;
     for (const [name, submit] of cases) {
       const f = fixture();
-      const data = name === "privateTransfer" ? actionData(8) : f.common.data;
+      const data = name === "privateTransfer" ? actionData(4) : f.common.data;
       await submit({ ...f.common, data });
       expect(f.methods[name]).toHaveBeenCalledOnce();
       expect(f.methods[name].mock.calls[0][0]).toEqual({ ...data, receiveAuthorizations: Array.from({ length: 2 }, () => ({ checkpointId: 0n, asOf: 0n, expiresAt: 0n, recipientBinding: 0n, proof: "0x" })) });
     }
     const f = fixture();
-    await submitUnshield({ ...f.common, data: actionData(8), recipient: RECIPIENT, amount: 75n });
+    await submitUnshield({ ...f.common, data: actionData(4), recipient: RECIPIENT, amount: 75n });
     expect(f.methods.unshield.mock.calls[0][0]).toBe(RECIPIENT);
     expect(f.methods.unshield.mock.calls[0][1]).toBe(75n);
   });

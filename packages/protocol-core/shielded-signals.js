@@ -26,14 +26,14 @@ const LINEAGE = ["endorsementRoot", "trustedRoot", "asOf"];
 
 function inputSlotCount(action) {
   return action === SHIELDED_POOL_ACTION.PrivateTransfer || action === SHIELDED_POOL_ACTION.Unshield
-    ? 8
+    ? 4
     : 2;
 }
 
 /**
  * Each action's circuit declares exactly these named public inputs, in this order.
  * ShieldedPoolCore._publicSignals builds the same sequence. VALUE transfers and
- * withdrawals always use eight input slots; Fund and Claim use two.
+ * withdrawals always use four input slots; Fund and Claim use two.
  */
 export const SHIELDED_POOL_PUBLIC_INPUTS = Object.freeze({
   [SHIELDED_POOL_ACTION.Shield]: Object.freeze([...CONTEXT, ...OUTPUTS, "amount"]),

@@ -50,7 +50,7 @@ abstract contract ShieldedPoolCore is ReentrancyGuardTransient {
 
   /**
    * @notice All actions use two output slots. PrivateTransfer and Unshield always use
-   *         eight input slots, including proved placeholders for unused slots.
+   *         four input slots, including proved placeholders for unused slots.
    *         Shield, Fund and Claim use two input slots. Initial Fund repeats the
    *         first shard and root; Claim proves both input roots.
    */
@@ -279,7 +279,7 @@ abstract contract ShieldedPoolCore is ReentrancyGuardTransient {
     bool isShield = action == Action.Shield;
     bool isClaim = action == Action.Claim;
     bool isInitialFund = action == Action.Fund && data.fundMode == 0;
-    uint256 capacity = action == Action.PrivateTransfer || action == Action.Unshield ? 8 : 2;
+    uint256 capacity = action == Action.PrivateTransfer || action == Action.Unshield ? 4 : 2;
     if (
       data.inputNullifiers.length != capacity ||
       data.inputShardIds.length != capacity ||
@@ -542,10 +542,10 @@ abstract contract ShieldedPoolCore is ReentrancyGuardTransient {
     ) revert InvalidFieldElement();
   }
 
-  /** @dev VALUE actions prove eight root slots; Fund and Claim prove two. */
+  /** @dev VALUE actions prove four root slots; Fund and Claim prove two. */
   function _inputCount(Action action) private pure returns (uint256) {
     if (action == Action.Shield) return 0;
-    if (action == Action.PrivateTransfer || action == Action.Unshield) return 8;
+    if (action == Action.PrivateTransfer || action == Action.Unshield) return 4;
     return 2;
   }
 

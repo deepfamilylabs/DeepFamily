@@ -49,8 +49,8 @@ contract ShieldedGroth16VerifierMock {
     uint256[2] calldata,
     uint256[2][2] calldata,
     uint256[2] calldata,
-    uint256[32] calldata publicSignals
+    uint256[20] calldata publicSignals
   ) external view returns (bool) {
-    return _check(publicSignals[31]);
+    return _check(publicSignals[19]);
   }
 }

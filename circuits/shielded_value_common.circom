@@ -9,7 +9,7 @@ include "shielded_merkle_common.circom";
 // VALUE spends share their real nullifier formula with every other pool action.
 // Capacity changes only the number of slots, never the authority or spend tag.
 template ShieldedValueInputs(CAPACITY) {
-    assert(CAPACITY == 8);
+    assert(CAPACITY == 4);
     signal input poolDomain;
     signal input inputShardIds[CAPACITY];
     signal input inputRoots[CAPACITY];
@@ -115,7 +115,7 @@ template ShieldedValueInputs(CAPACITY) {
         dummy[i - 2].inputs[3] <== i;
         inputNullifiers[i] === dummy[i - 2].out + inputEnabled[i] * (spend[i].out - dummy[i - 2].out);
     }
-    component sumBits = Num2Bits(131);
+    component sumBits = Num2Bits(130);
     sumBits.in <== sums[CAPACITY];
     totalAmount <== sums[CAPACITY];
     component duplicateNote[CAPACITY * (CAPACITY - 1) / 2];

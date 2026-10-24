@@ -31,9 +31,9 @@ const base = {
 
 const valueBase = {
   ...base,
-  inputShardIds: Array.from({ length: 8 }, (_, index) => index + 2),
-  inputRoots: Array.from({ length: 8 }, (_, index) => index + 11),
-  inputNullifiers: Array.from({ length: 8 }, (_, index) => index + 21),
+  inputShardIds: Array.from({ length: 4 }, (_, index) => index + 2),
+  inputRoots: Array.from({ length: 4 }, (_, index) => index + 11),
+  inputNullifiers: Array.from({ length: 4 }, (_, index) => index + 21),
 };
 
 test("each pool action has the verifier input count in ProofConstants.sol", () => {
@@ -48,8 +48,8 @@ test("each pool action has the verifier input count in ProofConstants.sol", () =
       Shield: 7,
       Fund: 29,
       Claim: 27,
-      PrivateTransfer: 32,
-      Unshield: 32,
+      PrivateTransfer: 20,
+      Unshield: 20,
     },
   );
 });
@@ -95,7 +95,7 @@ test("claim signals follow the circuit's named public inputs", () => {
   assert.equal(witness.asOf, "31");
 });
 
-test("VALUE transfers list all eight shard ids before all roots and nullifiers", () => {
+test("VALUE transfers list all four shard ids before all roots and nullifiers", () => {
   const signals = buildShieldedPoolPublicSignals({
     ...valueBase,
     action: SHIELDED_POOL_ACTION.PrivateTransfer,

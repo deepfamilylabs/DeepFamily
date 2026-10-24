@@ -31,7 +31,7 @@ const dataFor = (overrides = {}) => ({
 const valueDataFor = (overrides = {}) => {
   const data = dataFor(overrides);
   const pad = (values, filler) =>
-    Array.from({ length: 8 }, (_, slot) => values[slot] ?? filler(slot));
+    Array.from({ length: 4 }, (_, slot) => values[slot] ?? filler(slot));
   return {
     ...data,
     inputShardIds: pad(data.inputShardIds, () => data.inputShardIds[0]),

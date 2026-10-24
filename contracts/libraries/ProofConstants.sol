@@ -58,6 +58,6 @@ library ProofConstants {
   uint256 internal constant SHIELDED_SHIELD_PUBLIC_SIGNALS_LEN = 7;
   uint256 internal constant SHIELDED_FUND_PUBLIC_SIGNALS_LEN = 29;
   uint256 internal constant SHIELDED_CLAIM_PUBLIC_SIGNALS_LEN = 27;
-  uint256 internal constant SHIELDED_PRIVATE_TRANSFER_PUBLIC_SIGNALS_LEN = 32;
-  uint256 internal constant SHIELDED_UNSHIELD_PUBLIC_SIGNALS_LEN = 32;
+  uint256 internal constant SHIELDED_PRIVATE_TRANSFER_PUBLIC_SIGNALS_LEN = 20;
+  uint256 internal constant SHIELDED_UNSHIELD_PUBLIC_SIGNALS_LEN = 20;
 }

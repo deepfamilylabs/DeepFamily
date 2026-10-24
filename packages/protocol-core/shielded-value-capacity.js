@@ -106,8 +106,8 @@ export function computeShieldedDummyInputNullifierForSlot(
   slot,
   scope,
 ) {
-  if (!Number.isInteger(slot) || slot < 1 || slot > 7)
-    throw new Error("Dummy input slot must be 1..7");
+  if (!Number.isInteger(slot) || slot < 1 || slot > 3)
+    throw new Error("Dummy input slot must be 1..3");
   const secret = BigInt(ownerSecret);
   const commitment = BigInt(firstCommitment);
   if (
@@ -128,11 +128,11 @@ export function computeShieldedDummyInputNullifierForSlot(
  * Pure, deterministic preview. Candidate notes are a permission boundary, not a request to
  * consume every note. Generated IDs describe later steps; clients re-scan after each receipt.
  */
-export function planShieldedValueSpend({ notes, candidateCommitments, amount, maxInputs = 8 }) {
+export function planShieldedValueSpend({ notes, candidateCommitments, amount, maxInputs = 4 }) {
   const target = BigInt(amount);
   if (target <= 0n || target > MAX_UINT128)
     throw new Error("Spend amount must be positive uint128");
-  if (![1, 8].includes(maxInputs)) throw new Error("Spend capacity must be 1 or 8");
+  if (![1, 4].includes(maxInputs)) throw new Error("Spend capacity must be 1 or 4");
   if (!Array.isArray(notes)) throw new Error("Candidate notes must be an array");
   const commitmentId = (value) => {
     const commitment = BigInt(value);
@@ -178,8 +178,8 @@ export function planShieldedValueSpend({ notes, candidateCommitments, amount, ma
     available.sort(byAmount);
     const selected = selectValueInputs(available, target, maxInputs);
     const final = selected.length <= maxInputs;
-    // Transfers can merge up to eight even when the final operation (Fund) consumes one.
-    const inputs = final ? selected : selected.slice(0, 8);
+    // Transfers can merge up to four even when the final operation (Fund) consumes one.
+    const inputs = final ? selected : selected.slice(0, 4);
     const total = inputs.reduce((sum, note) => sum + note.amount, 0n);
     const principal = final || total >= target ? target : total;
     const remainder = total - principal;
@@ -191,7 +191,7 @@ export function planShieldedValueSpend({ notes, candidateCommitments, amount, ma
     for (const note of inputs) if (seen.has(note.commitment)) usedOriginal.add(note.commitment);
     steps.push({
       kind: final ? "spend" : "merge",
-      capacity: 8,
+      capacity: 4,
       inputCommitments: inputs.map((note) => note.commitment),
       inputAmount: total,
       outputAmounts: [principal, remainder],

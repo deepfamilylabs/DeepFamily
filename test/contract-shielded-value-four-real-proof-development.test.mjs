@@ -23,15 +23,15 @@ import {
 import { deployUnifiedVerifierAdapter } from "./helpers/unifiedVerifierAdapter.mjs";
 import { deployMockReceiveAuthorization } from "./helpers/shieldedReceiveAuthorization.mjs";
 
-describe("development-key real proofs for eight-input VALUE routes", function () {
+describe("development-key real proofs for four-input VALUE routes", function () {
   this.timeout(600_000);
-  it("transfers eight real inputs, withdraws with the eight-slot key and prevents replay with padded inputs", async () => {
+  it("transfers four real inputs, withdraws with the four-slot key and prevents replay with padded inputs", async () => {
     const manifest = JSON.parse(
       fs.readFileSync("circuits/shielded-development-manifest.json", "utf8"),
     );
     assert.equal(manifest.developmentOnly, true);
     assert.equal(manifest.productionReady, false);
-    const directory = fs.mkdtempSync(path.join(os.tmpdir(), "deepfamily-value-eight-real-"));
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), "deepfamily-value-four-real-"));
     try {
       const generated = {};
       for (const action of ["shield", "privateTransfer", "unshield"]) {
@@ -138,7 +138,7 @@ describe("development-key real proofs for eight-input VALUE routes", function ()
       await token.mint(signer.address, 80n);
       await token.approve(scope.poolAddress, 80n);
       const sources = [];
-      for (let i = 0; i < 8; i++) {
+      for (let i = 0; i < 4; i++) {
         const notes = await Promise.all([value(10n), value(0n)]);
         const actionData = data(notes);
         const publicInputs = buildShieldedPoolPublicInputs({
@@ -175,7 +175,7 @@ describe("development-key real proofs for eight-input VALUE routes", function ()
         };
       };
       const buildInputs = async (notes) => {
-        const capacity = 8;
+        const capacity = 4;
         const paths = await Promise.all(notes.map(pathFor));
         const fill = (values) =>
           Array.from({ length: capacity }, (_, i) => String(values[i] ?? 0n));
@@ -205,7 +205,7 @@ describe("development-key real proofs for eight-input VALUE routes", function ()
           },
         };
       };
-      const outputs = await Promise.all([value(40n), value(40n)]);
+      const outputs = await Promise.all([value(20n), value(20n)]);
       const opened = await buildInputs(sources);
       const transferData = { ...data(outputs), ...opened.data };
       const transferPublic = buildShieldedPoolPublicInputs({
@@ -224,14 +224,14 @@ describe("development-key real proofs for eight-input VALUE routes", function ()
           receiveViewKeyLo: ["0", "0"],
           receiveViewKeyHi: ["0", "0"],
           outputOwnerCommitments: [String(owner), String(owner)],
-          outputAmounts: ["40", "40"],
+          outputAmounts: ["20", "20"],
           outputNonces: outputs.map((note) => String(note.nonce)),
         },
         transferPublic.signals,
       );
       const receipt = await (await pool.privateTransfer(transferData, transferProof)).wait();
       console.log(`development-only privateTransfer gas: ${receipt.gasUsed}`);
-      expect(await pool.nullifierCount()).to.equal(8n);
+      expect(await pool.nullifierCount()).to.equal(4n);
       const replayOutputs = await Promise.all([value(20n), value(0n)]);
       const replayInput = await buildInputs(sources.slice(0, 2));
       const replayData = { ...data(replayOutputs), ...replayInput.data };
@@ -259,8 +259,8 @@ describe("development-key real proofs for eight-input VALUE routes", function ()
       );
       await token.mint(signer.address, 60n);
       await token.approve(scope.poolAddress, 60n);
-      const exitSources = outputs.map((note, i) => ({ ...note, leafIndex: 16 + i }));
-      for (let i = 0; i < 3; i++) {
+      const exitSources = outputs.map((note, i) => ({ ...note, leafIndex: 8 + i }));
+      for (let i = 0; i < 1; i++) {
         const notes = await Promise.all([value(10n), value(10n)]);
         const shieldData = data(notes);
         const shieldPublic = buildShieldedPoolPublicInputs({
@@ -280,9 +280,9 @@ describe("development-key real proofs for eight-input VALUE routes", function ()
           shieldPublic.signals,
         );
         await pool.shield(20n, shieldData, shieldProof);
-        exitSources.push(...notes.map((note, j) => ({ ...note, leafIndex: 18 + 2 * i + j })));
+        exitSources.push(...notes.map((note, j) => ({ ...note, leafIndex: 10 + 2 * i + j })));
       }
-      const exitOutputs = await Promise.all([value(120n), value(0n)]);
+      const exitOutputs = await Promise.all([value(40n), value(0n)]);
       const exitInput = await buildInputs(exitSources);
       const exitData = { ...data(exitOutputs), ...exitInput.data };
       const exitPublic = buildShieldedPoolPublicInputs({
@@ -297,7 +297,7 @@ describe("development-key real proofs for eight-input VALUE routes", function ()
         {
           ...exitPublic.witness,
           ...exitInput.witness,
-          changeAmount: "120",
+          changeAmount: "40",
           changeNonce: String(exitOutputs[0].nonce),
           dummyNonce: String(exitOutputs[1].nonce),
         },
@@ -307,9 +307,9 @@ describe("development-key real proofs for eight-input VALUE routes", function ()
         await pool.unshield(recipient.address, 20n, exitData, exitProof)
       ).wait();
       console.log(`development-only unshield gas: ${exitReceipt.gasUsed}`);
-      expect(await pool.nullifierCount()).to.equal(16n);
+      expect(await pool.nullifierCount()).to.equal(8n);
       expect(await token.balanceOf(recipient.address)).to.equal(20n);
-      expect(await pool.totalShielded()).to.equal(120n);
+      expect(await pool.totalShielded()).to.equal(40n);
     } finally {
       fs.rmSync(directory, { recursive: true, force: true });
     }

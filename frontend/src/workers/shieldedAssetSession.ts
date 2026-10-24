@@ -1401,7 +1401,7 @@ export class ShieldedAssetSession {
         })),
         candidateCommitments: request.candidates,
         amount,
-        maxInputs: request.action === "fund" ? 1 : 8,
+        maxInputs: request.action === "fund" ? 1 : 4,
       });
       steps = plan.steps.map((step) => ({
         action: step.kind === "merge" ? "privateTransfer" : request.action,

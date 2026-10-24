@@ -1196,20 +1196,20 @@ export async function runShieldedAcceptanceSmoke({
     );
 
     const valuePrivateInputs = (source, membership) => ({
-      inputEnabled: ["1", ...Array(7).fill("0")],
-      inputOwnerSecrets: [String(source.keys.ownerSecret), ...Array(7).fill("0")],
-      inputAmounts: [String(source.amount), ...Array(7).fill("0")],
-      inputNonces: [String(source.nonce), ...Array(7).fill("0")],
-      inputCiphertextHashes: [String(source.ciphertextHashField), ...Array(7).fill("0")],
-      inputDepths: [membership.depth, ...Array(7).fill("0")],
-      inputIndices: [membership.index, ...Array(7).fill("0")],
-      inputSiblings: [membership.siblings, ...Array.from({ length: 7 }, () => Array(32).fill("0"))],
+      inputEnabled: ["1", ...Array(3).fill("0")],
+      inputOwnerSecrets: [String(source.keys.ownerSecret), ...Array(3).fill("0")],
+      inputAmounts: [String(source.amount), ...Array(3).fill("0")],
+      inputNonces: [String(source.nonce), ...Array(3).fill("0")],
+      inputCiphertextHashes: [String(source.ciphertextHashField), ...Array(3).fill("0")],
+      inputDepths: [membership.depth, ...Array(3).fill("0")],
+      inputIndices: [membership.index, ...Array(3).fill("0")],
+      inputSiblings: [membership.siblings, ...Array.from({ length: 3 }, () => Array(32).fill("0"))],
     });
     const valueData = (source, membership, outputNotes) => ({
       ...zeroData(),
-      inputShardIds: Array(8).fill(membership.shardId),
-      inputRoots: Array(8).fill(membership.root),
-      inputNullifiers: Array.from({ length: 8 }, (_, index) =>
+      inputShardIds: Array(4).fill(membership.shardId),
+      inputRoots: Array(4).fill(membership.root),
+      inputNullifiers: Array.from({ length: 4 }, (_, index) =>
         index === 0
           ? spend(source)
           : computeShieldedDummyInputNullifierForSlot(

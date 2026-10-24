@@ -172,7 +172,7 @@ const independentKeyMaterial = await deriveShieldedIndependentKeyMaterial({
   independentKeyRoot: fixedRoot,
   independentKeyIdentitySecret: new Uint8Array(32).fill(3),
 });
-function preparedValueOutputs(amounts: bigint[], offset = 0n, capacity = 8) {
+function preparedValueOutputs(amounts: bigint[], offset = 0n, capacity = 4) {
   return {
     witness: {},
     outputs: amounts.map((amount) => ({ note: { amount } })),
@@ -1023,7 +1023,7 @@ describe("asset Worker preview and proof boundary", () => {
     });
     expect(preview.slot).toBe("independent");
     expect(preview.action).toBe("privateTransfer");
-    expect(preview.steps.map((step) => step.action)).toEqual(["privateTransfer", "unshield"]);
+    expect(preview.steps.map((step) => step.action)).toEqual(["privateTransfer", "privateTransfer", "unshield"]);
     const transfer = mocks.transfer.mock.calls[0][0];
     expect(transfer.inputs.length).toBeGreaterThan(1);
     for (const input of transfer.inputs)

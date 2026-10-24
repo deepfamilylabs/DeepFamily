@@ -114,11 +114,11 @@ function copyPair(pair: readonly [BigNumberish, BigNumberish]): [bigint, bigint]
 function copyActionData(data: ShieldedPoolActionData): ContractActionData {
   const capacity = data.inputNullifiers.length;
   if (
-    (capacity !== 2 && capacity !== 8) ||
+    (capacity !== 2 && capacity !== 4) ||
     data.inputShardIds.length !== capacity ||
     data.inputRoots.length !== capacity
   ) {
-    throw new Error("Shielded action needs two or eight matching input slots");
+    throw new Error("Shielded action needs two or four matching input slots");
   }
   if (data.periodNullifiers.length !== 12) {
     throw new Error("Shielded action needs exactly 12 period nullifier slots");

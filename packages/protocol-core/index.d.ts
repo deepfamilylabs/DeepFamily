@@ -1087,7 +1087,7 @@ export interface ShieldedValueSpendCandidate {
 }
 export interface ShieldedValueSpendStep {
   kind: "merge" | "spend";
-  capacity: 8;
+  capacity: 4;
   inputCommitments: string[];
   inputAmount: bigint;
   outputAmounts: [bigint, bigint];
@@ -1095,7 +1095,7 @@ export interface ShieldedValueSpendStep {
 }
 export interface ShieldedValueSpendPlan {
   amount: bigint;
-  maxInputs: 1 | 8;
+  maxInputs: 1 | 4;
   steps: ShieldedValueSpendStep[];
   selectedCommitments: string[];
 }
@@ -1103,7 +1103,7 @@ export function planShieldedValueSpend(input: {
   notes: readonly ShieldedValueSpendCandidate[];
   candidateCommitments?: readonly BigNumberish[];
   amount: BigNumberish;
-  maxInputs?: 1 | 8;
+  maxInputs?: 1 | 4;
 }): ShieldedValueSpendPlan;
 
 export const SHIELDED_INDEPENDENT_KEY_VERSION: 1;

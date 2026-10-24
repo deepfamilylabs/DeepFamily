@@ -74,7 +74,7 @@ describe("ShieldedErc20Pool contract boundaries", function () {
   const valueActionData = (overrides = {}) => {
     const data = actionData(overrides);
     const pad = (values, filler) =>
-      Array.from({ length: 8 }, (_, slot) => values[slot] ?? filler(slot));
+      Array.from({ length: 4 }, (_, slot) => values[slot] ?? filler(slot));
     return {
       ...data,
       inputShardIds: pad(data.inputShardIds, () => data.inputShardIds[0]),
@@ -341,15 +341,15 @@ describe("ShieldedErc20Pool contract boundaries", function () {
     expect(await pool.nullifierSpent(981n)).to.equal(true);
   });
 
-  it("routes eight-slot VALUE proofs and spends every real and placeholder nullifier", async () => {
+  it("routes four-slot VALUE proofs and spends every real and placeholder nullifier", async () => {
     const { pool, recipient } = await setup();
     const deposit = actionData();
     await pool.shield(100n, deposit, await proofFor(pool, 0, deposit, 100n));
     const root = (await pool.noteShard(0)).root;
     const transfer = valueActionData({
-      inputShardIds: Array(8).fill(0n),
-      inputRoots: Array(8).fill(root),
-      inputNullifiers: Array.from({ length: 8 }, (_, i) => BigInt(501 + i)),
+      inputShardIds: Array(4).fill(0n),
+      inputRoots: Array(4).fill(root),
+      inputNullifiers: Array.from({ length: 4 }, (_, i) => BigInt(501 + i)),
       outputCommitments: [5031n, 5032n],
     });
     const proof = await proofFor(pool, 3, transfer);
@@ -382,8 +382,22 @@ describe("ShieldedErc20Pool contract boundaries", function () {
     await expect(
       pool.unshield(recipient.address, 1n, shortInputs, proof),
     ).to.be.revertedWithCustomError(pool, "InvalidActionData");
+    const oversized = {
+      ...transfer,
+      inputShardIds: [...transfer.inputShardIds, ...transfer.inputShardIds],
+      inputRoots: [...transfer.inputRoots, ...transfer.inputRoots],
+      inputNullifiers: [...transfer.inputNullifiers, ...transfer.inputNullifiers],
+    };
+    await expect(pool.privateTransfer(oversized, proof)).to.be.revertedWithCustomError(
+      pool,
+      "InvalidActionData",
+    );
+    await expect(pool.unshield(recipient.address, 1n, oversized, proof)).to.be.revertedWithCustomError(
+      pool,
+      "InvalidActionData",
+    );
     const duplicate = { ...transfer, inputNullifiers: [...transfer.inputNullifiers] };
-    duplicate.inputNullifiers[7] = duplicate.inputNullifiers[6];
+    duplicate.inputNullifiers[3] = duplicate.inputNullifiers[2];
     await expect(pool.privateTransfer(duplicate, proof)).to.be.revertedWithCustomError(
       pool,
       "NullifierAlreadySpent",
@@ -393,15 +407,15 @@ describe("ShieldedErc20Pool contract boundaries", function () {
       "InvalidActionData",
     );
     await pool.privateTransfer(transfer, proof);
-    expect(await pool.nullifierCount()).to.equal(8n);
+    expect(await pool.nullifierCount()).to.equal(4n);
     for (const nullifier of transfer.inputNullifiers)
       expect(await pool.nullifierSpent(nullifier)).to.equal(true);
     expect(await pool.totalShielded()).to.equal(100n);
     const nextRoot = (await pool.noteShard(0)).root;
     const withdrawal = valueActionData({
-      inputShardIds: Array(8).fill(0n),
-      inputRoots: Array(8).fill(nextRoot),
-      inputNullifiers: Array.from({ length: 8 }, (_, i) => BigInt(601 + i)),
+      inputShardIds: Array(4).fill(0n),
+      inputRoots: Array(4).fill(nextRoot),
+      inputNullifiers: Array.from({ length: 4 }, (_, i) => BigInt(601 + i)),
       outputCommitments: [6031n, 6032n],
     });
     await pool.unshield(
@@ -410,7 +424,7 @@ describe("ShieldedErc20Pool contract boundaries", function () {
       withdrawal,
       await proofFor(pool, 4, withdrawal, 30n, recipient.address),
     );
-    expect(await pool.nullifierCount()).to.equal(16n);
+    expect(await pool.nullifierCount()).to.equal(8n);
     for (const nullifier of withdrawal.inputNullifiers)
       expect(await pool.nullifierSpent(nullifier)).to.equal(true);
     expect(await pool.totalShielded()).to.equal(70n);

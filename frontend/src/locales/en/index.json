@@ -1695,7 +1695,7 @@
         "unshield": "To ordinary wallet"
       },
       "recipient": "Recipient",
-      "transactions": "{{count}} transactions; use up to 8 balances per step and confirm each step.",
+      "transactions": "{{count}} transactions; use up to 4 balances per step and confirm each step.",
       "step": "Step {{index}} / {{count}}: {{action}}",
       "merge": "Merge balances",
       "inputs": "This step uses {{count}} balances, {{amount}} {{symbol}} total",
@@ -1897,7 +1897,7 @@
       "recoveryCandidateHistoryMissing": "No valid history confirmed this original independent key. Recovery remains unconfirmed; an empty scan does not prove that the backup or identity input is correct.",
       "restoreAnotherMethod": "Enter recovery material again",
       "connectSignatureWallet": "Connect the signing wallet used to create or restore this independent key.",
-      "valueCandidatesHint": "Checking a balance permits its use; it does not spend every checked balance. Selection avoids extra consolidation, seeks an exact amount, then prefers less change. Preview the actual inputs and change. Each transaction uses up to 8 balances; candidates are unlimited.",
+      "valueCandidatesHint": "Checking a balance permits its use; it does not spend every checked balance. Selection avoids extra consolidation, seeks an exact amount, then prefers less change. Preview the actual inputs and change. Each transaction uses up to 4 balances; candidates are unlimited.",
       "signatureMessage": "View the fixed message to sign",
       "planTransactions": "{{count}} transactions. Confirm each one in your wallet.",
       "continueIdentity": "Unlock identity"

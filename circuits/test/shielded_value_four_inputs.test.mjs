@@ -31,13 +31,13 @@ function fixture(count, unshield = false, amounts = Array(count).fill(10n)) {
   const outputAmounts = [outputAmount > MAX ? MAX : outputAmount, 0n];
   const outputNonces = [1001n, 1002n];
   const hashes = [201n, 202n];
-  const inputArray = (values) => Array.from({ length: 8 }, (_, i) => String(values[i] ?? 0n));
+  const inputArray = (values) => Array.from({ length: 4 }, (_, i) => String(values[i] ?? 0n));
   const witness = {
     chainId: String(scope.chainId),
     pool: String(BigInt(scope.poolAddress)),
-    inputShardIds: Array(8).fill("0"),
-    inputRoots: Array.from({ length: 8 }, (_, i) => String(commitments[i] ?? commitments[0])),
-    inputNullifiers: Array.from({ length: 8 }, (_, i) =>
+    inputShardIds: Array(4).fill("0"),
+    inputRoots: Array.from({ length: 4 }, (_, i) => String(commitments[i] ?? commitments[0])),
+    inputNullifiers: Array.from({ length: 4 }, (_, i) =>
       String(
         i < count
           ? computeShieldedSpendNullifier(
@@ -47,14 +47,14 @@ function fixture(count, unshield = false, amounts = Array(count).fill(10n)) {
           : computeShieldedDummyInputNullifierForSlot(secret, commitments[0], i, scope),
       ),
     ),
-    inputEnabled: Array.from({ length: 8 }, (_, i) => (i < count ? "1" : "0")),
+    inputEnabled: Array.from({ length: 4 }, (_, i) => (i < count ? "1" : "0")),
     inputOwnerSecrets: inputArray(Array(count).fill(secret)),
     inputAmounts: inputArray(amounts),
     inputNonces: inputArray(amounts.map((_, i) => BigInt(i + 1))),
     inputCiphertextHashes: inputArray(amounts.map((_, i) => BigInt(i + 101))),
-    inputDepths: Array(8).fill("0"),
-    inputIndices: Array(8).fill("0"),
-    inputSiblings: Array.from({ length: 8 }, () => Array(32).fill("0")),
+    inputDepths: Array(4).fill("0"),
+    inputIndices: Array(4).fill("0"),
+    inputSiblings: Array.from({ length: 4 }, () => Array(32).fill("0")),
     outputCommitments: outputAmounts.map((amount, i) =>
       String(note(amount, outputNonces[i], hashes[i])),
     ),
@@ -84,8 +84,8 @@ const mutate = (original, change) => {
   change(copy);
   return copy;
 };
-test("eight-input VALUE constraints and canonical nullifiers", async (t) => {
-  const output = fs.mkdtempSync(path.join(os.tmpdir(), "deepfamily-shielded-value-eight-"));
+test("four-input VALUE constraints and canonical nullifiers", async (t) => {
+  const output = fs.mkdtempSync(path.join(os.tmpdir(), "deepfamily-shielded-value-four-"));
   t.after(() => fs.rmSync(output, { recursive: true, force: true }));
   const calculators = {};
   for (const circuit of ["shielded_private_transfer", "shielded_unshield"]) {
@@ -111,11 +111,11 @@ test("eight-input VALUE constraints and canonical nullifiers", async (t) => {
   const transfer = calculators.shielded_private_transfer;
   const unshield = calculators.shielded_unshield;
   await t.test(
-    "all eight inputs support complete 32-sibling paths and enforce their bounds",
+    "all four inputs support complete 32-sibling paths and enforce their bounds",
     async () => {
       for (const isExit of [false, true]) {
-        const witness = fixture(8, isExit);
-        for (let slot = 0; slot < 8; slot++) {
+        const witness = fixture(4, isExit);
+        for (let slot = 0; slot < 4; slot++) {
           const index = BigInt(slot * 71);
           const siblings = Array.from({ length: 32 }, (_, level) =>
             BigInt(10000 + slot * 32 + level),
@@ -136,38 +136,38 @@ test("eight-input VALUE constraints and canonical nullifiers", async (t) => {
         await calculator.calculateWitness(witness, true);
         await assertConstraintViolation(() =>
           calculator.calculateWitness(
-            mutate(witness, (copy) => (copy.inputDepths[7] = "33")),
+            mutate(witness, (copy) => (copy.inputDepths[3] = "33")),
             true,
           ),
         );
         await assertConstraintViolation(() =>
           calculator.calculateWitness(
-            mutate(witness, (copy) => (copy.inputIndices[7] = String(1n << 32n))),
+            mutate(witness, (copy) => (copy.inputIndices[3] = String(1n << 32n))),
             true,
           ),
         );
       }
     },
   );
-  for (let count = 1; count <= 8; count++)
+  for (let count = 1; count <= 4; count++)
     await t.test(`${count} contiguous inputs pass transfer and withdrawal`, async () => {
       await transfer.calculateWitness(fixture(count), true);
       await unshield.calculateWitness(fixture(count, true), true);
     });
   await t.test(
-    "all eight inputs sum above uint128 while bounded outputs remain valid",
+    "all four inputs sum above uint128 while bounded outputs remain valid",
     async () => {
-      const values = Array(8).fill(MAX / 8n);
-      values[0] += 8n;
-      const witness = fixture(8, false, values);
+      const values = Array(4).fill(MAX / 4n);
+      values[0] += 4n;
+      const witness = fixture(4, false, values);
       witness.outputAmounts = [String(MAX), "1"];
       witness.outputCommitments = [String(note(MAX, 1001n, 201n)), String(note(1n, 1002n, 202n))];
       await transfer.calculateWitness(witness, true);
       await assertConstraintViolation(() =>
-        transfer.calculateWitness(fixture(8, false, Array(8).fill(MAX)), true),
+        transfer.calculateWitness(fixture(4, false, Array(4).fill(MAX)), true),
       );
       await assertConstraintViolation(() =>
-        unshield.calculateWitness(fixture(8, true, Array(8).fill(MAX)), true),
+        unshield.calculateWitness(fixture(4, true, Array(4).fill(MAX)), true),
       );
     },
   );
@@ -177,9 +177,9 @@ test("eight-input VALUE constraints and canonical nullifiers", async (t) => {
     ["enabled gap", (w) => (w.inputEnabled[1] = "0")],
     ["nonboolean enable", (w) => (w.inputEnabled[1] = "2")],
     ["empty batch", (w) => w.inputEnabled.fill("0")],
-    ["disabled private field", (w) => (w.inputNonces[7] = "1")],
-    ["disabled public root", (w) => (w.inputRoots[7] = w.inputRoots[1])],
-    ["duplicate nullifier", (w) => (w.inputNullifiers[7] = w.inputNullifiers[6])],
+    ["disabled private field", (w) => (w.inputNonces[3] = "1")],
+    ["disabled public root", (w) => (w.inputRoots[3] = w.inputRoots[1])],
+    ["duplicate nullifier", (w) => (w.inputNullifiers[3] = w.inputNullifiers[2])],
     ["real NF tampering", (w) => (w.inputNullifiers[0] = "1")],
     ["wrong chain", (w) => (w.chainId = "1")],
     ["amount conservation", (w) => (w.outputAmounts[0] = "29")],

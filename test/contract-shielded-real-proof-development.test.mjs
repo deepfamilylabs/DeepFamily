@@ -121,15 +121,15 @@ async function prepareTransferReceive(pool, data, recipients, inputOwnerSecret) 
   return receive;
 }
 
-/** Build the canonical eight slots, including distinct proved placeholders. */
+/** Build the canonical four slots, including distinct proved placeholders. */
 function valueSpendInputs({ notes, ownerSecrets, memberships, roots, chainId, poolAddress }) {
   const scope = { chainId, poolAddress };
-  const fill = (values) => Array.from({ length: 8 }, (_, slot) => String(values[slot] ?? 0n));
+  const fill = (values) => Array.from({ length: 4 }, (_, slot) => String(values[slot] ?? 0n));
   return {
     data: {
-      inputShardIds: Array(8).fill(0n),
-      inputRoots: Array.from({ length: 8 }, (_, slot) => roots[slot] ?? roots[0]),
-      inputNullifiers: Array.from({ length: 8 }, (_, slot) =>
+      inputShardIds: Array(4).fill(0n),
+      inputRoots: Array.from({ length: 4 }, (_, slot) => roots[slot] ?? roots[0]),
+      inputNullifiers: Array.from({ length: 4 }, (_, slot) =>
         notes[slot]
           ? computeShieldedSpendNullifier(
               { ownerSecret: ownerSecrets[slot], noteCommitment: notes[slot].commitment },
@@ -144,7 +144,7 @@ function valueSpendInputs({ notes, ownerSecrets, memberships, roots, chainId, po
       ),
     },
     witness: {
-      inputEnabled: Array.from({ length: 8 }, (_, slot) => (slot < notes.length ? "1" : "0")),
+      inputEnabled: Array.from({ length: 4 }, (_, slot) => (slot < notes.length ? "1" : "0")),
       inputOwnerSecrets: fill(ownerSecrets),
       inputAmounts: fill(notes.map((note) => note.amount)),
       inputNonces: fill(notes.map((note) => note.nonce)),
@@ -152,7 +152,7 @@ function valueSpendInputs({ notes, ownerSecrets, memberships, roots, chainId, po
       inputDepths: fill(memberships.map((proof) => proof.depth)),
       inputIndices: fill(memberships.map((proof) => proof.index)),
       inputSiblings: Array.from(
-        { length: 8 },
+        { length: 4 },
         (_, slot) => memberships[slot]?.siblings ?? Array(32).fill("0"),
       ),
     },

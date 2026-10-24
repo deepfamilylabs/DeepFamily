@@ -71,10 +71,10 @@ function unshieldFixture(scope = defaultScope) {
   return {
     chainId: String(scope.chainId),
     pool: String(BigInt(scope.poolAddress)),
-    inputShardIds: Array(8).fill("0"),
-    inputRoots: Array(8).fill(inputCommitment.toString()),
+    inputShardIds: Array(4).fill("0"),
+    inputRoots: Array(4).fill(inputCommitment.toString()),
     inputNullifiers: asStrings(
-      Array.from({ length: 8 }, (_, i) =>
+      Array.from({ length: 4 }, (_, i) =>
         i === 0
           ? computeShieldedSpendNullifier({ ownerSecret, noteCommitment: inputCommitment }, scope)
           : computeShieldedDummyInputNullifierForSlot(ownerSecret, inputCommitment, i, scope),
@@ -87,14 +87,14 @@ function unshieldFixture(scope = defaultScope) {
     ciphertextHashes: asStrings([changeHash, dummyHash]),
     amount: "30",
     recipient: String(0x5678n),
-    inputEnabled: ["1", ...Array(7).fill("0")],
-    inputOwnerSecrets: [ownerSecret.toString(), ...Array(7).fill("0")],
-    inputAmounts: [inputAmount.toString(), ...Array(7).fill("0")],
-    inputNonces: [inputNonce.toString(), ...Array(7).fill("0")],
-    inputCiphertextHashes: [inputCiphertextHash.toString(), ...Array(7).fill("0")],
-    inputDepths: Array(8).fill("0"),
-    inputIndices: Array(8).fill("0"),
-    inputSiblings: Array.from({ length: 8 }, () => Array(32).fill("0")),
+    inputEnabled: ["1", ...Array(3).fill("0")],
+    inputOwnerSecrets: [ownerSecret.toString(), ...Array(3).fill("0")],
+    inputAmounts: [inputAmount.toString(), ...Array(3).fill("0")],
+    inputNonces: [inputNonce.toString(), ...Array(3).fill("0")],
+    inputCiphertextHashes: [inputCiphertextHash.toString(), ...Array(3).fill("0")],
+    inputDepths: Array(4).fill("0"),
+    inputIndices: Array(4).fill("0"),
+    inputSiblings: Array.from({ length: 4 }, () => Array(32).fill("0")),
     changeAmount: changeAmount.toString(),
     changeNonce: changeNonce.toString(),
     dummyNonce: dummyNonce.toString(),

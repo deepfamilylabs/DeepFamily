@@ -1,33 +1,33 @@
 pragma circom 2.2.3;
 include "shielded_value_common.circom";
 
-// Action 4: one to eight VALUE inputs fund a public withdrawal, private change,
+// Action 4: one to four VALUE inputs fund a public withdrawal, private change,
 // and a zero-value output. All real inputs share the same owner and pool.
 template ShieldedUnshield() {
     signal input chainId;
     signal input pool;
-    signal input inputShardIds[8];
-    signal input inputRoots[8];
-    signal input inputNullifiers[8];
+    signal input inputShardIds[4];
+    signal input inputRoots[4];
+    signal input inputNullifiers[4];
     signal input outputCommitments[2];
     signal input ciphertextHashes[2];
     signal input amount;
     signal input recipient;
-    signal input inputEnabled[8];
-    signal input inputOwnerSecrets[8];
-    signal input inputAmounts[8];
-    signal input inputNonces[8];
-    signal input inputCiphertextHashes[8];
-    signal input inputDepths[8];
-    signal input inputIndices[8];
-    signal input inputSiblings[8][32];
+    signal input inputEnabled[4];
+    signal input inputOwnerSecrets[4];
+    signal input inputAmounts[4];
+    signal input inputNonces[4];
+    signal input inputCiphertextHashes[4];
+    signal input inputDepths[4];
+    signal input inputIndices[4];
+    signal input inputSiblings[4][32];
     signal input changeAmount;
     signal input changeNonce;
     signal input dummyNonce;
     component scope = ShieldedPoolDomain();
     scope.chainId <== chainId;
     scope.pool <== pool;
-    component inputs = ShieldedValueInputs(8);
+    component inputs = ShieldedValueInputs(4);
     inputs.poolDomain <== scope.domain;
     inputs.inputShardIds <== inputShardIds;
     inputs.inputRoots <== inputRoots;

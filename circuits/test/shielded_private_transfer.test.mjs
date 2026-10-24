@@ -83,7 +83,7 @@ function privateTransferFixture(scope = defaultScope) {
         ),
       ),
     ),
-    inputEnabled: ["1", "1", ...Array(6).fill("0")],
+    inputEnabled: ["1", "1", ...Array(2).fill("0")],
     inputOwnerSecrets: strs(inputOwnerSecrets),
     inputAmounts: strs(inputAmounts),
     inputNonces: strs(inputNonces),
@@ -95,7 +95,7 @@ function privateTransferFixture(scope = defaultScope) {
     outputAmounts: strs(outputAmounts),
     outputNonces: strs(outputNonces),
   };
-  for (let i = 2; i < 8; i++) {
+  for (let i = 2; i < 4; i++) {
     witness.inputShardIds.push(witness.inputShardIds[0]);
     witness.inputRoots.push(witness.inputRoots[0]);
     witness.inputNullifiers.push(
@@ -387,7 +387,7 @@ test("private transfer circuit", async (t) => {
       }
       witness.inputDepths[0] = "32";
       witness.inputIndices[0] = ((1n << 32n) - 1n).toString();
-      witness.inputRoots = Array(8).fill(root.toString());
+      witness.inputRoots = Array(4).fill(root.toString());
       await transfer.valid(witness);
       await transfer.invalid(
         mutate(witness, (w) => {

@@ -68,7 +68,7 @@ describe("ShieldedSpendReview", () => {
     expect(within(review).getByText("第 4 笔余额 · 1 DEEP")).toBeTruthy();
     expect(within(review).getByText("第 8 笔余额 · 2 DEEP")).toBeTruthy();
     expect(within(review).queryByText("第 3 笔余额 · 10 DEEP")).toBeNull();
-    expect(within(review).getByText("共 1 笔交易；每步最多使用 8 笔余额，逐步确认。")).toBeTruthy();
+    expect(within(review).getByText("共 1 笔交易；每步最多使用 4 笔余额，逐步确认。")).toBeTruthy();
     expect(within(review).getByText("找零（仍归你所有）").parentElement!.textContent).toBe("找零（仍归你所有）0 DEEP");
     // The amount heads the review once and closes the final step once.
     expect(within(review).getAllByText("3 DEEP")).toHaveLength(1);
@@ -118,12 +118,15 @@ describe("ShieldedSpendReview", () => {
     renderReview(reviewProps("31333", action));
     const review = screen.getByRole("region", { name: "余额使用预览" });
     expect(within(review).getByText("本次计划实际使用：9 笔，共 31,333 DEEP")).toBeTruthy();
-    expect(within(review).getByText("共 2 笔交易；每步最多使用 8 笔余额，逐步确认。")).toBeTruthy();
-    expect(within(review).getByText("第 1 / 2 步：合并余额")).toBeTruthy();
-    expect(within(review).getByText(`第 2 / 2 步：${action === "unshield" ? "提现" : "转账"}`)).toBeTruthy();
-    expect(within(review).getByText("本步使用 8 笔，共 31,332 DEEP")).toBeTruthy();
-    expect(within(review).getByText("本步使用 2 笔，共 31,333 DEEP")).toBeTruthy();
-    expect(within(review).getByText("第 1 步生成的余额 · 31,332 DEEP")).toBeTruthy();
+    expect(within(review).getByText("共 3 笔交易；每步最多使用 4 笔余额，逐步确认。")).toBeTruthy();
+    expect(within(review).getByText("第 1 / 3 步：合并余额")).toBeTruthy();
+    expect(within(review).getByText("第 2 / 3 步：合并余额")).toBeTruthy();
+    expect(within(review).getByText("本步使用 4 笔，共 31,330 DEEP")).toBeTruthy();
+    expect(within(review).getByText("第 2 步生成的余额 · 31,330 DEEP")).toBeTruthy();
+    expect(within(review).getByText(`第 3 / 3 步：${action === "unshield" ? "提现" : "转账"}`)).toBeTruthy();
+    expect(within(review).getByText("本步使用 4 笔，共 31,200 DEEP")).toBeTruthy();
+    expect(within(review).getByText("本步使用 3 笔，共 31,333 DEEP")).toBeTruthy();
+    expect(within(review).getByText("第 1 步生成的余额 · 31,200 DEEP")).toBeTruthy();
     expect(within(review).getByText("第 4 笔余额 · 1 DEEP")).toBeTruthy();
     expect(within(review).getByText("确认仅执行下一步。取消会停止后续步骤，已完成的交易不会撤回。")).toBeTruthy();
     expect(review.textContent).not.toContain("planned:");
