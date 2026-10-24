@@ -192,11 +192,9 @@ function checkedCurrentArtifacts(actions) {
       actions.flatMap((action) =>
         action === "claim"
           ? ["claim", "claim32"]
-          : action === "fund"
-            ? ["fund", "fundContinuation"]
-            : action === "privateTransfer" || action === "unshield"
-              ? [action, `${action}4`]
-              : [action],
+          : action === "privateTransfer" || action === "unshield"
+            ? [action, `${action}4`]
+            : [action],
       ),
     ),
   ];
@@ -266,11 +264,9 @@ async function deployCurrentGeneratedVerifiers(actions, signer) {
       actions.flatMap((action) =>
         action === "claim"
           ? ["claim", "claim32"]
-          : action === "fund"
-            ? ["fund", "fundContinuation"]
-            : action === "privateTransfer" || action === "unshield"
-              ? [action, `${action}4`]
-              : [action],
+          : action === "privateTransfer" || action === "unshield"
+            ? [action, `${action}4`]
+            : [action],
       ),
     ),
   ];
@@ -382,8 +378,7 @@ function syntheticFullMerklePath(leaf, depth, index, siblingSeed) {
   return { root, siblings, index: index.toString(), depth: depth.toString() };
 }
 
-function shieldedCircuitAction(action, witness) {
-  if (action === "fund" && BigInt(witness.fundMode) === 1n) return "fundContinuation";
+function valueCircuitAction(action, witness) {
   return (action === "privateTransfer" || action === "unshield") &&
     witness.inputEnabled?.length === 4
     ? `${action}4`
@@ -391,7 +386,7 @@ function shieldedCircuitAction(action, witness) {
 }
 
 async function prove(action, witness, expectedSignals) {
-  action = shieldedCircuitAction(action, witness);
+  action = valueCircuitAction(action, witness);
   if (
     action === "claim" &&
     Number(witness.endorsementDepth) <= 32 &&
@@ -439,7 +434,7 @@ async function prove(action, witness, expectedSignals) {
 }
 
 function assertInvalidCircuitWitness(action, witness, expectedFailure) {
-  action = shieldedCircuitAction(action, witness);
+  action = valueCircuitAction(action, witness);
   const files = circuitFiles(action);
   const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "deepfamily-shielded-invalid-"));
   const inputPath = path.join(temporary, "input.json");

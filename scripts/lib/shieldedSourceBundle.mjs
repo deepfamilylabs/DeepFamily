@@ -41,7 +41,6 @@ const SOURCE_EXCLUSIONS = new Set([
   "frontend/public/zk/disclosure_binding.vkey.json",
   "contracts/ShieldedShieldVerifier.sol",
   "contracts/ShieldedFundVerifier.sol",
-  "contracts/ShieldedFundContinuationVerifier.sol",
   "contracts/ShieldedClaim64Verifier.sol",
   "contracts/ShieldedClaim32Verifier.sol",
   "contracts/ShieldedPrivateTransferVerifier.sol",

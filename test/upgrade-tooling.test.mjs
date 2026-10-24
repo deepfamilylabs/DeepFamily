@@ -65,8 +65,8 @@ describe("Upgrade tooling & governance deploy path", function () {
         },
       });
 
-      expect(Object.keys(deployed.transactionReceipts)).to.have.length(38);
-      expect(observed.size).to.equal(38);
+      expect(Object.keys(deployed.transactionReceipts)).to.have.length(37);
+      expect(observed.size).to.equal(37);
       for (const [label, receipt] of Object.entries(deployed.transactionReceipts)) {
         expect(observed.get(label)).to.equal(receipt.hash);
       }
@@ -84,7 +84,7 @@ describe("Upgrade tooling & governance deploy path", function () {
           deploymentDirectory,
         });
         const files = (await fs.readdir(deploymentDirectory)).sort();
-        expect(files).to.have.length(33);
+        expect(files).to.have.length(32);
         expect(files).to.include.members([
           "DeepFamilyArchive.json",
           "DeepFamilyReader.json",
@@ -102,7 +102,6 @@ describe("Upgrade tooling & governance deploy path", function () {
           "ShieldedPrivateTransfer4Verifier.json",
           "ShieldedUnshieldVerifier.json",
           "ShieldedUnshield4Verifier.json",
-          "ShieldedFundContinuationVerifier.json",
           "Groth16VerifierAdapter.json",
         ]);
         const deepFamilyMetadata = JSON.parse(

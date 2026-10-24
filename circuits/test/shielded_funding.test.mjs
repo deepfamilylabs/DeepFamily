@@ -123,7 +123,7 @@ test("shielded initial Fund and continuation Fund constraints", async (t) => {
   const output = fs.mkdtempSync(path.join(os.tmpdir(), "deepfamily-shielded-funding-"));
   try {
     const calculators = {};
-    for (const action of ["fund", "fund_continuation", "claim"]) {
+    for (const action of ["fund", "claim"]) {
       const circuit = action === "claim" ? "shielded_claim_64" : `shielded_${action}`;
       execFileSync(
         path.join(repoRoot, "bin/circom"),
@@ -149,33 +149,22 @@ test("shielded initial Fund and continuation Fund constraints", async (t) => {
         { singleThread: true },
       );
     }
-    const calculatorFor = (action, witness) =>
-      calculators[action === "fund" && witness.fundMode === "1" ? "fund_continuation" : action];
     const valid = async (action, witness) => {
-      assert.equal((await calculatorFor(action, witness).calculateWitness(witness, 1))[0], 1n);
+      assert.equal((await calculators[action].calculateWitness(witness, 1))[0], 1n);
     };
     const invalid = (action, witness) =>
-      assertConstraintViolation(() => calculatorFor(action, witness).calculateWitness(witness, 1));
+      assertConstraintViolation(() => calculators[action].calculateWitness(witness, 1));
     const mutate = (witness, change) => {
       const copy = structuredClone(witness);
       change(copy);
       return copy;
     };
     const fixture = buildShieldedFundingFixtures();
-    await t.test("separate funding circuits bind their own public mode", async () => {
+    await t.test("one Fund circuit supports both public funding modes", async () => {
       const initial = await calculators.fund.calculateWitness(fixture.initial, true);
-      const continuation = await calculators.fund_continuation.calculateWitness(
-        fixture.continuation,
-        true,
-      );
+      const continuation = await calculators.fund.calculateWitness(fixture.continuation, true);
       assert.equal(initial[3], 0n);
       assert.equal(continuation[3], 1n);
-      await assertConstraintViolation(() =>
-        calculators.fund.calculateWitness(fixture.continuation, true),
-      );
-      await assertConstraintViolation(() =>
-        calculators.fund_continuation.calculateWitness(fixture.initial, true),
-      );
     });
     await t.test(
       "private Fund initial and top-up require the exact authenticated recipient binding",
@@ -597,7 +586,7 @@ test("shielded initial Fund and continuation Fund constraints", async (t) => {
       const cli = path.join(repoRoot, "node_modules/snarkjs/build/cli.cjs");
       for (const [action, witness] of [
         ["fund", fixture.initial],
-        ["fund_continuation", fixture.continuation],
+        ["fund", fixture.continuation],
       ]) {
         await valid(action, witness);
         const circuit = `shielded_${action}`;
@@ -759,7 +748,7 @@ test("shielded initial Fund and continuation Fund constraints", async (t) => {
       async () => {
         for (const [action, witness] of [
           ["fund", fixture.initial],
-          ["fund_continuation", fixture.continuation],
+          ["fund", fixture.continuation],
         ]) {
           await invalid(
             action,

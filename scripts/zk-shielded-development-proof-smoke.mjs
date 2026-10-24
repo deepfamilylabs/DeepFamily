@@ -20,7 +20,6 @@ const cli = path.join(root, "node_modules", "snarkjs", "build", "cli.cjs");
 const sha256 = (file) => createHash("sha256").update(fs.readFileSync(file)).digest("hex");
 const fixtures = {
   fund: () => buildShieldedFundingFixtures().initial,
-  fundContinuation: () => buildShieldedFundingFixtures().continuation,
   claim: () => buildShieldedClaimFixture({ claimCount: 3, remainingPeriods: 12 }).witness,
   claim32: () => {
     const witness = buildShieldedClaimFixture({ claimCount: 3, remainingPeriods: 12 }).witness;
@@ -110,22 +109,26 @@ export function smokeDevelopmentProofs(actions = Object.keys(fixtures)) {
       const wasm = path.join(publicDirectory, `${source}.wasm`);
       const zkey = path.join(publicDirectory, `${source}_final.zkey`);
       const vkey = path.join(publicDirectory, `${source}.vkey.json`);
-      const input = fixtures[action]();
-      const inputPath = path.join(temporary, `${action}.input.json`);
-      const proofPath = path.join(temporary, `${action}.proof.json`);
-      const publicPath = path.join(temporary, `${action}.public.json`);
-      fs.writeFileSync(inputPath, JSON.stringify(input));
-      const started = Date.now();
-      runSnarkjs(["groth16", "fullprove", inputPath, wasm, zkey, proofPath, publicPath]);
-      const actual = JSON.parse(fs.readFileSync(publicPath, "utf8")).map(BigInt);
-      assert.deepEqual(
-        actual,
-        expectedPublicSignals(action, input),
-        `${action} public signals changed`,
-      );
-      const verified = runSnarkjs(["groth16", "verify", vkey, publicPath, proofPath]);
-      assert.match(verified, /OK!/u, `${action} real proof did not verify`);
-      console.log(`development-only ${action} real proof verified in ${Date.now() - started} ms`);
+      const inputs = action === "fund"
+        ? [fixtures[action](), buildShieldedFundingFixtures().continuation]
+        : [fixtures[action]()];
+      for (const input of inputs) {
+        const inputPath = path.join(temporary, `${action}.input.json`);
+        const proofPath = path.join(temporary, `${action}.proof.json`);
+        const publicPath = path.join(temporary, `${action}.public.json`);
+        fs.writeFileSync(inputPath, JSON.stringify(input));
+        const started = Date.now();
+        runSnarkjs(["groth16", "fullprove", inputPath, wasm, zkey, proofPath, publicPath]);
+        const actual = JSON.parse(fs.readFileSync(publicPath, "utf8")).map(BigInt);
+        assert.deepEqual(
+          actual,
+          expectedPublicSignals(action, input),
+          `${action} public signals changed`,
+        );
+        const verified = runSnarkjs(["groth16", "verify", vkey, publicPath, proofPath]);
+        assert.match(verified, /OK!/u, `${action} real proof did not verify`);
+        console.log(`development-only ${action}${action === "fund" ? ` mode ${input.fundMode}` : ""} real proof verified in ${Date.now() - started} ms`);
+      }
     }
   } finally {
     fs.rmSync(temporary, { recursive: true, force: true });

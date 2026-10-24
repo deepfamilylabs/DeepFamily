@@ -81,10 +81,10 @@ interface IGroth16Verifier20 {
 /**
  * @title Groth16VerifierAdapter
  * @notice Shared Groth16 proof transport for identity, disclosure and five shielded pool
- *         actions. Each circuit variant has an immutable verifier address.
+ *         actions. Each route has an immutable verifier address.
  *
  *         Business contracts select a purpose and construct its public signals. This adapter
- *         validates their encoding and length and selects fixed variants from public fields.
+ *         validates their encoding and length without interpreting their business meaning.
  */
 contract Groth16VerifierAdapter is IProofVerifierAdapter {
   error UnsupportedProofEncoding();
@@ -106,17 +106,16 @@ contract Groth16VerifierAdapter is IProofVerifierAdapter {
   address public immutable unshieldVerifier;
   address public immutable privateTransfer4Verifier;
   address public immutable unshield4Verifier;
-  address public immutable fundContinuationVerifier;
 
   /**
    * @param shieldedVerifiers Five default pool actions in enum order, followed by Claim32,
-   *                          PrivateTransfer4, Unshield4 and FundContinuation. A zero
+   *                          PrivateTransfer4 and Unshield4. A zero
    *                          address explicitly disables a route.
    */
   constructor(
     address _personVerifier,
     address _disclosureBindingVerifier,
-    address[9] memory shieldedVerifiers
+    address[8] memory shieldedVerifiers
   ) {
     _validateVerifier(_personVerifier);
     _validateVerifier(_disclosureBindingVerifier);
@@ -135,7 +134,6 @@ contract Groth16VerifierAdapter is IProofVerifierAdapter {
     claim32Verifier = shieldedVerifiers[5];
     privateTransfer4Verifier = shieldedVerifiers[6];
     unshield4Verifier = shieldedVerifiers[7];
-    fundContinuationVerifier = shieldedVerifiers[8];
   }
 
   /** @notice Returns a known route's verifier, or zero when the route was explicitly disabled. */
@@ -192,12 +190,6 @@ contract Groth16VerifierAdapter is IProofVerifierAdapter {
       verifier = unshield4Verifier;
     } else if (publicSignals.length != _publicSignalsLength(purpose)) {
       revert MalformedProofData();
-    }
-    if (purpose == ProofConstants.PROOF_PURPOSE_SHIELDED_FUND) {
-      // Both statements retain fundMode at index two and prove that exact mode.
-      // Route directly so a continuation never attempts the initial verifier.
-      if (publicSignals[2] > 1) revert MalformedProofData();
-      if (publicSignals[2] == 1) verifier = fundContinuationVerifier;
     }
     if (verifier == address(0)) revert VerifierNotConfigured(purpose);
 

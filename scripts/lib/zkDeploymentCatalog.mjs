@@ -13,14 +13,14 @@ export const SHIELDED_ACTIONS = Object.freeze([
 export const SHIELDED_ACTION_PROOF_PURPOSE_BASE = 2;
 
 /**
- * Five pool actions use nine verifier targets: Fund continuation, Claim32 and
- * four-input VALUE variants supplement the default action verifiers.
+ * Five pool actions use eight verifier targets: Claim32 and four-input VALUE variants
+ * supplement the default claim and single-input VALUE verifiers.
  * The receive-code circuit is verified in the browser and is never deployed.
  */
 export const SHIELDED_DEPLOYMENT_CIRCUITS = Object.freeze(
   Object.fromEntries(
-    [...SHIELDED_ACTIONS, "claim32", "privateTransfer4", "unshield4", "fundContinuation"].map((action, index) => {
-      const actionId = action === "fundContinuation" ? 1 : action === "claim32" ? 2 : action === "privateTransfer4" ? 3 : action === "unshield4" ? 4 : index;
+    [...SHIELDED_ACTIONS, "claim32", "privateTransfer4", "unshield4"].map((action, index) => {
+      const actionId = action === "claim32" ? 2 : action === "privateTransfer4" ? 3 : action === "unshield4" ? 4 : index;
       const suffix = action === "claim" ? "Claim64" : action[0].toUpperCase() + action.slice(1);
       return [
         action,

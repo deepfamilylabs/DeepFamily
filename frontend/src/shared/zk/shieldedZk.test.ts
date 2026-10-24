@@ -51,7 +51,6 @@ describe("shielded proof public inputs", () => {
       ["identityAuthorizationUpdate", 6],
       ["shield", 7],
       ["fund", 29],
-      ["fundContinuation", 29],
       ["claim", 15],
       ["claim32", 15],
       ["privateTransfer", 11],
@@ -68,12 +67,12 @@ describe("shielded proof public inputs", () => {
     }
   });
 
-  it("selects the Fund circuit from its mode before downloading artifacts", () => {
+  it("uses the same Fund circuit for both valid modes before downloading artifacts", () => {
     for (const fundMode of [0, "0"] as const) {
       expect(selectShieldedFundCircuit({ fundMode })).toBe("fund");
     }
     for (const fundMode of [1, "1"] as const) {
-      expect(selectShieldedFundCircuit({ fundMode })).toBe("fundContinuation");
+      expect(selectShieldedFundCircuit({ fundMode })).toBe("fund");
     }
     for (const fundMode of [-1, 2, 0.5, "", "01", "1.0", "bad", ["1"]]) {
       expect(() => selectShieldedFundCircuit({ fundMode })).toThrow("mode must be 0 or 1");
@@ -81,35 +80,30 @@ describe("shielded proof public inputs", () => {
     expect(() => selectShieldedFundCircuit({})).toThrow("mode must be 0 or 1");
   });
 
-  it("downloads only the Fund mode's proving artifacts and retains its witness", async () => {
+  it("shares one Fund artifact set across both modes and retains each witness", async () => {
     mocks.verify.mockResolvedValue(true);
     const fetch = vi.fn(async () => new Response(JSON.stringify({ nPublic: 29 })));
     vi.stubGlobal("fetch", fetch);
-    for (const [fundMode, file] of [
-      [0, "shielded_fund"],
-      [1, "shielded_fund_continuation"],
-    ] as const) {
-      mocks.fetchAsset.mockClear();
-      fetch.mockClear();
+    for (const fundMode of [0, 1] as const) {
       const expectedPublicSignals = Array(29).fill("0");
       expectedPublicSignals[2] = String(fundMode);
       mocks.fullProve.mockResolvedValue({ proof: {}, publicSignals: expectedPublicSignals });
       const witness = { fundMode: String(fundMode), endorsementSiblings: Array(64).fill("0") };
       await generateShieldedProof({ circuit: "fund", witness, expectedPublicSignals });
-      expect(mocks.fetchAsset.mock.calls).toEqual([
-        [`/zk/shielded/${file}.wasm`],
-        [`/zk/shielded/${file}_final.zkey`],
-      ]);
-      expect(fetch).toHaveBeenCalledExactlyOnceWith(`/zk/shielded/${file}.vkey.json`, {
-        cache: "no-cache",
-        credentials: "same-origin",
-      });
       expect(mocks.fullProve.mock.calls[mocks.fullProve.mock.calls.length - 1][0]).toBe(witness);
       expect(witness.endorsementSiblings).toHaveLength(64);
     }
+    expect(mocks.fetchAsset.mock.calls).toEqual([
+      ["/zk/shielded/shielded_fund.wasm"],
+      ["/zk/shielded/shielded_fund_final.zkey"],
+    ]);
+    expect(fetch).toHaveBeenCalledExactlyOnceWith("/zk/shielded/shielded_fund.vkey.json", {
+      cache: "no-cache",
+      credentials: "same-origin",
+    });
   });
 
-  it("rejects unsupported Fund modes and explicit continuation mismatches before proving", async () => {
+  it("rejects unsupported Fund modes before proving", async () => {
     vi.stubGlobal("fetch", vi.fn());
     for (const witness of [{}, { fundMode: "2" }, { fundMode: ["1"] }] as ShieldedWitness[]) {
       await expect(
@@ -120,13 +114,6 @@ describe("shielded proof public inputs", () => {
         }),
       ).rejects.toThrow("mode must be 0 or 1");
     }
-    await expect(
-      generateShieldedProof({
-        circuit: "fundContinuation",
-        witness: { fundMode: "0" },
-        expectedPublicSignals: Array(29).fill("0"),
-      }),
-    ).rejects.toThrow("requires mode 1");
     expect(mocks.fullProve).not.toHaveBeenCalled();
     expect(mocks.fetchAsset).not.toHaveBeenCalled();
     expect(fetch).not.toHaveBeenCalled();

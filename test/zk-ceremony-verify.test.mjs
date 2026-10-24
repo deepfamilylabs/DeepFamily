@@ -43,7 +43,7 @@ describe("recorded ZK ceremony checks", function () {
       },
       shieldedVerifier: async (args) => {
         calls.push(["shielded", args]);
-        return { circuitCount: 15, manifestSha256: "ab".repeat(32) };
+        return { circuitCount: 14, manifestSha256: "ab".repeat(32) };
       },
       receiveInspector: async (args) => {
         calls.push(["receive", args]);
@@ -74,7 +74,7 @@ describe("recorded ZK ceremony checks", function () {
     await recordShielded();
     options.artifactInspector = () => ({ trustedSetupStatus: "production" });
     const result = await verifyRecordedCeremonies(options);
-    expect(result.circuitCount).to.equal(17);
+    expect(result.circuitCount).to.equal(16);
     expect(calls).to.deep.equal([
       ["receive", { root, requireProduction: true }],
       ["core", { root, ptauPath: options.ptauPath }],
@@ -94,7 +94,7 @@ describe("recorded ZK ceremony checks", function () {
     calls.length = 0;
     await recordShielded();
     const shielded = await verifyRecordedCeremonies(options);
-    expect(shielded.circuitCount).to.equal(15);
+    expect(shielded.circuitCount).to.equal(14);
     expect(calls.map(([name]) => name)).to.deep.equal(["artifacts", "shielded"]);
   });
 

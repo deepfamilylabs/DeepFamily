@@ -83,7 +83,7 @@ const SHIELDED_VERIFICATION_KEY_SHA256 = "47".repeat(32);
 const SHIELDED_PROOF_SHA256 = "48".repeat(32);
 const SHIELDED_ACTION_TRANSACTION_LABELS = Object.keys(SHIELDED_DEPLOYMENT_CIRCUITS)
   .filter((action) => action !== "claim")
-  .map((action) => action === "fundContinuation" ? "shielded-action-fund-additional" : `shielded-action-${action}`);
+  .map((action) => `shielded-action-${action}`);
 const SHIELDED_TRANSACTION_RECEIPTS = Object.fromEntries(
   [...SHIELDED_ACTION_TRANSACTION_LABELS, "shielded-action-fund-identity"].map((label, index) => [
     label,
@@ -334,7 +334,6 @@ const shieldedProofs = (chainId) =>
       signals[1] = BigInt(SHIELDED_ADDRESSES.shieldedErc20Pool).toString();
       // asOf closes the fund and claim inputs.
       if (action === "fund") signals[signals.length - 1] = "1000";
-      if (action === "fundContinuation") signals[2] = "1";
       if ((action === "claim" || action === "claim32")) signals[signals.length - 1] = String(8200 + 3 * 2_592_000);
       return [
         action,
@@ -352,7 +351,7 @@ const shieldedProofs = (chainId) =>
           ...((action === "claim" || action === "claim32")
             ? { claimCount: 3 }
             : ["privateTransfer4", "unshield4"].includes(action) ? {}
-            : { transactionLabel: action === "fundContinuation" ? "shielded-action-fund-additional" : `shielded-action-${action}` }),
+            : { transactionLabel: `shielded-action-${action}` }),
         },
       ];
     }),
@@ -792,16 +791,16 @@ describe("schema v1 initial-mainnet-release rehearsal evidence", function () {
       protocolGeneration: PROTOCOL_GENERATION,
       goldenVectorSha256: GOLDEN_VECTOR_SHA256,
     });
-    expect(result.publicSummary.finality.revalidatedTransactionCount).to.equal(10);
+    expect(result.publicSummary.finality.revalidatedTransactionCount).to.equal(9);
     expect(result.publicSummary.shielded).to.deep.include({
       manifestSha256: SHIELDED_MANIFEST_SHA256,
-      proofCount: 9,
+      proofCount: 8,
       claimCount: 3,
       lineageDepth: 1,
       noteDepth: 1,
     });
     expect(result.publicSummary.shielded.verifierCallActions).to.deep.equal(["claim", "claim32", "privateTransfer4", "unshield4"]);
-    expect(result.publicSummary.shielded.transactionActions).to.have.length(5);
+    expect(result.publicSummary.shielded.transactionActions).to.have.length(4);
     expect(result.publicSummary.refund.transactionHash).to.equal(REFUND_TRANSACTION_HASH);
     expect(Object.isFrozen(result)).to.equal(true);
     expect(Object.isFrozen(result.publicSummary)).to.equal(true);
@@ -1566,15 +1565,6 @@ describe("schema v1 initial-mainnet-release rehearsal evidence", function () {
         (report) => (report.shielded.proofs.fund.verified = false),
         /shielded\.proofs\.fund\.verified/iu,
       ],
-      ...["fund", "fundContinuation"].map((action) => [
-        (report) => {
-          const proof = report.shielded.proofs[action];
-          proof.publicSignals[2] = action === "fund" ? "1" : "0";
-          proof.publicSignalsSha256 = createHash("sha256")
-            .update(JSON.stringify(proof.publicSignals)).digest("hex");
-        },
-        new RegExp(`shielded\\.proofs\\.${action}\\.fundMode`, "iu"),
-      ]),
       [
         (report) => (report.shielded.proofs.shield.verifierAddress = address(999)),
         /shielded\.proofs\.shield\.verifierAddress/iu,

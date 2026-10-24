@@ -52,7 +52,6 @@ const suffix = (action) => action[0].toUpperCase() + action.slice(1);
 
 /** Pool action counts mirror ProofConstants.sol; the receive code is verified off-chain. */
 const publicSignalCount = (action) => {
-  if (action === "fundContinuation") return SHIELDED_POOL_PUBLIC_SIGNAL_COUNTS[SHIELDED_POOL_ACTION.Fund];
   if (action === "privateTransfer4" || action === "unshield4") return SHIELDED_VALUE_PUBLIC_SIGNAL_COUNTS[4];
   if (action === "claim32") return SHIELDED_POOL_PUBLIC_SIGNAL_COUNTS[SHIELDED_POOL_ACTION.Claim];
   return RECEIVE_PRESENTATION_CIRCUITS[action]

@@ -1,7 +1,7 @@
 # DeepFamily ZK Setup
 
-This runbook covers the single final setup for all seventeen Circom circuits (two core and
-fifteen shielded, including three receive presentations). Local development, CI and release share
+This runbook covers the single final setup for all sixteen Circom circuits (two core and
+fourteen shielded, including three receive presentations). Local development, CI and release share
 the resulting keys, verifiers, linking parameters and evidence:
 
 ```bash
@@ -355,7 +355,7 @@ The identity/disclosure schema-v3 transcript records:
 - the finalization value, exponent, source, and embedded finalization contribution hashes.
 
 The same setup command generates the shielded production manifest and Phase 2 transcript. Their
-`@1` schemas bind all fifteen shielded circuits to their source and artifact hashes, the pinned
+`@1` schemas bind all fourteen shielded circuits to their source and artifact hashes, the pinned
 toolchain and pTau, and each circuit's operator contribution and finalization metadata. The two
 manifests and two transcripts are generated and installed together. The shielded manifest also
 binds the shared receive-link parameters, verifier base and all three fixed receive verifiers

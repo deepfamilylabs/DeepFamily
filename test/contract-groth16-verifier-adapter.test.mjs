@@ -73,7 +73,6 @@ describe("Unified Groth16 verifier adapter", function () {
       [0, 4],
       [1, 5],
       [2, 8],
-      [3, 2],
       [3, 12],
       [4, 12],
       [4, 27],
@@ -136,41 +135,19 @@ describe("Unified Groth16 verifier adapter", function () {
       .withArgs(5);
   });
 
-  it("routes each Fund mode directly to its matching verifier", async function () {
+  it("uses the same Fund verifier for initial and continuation proofs", async function () {
     const fund = await hre.ethers.deployContract("ShieldedGroth16VerifierMock");
-    const fundContinuation = await hre.ethers.deployContract("ShieldedGroth16VerifierMock");
     await fund.configure(true, 10n);
-    await fundContinuation.configure(true, 20n);
-    const adapter = await deployUnifiedVerifierAdapter(hre, { fund, fundContinuation });
+    const adapter = await deployUnifiedVerifierAdapter(hre, { fund });
     expect(await adapter.verifierForPurpose(3)).to.equal(await fund.getAddress());
-    expect(await adapter.fundContinuationVerifier()).to.equal(await fundContinuation.getAddress());
     const signals = Array(29).fill(0n);
     signals[28] = 10n;
-    expect(await adapter.verifyProof(3, 1, PROOF, signals)).to.equal(true);
-    signals[2] = 1n;
-    expect(await adapter.verifyProof(3, 1, PROOF, signals)).to.equal(false);
-    signals[28] = 20n;
-    expect(await adapter.verifyProof(3, 1, PROOF, signals)).to.equal(true);
-    signals[2] = 0n;
-    expect(await adapter.verifyProof(3, 1, PROOF, signals)).to.equal(false);
-    for (const mode of [2n, (1n << 256n) - 1n]) {
+    for (const mode of [0n, 1n]) {
       signals[2] = mode;
-      await expect(adapter.verifyProof(3, 1, PROOF, signals)).to.be.revertedWithCustomError(
-        adapter,
-        "MalformedProofData",
-      );
+      expect(await adapter.verifyProof(3, 1, PROOF, signals)).to.equal(true);
     }
-    const initialOnly = await deployUnifiedVerifierAdapter(hre, { fund });
-    signals[2] = 1n;
-    await expect(initialOnly.verifyProof(3, 1, PROOF, signals))
-      .to.be.revertedWithCustomError(initialOnly, "VerifierNotConfigured")
-      .withArgs(3);
-    const continuationOnly = await deployUnifiedVerifierAdapter(hre, { fundContinuation });
-    expect(await continuationOnly.verifyProof(3, 1, PROOF, signals)).to.equal(true);
-    signals[2] = 0n;
-    await expect(continuationOnly.verifyProof(3, 1, PROOF, signals))
-      .to.be.revertedWithCustomError(continuationOnly, "VerifierNotConfigured")
-      .withArgs(3);
+    signals[28] = 11n;
+    expect(await adapter.verifyProof(3, 1, PROOF, signals)).to.equal(false);
   });
 
   it("accepts either claim key and falls back to the 64-level verifier", async function () {
@@ -204,11 +181,11 @@ describe("Unified Groth16 verifier adapter", function () {
       hre.ethers.deployContract("Groth16VerifierAdapter", [
         eoa.address,
         hre.ethers.ZeroAddress,
-        Array(9).fill(hre.ethers.ZeroAddress),
+        Array(8).fill(hre.ethers.ZeroAddress),
       ]),
     ).to.be.revertedWithCustomError(adapter, "InvalidVerifier");
-    const invalidShieldedRoutes = Array(9).fill(hre.ethers.ZeroAddress);
-    invalidShieldedRoutes[8] = eoa.address;
+    const invalidShieldedRoutes = Array(8).fill(hre.ethers.ZeroAddress);
+    invalidShieldedRoutes[4] = eoa.address;
     await expect(
       hre.ethers.deployContract("Groth16VerifierAdapter", [
         hre.ethers.ZeroAddress,

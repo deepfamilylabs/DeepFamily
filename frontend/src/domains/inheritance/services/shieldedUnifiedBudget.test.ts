@@ -76,11 +76,7 @@ function checkWitness(
   const repoRoot = fileURLToPath(new URL("../../../../../", import.meta.url));
   const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "deepfamily-unified-witness-"));
   try {
-    const source = circuit === "claim"
-      ? "shielded_claim_64"
-      : Number(witness.fundMode) === 1
-        ? "shielded_fund_continuation"
-        : "shielded_fund";
+    const source = circuit === "claim" ? "shielded_claim_64" : "shielded_fund";
     const inputPath = path.join(temporary, "input.json");
     fs.writeFileSync(inputPath, JSON.stringify(witness));
     execFileSync(

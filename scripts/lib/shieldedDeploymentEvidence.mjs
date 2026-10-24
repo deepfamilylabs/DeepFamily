@@ -44,7 +44,7 @@ export async function assertShieldedDeploymentBindings({
     const verifier = await read(`adapter ${getter}`, () => adapter[getter]());
     same(verifier, addresses[label], `adapter ${getter}`);
     // The canonical purpose lookup exposes defaults; variants route by signal width
-    // (VALUE), Fund mode or proof verification (Claim32), with their own immutable getter.
+    // (VALUE) or proof verification (Claim32), and have their own immutable getter.
     if (purpose < 7) {
       const routedVerifier = await read(`adapter proof purpose ${purpose}`, () => adapter.verifierForPurpose(purpose));
       same(routedVerifier, addresses[label], `adapter proof purpose ${purpose}`);

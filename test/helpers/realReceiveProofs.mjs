@@ -36,7 +36,6 @@ export function checkRealReceiveArtifacts() {
     ...presentationSources,
     "shielded_shield",
     "shielded_fund",
-    "shielded_fund_continuation",
     "shielded_identity_authorization_update",
     "shielded_private_transfer",
   ]) {
@@ -80,7 +79,6 @@ export async function deployRealReceiveVerifiers(hre) {
     [
       "ShieldedShieldVerifier",
       "ShieldedFundVerifier",
-      "ShieldedFundContinuationVerifier",
       "ShieldedIdentityAuthorizationUpdateVerifier",
       "ShieldedPrivateTransferVerifier",
     ].map((name) => [
