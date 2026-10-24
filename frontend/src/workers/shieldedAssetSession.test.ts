@@ -22,6 +22,9 @@ import {
   computeShieldedLetterRelationCommitment,
   computeShieldedAuthorizationAlias,
   buildShieldedIdentityAuthorizationState,
+  encodeShieldedReceiveCredential,
+  encodeShieldedBudgetReceiveCode,
+  type ShieldedReceiveCredentialProof,
 } from "@deepfamily/protocol-core";
 import { ShieldedAssetSession, shieldedAssetErrorMessage } from "./shieldedAssetSession";
 import { InheritanceError } from "../domains/inheritance/model/inheritanceErrors";
@@ -30,6 +33,7 @@ import type { ShieldedWorkerContext } from "../shared/workers/shieldedAssetWorke
 const mocks = vi.hoisted(() => ({
   recover: vi.fn(),
   receive: vi.fn(),
+  verifyReceive: vi.fn(),
   identity: vi.fn(),
   independentKeyIdentity: vi.fn(),
   independentKeyMaterial: vi.fn(),
@@ -99,7 +103,7 @@ vi.mock("../domains/inheritance/services/privateLetterChain", () => ({
 }));
 vi.mock("../shared/zk/shieldedReceiveCode", () => ({
   createShieldedReceiveCode: mocks.receive,
-  verifyShieldedReceiveCode: vi.fn(),
+  verifyShieldedReceiveCode: mocks.verifyReceive,
 }));
 vi.mock("../shared/zk/shieldedZk", () => ({ generateShieldedProof: mocks.ownerProof }));
 vi.mock("../domains/inheritance/services/shieldedAssetRegistry", async (importOriginal) => ({
@@ -150,6 +154,7 @@ vi.setConfig({ testTimeout: 30_000 });
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.providers.length = 0;
+  mocks.verifyReceive.mockReset();
   mocks.network.mockReset().mockResolvedValue({ chainId: 31337n });
   mocks.authorizationState.mockReset().mockResolvedValue({ state: buildShieldedIdentityAuthorizationState(), checkpointId: 1n, asOf: 1000n, blockNumber: 12 });
   mocks.independentKeyIdentity
@@ -624,6 +629,54 @@ async function signatureCandidate(session: ShieldedAssetSession) {
     }),
   };
 }
+
+describe("budget letter preflight before funding", () => {
+  const letterContext = { ...context, lettersAddress: "0x6666666666666666666666666666666666666666" };
+  const proof: ShieldedReceiveCredentialProof = { protocol: "groth16", curve: "bn128", pi_a: ["1", "2", "1"], pi_b: [["3", "4"], ["5", "6"], ["1", "0"]], pi_c: ["7", "8", "1"] };
+  function receivePackage(counter = 0n, expiresAt = 2000n, keyMode = 1 as 0 | 1) {
+    const shared = { authorizationAlias: 17n, authorizationCounter: counter, expiresAt, ownerCommitment: 29n, viewingKey: new Uint8Array(32).fill(42), keyMode, proof };
+    return encodeShieldedBudgetReceiveCode({
+      fundCode: encodeShieldedReceiveCredential({ ...shared, disclosure: "fund", identityCommitment: 31n }),
+      anonymousCode: encodeShieldedReceiveCredential({ ...shared, disclosure: "anonymous" }),
+    });
+  }
+  beforeEach(() => mocks.verifyReceive.mockResolvedValue({ ok: true, disclosure: "anonymous", ownerCommitment: "29", keyMode: 1 }));
+
+  it("checks a bundled letter credential without requiring an already-created budget", async () => {
+    const session = new ShieldedAssetSession();
+    const code = receivePackage();
+    await expect(session.call("validateLetter", { context: letterContext, code, body: "A letter before funding", keyMode: 1 })).resolves.toEqual({ ok: true });
+    expect(mocks.verifyReceive).toHaveBeenCalledWith(code, "anonymous");
+    expect(mocks.authorizationState).toHaveBeenCalledWith(undefined, { chainId: context.chainId, authorizationStateAddress: mocks.verifier });
+    expect(mocks.recover).not.toHaveBeenCalled();
+  });
+
+  it.each(["empty body", "invalid credential", "mode mismatch", "revoked credential", "expired credential", "unavailable authorization"])("rejects %s before a funding transaction can start", async failure => {
+    const session = new ShieldedAssetSession();
+    if (failure === "invalid credential") mocks.verifyReceive.mockResolvedValueOnce({ ok: false, reason: "invalid" });
+    if (failure === "mode mismatch") mocks.verifyReceive.mockResolvedValueOnce({ ok: true, disclosure: "anonymous", ownerCommitment: "29", keyMode: 0 });
+    if (failure === "revoked credential") mocks.authorizationState.mockResolvedValueOnce({ state: buildShieldedIdentityAuthorizationState([[17n, 1n]]), checkpointId: 2n, asOf: 1000n, blockNumber: 12 });
+    if (failure === "unavailable authorization") mocks.authorizationState.mockRejectedValueOnce(new Error("RPC unavailable"));
+    await expect(session.call("validateLetter", {
+      context: letterContext,
+      code: receivePackage(0n, failure === "expired credential" ? 1000n : 2000n),
+      body: failure === "empty body" ? "" : "A private letter",
+      keyMode: 1,
+    })).rejects.toThrow();
+    expect(mocks.recover).not.toHaveBeenCalled();
+  });
+
+  it("invalidates preflight after the identity is locked while authorization is loading", async () => {
+    const session = new ShieldedAssetSession();
+    let finish!: (value: unknown) => void;
+    mocks.authorizationState.mockReturnValueOnce(new Promise(resolve => { finish = resolve; }));
+    const pending = session.call("validateLetter", { context: letterContext, code: receivePackage(), body: "Sensitive draft", keyMode: 1 });
+    await vi.waitFor(() => expect(mocks.authorizationState).toHaveBeenCalledOnce());
+    session.clear();
+    finish({ state: buildShieldedIdentityAuthorizationState(), checkpointId: 1n, asOf: 1000n, blockNumber: 12 });
+    await expect(pending).rejects.toThrow("replaced or locked");
+  });
+});
 
 describe("private letter recovery with original keys", () => {
   const letterContext = { ...context, lettersAddress: "0x6666666666666666666666666666666666666666" };

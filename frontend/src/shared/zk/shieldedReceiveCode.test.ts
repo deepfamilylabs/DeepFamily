@@ -5,14 +5,22 @@ import {
   computeIdentityFromDerivedSecret,
   computeShieldedAuthorizationAlias,
   buildShieldedIdentityAuthorizationState,
+  computeShieldedBudgetNoteCommitment,
+  prepareShieldedReceivePresentation,
+  verifyLinkedGroth16Proof,
   decodeShieldedReceiveCredential,
+  decodeShieldedBudgetReceiveCode,
+  encodeShieldedBudgetReceiveCode,
   deriveShieldedHeirKeyMaterial,
   deriveShieldedIndependentKeyMaterial,
   deriveShieldedViewPublicKey,
   encodeShieldedReceiveCredential,
   wrapIdentityCommitmentAsPersonHash,
 } from "@deepfamily/protocol-core";
-import { hexlify } from "ethers";
+import { hexlify, keccak256 } from "ethers";
+import { poseidon2, poseidon3 } from "poseidon-lite";
+import { proveShieldedReceivePresentation } from "./shieldedReceivePresentation";
+import { SHIELDED_RECEIVE_CREDENTIAL_VERIFICATION_KEYS, SHIELDED_RECEIVE_LINK_KEYS } from "./shieldedZk";
 // @ts-ignore snarkjs does not publish complete browser typings.
 import * as snarkjs from "snarkjs";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -187,7 +195,7 @@ describe("receive code proofs", () => {
     await expect(verifyShieldedReceiveCode(code)).resolves.toEqual({
       ok: true,
       disclosure: "fund",
-      authorizationAlias: String(decodeShieldedReceiveCredential(code).authorizationAlias),
+      authorizationAlias: String(decodeShieldedReceiveCredential(decodeShieldedBudgetReceiveCode(code).fundCode).authorizationAlias),
       authorizationCounter: "0",
       expiresAt: "2000000000",
       identityCommitment: material.identityCommitment.toString(),
@@ -198,9 +206,79 @@ describe("receive code proofs", () => {
       identitySuiteId: 1,
       independentKeySuiteId: 1,
       independentKeyDerivationVersion: 1,
-      fingerprint: decodeShieldedReceiveCredential(code).fingerprint,
+      fingerprint: decodeShieldedReceiveCredential(decodeShieldedBudgetReceiveCode(code).fundCode).fingerprint,
     });
   }, 60_000);
+
+  it("verifies both independent issuer proofs in one budget code and selects the anonymous letter credential", async () => {
+    const bundle = decodeShieldedBudgetReceiveCode(code);
+    const anonymous = decodeShieldedReceiveCredential(bundle.anonymousCode);
+    expect(bundle.fundCode.startsWith("dffund1")).toBe(true);
+    expect(bundle.anonymousCode.startsWith("dfrecv1")).toBe(true);
+    await expect(verifyShieldedReceiveCode(code, "anonymous")).resolves.toMatchObject({
+      ok: true, disclosure: "anonymous", fingerprint: anonymous.fingerprint,
+      ownerCommitment: anonymous.ownerCommitment.toString(),
+    });
+    expect((await verifyShieldedReceiveCode(code, "anonymous"))).not.toHaveProperty("identityCommitment");
+  }, 60_000);
+
+  it("rejects a package with a valid Fund proof but a forged anonymous issuer proof", async () => {
+    const bundle = decodeShieldedBudgetReceiveCode(code);
+    const anonymous = decodeShieldedReceiveCredential(bundle.anonymousCode);
+    const fund = decodeShieldedReceiveCredential(bundle.fundCode);
+    const forged = encodeShieldedBudgetReceiveCode({
+      fundCode: bundle.fundCode,
+      anonymousCode: encodeShieldedReceiveCredential({ ...anonymous, proof: fund.proof }),
+    });
+    await expect(verifyShieldedReceiveCode(forged)).resolves.toEqual({ ok: false, reason: "invalid" });
+    await expect(verifyShieldedReceiveCode(forged, "anonymous")).resolves.toEqual({ ok: false, reason: "invalid" });
+  }, 60_000);
+
+  it.each([0, 1] as const)("uses a combined code for real Fund and attached-letter presentation proofs in key mode %s", async keyMode => {
+    const keys = keyMode === 0 ? identity.keyMaterial : await deriveShieldedIndependentKeyMaterial({
+      independentKeyRoot: new Uint8Array(32).fill(53),
+      independentKeyIdentitySecret: new Uint8Array(32).fill(71),
+    });
+    const packageCode = keyMode === 0 ? code : (await createShieldedReceiveCode({ ...identity, keyMode, keyMaterial: keys })).code;
+    const bundle = decodeShieldedBudgetReceiveCode(packageCode);
+    const fund = decodeShieldedReceiveCredential(bundle.fundCode);
+    const anonymous = decodeShieldedReceiveCredential(bundle.anonymousCode);
+    const scope = { chainId: 31337n, poolAddress: "0x2222222222222222222222222222222222222222" };
+    const common = {
+      chainId: scope.chainId, consumer: scope.poolAddress, messageId: 0n,
+      payloadHash: keccak256("0x123456"), checkpointId: 1n, asOf: 1800000000n,
+      state: buildShieldedIdentityAuthorizationState(), salt: 4321n,
+    };
+    const fundPresentation = prepareShieldedReceivePresentation({ ...common, credential: fund, action: 3n });
+    const attachmentPresentation = prepareShieldedReceivePresentation({ ...common, credential: anonymous, action: 2n, messageId: 42n });
+    const leaf = computeShieldedBudgetNoteCommitment({
+      budgetOrigin: "fund", policyCommitment: 31n, enrollmentCommitment: 32n,
+      heirOwnerCommitment: keys.ownerCommitment, viewingKey: anonymous.viewingKey, keyMode,
+      amountPerPeriod: 5n, remaining: 15n, nonce: 33n, ciphertextHashField: 34n,
+    }, scope);
+    let noteRoot = leaf;
+    for (let level = 0; level < 32; level++) noteRoot = poseidon2([noteRoot, 0n]);
+    const attachment = {
+      budgetPool: String(BigInt(scope.poolAddress)), budgetRoot: String(noteRoot),
+      relation: String(poseidon3([poseidon3([202610210401n, BigInt(scope.poolAddress), leaf]), attachmentPresentation.recipientBinding, 4321n])),
+      policy: "31", enrollment: "32", rate: "5", remaining: "15", nonce: "33", ciphertextHash: "34",
+      depth: "32", index: "0", siblings: Array(32).fill("0"),
+    };
+    for (const [kind, presentation] of [["fund", fundPresentation], ["attachment", attachmentPresentation]] as const) {
+      const expected = [...presentation.publicSignals, ...(kind === "attachment" ? [BigInt(scope.poolAddress), noteRoot, BigInt(attachment.relation)] : [])];
+      const request = kind === "attachment" ? { ...presentation.request, attachment } : presentation.request;
+      const result = await proveShieldedReceivePresentation(request, expected);
+      const linkKeys = SHIELDED_RECEIVE_LINK_KEYS?.[kind];
+      if (!linkKeys) throw new Error("Receive link keys are missing");
+      await expect(verifyLinkedGroth16Proof({
+        proof: result.proof, publicInputs: expected,
+        issuer: { verificationKey: SHIELDED_RECEIVE_CREDENTIAL_VERIFICATION_KEYS[kind === "fund" ? "fund" : "anonymous"], deltaG1: linkKeys.issuerDeltaG1 },
+        presentation: { verificationKey: linkKeys.verificationKey, deltaG1: linkKeys.deltaG1 },
+      })).resolves.toBe(true);
+    }
+    expect(() => prepareShieldedReceivePresentation({ ...common, credential: anonymous, action: 3n })).toThrow("credential disclosure");
+    expect(() => prepareShieldedReceivePresentation({ ...common, credential: fund, action: 2n })).toThrow("credential disclosure");
+  }, 120_000);
 
   it("creates a recipient code using the current nonzero chain counter", async () => {
     const material = computeIdentityFromDerivedSecret(identity);
@@ -286,7 +364,7 @@ describe("receive code proofs", () => {
       viewingKey: hexlify(keys.viewPublicKey),
       fingerprint: independent.fingerprint,
     });
-    const decoded = decodeShieldedReceiveCredential(independent.code);
+    const decoded = decodeShieldedReceiveCredential(decodeShieldedBudgetReceiveCode(independent.code).fundCode);
     const downgraded = encodeShieldedReceiveCredential({ ...decoded, keyMode: 0 });
     await expect(verifyShieldedReceiveCode(downgraded)).resolves.toEqual({
       ok: false,
@@ -298,7 +376,7 @@ describe("receive code proofs", () => {
   }, 120_000);
 
   it("rejects a well-formed code whose identity was swapped", async () => {
-    const decoded = decodeShieldedReceiveCredential(code);
+    const decoded = decodeShieldedReceiveCredential(decodeShieldedBudgetReceiveCode(code).fundCode);
     const otherIdentity = encodeShieldedReceiveCredential({
       ...decoded,
       identityCommitment: decoded.identityCommitment! + 1n,
@@ -310,7 +388,7 @@ describe("receive code proofs", () => {
   }, 60_000);
 
   it("rejects a well-formed code whose owner key was swapped", async () => {
-    const decoded = decodeShieldedReceiveCredential(code);
+    const decoded = decodeShieldedReceiveCredential(decodeShieldedBudgetReceiveCode(code).fundCode);
     const otherOwner = encodeShieldedReceiveCredential({
       ...decoded,
       ownerCommitment: decoded.ownerCommitment + 1n,
@@ -327,7 +405,7 @@ describe("receive code proofs", () => {
   ] as const)(
     "rejects a well-formed code with only %s changed",
     async (_name, byteIndex) => {
-      const decoded = decodeShieldedReceiveCredential(code);
+      const decoded = decodeShieldedReceiveCredential(decodeShieldedBudgetReceiveCode(code).fundCode);
       const viewingKey = decoded.viewingKey.slice();
       viewingKey[byteIndex] ^= 1;
       // Keep the identity, owner and proof intact and regenerate the checksum.
@@ -366,6 +444,6 @@ describe("receive code proofs", () => {
     const point = curve.G2.fromObject([outside[0].map(BigInt), outside[1].map(BigInt), [1n, 0n]]);
     expect(curve.G2.isValid(point)).toBe(true);
     expect(await isInG2Subgroup(outside)).toBe(false);
-    expect(await isInG2Subgroup(decodeShieldedReceiveCredential(code).proof.pi_b)).toBe(true);
+    expect(await isInG2Subgroup(decodeShieldedReceiveCredential(decodeShieldedBudgetReceiveCode(code).fundCode).proof.pi_b)).toBe(true);
   }, 60_000);
 });

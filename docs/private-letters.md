@@ -30,6 +30,53 @@ paths. Owner authorization is independent of tree depth. Distinct aliases with
 identical low 64 bits cannot both be inserted; this separate dictionary capacity
 limit rejects without modifying state.
 
+## Budget receive codes and inline letters
+
+The funding form uses one **Budget receive code** for an optional family letter in
+both private child-budget modes: identity credentials and an independent key. These
+are recipient key modes, not the distinction between a child budget and a private
+asset transfer. Public identity budgets remain ineligible for attached letters, and
+this change does not add authenticated attachments to ordinary private transfers.
+
+A budget receive code (`dfbudget`, transport version 1) packages two independently
+issued credentials: a Fund credential for funding and an anonymous credential for
+the letter. Both credentials
+must agree on their authorization alias, counter, expiry, owner commitment, complete
+viewing key, key mode and suite/version metadata. Decoding must reject mismatched
+pairs, and verification must authenticate both issuer proofs. A Fund proof cannot
+be converted into an anonymous proof by removing its identity field. The existing
+circuits and fixed verifiers continue to receive the credential for their own
+operation; the package does not extend a Fund credential's proof relation to letters.
+The UI explains that sharing a budget receive code discloses and authenticates the
+heir identity to the funder.
+
+The funding form includes an optional letter body before submission. It preflights
+the letter and receiving authorization, submits the budget, waits for a successful
+on-chain receipt, then prepares and submits the attached-letter proof for that
+authenticated budget. The user remains in one flow and reuses the supplied receiving
+package, without opening an empty composer or entering another code after a
+successful deposit. These remain two transactions, with separate wallet
+confirmations and fees. A failed or cancelled deposit sends no letter. A successful
+deposit followed by an unsuccessful or cancelled letter remains visibly marked as
+funded, with a letter-only retry. An uncertain submission reuses its prepared message
+and proof; only an irreversibly expired preparation may be replaced. If preparation
+failed before a reusable proof existed, the user may also update the receiving
+material for that letter-only retry. None of these retries resubmits the budget.
+
+Before requesting the funding transaction, the current session retains the draft,
+expected budget commitment and funding submission ID as an awaiting-deposit step.
+No letter proof or transaction starts while funding is unconfirmed or its result is
+unknown. The normal receipt or later submission reconciliation can confirm that
+exact ID and continue the letter once; duplicate confirmations cannot send another
+letter. A failed deposit cancels only its matching awaiting step and preserves the
+form draft for another funding attempt. Locking or changing the session clears this
+in-memory continuation, so a late receipt cannot send a previous session's letter.
+
+The standalone composer and existing-budget entry remain available for later
+letters. Letter plaintext and receive material stay in the active session and are
+cleared when its wallet, identity, key or deployment context is invalidated. They
+are not silently persisted as plaintext to support retry after reload.
+
 ## Proof and contract flow
 
 The Circom issuer authenticates the canonical identity and R derived from the
@@ -74,8 +121,8 @@ retrying an attachment never repeats a successful deposit.
 The inheritance page places Private letters below Child budgets in the unlocked
 workspace's task rail. Write a letter and Inbox are separate entries; they use the
 same task area as deposits and claims. The inbox reads when selected and provides
-an explicit refresh action. A budget attachment entry selects the write task with
-that budget. A standalone letter proof requires a valid anonymous
+an explicit refresh action. To write for an existing budget, select it in the write task.
+The funding form has no navigation to a separate letter composer. A standalone letter proof requires a valid anonymous
 receive credential and a transaction wallet; it does not require the sender's
 identity secrets. Reading an inbox requires the original receiving keys. Wallet
 or key-session changes invalidate pending submissions and clear locally displayed

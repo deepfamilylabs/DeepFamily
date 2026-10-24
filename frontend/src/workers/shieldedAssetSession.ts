@@ -16,7 +16,7 @@ import {
   computeShieldedAuthorizationAlias,
   verifyShieldedIdentityAuthorizationWitness,
   prepareShieldedIdentityCounterAuthorization,
-  decodeShieldedReceiveCredential, computeShieldedReceiveCredentialBinding, computeShieldedReceiveActionHash,
+  decodeShieldedReceiveCredential, decodeShieldedBudgetReceiveCode, isShieldedBudgetReceiveCode, computeShieldedReceiveCredentialBinding, computeShieldedReceiveActionHash,
   emptyShieldedReceiveAuthorizations, prepareShieldedReceivePresentation, generateShieldedRandomField,
   splitShieldedViewPublicKey, createShieldedLetterEnvelope, computeShieldedLetterRelationCommitment,
   encryptShieldedLetter, decryptShieldedLetter, computeShieldedLetterCiphertextHash,
@@ -104,6 +104,11 @@ import { createIdentityAuthorizationContract, loadShieldedIdentityAuthorizationW
 import { createPrivateLetterContract, readPrivateLetters } from "../domains/inheritance/services/privateLetterChain";
 import { proveShieldedReceivePresentation } from "../shared/zk/shieldedReceivePresentation";
 
+function receiveCredentialFor(code: string, disclosure: "anonymous" | "fund") {
+  const bundle = isShieldedBudgetReceiveCode(code) ? decodeShieldedBudgetReceiveCode(code) : null;
+  return decodeShieldedReceiveCredential(bundle ? disclosure === "fund" ? bundle.fundCode : bundle.anonymousCode : code);
+}
+
 type IdentityMaterial = Awaited<ReturnType<typeof deriveIdentityMaterial>>;
 type IndependentKeyMaterial = Awaited<ReturnType<typeof deriveShieldedIndependentKeyMaterial>>;
 type Keys = { ownerSecret: bigint; ownerCommitment: bigint; hpkeIkm: string; keyMode: 0 | 1 };
@@ -130,6 +135,7 @@ const ASSET_METHODS = new Set([
   "clearPendingIndependentKey",
   "receiveCode",
   "prepareLetter",
+  "validateLetter",
   "recoverLetters",
   "authorizeIdentityCounter",
   "recover",
@@ -704,6 +710,28 @@ export class ShieldedAssetSession {
       : null;
   }
 
+  async validateLetter(params: ShieldedAssetWorkerCallMap["validateLetter"]["params"]): Promise<{ ok: true }> {
+    const current = this.sessionGuard();
+    const ctx = params.context;
+    requireValue(ctx.lettersAddress, "The private letter archive is not configured for this chain.");
+    // Match the envelope's strict text encoding before any funding transaction.
+    createShieldedLetterEnvelope({ body: params.body, salt: 1n });
+    const verified = await this.recipient(params.code, "anonymous");
+    requireValue(params.keyMode === undefined || verified.keyMode === params.keyMode,
+      "The letter receiving keys must use the selected budget mode.");
+    const credential = receiveCredentialFor(params.code, "anonymous");
+    const env = await this.context(ctx);
+    const archive = createPrivateLetterContract(ctx.lettersAddress, env.provider);
+    requireValue(getAddress(await archive.POOL_FACTORY()) === getAddress(ctx.factoryAddress) &&
+      getAddress(await archive.AUTHORIZATION_STATE()) === getAddress(await env.pool.AUTHORIZATION_STATE()),
+      "Letter archive belongs to another protocol deployment.");
+    await this.validateReceiveDestination({ credential, action: "privateTransfer" }, ctx, env);
+    const block = await env.provider.getBlock("latest");
+    requireValue(block && BigInt(block.timestamp) < credential.expiresAt, "Receive credential has expired.");
+    current();
+    return { ok: true };
+  }
+
   async prepareLetter(params: ShieldedAssetWorkerCallMap["prepareLetter"]["params"]): Promise<ShieldedAssetWorkerCallMap["prepareLetter"]["result"]> {
     const current = this.sessionGuard();
     const ctx = params.context;
@@ -713,9 +741,9 @@ export class ShieldedAssetSession {
     const authorizationAddress = await env.pool.AUTHORIZATION_STATE();
     requireValue(getAddress(await archive.POOL_FACTORY()) === getAddress(ctx.factoryAddress) &&
       getAddress(await archive.AUTHORIZATION_STATE()) === getAddress(authorizationAddress), "Letter archive belongs to another protocol deployment.");
-    const verified = await this.recipient(params.code);
+    const verified = await this.recipient(params.code, "anonymous");
     requireValue(verified.disclosure === "anonymous", "Use an anonymous receive code for letters.");
-    const credential = decodeShieldedReceiveCredential(params.code);
+    const credential = receiveCredentialFor(params.code, "anonymous");
     const messageId = BigInt(hexlify(randomBytes(16))) || 1n;
     const salt = generateShieldedRandomField();
     const binding = computeShieldedReceiveCredentialBinding({ credential, salt });
@@ -1071,8 +1099,8 @@ export class ShieldedAssetSession {
     return { ok: true as const };
   }
 
-  private async recipient(code: string): Promise<VerifiedShieldedRecipient> {
-    const result = await verifyShieldedReceiveCode(code);
+  private async recipient(code: string, disclosure?: "anonymous" | "fund"): Promise<VerifiedShieldedRecipient> {
+    const result = await verifyShieldedReceiveCode(code, disclosure);
     requireValue(
       result.ok,
       "The receiving code is incomplete or failed its identity and ownership proof.",
@@ -1142,12 +1170,12 @@ export class ShieldedAssetSession {
     // Verify the final destination before any preparatory consolidation spend.
     const transferRecipient =
       request.action === "privateTransfer"
-        ? await this.recipient(request.recipientCode ?? "")
+        ? await this.recipient(request.recipientCode ?? "", "anonymous")
         : undefined;
     if (transferRecipient) {
       recipient = transferRecipient.fingerprint;
       receiveDestination = {
-        credential: decodeShieldedReceiveCredential(request.recipientCode ?? ""),
+        credential: receiveCredentialFor(request.recipientCode ?? "", "anonymous"),
         action: "privateTransfer",
       };
       await this.validateReceiveDestination(receiveDestination, ctx, env);
@@ -1260,7 +1288,7 @@ export class ShieldedAssetSession {
         );
       if (verified) {
         receiveDestination = {
-          credential: decodeShieldedReceiveCredential(request.recipientCode ?? ""),
+          credential: receiveCredentialFor(request.recipientCode ?? "", "fund"),
           action: "fund",
         };
         await this.validateReceiveDestination(receiveDestination, ctx, env);

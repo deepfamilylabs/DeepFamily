@@ -22,11 +22,11 @@ import {
   BADGE_ACCENT,
   CHOICE_INPUT,
   FIELD_INPUT,
+  FIELD_TEXTAREA,
   FieldBlock,
   TaskHeader,
   TaskSection,
   WarningNotice,
-  PanelButton,
   choiceCardClass,
   shortHex,
 } from "./inheritanceControls";
@@ -70,7 +70,11 @@ export interface ShieldedFundComposerProps {
   onGenerateRecipientCode: () => void;
   /** The funding parent's own label, used to name existing arrangements. */
   parentLabel?: string;
-  onWriteLetter?: () => void;
+  letterEnabled: boolean;
+  onLetterEnabledChange: (enabled: boolean) => void;
+  letterBody: string;
+  onLetterBodyChange: (body: string) => void;
+  lettersConfigured: boolean;
 }
 
 /** Budget arrangement, then the child, then how privately the budget is held. */
@@ -135,6 +139,23 @@ export function ShieldedFundComposer(props: ShieldedFundComposerProps) {
           </div>
         ) : null}
       </TaskHeader>
+
+      <section aria-labelledby={`${titleId}-letter`} className="space-y-3 rounded-xl bg-surface-alt p-4">
+        <h3 id={`${titleId}-letter`} className="text-sm font-semibold text-ink">{t("shielded.privateLetters.budgetLetterTitle")}</h3>
+        {!privateFunding ? <p className="text-sm text-ink-muted">{t("shielded.privateLetters.publicBudgetUnavailable")}</p> : null}
+        {privateFunding && props.lettersConfigured ? <>
+          <label className="flex items-center gap-2 text-sm text-ink">
+            <input type="checkbox" className={CHOICE_INPUT} checked={props.letterEnabled} disabled={busy} onChange={event => props.onLetterEnabledChange(event.target.checked)} />
+            {t("shielded.privateLetters.includeLetter")}
+          </label>
+          {props.letterEnabled ? <>
+            <FieldBlock label={t("shielded.privateLetters.body")}>
+              <textarea aria-label={t("shielded.privateLetters.body")} className={FIELD_TEXTAREA} rows={6} value={props.letterBody} disabled={busy} onChange={event => props.onLetterBodyChange(event.target.value)} />
+            </FieldBlock>
+            <p className="text-xs text-ink-muted">{t("shielded.privateLetters.twoTransactions")}</p>
+          </> : null}
+        </> : privateFunding ? <p className="text-sm text-ink-muted">{t("shielded.privateLetters.notConfigured")}</p> : null}
+      </section>
 
       <TaskSection
         id={`${titleId}-rule`}
@@ -423,7 +444,6 @@ export function ShieldedFundComposer(props: ShieldedFundComposerProps) {
           </p>
         ) : null}
       </TaskSection>
-      {props.onWriteLetter && privateFunding ? <PanelButton size="compact" disabled={busy} onClick={props.onWriteLetter}>{t("shielded.privateLetters.attach")}</PanelButton> : null}
     </>
   );
 }

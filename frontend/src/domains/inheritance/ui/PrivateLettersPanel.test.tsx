@@ -35,6 +35,22 @@ beforeEach(() => { vi.clearAllMocks(); mocks.walletGeneration = 0; mocks.worker.
 afterEach(cleanup);
 
 describe("private letter composer", () => {
+  it("disables sending on a network without a letter archive", () => {
+    render(<PrivateLettersPanel {...props()} context={{ ...context, lettersAddress: "" }} />);
+    fillLetter();
+    expect((screen.getByRole("button", { name: tr("send") }) as HTMLButtonElement).disabled).toBe(true);
+    expect(mocks.worker).not.toHaveBeenCalled();
+  });
+
+  it.each([false, true])("reports unavailable ciphertext without claiming an empty inbox (readable letters: %s)", async readable => {
+    mocks.worker.mockResolvedValue({ letters: readable ? [{ messageId: "7", body: "Readable letter", registeredAt: "1000", attachment: null }] : [], unavailable: 2 });
+    render(<PrivateLettersPanel {...props()} mode="inbox" />);
+    expect(await screen.findByRole("alert")).toHaveProperty("textContent", tr("unavailable"));
+    expect(screen.queryByText(tr("emptyInbox"))).toBeNull();
+    if (readable) expect(screen.getByText("Readable letter")).toBeTruthy();
+    expect((screen.getByRole("button", { name: tr("refresh") }) as HTMLButtonElement).disabled).toBe(false);
+  });
+
   it("explains missing recovery keys before offering inbox recovery", () => {
     render(<PrivateLettersPanel {...props()} mode="inbox" recoveryReady={false} />);
     expect((screen.getByRole("button", { name: tr("refresh") }) as HTMLButtonElement).disabled).toBe(true);

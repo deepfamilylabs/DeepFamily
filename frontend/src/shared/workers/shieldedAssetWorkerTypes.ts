@@ -204,6 +204,10 @@ export type ShieldedAssetWorkerCallMap = {
     params: { expectedCredentialsHandle: string; expectedFingerprint: string };
     result: ShieldedAssetSessionState;
   };
+  validateLetter: {
+    params: { context: ShieldedWorkerContext; code: string; body: string; keyMode?: 0 | 1 };
+    result: { ok: true };
+  };
   prepareLetter: {
     params: { context: ShieldedWorkerContext; code: string; body: string; budgetCommitment?: string };
     result: import("../../domains/inheritance/services/privateLetterChain").ProvenPrivateLetter;

@@ -1325,6 +1325,17 @@ export function decodeShieldedReceiveCredential(code: string): {
   proof: ShieldedReceiveCredentialProof;
 };
 
+/** Combined transport only; both contained issuer proofs must be verified independently. */
+export const SHIELDED_BUDGET_RECEIVE_CODE_VERSION: 1;
+export interface ShieldedBudgetReceiveCode {
+  fundCode: string;
+  anonymousCode: string;
+}
+export function encodeShieldedBudgetReceiveCode(input: ShieldedBudgetReceiveCode): string;
+export function decodeShieldedBudgetReceiveCode(code: string): ShieldedBudgetReceiveCode;
+/** Prefix dispatch only, without checksum, field or proof validation. */
+export function isShieldedBudgetReceiveCode(code: unknown): boolean;
+
 export const SHIELDED_IDENTITY_AUTHORIZATION_DEPTH: 64;
 export const SHIELDED_IDENTITY_COUNTER_AUTHORIZATION_DOMAIN: bigint;
 export interface ShieldedIdentityAuthorizationState {

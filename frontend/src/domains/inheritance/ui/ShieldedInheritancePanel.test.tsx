@@ -31,6 +31,7 @@ const mocks = vi.hoisted(() => ({
   center: null as any,
   busy: vi.fn(),
   locked: null as (() => void) | null,
+  lockListeners: new Set<() => void>(),
   revision: 0,
   listeners: new Set<() => void>(),
   stateReadMode: "rebuild" as "rebuild" | "chain",
@@ -90,10 +91,9 @@ vi.mock("../../../shared/workers/shieldedAssetWorkerClient", () => ({
   cancelShieldedAssetPreview: mocks.cancel,
   getShieldedAssetWorkerGeneration: () => mocks.generation,
   subscribeShieldedAssetWorkerLock: (listener: () => void) => {
-    mocks.locked = listener;
-    return () => {
-      mocks.locked = null;
-    };
+    mocks.lockListeners.add(listener);
+    mocks.locked = () => { for (const current of mocks.lockListeners) current(); };
+    return () => { mocks.lockListeners.delete(listener); };
   },
 }));
 vi.mock("../../../shared/workers/publicStateSyncProgress", () => ({
@@ -2313,6 +2313,261 @@ describe("Worker-backed shielded wallet", () => {
     expect(screen.queryByRole("radio", { name: label("restoreTitle") })).toBeNull();
     expect(screen.queryByRole("radio", { name: label("randomSource") })).toBeNull();
   });
+  it("keeps funding letters inline and selects existing budgets only in the write task", async () => {
+    mocks.lettersAddress = "0x1111111111111111111111111111111111111111";
+    const originalCall = mocks.call.getMockImplementation()!;
+    mocks.call.mockImplementation(async (method, ...args) => method === "recover" ? {
+      ...emptyWallet,
+      templates: [
+        { handle: "73", policyHandle: "policy:existing", personHash: identity.personHash, bindingKind: 0, keyMode: 1 },
+        { handle: "74", policyHandle: "policy:public", personHash: identity.personHash, bindingKind: 1, keyMode: 0 },
+      ],
+    } : originalCall(method, ...args));
+    await renderUnlockedPanel();
+    chooseAction("fund");
+    const entry = screen.getByRole("region", { name: "shielded.privateLetters.budgetLetterTitle" });
+    expect(within(entry).getByRole("checkbox", { name: "shielded.privateLetters.includeLetter" })).toBeTruthy();
+    expect(within(entry).queryByRole("button")).toBeNull();
+    expect(screen.queryByLabelText("shielded.privateLetters.budget")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "shielded.privateLetters.write" }));
+    const budget = screen.getByLabelText("shielded.privateLetters.budget") as HTMLSelectElement;
+    expect(Array.from(budget.options).map(option => option.value)).toEqual(["", "73"]);
+    fireEvent.change(budget, { target: { value: "73" } });
+    expect((screen.getByLabelText("shielded.privateLetters.budget") as HTMLSelectElement).value).toBe("73");
+    expect(screen.getByLabelText("shielded.privateLetters.body")).toBeTruthy();
+    expect(mocks.submit).not.toHaveBeenCalled();
+  });
+
+  it("keeps the attached-letter section visible and explains why public funding cannot attach letters", async () => {
+    await renderUnlockedPanel();
+    chooseAction("fund");
+    expect(screen.getByRole("region", { name: "shielded.privateLetters.budgetLetterTitle" })).toBeTruthy();
+    chooseFundingEntry("public");
+    expect(screen.getByRole("region", { name: "shielded.privateLetters.budgetLetterTitle" })).toBeTruthy();
+    expect(screen.getByText("shielded.privateLetters.publicBudgetUnavailable")).toBeTruthy();
+    expect(screen.queryByLabelText("shielded.privateLetters.budget")).toBeNull();
+  });
+
+  it.each([0, 1])("stays in funding after a deposit without a letter in key mode %s", async keyMode => {
+    mocks.lettersAddress = "0x1111111111111111111111111111111111111111";
+    mocks.verify.mockResolvedValue({ disclosure: "fund", personHash: identity.personHash, keyMode, fingerprint: "child-fingerprint" });
+    mocks.call.mockImplementation(async (method, params) => {
+      if (method === "recover") return {
+        ...emptyWallet,
+        children: [{ personHash: identity.personHash, rootVersionIndex: 0, eligible: true }],
+        notes: [{ commitment: "11", ownerCommitment: identity.identityCommitment, slot: "identity", kind: "value", amount: "100000000000000000000" }],
+      };
+      if (method === "prove") return { action: "fund", data: { budgetKind: 0, outputCommitments: [31n, 32n] }, proof: {} };
+      return {
+        handle: "fund:1", action: "fund", amount: params.amount, slot: params.slot,
+        steps: [], inputs: [], inputAmounts: [], outputAmounts: [params.amount, "0"],
+      };
+    });
+    mocks.submit.mockResolvedValue(sentTransaction);
+    await renderUnlockedPanel(signer);
+    chooseAction("fund");
+    chooseFundingEntry(keyMode === 0 ? "privateConvenient" : "privateIndependent");
+    chooseOption("shielded.fields.familyVersion", "shielded.fundingVersionOption:0");
+    chooseHeir(identity.personHash);
+    fireEvent.change(screen.getByLabelText("shielded.fields.rate"), { target: { value: "1" } });
+    fireEvent.change(screen.getByLabelText("shielded.receiveCodeInputLabel"), { target: { value: "child-receive-code" } });
+    const submit = screen.getByRole("button", { name: submitLabel }) as HTMLButtonElement;
+    await waitFor(() => expect(submit.disabled).toBe(false));
+    fireEvent.click(submit);
+    await waitFor(() => expect(mocks.submit).toHaveBeenCalledTimes(1));
+    await waitUntilIdle();
+    expect(navButton("fund").getAttribute("aria-current")).toBe("true");
+    expect(screen.queryByLabelText("shielded.privateLetters.body")).toBeNull();
+    expect(screen.queryByLabelText("shielded.privateLetters.budget")).toBeNull();
+    const letterSection = screen.getByRole("region", { name: "shielded.privateLetters.budgetLetterTitle" });
+    expect(within(letterSection).queryByRole("button")).toBeNull();
+    expect(mocks.submitLetter).not.toHaveBeenCalled();
+  });
+  it("preserves the child, code and letter across budget arrangements and restores custom amounts", async () => {
+    mocks.verify.mockResolvedValue({ personHash: identity.personHash, keyMode: 1, fingerprint: "child-fingerprint" });
+    mocks.lettersAddress = "0x1111111111111111111111111111111111111111";
+    const originalCall = mocks.call.getMockImplementation()!;
+    mocks.call.mockImplementation(async (method, ...args) => method === "recover" ? {
+      ...emptyWallet,
+      parentVersions: [0, 1],
+      children: [0, 1].map(rootVersionIndex => ({ personHash: identity.personHash, rootVersionIndex, eligible: true })),
+      policies: [0, 1].map((version, index) => ({ handle: `policy:${index}`, rootVersionIndex: String(version), amountPerPeriod: "1000000000000000000", periodDays: "30" })),
+    } : originalCall(method, ...args));
+    await renderUnlockedPanel();
+    chooseAction("fund");
+    chooseOption("shielded.fields.familyVersion", "shielded.fundingVersionOption:0");
+    chooseHeir(identity.personHash);
+    fireEvent.change(screen.getByLabelText("shielded.fields.rate"), { target: { value: "2" } });
+    chooseOption("shielded.fields.periodDays", "shielded.periodDaysSummary:14");
+    fireEvent.change(screen.getByLabelText("shielded.fields.periods"), { target: { value: "3" } });
+    fireEvent.change(screen.getByLabelText("shielded.receiveCodeInputLabel"), { target: { value: "budget-code" } });
+    fireEvent.click(screen.getByRole("checkbox", { name: "shielded.privateLetters.includeLetter" }));
+    fireEvent.change(screen.getByLabelText("shielded.privateLetters.body"), { target: { value: "Keep this letter while choosing an arrangement" } });
+    const expectDraft = () => {
+      expect(heirChoice(identity.personHash).checked).toBe(true);
+      expect((screen.getByLabelText("shielded.receiveCodeInputLabel") as HTMLTextAreaElement).value).toBe("budget-code");
+      expect((screen.getByLabelText("shielded.privateLetters.body") as HTMLTextAreaElement).value).toBe("Keep this letter while choosing an arrangement");
+      expect((screen.getByLabelText("shielded.fields.periods") as HTMLInputElement).value).toBe("3");
+    };
+    chooseOption("shielded.fields.fundingRule", "shielded.newFundingRule");
+    expectDraft();
+    chooseOption("shielded.fields.familyVersion", "shielded.fundingVersionOption:0");
+    expectDraft();
+    chooseHeir(identity.personHash);
+    expectDraft();
+    chooseOption("shielded.fields.familyVersion", "shielded.fundingVersionOption:1");
+    expectDraft();
+    chooseOption("shielded.fields.familyVersion", "shielded.fundingVersionOption:0");
+    expectDraft();
+    chooseOption("shielded.fields.fundingRule", "shielded.policyOption:1");
+    expectDraft();
+    chooseOption("shielded.fields.fundingRule", "shielded.policyOption:2");
+    expectDraft();
+    chooseOption("shielded.fields.fundingRule", "shielded.newFundingRule");
+    expectDraft();
+    expect((screen.getByLabelText("shielded.fields.rate") as HTMLInputElement).value).toBe("2");
+    expect(selectTrigger("shielded.fields.periodDays").textContent).toBe("shielded.periodDaysSummary:14");
+    expect(selectTrigger("shielded.fields.familyVersion").textContent).toBe("shielded.fundingVersionOption:0");
+    chooseFundingEntry("privateConvenient");
+    expect((screen.getByLabelText("shielded.privateLetters.body") as HTMLTextAreaElement).value).toBe("Keep this letter while choosing an arrangement");
+    chooseFundingEntry("public");
+    expect(screen.queryByLabelText("shielded.privateLetters.body")).toBeNull();
+    chooseFundingEntry("privateIndependent");
+    expect((screen.getByLabelText("shielded.privateLetters.body") as HTMLTextAreaElement).value).toBe("Keep this letter while choosing an arrangement");
+  });
+
+  it("keeps the letter through an arrangement without the selected child until a different child is chosen", async () => {
+    mocks.lettersAddress = "0x1111111111111111111111111111111111111111";
+    const otherChild = "0x" + "02".repeat(32);
+    const originalCall = mocks.call.getMockImplementation()!;
+    mocks.call.mockImplementation(async (method, ...args) => method === "recover" ? {
+      ...emptyWallet,
+      parentVersions: [0, 1],
+      children: [{ personHash: identity.personHash, rootVersionIndex: 0, eligible: true }, { personHash: otherChild, rootVersionIndex: 1, eligible: true }],
+      policies: [{ handle: "policy:other", rootVersionIndex: "1", amountPerPeriod: "1000000000000000000", periodDays: "30" }],
+    } : originalCall(method, ...args));
+    await renderUnlockedPanel();
+    chooseAction("fund");
+    chooseOption("shielded.fields.familyVersion", "shielded.fundingVersionOption:0");
+    chooseHeir(identity.personHash);
+    fireEvent.click(screen.getByRole("checkbox", { name: "shielded.privateLetters.includeLetter" }));
+    fireEvent.change(screen.getByLabelText("shielded.privateLetters.body"), { target: { value: "For the original child" } });
+    chooseOption("shielded.fields.fundingRule", "shielded.policyOption:1");
+    expect((screen.getByLabelText("shielded.privateLetters.body") as HTMLTextAreaElement).value).toBe("For the original child");
+    expect((screen.getByRole("button", { name: submitLabel }) as HTMLButtonElement).disabled).toBe(true);
+    chooseOption("shielded.fields.fundingRule", "shielded.newFundingRule");
+    chooseHeir(identity.personHash);
+    expect((screen.getByLabelText("shielded.privateLetters.body") as HTMLTextAreaElement).value).toBe("For the original child");
+    chooseOption("shielded.fields.fundingRule", "shielded.policyOption:1");
+    chooseHeir(otherChild);
+    expect(screen.queryByLabelText("shielded.privateLetters.body")).toBeNull();
+    fireEvent.click(screen.getByRole("checkbox", { name: "shielded.privateLetters.includeLetter" }));
+    expect((screen.getByLabelText("shielded.privateLetters.body") as HTMLTextAreaElement).value).toBe("");
+  });
+
+  it("clears an inline letter when switching to another child", async () => {
+    mocks.lettersAddress = "0x1111111111111111111111111111111111111111";
+    const otherChild = "0x" + "02".repeat(32);
+    const originalCall = mocks.call.getMockImplementation()!;
+    mocks.call.mockImplementation(async (method, ...args) => method === "recover" ? {
+      ...emptyWallet,
+      children: [identity.personHash, otherChild].map(personHash => ({ personHash, rootVersionIndex: 0, eligible: true })),
+    } : originalCall(method, ...args));
+    await renderUnlockedPanel();
+    chooseAction("fund");
+    chooseOption("shielded.fields.familyVersion", "shielded.fundingVersionOption:0");
+    chooseHeir(identity.personHash);
+    fireEvent.click(screen.getByRole("checkbox", { name: "shielded.privateLetters.includeLetter" }));
+    fireEvent.change(screen.getByLabelText("shielded.privateLetters.body"), { target: { value: "For the first child only" } });
+    chooseHeir(otherChild);
+    expect((screen.getByRole("checkbox", { name: "shielded.privateLetters.includeLetter" }) as HTMLInputElement).checked).toBe(false);
+    fireEvent.click(screen.getByRole("checkbox", { name: "shielded.privateLetters.includeLetter" }));
+    expect((screen.getByLabelText("shielded.privateLetters.body") as HTMLTextAreaElement).value).toBe("");
+  });
+
+  it.each([
+    [0, "sent"], [1, "sent"], [1, "letterFailed"], [0, "depositFailed"], [1, "preflightFailed"], [1, "depositUncertain"],
+  ] as const)("handles inline budget letters in mode %s with outcome %s", async (keyMode, outcome) => {
+    mocks.lettersAddress = "0x1111111111111111111111111111111111111111";
+    mocks.verify.mockResolvedValue({ disclosure: "fund", personHash: identity.personHash, keyMode, fingerprint: "child-fingerprint" });
+    const preparedLetter = { delivery: { messageId: "7", checkpointId: "1", asOf: "900", expiresAt: "1200", recipientBinding: "9" }, ciphertext: "0x010203", proof: "0x1234" };
+    mocks.call.mockImplementation(async (method, params) => {
+      if (method === "recover") return {
+        ...emptyWallet,
+        children: [{ personHash: identity.personHash, rootVersionIndex: 0, eligible: true }],
+        notes: [{ commitment: "11", ownerCommitment: identity.identityCommitment, slot: "identity", kind: "value", amount: "100000000000000000000" }],
+      };
+      if (method === "validateLetter") {
+        if (outcome === "preflightFailed") throw new Error("invalid letter credential");
+        return { ok: true };
+      }
+      if (method === "prepareLetter") return preparedLetter;
+      if (method === "prove") return { action: "fund", data: { budgetKind: 0, outputCommitments: [31n, 32n] }, proof: {} };
+      return { handle: "fund:1", action: "fund", amount: params.amount, slot: params.slot, steps: [], inputs: [], inputAmounts: [], outputAmounts: [params.amount, "0"] };
+    });
+    let confirmDeposit!: (result: typeof sentTransaction) => void;
+    mocks.submit.mockReturnValue(new Promise(resolve => { confirmDeposit = resolve; }));
+    let confirmPublicReceipt!: (result: { status: number }) => void;
+    if (outcome === "depositUncertain") {
+      mocks.receipt.mockReturnValueOnce(new Promise(resolve => { confirmPublicReceipt = resolve; }));
+      mocks.submit.mockImplementation(async params => {
+        params.onSubmitting({ nonce: 7, fromBlock: 30, signerAddress: address });
+        params.onBroadcast("0xuncertain-fund");
+        throw new Error("Deposit receipt unavailable");
+      });
+    }
+    if (outcome === "letterFailed") mocks.submitLetter.mockRejectedValueOnce(new Error("receipt unavailable")).mockResolvedValue({ transactionHash: "0xletter" });
+    await renderUnlockedPanel(signer);
+    chooseAction("fund");
+    chooseFundingEntry(keyMode === 0 ? "privateConvenient" : "privateIndependent");
+    chooseOption("shielded.fields.familyVersion", "shielded.fundingVersionOption:0");
+    chooseHeir(identity.personHash);
+    fireEvent.change(screen.getByLabelText("shielded.fields.rate"), { target: { value: "1" } });
+    fireEvent.change(screen.getByLabelText("shielded.receiveCodeInputLabel"), { target: { value: "budget-combined-code" } });
+    fireEvent.click(screen.getByRole("checkbox", { name: "shielded.privateLetters.includeLetter" }));
+    fireEvent.change(screen.getByLabelText("shielded.privateLetters.body"), { target: { value: "A letter written before the deposit" } });
+    const submit = screen.getByRole("button", { name: submitLabel }) as HTMLButtonElement;
+    await waitFor(() => expect(submit.disabled).toBe(false));
+    fireEvent.click(submit);
+    if (outcome === "preflightFailed") {
+      await screen.findByText("shielded.privateLetters.preflightFailed");
+      expect(mocks.submit).not.toHaveBeenCalled();
+      expect(mocks.submitLetter).not.toHaveBeenCalled();
+      return;
+    }
+    await waitFor(() => expect(mocks.submit).toHaveBeenCalledTimes(1));
+    expect(mocks.call).toHaveBeenCalledWith("validateLetter", expect.objectContaining({ code: "budget-combined-code", body: "A letter written before the deposit", keyMode }), expect.anything());
+    expect(mocks.call.mock.calls.filter(([method]) => method === "prepareLetter")).toHaveLength(0);
+    if (outcome === "depositUncertain") {
+      await screen.findByText("shielded.privateLetters.delivery.awaitingDeposit");
+      expect(submit.disabled).toBe(true);
+      await waitFor(() => expect(mocks.receipt).toHaveBeenCalled());
+      await act(async () => confirmPublicReceipt({ status: 1 }));
+    } else {
+      await act(async () => confirmDeposit({ ...sentTransaction, receipt: { status: outcome === "depositFailed" ? 0 : 1 } }));
+    }
+    if (outcome === "depositFailed") {
+      await waitUntilIdle();
+      expect(mocks.submitLetter).not.toHaveBeenCalled();
+      expect(mocks.call.mock.calls.filter(([method]) => method === "prepareLetter")).toHaveLength(0);
+      return;
+    }
+    if (outcome === "letterFailed") {
+      await screen.findByText("shielded.privateLetters.delivery.failed");
+      await waitUntilIdle();
+      expect(submit.disabled).toBe(true);
+      fireEvent.click(screen.getByRole("button", { name: "shielded.privateLetters.retryLetter" }));
+    }
+    await screen.findByText("shielded.privateLetters.delivery.sent");
+    await waitUntilIdle();
+    expect(navButton("fund").getAttribute("aria-current")).toBe("true");
+    expect(mocks.call).toHaveBeenCalledWith("prepareLetter", expect.objectContaining({ code: "budget-combined-code", body: "A letter written before the deposit", budgetCommitment: "31" }), expect.anything());
+    expect(mocks.call.mock.calls.filter(([method]) => method === "prepareLetter")).toHaveLength(1);
+    expect(mocks.submit).toHaveBeenCalledTimes(1);
+    expect(mocks.submitLetter).toHaveBeenCalledTimes(outcome === "letterFailed" ? 2 : 1);
+    expect(submit.disabled).toBe(true);
+  });
+
   it.each([
     ["privateConvenient", 0, "identity"],
     ["privateIndependent", 1, "identity"],

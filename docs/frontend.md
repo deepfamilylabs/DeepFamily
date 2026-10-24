@@ -518,11 +518,42 @@ progress advances; explicit caller deadlines are unchanged and stalled tasks sti
 The RPC must retain the pinned block while pages are downloaded. Rebuilding current state can
 still require substantial traffic, disk and verification time; it is not a constant-size first sync.
 
+Budget funding and an optional letter share one form and submission flow.
+The UI name **Budget receive code** replaces the exposed Fund-disclosure-material
+term, while the help text explicitly says that it discloses and authenticates the
+heir identity to the funder. The `dfbudget` version-1 package contains separately
+proved Fund and anonymous credentials with matching alias, authorization counter,
+expiry, owner,
+full viewing key, recipient key mode and suite/version metadata. Both proofs must
+be verified; the Fund credential is used only for funding and the anonymous
+credential for letters. No circuit, verifier or contract permission is broadened.
+
+Both identity-credential and independent-key private budgets offer an optional
+letter in the funding form. Changing the arrangement or family version preserves
+the selected child and receive code when still applicable, and retains the letter
+draft. Selecting a different child clears the previous letter; reselecting the
+same child does not reset the form. After preflight, the page submits the budget and waits
+for success before preparing the real-budget attachment proof and requesting the
+second transaction. It keeps the user in the funding flow and reuses the receiving
+package. The form explains the two transactions, wallet confirmations and fees;
+deposit and letter results are displayed separately. The pre-submission draft and
+expected budget are retained in an awaiting-deposit step tied to the funding
+submission ID. An unknown funding result waits for reconciliation; only a confirmed
+matching ID can consume that step and start letter delivery, and it can do so once.
+A confirmed failure cancels the matching awaiting step while preserving the form
+draft; locking or replacing the session clears the continuation.
+Letter failure, cancellation or refreshed authorization must never resubmit a
+successful deposit. Retry invokes only the letter step, reusing any prepared
+message until irreversible expiry permits replacement. If no prepared proof is
+reusable, the receiving material may be updated while retaining the confirmed
+budget. Plaintext remains confined to the current session. Public budgets explain
+that attachments are unavailable. Letters for existing budgets are composed by selecting the budget in the Write a letter task; ordinary private-transfer
+attachments are outside this change. See [private letters](private-letters.md#budget-receive-codes-and-inline-letters).
+
 The locked page shows the unlock form; read-mode controls and private letters appear in the
 unlocked workspace. The task rail lists Private letters below Child budgets, with separate
 Write a letter and Inbox entries that open in the shared task area. Entering the inbox reads
-letters once; its refresh button explicitly reads again. Budget attachment entries open the
-write task with the selected private budget. Initial recovery uses local reconstruction unless
+letters once; its refresh button explicitly reads again. The write task lets users select an existing private budget for an attachment. Initial recovery uses local reconstruction unless
 a read preference was previously saved. Users may explicitly select chain paths (`stateReadMode: "chain"`) inside
 the workspace. The choice is persisted as a public preference, with a missing or invalid saved
 value defaulting to rebuild.

@@ -12,6 +12,7 @@ export * from "./inheritance.js";
 export * from "./shielded-inheritance.js";
 export * from "./shielded-signals.js";
 export * from "./shielded-receive-credential.js";
+export * from "./shielded-budget-receive-code.js";
 export * from "./shielded-identity-authorization.js";
 export * from "./shielded-receive-presentation.js";
 export * from "./groth16-link.js";

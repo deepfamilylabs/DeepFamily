@@ -136,12 +136,13 @@ export function PrivateLettersPanel(props: {
       </FieldBlock>
       <FieldBlock label={tr("recipientCode")}><textarea aria-label={tr("recipientCode")} className={FIELD_TEXTAREA} rows={3} disabled={busy} value={code} onChange={event => { setCode(event.target.value); prepared.current = null; setSent(""); }} /></FieldBlock>
       <FieldBlock label={tr("body")}><textarea aria-label={tr("body")} className={FIELD_TEXTAREA} rows={6} disabled={busy} value={body} onChange={event => { setBody(event.target.value); prepared.current = null; setSent(""); }} /></FieldBlock>
-      <PanelButton disabled={busy || !props.signer || !code.trim() || !body.trim()} onClick={() => void send()}>{working ? tr("working") : tr("send")}</PanelButton>
+      <PanelButton disabled={busy || !props.context.lettersAddress || !props.signer || !code.trim() || !body.trim()} onClick={() => void send()}>{working ? tr("working") : tr("send")}</PanelButton>
       {props.budgetCommitment ? <p className="text-xs text-ink-muted">{tr("separateResults")}</p> : null}
     </div> : null}
     {props.mode === "inbox" && inbox ? <div className="space-y-3">
       <p className="text-xs text-ink-muted">{tr("recoveryHint")}</p>
-      {inbox.letters.length === 0 ? <p className="text-sm text-ink-muted">{tr("emptyInbox")}</p> : inbox.letters.map(letter => <article key={letter.messageId} className="space-y-2 rounded-xl bg-surface-alt p-4">
+      {inbox.unavailable > 0 ? <p role="alert" className="text-sm text-danger">{t("shielded.privateLetters.unavailable", { count: inbox.unavailable })}</p> : null}
+      {inbox.letters.length === 0 && inbox.unavailable === 0 ? <p className="text-sm text-ink-muted">{tr("emptyInbox")}</p> : inbox.letters.map(letter => <article key={letter.messageId} className="space-y-2 rounded-xl bg-surface-alt p-4">
         <p className="text-xs text-ink-muted">{new Date(Number(letter.registeredAt) * 1000).toLocaleString()}{letter.attachment ? ` · ${tr("budget")}: ${shortHex(letter.attachment.budgetCommitment)}` : ""}</p>
         <p className="whitespace-pre-wrap break-words text-sm text-ink">{letter.body}</p>
       </article>)}
