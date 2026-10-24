@@ -579,11 +579,13 @@ export interface LineageTreeNode {
   readonly value: bigint;
 }
 export function verifyLineageTreeNode(input: {
-  level: BigNumberish; index: BigNumberish; value: BigNumberish;
+  level: BigNumberish;
+  index: BigNumberish;
+  value: BigNumberish;
 }): LineageTreeNode;
 export function createLineageTreeFromNodes(
-  input: {size: BigNumberish; root: BigNumberish},
-  nodes: Iterable<{level: BigNumberish; index: BigNumberish; value: BigNumberish}>,
+  input: { size: BigNumberish; root: BigNumberish },
+  nodes: Iterable<{ level: BigNumberish; index: BigNumberish; value: BigNumberish }>,
 ): LineageTree;
 export interface LineageMerklePathInput {
   root: BigNumberish;
@@ -1340,12 +1342,14 @@ export interface ShieldedIdentityAuthorizationTree {
   clone(): ShieldedIdentityAuthorizationTree;
   snapshot(): ShieldedIdentityAuthorizationState;
   /** Content-addressed nodes; a previous clone prunes unchanged subtrees. */
-  exportNodes(previous?: ShieldedIdentityAuthorizationTree): IterableIterator<ShieldedIdentityAuthorizationNode>;
+  exportNodes(
+    previous?: ShieldedIdentityAuthorizationTree,
+  ): IterableIterator<ShieldedIdentityAuthorizationNode>;
 }
 export type ShieldedIdentityAuthorizationNode =
-  | Readonly<{kind: "empty"; hash: bigint}>
-  | Readonly<{kind: "leaf"; hash: bigint; key: bigint; value: bigint}>
-  | Readonly<{kind: "branch"; hash: bigint; leftHash: bigint; rightHash: bigint}>;
+  | Readonly<{ kind: "empty"; hash: bigint }>
+  | Readonly<{ kind: "leaf"; hash: bigint; key: bigint; value: bigint }>
+  | Readonly<{ kind: "branch"; hash: bigint; leftHash: bigint; rightHash: bigint }>;
 export function verifyShieldedIdentityAuthorizationNode(
   input: unknown,
   expectedHash?: BigNumberish,
@@ -1384,18 +1388,7 @@ export function verifyShieldedIdentityAuthorizationWitness(
   expectedRoot: BigNumberish,
   expectedAlias?: BigNumberish,
 ): ShieldedIdentityAuthorizationWitness;
-export function prepareShieldedIdentityAuthorizationIncrementFromWitness(input: {
-  authorizationWitness: ShieldedIdentityAuthorizationWitnessInput;
-  authorizationStateRoot: BigNumberish;
-  chainId: BigNumberish;
-  authorizationStateAddress: string;
-  identityCommitment: BigNumberish;
-  derivedSecretField: BigNumberish;
-}): {
-  newRoot: bigint;
-  publicSignals: bigint[];
-  witness: Record<string, string | string[]>;
-};
+/** Owner authority only; the state contract checks the live counter and updates the tree. */
 export function prepareShieldedIdentityCounterAuthorization(input: {
   authorizationCounter: BigNumberish;
   chainId: BigNumberish;
@@ -1403,20 +1396,15 @@ export function prepareShieldedIdentityCounterAuthorization(input: {
   identityCommitment: BigNumberish;
   derivedSecretField: BigNumberish;
 }): {
-  newRoot: bigint;
-  publicSignals: bigint[];
-  witness: Record<string, string | string[]>;
-};
-export function prepareShieldedIdentityAuthorizationIncrement(input: {
-  state: ShieldedIdentityAuthorizationState;
-  chainId: BigNumberish;
-  authorizationStateAddress: string;
-  identityCommitment: BigNumberish;
-  derivedSecretField: BigNumberish;
-}): {
-  nextState: ShieldedIdentityAuthorizationState;
-  publicSignals: bigint[];
-  witness: Record<string, string | string[]>;
+  /** [authorizationNullifier, chainId, consumer, aliasR, oldCounter, newCounter]. */
+  publicSignals: [bigint, bigint, bigint, bigint, bigint, bigint];
+  witness: {
+    chainId: string;
+    consumer: string;
+    aliasR: string;
+    oldCounter: string;
+    newCounter: string;
+  };
 };
 
 export const SHIELDED_RECEIVE_PRESENTATION_ACTION: Readonly<{

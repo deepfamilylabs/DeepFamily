@@ -75,7 +75,9 @@ describe("Private state reconstruction against current on-chain nodes", function
       bundle: true,
       platform: "node",
       format: "esm",
-      banner: { js: 'import { createRequire } from "node:module"; const require = createRequire(import.meta.url);' },
+      banner: {
+        js: 'import { createRequire } from "node:module"; const require = createRequire(import.meta.url);',
+      },
       define: { "import.meta.env": "{}" },
       logLevel: "silent",
     });
@@ -86,7 +88,7 @@ describe("Private state reconstruction against current on-chain nodes", function
     if (directory) await rm(directory, { recursive: true, force: true });
   });
 
-  it("replays actual execution roots when owner proof roots are independent and reuses only public updates", async function () {
+  it("replays execution roots from independent counter authorizations and reuses only public updates", async function () {
     const verifier = await hre.ethers.deployContract("IdentityCounterVerifierMock");
     const t3 = await hre.ethers.deployContract("PoseidonT3");
     const t4 = await hre.ethers.deployContract("PoseidonT4");
@@ -126,19 +128,15 @@ describe("Private state reconstruction against current on-chain nodes", function
         (await hre.ethers.provider.getNetwork()).chainId,
         BigInt(await state.getAddress()),
         alias,
-        0n,
-        1n,
         counter,
         counter + 1n,
       ];
       await state.incrementCounter(
         nonce,
         alias,
-        0n,
-        1n,
         counter,
         counter + 1n,
-        hre.ethers.AbiCoder.defaultAbiCoder().encode(["uint256[8]"], [input]),
+        hre.ethers.AbiCoder.defaultAbiCoder().encode(["uint256[6]"], [input]),
       );
     };
     let loaded = await compare();
@@ -294,19 +292,15 @@ describe("Private state reconstruction against current on-chain nodes", function
         chainId,
         BigInt(await state.getAddress()),
         alias,
-        0n,
-        1n,
         oldCounter,
         oldCounter + 1n,
       ];
       await state.incrementCounter(
         inputs[0],
         alias,
-        0n,
-        1n,
         oldCounter,
         oldCounter + 1n,
-        hre.ethers.AbiCoder.defaultAbiCoder().encode(["uint256[8]"], [inputs]),
+        hre.ethers.AbiCoder.defaultAbiCoder().encode(["uint256[6]"], [inputs]),
       );
     };
     const deepAlias = 11n ^ (1n << 63n);

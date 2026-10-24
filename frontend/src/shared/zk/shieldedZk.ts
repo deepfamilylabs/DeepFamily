@@ -31,7 +31,7 @@ const PUBLIC_SIGNAL_COUNTS: Record<ShieldedCircuitName, number> = {
   anonymousReceivePresentation: SHIELDED_RECEIVE_CREDENTIAL_PUBLIC_SIGNAL_COUNTS.anonymous + 11,
   fundReceivePresentation: SHIELDED_RECEIVE_CREDENTIAL_PUBLIC_SIGNAL_COUNTS.fund + 11,
   attachedReceivePresentation: SHIELDED_RECEIVE_CREDENTIAL_PUBLIC_SIGNAL_COUNTS.anonymous + 14,
-  identityAuthorizationUpdate: 8,
+  identityAuthorizationUpdate: 6,
   shield: SHIELDED_POOL_PUBLIC_SIGNAL_COUNTS[SHIELDED_POOL_ACTION.Shield],
   fund: SHIELDED_POOL_PUBLIC_SIGNAL_COUNTS[SHIELDED_POOL_ACTION.Fund],
   claim: SHIELDED_POOL_PUBLIC_SIGNAL_COUNTS[SHIELDED_POOL_ACTION.Claim],

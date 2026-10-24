@@ -824,7 +824,7 @@ export class ShieldedAssetSession {
       birthDay: identity.identity.birthDay, gender: identity.identity.gender, suiteId: identity.identitySuiteId,
     } });
     const p = transition.publicSignals.map(String);
-    return { address, args: [p[0], p[3], p[4], p[5], p[6], p[7], encodeGroth16AbcProofData(normalizeGroth16Proof(proof))] };
+    return { address, args: [p[0], p[3], p[4], p[5], encodeGroth16AbcProofData(normalizeGroth16Proof(proof))] };
   }
 
   async recover(

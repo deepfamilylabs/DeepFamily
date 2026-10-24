@@ -26,7 +26,10 @@ describe("ShieldedErc20Pool contract boundaries", function () {
     const lineage = await hre.ethers.deployContract("ShieldedPoolLineageMock");
     const verifier = await hre.ethers.deployContract("ShieldedPoolVerifierMock");
     const counterVerifier = await hre.ethers.deployContract("IdentityCounterVerifierMock");
-    const authorizationState = await deployIdentityAuthorizationState(hre, await counterVerifier.getAddress());
+    const authorizationState = await deployIdentityAuthorizationState(
+      hre,
+      await counterVerifier.getAddress(),
+    );
     const receiveVerifier = await hre.ethers.deployContract("PrivateLetterVerifierMock");
     const poseidon = await hre.ethers.deployContract("PoseidonT3");
     await Promise.all([
@@ -254,12 +257,10 @@ describe("ShieldedErc20Pool contract boundaries", function () {
       BigInt(await authorizationState.getAddress()),
       99101n,
       0n,
-      962n,
-      0n,
       1n,
     ];
-    const updateProof = hre.ethers.AbiCoder.defaultAbiCoder().encode(["uint256[8]"], [inputs]);
-    await authorizationState.incrementCounter(961n, 99101n, 0n, 962n, 0n, 1n, updateProof);
+    const updateProof = hre.ethers.AbiCoder.defaultAbiCoder().encode(["uint256[6]"], [inputs]);
+    await authorizationState.incrementCounter(961n, 99101n, 0n, 1n, updateProof);
     const { retiredAt } = await authorizationState.getCheckpoint(1n);
     await hre.networkHelpers.time.increaseTo(retiredAt + 899n);
     await pool.fund.staticCall(funding, checkpointProof);

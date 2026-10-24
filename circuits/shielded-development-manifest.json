@@ -22,15 +22,15 @@
     },
     "identityAuthorizationUpdate": {
       "source": "shielded_identity_authorization_update",
-      "sourceSha256": "fe5cec84b13afba2ac44ed83cc29fcc288c815e2c21801cf0ceb7b9111f2b7c9",
-      "r1csSha256": "8ef8f0c39e8bb037e0a57993101a0577752677546ea1dd9935e8b8c26ebc8af5",
-      "wasmSha256": "5db150a82000411c118275b0b7c11e9c2bbdce8a0df45cc520d7c5b04b72106e",
-      "zkeySha256": "69f3d4b2ccf313695da62b6305137b0a5e47165fc0a6e06b961d272821243ee8",
-      "verificationKeySha256": "dedf436511a87750faaffbec0e6c537c6d4c282e2754f8cd19abf47c04612cc3",
-      "verifierSha256": "55471765e9da4a47925a04359cb0a63cba7258b0383476de0c584f809b47ba64",
+      "sourceSha256": "6296cd78a8aede8d2c2951a8f3a584e6091f463c18f3cfcc83f87592a9388fd6",
+      "r1csSha256": "a1fa11e0cb60f5611b1f6f0ab6fa1bb9438fc714ca97100e8c301ee027cada1c",
+      "wasmSha256": "79dbc697117e232e3133ee8f5aca5948fea0a8789addca9cddae9f211479ead2",
+      "zkeySha256": "26e91b94538ff821fabf12b4b3541ca219b8a678d3d06eaa02be488122630609",
+      "verificationKeySha256": "8b64c0ce0428484e136206b0ba7eb60f4f2a7a3c58000d1b804032e15df76df2",
+      "verifierSha256": "1166bef58854a8e40ee51d876a5cca5b0fe2cb962cd0038592ab62135e26f014",
       "verifierPath": "contracts/ShieldedIdentityAuthorizationUpdateVerifier.sol",
       "verifierContractName": "ShieldedIdentityAuthorizationUpdateVerifier",
-      "solidityVerifierSha256": "d53fd7112f3ff9a308ff427c1495b5f4843a4972a6c01a88e42a45d786407af8"
+      "solidityVerifierSha256": "1166bef58854a8e40ee51d876a5cca5b0fe2cb962cd0038592ab62135e26f014"
     },
     "shield": {
       "source": "shielded_shield",

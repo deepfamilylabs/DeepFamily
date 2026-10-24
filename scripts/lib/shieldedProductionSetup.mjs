@@ -59,7 +59,7 @@ const publicSignalCount = (action) =>
       : action === "fundReceiveCredential"
         ? 12
         : action === "identityAuthorizationUpdate"
-          ? 8
+          ? 6
           : SHIELDED_POOL_PUBLIC_SIGNAL_COUNTS[SHIELDED_POOL_ACTION[suffix(action)]];
 
 export const SHIELDED_SETUP_CIRCUITS = Object.freeze(

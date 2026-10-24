@@ -30,7 +30,7 @@ export const IDENTITY_AUTHORIZATION_ABI = [
   "function getCounterProof(uint256 aliasR) view returns (tuple(uint64 authorizationCounter,uint256 stateRoot,uint256 depth,uint256[64] siblings,uint256 oldKey,uint64 oldValue,bool isOld0,bool absent))",
   "function getStateSnapshotHeader() view returns (tuple(uint256 formatVersion,uint64 rootNodeId,uint64 nodeCount,uint256 root,uint256 checkpointId))",
   "function getNodePage(uint256 startId,uint256 limit) view returns (tuple(uint256 hash,uint256 key,uint64 counter,uint64 left,uint64 right)[])",
-  "function incrementCounter(uint256 authorizationNullifier,uint256 aliasR,uint256 oldRoot,uint256 newRoot,uint64 oldCounter,uint64 newCounter,bytes proof)",
+  "function incrementCounter(uint256 authorizationNullifier,uint256 aliasR,uint64 oldCounter,uint64 newCounter,bytes proof)",
   "event CounterIncremented(uint256 indexed checkpointId,uint256 indexed aliasR,uint64 oldCounter,uint64 newCounter,uint256 oldRoot,uint256 newRoot,uint256 authorizationNullifier)",
 ] as const;
 

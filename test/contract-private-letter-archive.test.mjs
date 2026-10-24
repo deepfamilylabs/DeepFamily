@@ -1,4 +1,7 @@
-import { deployIdentityAuthorizationState, identityAuthorizationStateFactory } from "./helpers/shieldedReceiveAuthorization.mjs";
+import {
+  deployIdentityAuthorizationState,
+  identityAuthorizationStateFactory,
+} from "./helpers/shieldedReceiveAuthorization.mjs";
 import "../hardhat-test-setup.mjs";
 import { expect } from "chai";
 import hre from "hardhat";
@@ -44,8 +47,6 @@ async function update(context, overrides = {}) {
   const values = {
     authorizationNullifier: 100n + checkpointId,
     aliasR: 200n + checkpointId,
-    oldRoot: await state.currentRoot(),
-    newRoot: 300n + checkpointId,
     oldCounter: 0n,
     newCounter: 1n,
     ...overrides,
@@ -55,16 +56,12 @@ async function update(context, overrides = {}) {
     (await hre.ethers.provider.getNetwork()).chainId,
     BigInt(await state.getAddress()),
     values.aliasR,
-    values.oldRoot,
-    values.newRoot,
     values.oldCounter,
     values.newCounter,
   ];
   const args = [
     values.authorizationNullifier,
     values.aliasR,
-    values.oldRoot,
-    values.newRoot,
     values.oldCounter,
     values.newCounter,
     encode(inputs),
@@ -126,7 +123,7 @@ describe("Shared identity authorization counter state", function () {
   it("binds owner authorization to actual context and commits the canonical current dictionary increment", async () => {
     const context = await hre.networkHelpers.loadFixture(fixture);
     const prepared = await update(context);
-    for (const index of [0, 1, 2, 3, 4, 5, 6, 7]) {
+    for (const index of [0, 1, 2, 3, 4, 5]) {
       const changed = [...prepared.inputs];
       changed[index] += 1n;
       await expect(
@@ -135,7 +132,9 @@ describe("Shared identity authorization counter state", function () {
     }
     expect(await context.state.currentCheckpointId()).to.equal(1n);
     await prepared.execute();
-    expect(await context.state.currentRoot()).to.equal(buildShieldedIdentityAuthorizationState([[prepared.values.aliasR, 1n]]).root);
+    expect(await context.state.currentRoot()).to.equal(
+      buildShieldedIdentityAuthorizationState([[prepared.values.aliasR, 1n]]).root,
+    );
     expect(await context.state.authorizationUsed(prepared.values.authorizationNullifier)).to.equal(
       true,
     );
@@ -150,11 +149,7 @@ describe("Shared identity authorization counter state", function () {
       context.state,
       "AuthorizationAlreadyUsed",
     );
-    for (const values of [
-      { newCounter: 2n },
-      { oldCounter: (1n << 64n) - 1n, newCounter: 0n },
-      { oldRoot: 700n, newRoot: 700n },
-    ]) {
+    for (const values of [{ newCounter: 2n }, { oldCounter: (1n << 64n) - 1n, newCounter: 0n }]) {
       await expect((await update(context, values)).execute()).to.be.revertedWithCustomError(
         context.state,
         "InvalidCounterIncrement",
@@ -181,25 +176,22 @@ describe("Shared identity authorization counter state", function () {
     ).to.be.revertedWithCustomError(context.state, "CheckpointExpired");
   });
 
-  it("never installs caller-selected proof roots or extends an actual root's retirement", async () => {
+  it("computes each root from its own nodes without extending an older checkpoint's retirement", async () => {
     const context = await hre.networkHelpers.loadFixture(fixture);
-    await (await update(context, { newRoot: 700n })).execute();
+    await (await update(context)).execute();
     const original = await context.state.getCheckpoint(2n);
-    expect(original.root).not.to.equal(700n);
-    await (await update(context, { newRoot: 701n })).execute();
+    await (await update(context)).execute();
     const retired = await context.state.getCheckpoint(2n);
     await hre.networkHelpers.time.increase(10);
-    // The verifier mock accepts the exact inputs, but proof roots are not state setters.
-    await (await update(context, { oldRoot: original.root, newRoot: 700n })).execute();
+    await (await update(context)).execute();
     expect(await context.state.firstRetiredAtByRoot(original.root)).to.equal(retired.retiredAt);
     expect(await context.state.validateCheckpoint(2n, original.createdAt)).to.equal(original.root);
     const current = await context.state.getCheckpoint(await context.state.currentCheckpointId());
     expect(current.root).not.to.equal(original.root);
-    expect(current.root).not.to.equal(700n);
     await hre.networkHelpers.time.increaseTo(Number(retired.retiredAt + 900n));
-    await expect(context.state.validateCheckpoint(2n, original.createdAt)).to.be.revertedWithCustomError(
-      context.state, "CheckpointExpired",
-    );
+    await expect(
+      context.state.validateCheckpoint(2n, original.createdAt),
+    ).to.be.revertedWithCustomError(context.state, "CheckpointExpired");
   });
 
   it("rejects missing checkpoints and state times outside their actual lifetime", async () => {

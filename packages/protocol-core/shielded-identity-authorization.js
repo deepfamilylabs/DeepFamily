@@ -171,12 +171,19 @@ function* exportAuthorizationNodes(node, previous, depth = 0) {
     return;
   }
   yield Object.freeze({
-    kind: "branch", hash: node.hash, leftHash: node.left.hash, rightHash: node.right.hash,
+    kind: "branch",
+    hash: node.hash,
+    leftHash: node.left.hash,
+    rightHash: node.right.hash,
   });
-  const oldRight = previous?.kind === "leaf" && ((previous.key >> BigInt(depth)) & 1n);
+  const oldRight = previous?.kind === "leaf" && (previous.key >> BigInt(depth)) & 1n;
   yield* exportAuthorizationNodes(
     node.left,
-    previous?.kind === "branch" ? previous.left : previous?.kind === "leaf" && !oldRight ? previous : undefined,
+    previous?.kind === "branch"
+      ? previous.left
+      : previous?.kind === "leaf" && !oldRight
+        ? previous
+        : undefined,
     depth + 1,
   );
   yield* exportAuthorizationNodes(
@@ -220,19 +227,28 @@ function importAuthorizationNodes(expectedRoot, inputs) {
   const records = new Map();
   for (const input of inputs) {
     const record = verifyShieldedIdentityAuthorizationNode(input);
-    protocolAssert(!records.has(record.hash), "INVALID_SHIELDED_AUTHORIZATION_NODE", "Duplicate authorization node");
+    protocolAssert(
+      !records.has(record.hash),
+      "INVALID_SHIELDED_AUTHORIZATION_NODE",
+      "Duplicate authorization node",
+    );
     records.set(record.hash, record);
   }
   const visited = new Set();
   const read = (hash, depth, prefix) => {
     if (hash === 0n) return EMPTY_NODE;
     const record = records.get(hash);
-    protocolAssert(record && !visited.has(hash), "INVALID_SHIELDED_AUTHORIZATION_NODE", "Missing or repeated authorization node");
+    protocolAssert(
+      record && !visited.has(hash),
+      "INVALID_SHIELDED_AUTHORIZATION_NODE",
+      "Missing or repeated authorization node",
+    );
     visited.add(hash);
     if (record.kind === "leaf") {
       protocolAssert(
         (record.key & ((1n << BigInt(depth)) - 1n)) === prefix,
-        "INVALID_SHIELDED_AUTHORIZATION_NODE", "Authorization leaf is on the wrong path",
+        "INVALID_SHIELDED_AUTHORIZATION_NODE",
+        "Authorization leaf is on the wrong path",
       );
       return leafNode(record.key, record.value);
     }
@@ -240,15 +256,20 @@ function importAuthorizationNodes(expectedRoot, inputs) {
     const left = read(record.leftHash, depth + 1, prefix);
     const right = read(record.rightHash, depth + 1, prefix | (1n << BigInt(depth)));
     protocolAssert(
-      !((left.kind === "empty" && right.kind === "leaf") || (right.kind === "empty" && left.kind === "leaf")),
-      "INVALID_SHIELDED_AUTHORIZATION_NODE", "Authorization leaf must be compressed",
+      !(
+        (left.kind === "empty" && right.kind === "leaf") ||
+        (right.kind === "empty" && left.kind === "leaf")
+      ),
+      "INVALID_SHIELDED_AUTHORIZATION_NODE",
+      "Authorization leaf must be compressed",
     );
     return branchNode(left, right);
   };
   const node = read(root, 0, 0n);
   protocolAssert(
     [...records.keys()].every((hash) => hash === 0n || visited.has(hash)),
-    "INVALID_SHIELDED_AUTHORIZATION_NODE", "Unreachable authorization node",
+    "INVALID_SHIELDED_AUTHORIZATION_NODE",
+    "Unreachable authorization node",
   );
   return node;
 }
@@ -384,89 +405,11 @@ export function verifyShieldedIdentityAuthorizationWitness(input, expectedRoot, 
   };
 }
 
-/** Prepare the existing owner circuit from one authenticated path, without a full state map. */
-export function prepareShieldedIdentityAuthorizationIncrementFromWitness(input) {
-  const chainId = bigintFrom(input.chainId, "chainId", MAX_UINT64);
-  const consumer = BigInt(getAddress(input.authorizationStateAddress));
-  protocolAssert(
-    chainId > 0n && consumer > 0n,
-    "INVALID_SHIELDED_AUTHORIZATION_CONTEXT",
-    "Authorization scope must be nonzero",
-  );
-  const aliasR = computeShieldedAuthorizationAlias(input);
-  const lookup = verifyShieldedIdentityAuthorizationWitness(
-    input.authorizationWitness,
-    input.authorizationStateRoot,
-    aliasR,
-  );
-  protocolAssert(
-    lookup.authorizationCounter < MAX_UINT64,
-    "SHIELDED_AUTHORIZATION_COUNTER_OVERFLOW",
-    "Authorization counter cannot be incremented further",
-  );
-  const newCounter = lookup.authorizationCounter + 1n;
-  let terminal = lookup.isOld0 ? EMPTY_NODE : leafNode(lookup.oldKey, lookup.oldValue);
-  terminal = writeNode(terminal, aliasR, newCounter, Number(lookup.depth));
-  let newRoot = terminal.hash;
-  for (let level = Number(lookup.depth) - 1; level >= 0; level -= 1)
-    newRoot =
-      (aliasR >> BigInt(level)) & 1n
-        ? poseidon2([lookup.siblings[level], newRoot])
-        : poseidon2([newRoot, lookup.siblings[level]]);
-  const authNullifier = poseidon6([
-    SHIELDED_IDENTITY_COUNTER_AUTHORIZATION_DOMAIN,
-    field(input.derivedSecretField, "derivedSecretField"),
-    aliasR,
-    chainId,
-    consumer,
-    lookup.authorizationCounter,
-  ]);
-  return {
-    newRoot,
-    publicSignals: [
-      authNullifier,
-      chainId,
-      consumer,
-      aliasR,
-      lookup.stateRoot,
-      newRoot,
-      lookup.authorizationCounter,
-      newCounter,
-    ],
-    witness: {
-      chainId: String(chainId),
-      consumer: String(consumer),
-      aliasR: String(aliasR),
-      oldRoot: String(lookup.stateRoot),
-      newRoot: String(newRoot),
-      oldCounter: String(lookup.authorizationCounter),
-      newCounter: String(newCounter),
-      siblings: lookup.siblings.map(String),
-      oldKey: String(lookup.oldKey),
-      oldValue: String(lookup.oldValue),
-      isOld0: String(lookup.isOld0),
-    },
-  };
-}
-
 /**
- * Authorize one counter value using a constant-size owner statement. Its synthetic
- * roots are not live chain roots: the state contract checks its current counter
- * and independently updates the canonical tree after verifying this proof.
+ * Prove authority for one counter increment. The state contract checks the live
+ * counter and updates its tree; ownership proofs never contain global tree paths.
  */
 export function prepareShieldedIdentityCounterAuthorization(input) {
-  const counter = bigintFrom(input.authorizationCounter, "authorizationCounter", MAX_UINT64);
-  const alias = computeShieldedAuthorizationAlias(input);
-  const tree = createShieldedIdentityAuthorizationTree(counter === 0n ? [] : [[alias, counter]]);
-  return prepareShieldedIdentityAuthorizationIncrementFromWitness({
-    ...input,
-    authorizationWitness: tree.getWitness(alias),
-    authorizationStateRoot: tree.root,
-  });
-}
-
-/** Prepare a transition for the owner circuit; identity preimage verification remains in-circuit. */
-export function prepareShieldedIdentityAuthorizationIncrement(input) {
   const chainId = bigintFrom(input.chainId, "chainId", MAX_UINT64);
   const consumer = BigInt(getAddress(input.authorizationStateAddress));
   protocolAssert(
@@ -474,49 +417,35 @@ export function prepareShieldedIdentityAuthorizationIncrement(input) {
     "INVALID_SHIELDED_AUTHORIZATION_CONTEXT",
     "Authorization scope must be nonzero",
   );
-  const aliasR = computeShieldedAuthorizationAlias(input);
-  const lookup = getShieldedIdentityAuthorizationWitness(input.state, aliasR);
+  const aliasR = nonzeroAlias(computeShieldedAuthorizationAlias(input));
+  const counter = bigintFrom(input.authorizationCounter, "authorizationCounter", MAX_UINT64);
   protocolAssert(
-    lookup.authorizationCounter < MAX_UINT64,
+    counter < MAX_UINT64,
     "SHIELDED_AUTHORIZATION_COUNTER_OVERFLOW",
     "Authorization counter cannot be incremented further",
   );
-  const newCounter = lookup.authorizationCounter + 1n;
-  const records = new Map(input.state.entries);
-  records.set(aliasR, newCounter);
-  const nextState = buildShieldedIdentityAuthorizationState(records);
+  const newCounter = counter + 1n;
   const authNullifier = poseidon6([
     SHIELDED_IDENTITY_COUNTER_AUTHORIZATION_DOMAIN,
     field(input.derivedSecretField, "derivedSecretField"),
     aliasR,
     chainId,
     consumer,
-    lookup.authorizationCounter,
+    counter,
   ]);
+  protocolAssert(
+    authNullifier !== 0n,
+    "INVALID_SHIELDED_AUTHORIZATION_NULLIFIER",
+    "Authorization nullifier must be nonzero",
+  );
   return {
-    nextState,
-    publicSignals: [
-      authNullifier,
-      chainId,
-      consumer,
-      aliasR,
-      lookup.stateRoot,
-      nextState.root,
-      lookup.authorizationCounter,
-      newCounter,
-    ],
+    publicSignals: [authNullifier, chainId, consumer, aliasR, counter, newCounter],
     witness: {
       chainId: String(chainId),
       consumer: String(consumer),
       aliasR: String(aliasR),
-      oldRoot: String(lookup.stateRoot),
-      newRoot: String(nextState.root),
-      oldCounter: String(lookup.authorizationCounter),
+      oldCounter: String(counter),
       newCounter: String(newCounter),
-      siblings: lookup.siblings.map(String),
-      oldKey: String(lookup.oldKey),
-      oldValue: String(lookup.oldValue),
-      isOld0: String(lookup.isOld0),
     },
   };
 }

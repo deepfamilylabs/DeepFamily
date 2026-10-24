@@ -3,9 +3,8 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import {
-  buildShieldedIdentityAuthorizationState,
   prepareReceivePresentationWitness,
-  prepareShieldedIdentityAuthorizationIncrement,
+  prepareShieldedIdentityCounterAuthorization,
 } from "@deepfamily/protocol-core";
 import { buildLineageFixture } from "../circuits/test/generate_lineage_fixture.mjs";
 import { buildShieldedClaimFixture } from "../circuits/test/generate_shielded_claim_input.mjs";
@@ -141,14 +140,14 @@ describe("Receive circuit real-proof public bindings", function () {
     );
   });
 
-  it("owner authorization proof binds all eight public transition signals", async function () {
+  it("owner authorization proof binds all six public counter signals", async function () {
     const lineage = buildLineageFixture().witness;
-    const transition = prepareShieldedIdentityAuthorizationIncrement({
+    const authorization = prepareShieldedIdentityCounterAuthorization({
       identityCommitment: buildShieldedClaimFixture().heirIdentityCommitment,
       derivedSecretField: lineage.derivedSecretField,
       chainId: 31337n,
       authorizationStateAddress: "0x1111111111111111111111111111111111111111",
-      state: buildShieldedIdentityAuthorizationState(),
+      authorizationCounter: 0n,
     });
     const privateIdentity = Object.fromEntries(
       [
@@ -162,8 +161,13 @@ describe("Receive circuit real-proof public bindings", function () {
         "suiteId",
       ].map((name) => [name, lineage[name]]),
     );
-    const data = await prove(sources.owner, { ...privateIdentity, ...transition.witness });
-    assert.equal(data.publicSignals.length, 8);
-    await rejectsEveryPublicMutation(vkey(sources.owner), data, transition.publicSignals, "owner");
+    const data = await prove(sources.owner, { ...privateIdentity, ...authorization.witness });
+    assert.equal(data.publicSignals.length, 6);
+    await rejectsEveryPublicMutation(
+      vkey(sources.owner),
+      data,
+      authorization.publicSignals,
+      "owner",
+    );
   });
 });

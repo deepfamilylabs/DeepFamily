@@ -10,11 +10,10 @@ import {
   getShieldedIdentityAuthorizationWitness,
   normalizeGroth16Proof,
   prepareShieldedIdentityCounterAuthorization,
-  prepareShieldedIdentityAuthorizationIncrement,
 } from "@deepfamily/protocol-core";
 
 const field = 21888242871839275222246405745257275088548364400416034343698204186575808495617n;
-const encode = (inputs) => hre.ethers.AbiCoder.defaultAbiCoder().encode(["uint256[8]"], [inputs]);
+const encode = (inputs) => hre.ethers.AbiCoder.defaultAbiCoder().encode(["uint256[6]"], [inputs]);
 
 async function deployState(verifier) {
   const t3 = await hre.ethers.deployContract("PoseidonT3");
@@ -31,28 +30,16 @@ async function fixture() {
   return { state, verifier };
 }
 
-async function mockUpdate(state, alias, counter, nonce, statement = {}) {
-  const oldRoot = statement.oldRoot ?? (await state.currentRoot());
-  const newRoot = statement.newRoot ?? (oldRoot + 1n) % field;
+async function mockUpdate(state, alias, counter, nonce) {
   const inputs = [
     nonce,
     (await hre.ethers.provider.getNetwork()).chainId,
     BigInt(await state.getAddress()),
     alias,
-    oldRoot,
-    newRoot,
     counter,
     counter + 1n,
   ];
-  return state.incrementCounter(
-    nonce,
-    alias,
-    oldRoot,
-    newRoot,
-    counter,
-    counter + 1n,
-    encode(inputs),
-  );
+  return state.incrementCounter(nonce, alias, counter, counter + 1n, encode(inputs));
 }
 
 async function assertProof(state, records, alias) {
@@ -110,14 +97,12 @@ describe("On-chain identity counter dictionary", function () {
     const { state } = await hre.networkHelpers.loadFixture(fixture);
     const records = new Map();
     const oldRoot = await state.currentRoot();
-    const arbitraryStatementNewRoot = 888n;
-    const tx = await mockUpdate(state, 11n, 0n, 201n, { newRoot: arbitraryStatementNewRoot });
+    const tx = await mockUpdate(state, 11n, 0n, 201n);
     records.set(11n, 1n);
     const actualRoot = buildShieldedIdentityAuthorizationState(records).root;
     await expect(tx)
       .to.emit(state, "CounterIncremented")
       .withArgs(2n, 11n, 0n, 1n, oldRoot, actualRoot, 201n);
-    assert.notEqual(actualRoot, arbitraryStatementNewRoot);
     await expect(mockUpdate(state, 11n, 0n, 202n)).to.be.revertedWithCustomError(
       state,
       "StaleAuthorizationCounter",
@@ -133,14 +118,12 @@ describe("On-chain identity counter dictionary", function () {
       12n,
       0n,
       1n,
-      0n,
-      1n,
     ];
     for (let index = 0; index < inputs.length; index++) {
       const changed = [...inputs];
       changed[index] += 1n;
       await expect(
-        state.incrementCounter(203n, 12n, 0n, 1n, 0n, 1n, encode(changed)),
+        state.incrementCounter(203n, 12n, 0n, 1n, encode(changed)),
       ).to.be.revertedWithCustomError(state, "InvalidCounterProof");
     }
     assert.equal(await state.currentRoot(), actualRoot);
@@ -158,7 +141,7 @@ describe("On-chain identity counter dictionary", function () {
     const tx = await mockUpdate(state, 17n, 0n, 301n);
     const receipt = await tx.wait();
     const atFirst = await state.getCounterProof(17n, { blockTag: receipt.blockNumber });
-    await mockUpdate(state, 18n, 0n, 302n, { oldRoot: 0n, newRoot: 1n });
+    await mockUpdate(state, 18n, 0n, 302n);
     assert.equal(
       (await state.getCounterProof(17n, { blockTag: receipt.blockNumber })).stateRoot,
       atFirst.stateRoot,
@@ -174,7 +157,7 @@ describe("On-chain identity counter dictionary", function () {
     );
   });
 
-  it("accepts genuinely proved unrelated old-root updates without weakening owner, scope or counter binding", async function () {
+  it("accepts real independent owner authorizations and full-depth updates with every signal bound", async function () {
     const verifier = await hre.ethers.deployContract("ShieldedIdentityAuthorizationUpdateVerifier");
     const adapter = await hre.ethers.deployContract("IdentityAuthorizationVerifierAdapter", [
       await verifier.getAddress(),
@@ -184,7 +167,6 @@ describe("On-chain identity counter dictionary", function () {
     const chainId = (await hre.ethers.provider.getNetwork()).chainId;
     const directory = path.resolve("frontend/public/zk/shielded");
     const snarkjs = await import("snarkjs");
-    const original = buildShieldedIdentityAuthorizationState();
     const identityFields = {
       fullName: "Root independent authorization",
       gender: 1,
@@ -193,7 +175,7 @@ describe("On-chain identity counter dictionary", function () {
       birthDay: 2,
       isBirthBC: false,
     };
-    async function prove(secret, snapshot, authorizationCounter) {
+    async function prove(secret, authorizationCounter = 0n, target = state) {
       const material = computeIdentityFromDerivedSecret({
         identity: identityFields,
         identitySuiteId: 1,
@@ -202,12 +184,12 @@ describe("On-chain identity counter dictionary", function () {
       const context = {
         ...material,
         chainId,
-        authorizationStateAddress: await state.getAddress(),
+        authorizationStateAddress: await target.getAddress(),
       };
-      const transition =
-        authorizationCounter === undefined
-          ? prepareShieldedIdentityAuthorizationIncrement({ ...context, state: snapshot })
-          : prepareShieldedIdentityCounterAuthorization({ ...context, authorizationCounter });
+      const transition = prepareShieldedIdentityCounterAuthorization({
+        ...context,
+        authorizationCounter,
+      });
       const generated = await snarkjs.groth16.fullProve(
         {
           nameField: String(material.nameField),
@@ -235,23 +217,21 @@ describe("On-chain identity counter dictionary", function () {
         proof: encodeGroth16AbcProofData(normalizeGroth16Proof(generated.proof)),
       };
     }
-    const first = await prove(222n, original);
-    const second = await prove(333n, original);
+    const first = await prove(222n);
+    const second = await prove(333n);
     const execute = (target, proved, change = {}) => {
       const p = proved.transition.publicSignals;
       return target.incrementCounter(
         change.nullifier ?? p[0],
         change.alias ?? p[3],
-        change.oldRoot ?? p[4],
-        change.newRoot ?? p[5],
-        change.oldCounter ?? p[6],
-        change.newCounter ?? p[7],
+        change.oldCounter ?? p[4],
+        change.newCounter ?? p[5],
         proved.proof,
       );
     };
     try {
-      // Every public coordinate, including old/new proof roots and actual scope,
-      // remains authenticated even though execution uses the contract's own roots.
+      // The verifier authenticates all six owner/counter/context coordinates.
+      // Neither authorization depends on the other identity's tree update.
       for (let index = 0; index < first.transition.publicSignals.length; index++) {
         const changed = [...first.transition.publicSignals];
         changed[index] += 1n;
@@ -295,12 +275,59 @@ describe("On-chain identity counter dictionary", function () {
         state,
         "AuthorizationAlreadyUsed",
       );
-      // A genuine subsequent authorization may come from a valid dictionary that
-      // was never installed here. Its live alias counter still has to match.
-      const next = await prove(222n, undefined, 1n);
+      // A genuine subsequent authorization needs only the live alias counter.
+      const next = await prove(222n, 1n);
       await execute(state, next);
       records.set(first.transition.publicSignals[3], 2n);
       await assertProof(state, records, first.transition.publicSignals[3]);
+
+      // A synthetic second alias creates the precise depth-64 boundary without
+      // claiming to have found another identity whose canonical alias collides.
+      // Seed only the tree with a mock, then replace that mock's runtime using a
+      // test-RPC override. Production has no verifier replacement entry point.
+      const seedVerifier = await hre.ethers.deployContract("IdentityCounterVerifierMock");
+      const deepState = await deployState(seedVerifier);
+      const alias = first.transition.publicSignals[3];
+      const secondAlias = alias ^ (1n << 63n);
+      const deepRecords = new Map([
+        [alias, 1n],
+        [secondAlias, 1n],
+      ]);
+      await mockUpdate(deepState, alias, 0n, 10_001n);
+      await mockUpdate(deepState, secondAlias, 0n, 10_002n);
+      await assertProof(deepState, deepRecords, alias);
+      assert.equal((await deepState.getCounterProof(alias)).depth, 64n);
+      assert.notEqual((await deepState.getCounterProof(alias)).siblings[63], 0n);
+      const realAdapterCode = await hre.ethers.provider.getCode(await adapter.getAddress());
+      await hre.ethers.provider.send("hardhat_setCode", [
+        await seedVerifier.getAddress(),
+        realAdapterCode,
+      ]);
+      assert.equal(
+        await hre.ethers.provider.getCode(await deepState.VERIFIER()),
+        realAdapterCode,
+        "the full-depth update must execute the real Groth16 adapter",
+      );
+      const deepCount = await deepState.nodeCount();
+      const deepOldRoot = await deepState.currentRoot();
+      const deepAuthorization = await prove(222n, 1n, deepState);
+      deepRecords.set(alias, 2n);
+      const expectedDeepRoot = buildShieldedIdentityAuthorizationState(deepRecords).root;
+      await expect(execute(deepState, deepAuthorization))
+        .to.emit(deepState, "CounterIncremented")
+        .withArgs(
+          4n,
+          alias,
+          1n,
+          2n,
+          deepOldRoot,
+          expectedDeepRoot,
+          deepAuthorization.transition.publicSignals[0],
+        );
+      await assertProof(deepState, deepRecords, alias);
+      await assertProof(deepState, deepRecords, secondAlias);
+      assert.equal((await deepState.getCounterProof(alias)).depth, 64n);
+      assert.equal(await deepState.nodeCount(), deepCount);
     } finally {
       await globalThis.curve_bn128?.terminate?.();
     }

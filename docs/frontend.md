@@ -551,13 +551,20 @@ connection timing and the public contracts/events being downloaded. Neither mode
 absolute network anonymity. Identity secrets and view keys remain local. Both modes use RPC
 reads without transaction gas; changing the read mode does not change on-chain write fees.
 
-Authorization proofs continue to use constant-size empty/singleton dictionary statements to
-authenticate owner, scope and expected counter with the existing circuit. Their statement roots
-are not live state roots. The contract checks the live counter and computes the actual updated
-root from stored nodes. Different identities' updates do not invalidate each other's prepared
-owner proofs; same-identity counter conflicts still fail. The 15-minute checkpoint retirement
-rules remain in force. Both reconstruction and chain-path implementations and contract views
-are retained. The project is unpublished; this preference change needs no deployed-state migration.
+The Worker prepares owner authority with `prepareShieldedIdentityCounterAuthorization`. Its
+six public signals are `[authNullifier, chainId, consumer, aliasR, oldCounter, newCounter]`; the
+proof binds identity ownership, scope and the exact counter increment without tree roots or
+paths. The Worker submits the five arguments
+`incrementCounter(authNullifier, aliasR, oldCounter, newCounter, proof)`. The contract checks the
+live counter and computes the actual updated root from stored nodes. Different identities'
+updates do not invalidate each other's prepared owner proofs; same-identity counter conflicts
+still fail. The old global-tree owner-proof APIs are removed. Their replacement circuit and
+development proving/verifying artifacts share the six-signal statement.
+
+The 15-minute checkpoint retirement rules remain in force. Both reconstruction and chain-path
+readers support authorization paths through depth 64. Distinct aliases with identical low 64 bits
+cannot both be inserted; this separate capacity limit rejects without modifying state. The
+project is unpublished and retains no old authorization ABI or deployed-state migration path.
 
 The asset session reuses its provider and clears it when locked. Credentials, receive codes,
 selected interests and decrypted notes are excluded from the public database; paths are transient.

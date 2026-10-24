@@ -219,7 +219,7 @@ export type ShieldedAssetWorkerCallMap = {
   };
   authorizeIdentityCounter: {
     params: { context: ShieldedWorkerContext };
-    result: { address: string; args: [string, string, string, string, string, string, string] };
+    result: { address: string; args: [string, string, string, string, string] };
   };
   recover: { params: { context: ShieldedWorkerContext }; result: ShieldedWalletSummary };
   discover: {

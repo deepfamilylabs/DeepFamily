@@ -1307,15 +1307,22 @@ A counter update reuses existing node IDs and updates only its path. New aliases
 necessary leaves and branches; previous hash versions are not appended as new nodes on every update.
 The contract links PoseidonT3 and PoseidonT4, pinned throughout deployment and runtime evidence.
 
-`incrementCounter` retains its existing proof-input ABI. Its `oldRoot` and `newRoot` parameters
-are roots of the verifier's ownership statement; they are not instructions to install a root.
-The verifier unconditionally binds the canonical identity alias, identity secret, actual chain
-and consumer, exact counters and authorization nullifier. The contract separately checks the live
-alias counter, rejects reused authorization, and atomically recomputes the actual root from stored
-nodes. This permits constant-size singleton ownership statements and concurrent preparation for
-different aliases without regenerating the existing proof keys. `CounterIncremented` emits the
-actual prior and resulting roots; receipt consumers must not substitute the proof-statement roots.
-Existing checkpoint creation/retirement and the 15-minute acceptance window are unchanged.
+`incrementCounter(authorizationNullifier, aliasR, oldCounter, newCounter, proof)` accepts a
+counter authorization with six public signals, in order:
+`[authNullifier, chainId, consumer, aliasR, oldCounter, newCounter]`. The verifier proves knowledge
+of the original identity secret, derives the canonical alias, binds the actual chain and state
+contract, and constrains an exact uint64 increment. No tree roots or paths enter this proof.
+The contract checks the live alias counter, rejects reused authorization, and atomically computes
+the updated root from its stored nodes. `CounterIncremented` emits the actual prior and resulting
+roots. Different aliases can prepare updates concurrently; a conflicting update to the same alias
+still fails. Checkpoint creation/retirement and the 15-minute acceptance window remain in force.
+
+`prepareShieldedIdentityCounterAuthorization` is the only owner-proof preparation API. The old
+global-tree transition APIs have been removed, and the authorization circuit, development keys,
+verification key and Solidity verifier have been regenerated for the six-signal statement. The
+unpublished protocol retains no old authorization ABI. Dictionary reads and receive presentations
+still support complete paths through depth 64. Inserting distinct aliases with identical low
+64 bits is a separate capacity boundary and reverts without changing state.
 
 The global snapshot API exposes `getStateSnapshotHeader()` (format version 1, root node ID,
 node count, root and checkpoint ID) and `getNodePage(startId,limit)` (current node hash, key,

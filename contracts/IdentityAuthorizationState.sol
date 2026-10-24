@@ -127,39 +127,31 @@ contract IdentityAuthorizationState is IIdentityAuthorizationState {
   /**
    * @notice Increment exactly one identity counter with its owner's ZK authorization.
    * @dev The verifier, rather than a caller-selected wallet, authenticates the identity secret.
-   *      The existing owner proof also authenticates a dictionary transition. Its roots
-   *      may be stale: ownership, scope and counter remain authenticated unconditionally.
-   *      The live counter is checked here and the actual root is computed from stored
-   *      nodes, so proofs for different aliases do not invalidate one another.
+   *      The owner proof authenticates the alias, scope and exact counter increment.
+   *      The live counter is checked here and the root is computed from stored nodes;
+   *      proofs do not depend on global tree paths or unrelated identity updates.
    */
   function incrementCounter(
     uint256 authorizationNullifier,
     uint256 aliasR,
-    uint256 oldRoot,
-    uint256 newRoot,
     uint64 oldCounter,
     uint64 newCounter,
     bytes calldata proof
   ) external {
-    if (uint256(newCounter) != uint256(oldCounter) + 1 || newRoot == oldRoot)
-      revert InvalidCounterIncrement();
+    if (uint256(newCounter) != uint256(oldCounter) + 1) revert InvalidCounterIncrement();
     if (
       aliasR == 0 ||
       aliasR >= SNARK_SCALAR_FIELD ||
       authorizationNullifier == 0 ||
-      authorizationNullifier >= SNARK_SCALAR_FIELD ||
-      oldRoot >= SNARK_SCALAR_FIELD ||
-      newRoot >= SNARK_SCALAR_FIELD
+      authorizationNullifier >= SNARK_SCALAR_FIELD
     ) revert InvalidFieldElement();
     if (authorizationUsed[authorizationNullifier]) revert AuthorizationAlreadyUsed();
     if (authorizationCounter[aliasR] != oldCounter) revert StaleAuthorizationCounter();
-    uint256[8] memory inputs = [
+    uint256[6] memory inputs = [
       authorizationNullifier,
       block.chainid,
       uint256(uint160(address(this))),
       aliasR,
-      oldRoot,
-      newRoot,
       uint256(oldCounter),
       uint256(newCounter)
     ];

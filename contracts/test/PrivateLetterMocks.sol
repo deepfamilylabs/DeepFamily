@@ -8,7 +8,7 @@ import {IPrivateLetterVerifier, IPrivateAttachedLetterVerifier} from "../interfa
 contract IdentityCounterVerifierMock is IIdentityCounterUpdateVerifier {
   function verifyProof(
     bytes calldata proof,
-    uint256[8] calldata inputs
+    uint256[6] calldata inputs
   ) external pure returns (bool) {
     return keccak256(proof) == keccak256(abi.encode(inputs));
   }

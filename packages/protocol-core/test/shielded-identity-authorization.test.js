@@ -1,17 +1,17 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { poseidon2, poseidon3 } from "poseidon-lite";
+import { poseidon2, poseidon3, poseidon6 } from "poseidon-lite";
+import * as protocol from "../index.js";
 import {
   buildShieldedIdentityAuthorizationState,
   createShieldedIdentityAuthorizationTree,
   createShieldedIdentityAuthorizationTreeFromNodes,
   verifyShieldedIdentityAuthorizationNode,
   getShieldedIdentityAuthorizationWitness,
-  prepareShieldedIdentityAuthorizationIncrement,
-  prepareShieldedIdentityAuthorizationIncrementFromWitness,
   verifyShieldedIdentityAuthorizationWitness,
   computeShieldedAuthorizationAlias,
   prepareShieldedIdentityCounterAuthorization,
+  SHIELDED_IDENTITY_COUNTER_AUTHORIZATION_DOMAIN,
 } from "../index.js";
 import { MAX_UINT64, SNARK_SCALAR_FIELD } from "../constants.js";
 
@@ -23,7 +23,18 @@ const scope = {
 };
 
 test("authorization node streams round-trip empty, collision and full-depth trees", () => {
-  for (const entries of [[], [[11n, 2n]], [[11n, 2n], [12n, 3n]], [[11n, 2n], [11n ^ (1n << 63n), 3n]]]) {
+  for (const entries of [
+    [],
+    [[11n, 2n]],
+    [
+      [11n, 2n],
+      [12n, 3n],
+    ],
+    [
+      [11n, 2n],
+      [11n ^ (1n << 63n), 3n],
+    ],
+  ]) {
     const tree = createShieldedIdentityAuthorizationTree(entries);
     const records = [...tree.exportNodes()];
     const restored = createShieldedIdentityAuthorizationTreeFromNodes(tree.root, records);
@@ -41,7 +52,9 @@ test("authorization node streams round-trip empty, collision and full-depth tree
 });
 
 test("authorization exports capture immutable roots and emit only changed paths", () => {
-  const tree = createShieldedIdentityAuthorizationTree(Array.from({ length: 64 }, (_, i) => [BigInt(i + 1), 1n]));
+  const tree = createShieldedIdentityAuthorizationTree(
+    Array.from({ length: 64 }, (_, i) => [BigInt(i + 1), 1n]),
+  );
   const previous = tree.clone();
   assert.deepEqual([...tree.exportNodes(previous)], []);
   const cache = new Map([...previous.exportNodes()].map((record) => [record.hash, record]));
@@ -60,7 +73,10 @@ test("authorization exports capture immutable roots and emit only changed paths"
     const record = cache.get(hash);
     assert.ok(record);
     reachable.push(record);
-    if (record.kind === "branch") { visit(record.leftHash); visit(record.rightHash); }
+    if (record.kind === "branch") {
+      visit(record.leftHash);
+      visit(record.rightHash);
+    }
   };
   visit(root);
   const restored = createShieldedIdentityAuthorizationTreeFromNodes(root, reachable);
@@ -77,16 +93,44 @@ test("authorization exports capture immutable roots and emit only changed paths"
 });
 
 test("authorization node import rejects missing, duplicate, misplaced and uncompressed records", () => {
-  const tree = createShieldedIdentityAuthorizationTree([[11n, 1n], [12n, 2n]]);
+  const tree = createShieldedIdentityAuthorizationTree([
+    [11n, 1n],
+    [12n, 2n],
+  ]);
   const records = [...tree.exportNodes()];
-  for (const input of [records.slice(1), [...records, records[0]], records.map((node, i) => i === 0 ? { ...node, hash: node.hash + 1n } : node)])
+  for (const input of [
+    records.slice(1),
+    [...records, records[0]],
+    records.map((node, i) => (i === 0 ? { ...node, hash: node.hash + 1n } : node)),
+  ])
     assert.throws(() => createShieldedIdentityAuthorizationTreeFromNodes(tree.root, input));
   const leaf = { kind: "leaf", key: 11n, value: 1n, hash: poseidon3([11n, 1n, 1n]) };
-  const wrongSide = { kind: "branch", leftHash: leaf.hash, rightHash: 0n, hash: poseidon2([leaf.hash, 0n]) };
-  assert.throws(() => createShieldedIdentityAuthorizationTreeFromNodes(wrongSide.hash, [wrongSide, leaf]));
-  const redundant = { kind: "branch", leftHash: 0n, rightHash: leaf.hash, hash: poseidon2([0n, leaf.hash]) };
-  assert.throws(() => createShieldedIdentityAuthorizationTreeFromNodes(redundant.hash, [redundant, leaf]), /compressed/u);
-  for (const node of [{ kind: "empty", hash: 1n }, { ...leaf, value: 0n }, { ...leaf, hash: 0n }, { ...leaf, key: SNARK_SCALAR_FIELD }, { kind: "branch", hash: poseidon2([0n, 0n]), leftHash: 0n, rightHash: 0n }])
+  const wrongSide = {
+    kind: "branch",
+    leftHash: leaf.hash,
+    rightHash: 0n,
+    hash: poseidon2([leaf.hash, 0n]),
+  };
+  assert.throws(() =>
+    createShieldedIdentityAuthorizationTreeFromNodes(wrongSide.hash, [wrongSide, leaf]),
+  );
+  const redundant = {
+    kind: "branch",
+    leftHash: 0n,
+    rightHash: leaf.hash,
+    hash: poseidon2([0n, leaf.hash]),
+  };
+  assert.throws(
+    () => createShieldedIdentityAuthorizationTreeFromNodes(redundant.hash, [redundant, leaf]),
+    /compressed/u,
+  );
+  for (const node of [
+    { kind: "empty", hash: 1n },
+    { ...leaf, value: 0n },
+    { ...leaf, hash: 0n },
+    { ...leaf, key: SNARK_SCALAR_FIELD },
+    { kind: "branch", hash: poseidon2([0n, 0n]), leftHash: 0n, rightHash: 0n },
+  ])
     assert.throws(() => verifyShieldedIdentityAuthorizationNode(node));
   assert.throws(() => createShieldedIdentityAuthorizationTreeFromNodes(0n, [leaf]), /Unreachable/u);
 });
@@ -123,25 +167,22 @@ test("public dictionary distinguishes genuine absence, collisions and membership
   assert.equal(collision.oldValue, 1n);
 });
 
-test("counter transitions preserve caller state and bind authorization to its chain and contract", () => {
-  const state = buildShieldedIdentityAuthorizationState();
-  const first = prepareShieldedIdentityAuthorizationIncrement({ ...scope, state });
-  assert.equal(state.entries.size, 0);
-  assert.equal(first.publicSignals[6], 0n);
-  assert.equal(first.publicSignals[7], 1n);
-  const second = prepareShieldedIdentityAuthorizationIncrement({
+test("owner authorizations bind exact successive counters without deriving a tree transition", () => {
+  const first = prepareShieldedIdentityCounterAuthorization({ ...scope, authorizationCounter: 0n });
+  const second = prepareShieldedIdentityCounterAuthorization({
     ...scope,
-    state: first.nextState,
+    authorizationCounter: 1n,
   });
-  assert.equal(second.publicSignals[6], 1n);
-  assert.equal(second.publicSignals[7], 2n);
+  assert.deepEqual(first.publicSignals.slice(4), [0n, 1n]);
+  assert.deepEqual(second.publicSignals.slice(4), [1n, 2n]);
   assert.notEqual(first.publicSignals[0], second.publicSignals[0]);
   for (const patch of [
     { chainId: 1n },
     { authorizationStateAddress: "0x2222222222222222222222222222222222222222" },
   ]) {
     assert.notEqual(
-      prepareShieldedIdentityAuthorizationIncrement({ ...scope, ...patch, state }).publicSignals[0],
+      prepareShieldedIdentityCounterAuthorization({ ...scope, ...patch, authorizationCounter: 0n })
+        .publicSignals[0],
       first.publicSignals[0],
     );
   }
@@ -160,15 +201,9 @@ test("dictionary rejects explicit zero, duplicates, wrong roots and exhausted co
   assert.throws(() =>
     getShieldedIdentityAuthorizationWitness({ root: 1n, entries: new Map() }, 11n),
   );
-  const first = prepareShieldedIdentityAuthorizationIncrement({
-    ...scope,
-    state: buildShieldedIdentityAuthorizationState(),
-  });
-  const exhausted = buildShieldedIdentityAuthorizationState([
-    [first.publicSignals[3], (1n << 64n) - 1n],
-  ]);
   assert.throws(
-    () => prepareShieldedIdentityAuthorizationIncrement({ ...scope, state: exhausted }),
+    () =>
+      prepareShieldedIdentityCounterAuthorization({ ...scope, authorizationCounter: MAX_UINT64 }),
     /cannot be incremented/u,
   );
   assert.throws(
@@ -377,67 +412,71 @@ test("external paths reject malformed, noncanonical and unauthenticated lookups"
   assert.throws(() => verifyShieldedIdentityAuthorizationWitness(redundant, 0n), /terminal/u);
 });
 
-test("path-only owner increments match existing full-state preparation", () => {
-  const alias = computeShieldedAuthorizationAlias(scope);
-  for (const entries of [
-    [],
-    [[11n, 1n]],
-    [
-      [alias, 1n],
-      [11n, 2n],
-    ],
-    [[alias ^ (1n << 62n), 1n]],
+test("counter authorization is independent of full-depth state and exposes no legacy tree update API", () => {
+  for (const name of [
+    "prepareShieldedIdentityAuthorizationIncrement",
+    "prepareShieldedIdentityAuthorizationIncrementFromWitness",
   ]) {
-    const tree = createShieldedIdentityAuthorizationTree(entries);
-    const expected = prepareShieldedIdentityAuthorizationIncrement({
-      ...scope,
-      state: tree.snapshot(),
-    });
-    const actual = prepareShieldedIdentityAuthorizationIncrementFromWitness({
-      ...scope,
-      authorizationWitness: tree.getWitness(alias),
-      authorizationStateRoot: tree.root,
-    });
-    assert.equal(actual.newRoot, expected.nextState.root);
-    assert.deepEqual(actual.publicSignals, expected.publicSignals);
-    assert.deepEqual(actual.witness, expected.witness);
+    assert.equal(Object.hasOwn(protocol, name), false);
   }
-  const tree = createShieldedIdentityAuthorizationTree([[alias, MAX_UINT64]]);
-  assert.throws(
-    () =>
-      prepareShieldedIdentityAuthorizationIncrementFromWitness({
-        ...scope,
-        authorizationWitness: tree.getWitness(alias),
-        authorizationStateRoot: tree.root,
-      }),
-    /cannot be incremented/u,
-  );
-  assert.throws(
-    () =>
-      prepareShieldedIdentityAuthorizationIncrementFromWitness({
-        ...scope,
-        authorizationWitness: tree.getWitness(11n),
-        authorizationStateRoot: tree.root,
-      }),
-    /alias/u,
-  );
+  const alias = computeShieldedAuthorizationAlias(scope);
+  const tree = createShieldedIdentityAuthorizationTree([
+    [alias, 1n],
+    [alias ^ (1n << 63n), 2n],
+  ]);
+  const before = tree.snapshot();
+  assert.equal(tree.getWitness(alias).depth, 64n);
+  const input = { ...scope, authorizationCounter: tree.getCounter(alias) };
+  for (const name of ["state", "authorizationWitness", "authorizationStateRoot"]) {
+    Object.defineProperty(input, name, {
+      get() {
+        throw new Error("Owner authorization must not read tree state");
+      },
+    });
+  }
+  const authorization = prepareShieldedIdentityCounterAuthorization(input);
+  assert.deepEqual(authorization.publicSignals.slice(3), [alias, 1n, 2n]);
+  assert.deepEqual(tree.snapshot(), before);
+  assert.deepEqual(Object.keys(authorization).sort(), ["publicSignals", "witness"]);
+  assert.deepEqual(Object.keys(authorization.witness).sort(), [
+    "aliasR",
+    "chainId",
+    "consumer",
+    "newCounter",
+    "oldCounter",
+  ]);
 });
 
-test("counter authorization has constant-size singleton roots and binds the expected counter and scope", () => {
+test("counter authorization matches its six-signal statement and binds identity, secret, counter and scope", () => {
   const alias = computeShieldedAuthorizationAlias(scope);
   for (const counter of [0n, 1n, 7n, MAX_UINT64 - 1n]) {
-    const state = buildShieldedIdentityAuthorizationState(counter === 0n ? [] : [[alias, counter]]);
-    const expected = prepareShieldedIdentityAuthorizationIncrement({ ...scope, state });
     const actual = prepareShieldedIdentityCounterAuthorization({
       ...scope,
       authorizationCounter: counter,
     });
-    assert.deepEqual(actual.publicSignals, expected.publicSignals);
-    assert.deepEqual(actual.witness, expected.witness);
-    assert.equal(actual.newRoot, expected.nextState.root);
-    assert.deepEqual(actual.witness.siblings, Array(64).fill("0"));
-    assert.equal(actual.publicSignals[6], counter);
-    assert.equal(actual.publicSignals[7], counter + 1n);
+    const nullifier = poseidon6([
+      SHIELDED_IDENTITY_COUNTER_AUTHORIZATION_DOMAIN,
+      scope.derivedSecretField,
+      alias,
+      scope.chainId,
+      BigInt(scope.authorizationStateAddress),
+      counter,
+    ]);
+    assert.deepEqual(actual.publicSignals, [
+      nullifier,
+      scope.chainId,
+      BigInt(scope.authorizationStateAddress),
+      alias,
+      counter,
+      counter + 1n,
+    ]);
+    assert.deepEqual(actual.witness, {
+      chainId: String(scope.chainId),
+      consumer: String(BigInt(scope.authorizationStateAddress)),
+      aliasR: String(alias),
+      oldCounter: String(counter),
+      newCounter: String(counter + 1n),
+    });
   }
   const base = prepareShieldedIdentityCounterAuthorization({ ...scope, authorizationCounter: 3n });
   for (const patch of [
@@ -445,12 +484,16 @@ test("counter authorization has constant-size singleton roots and binds the expe
     { authorizationStateAddress: "0x2222222222222222222222222222222222222222" },
     { authorizationCounter: 4n },
     { identityCommitment: 20n },
+    { derivedSecretField: 14n },
   ])
     assert.notEqual(
       prepareShieldedIdentityCounterAuthorization({ ...scope, authorizationCounter: 3n, ...patch })
         .publicSignals[0],
       base.publicSignals[0],
     );
+});
+
+test("counter authorization rejects exhausted counters and invalid field or scope encodings", () => {
   for (const patch of [
     { authorizationCounter: MAX_UINT64 },
     { authorizationCounter: -1n },
@@ -458,10 +501,24 @@ test("counter authorization has constant-size singleton roots and binds the expe
     { authorizationCounter: MAX_UINT64 + 1n },
     { identityCommitment: 0n },
     { derivedSecretField: 0n },
+    { derivedSecretField: SNARK_SCALAR_FIELD },
+    { identityCommitment: SNARK_SCALAR_FIELD },
     { chainId: 0n },
+    { chainId: MAX_UINT64 + 1n },
+    { chainId: -1n },
+    { chainId: "01030" },
     { authorizationStateAddress: "0x0000000000000000000000000000000000000000" },
+    { authorizationStateAddress: `0x1${"0".repeat(40)}` },
   ])
     assert.throws(() =>
       prepareShieldedIdentityCounterAuthorization({ ...scope, authorizationCounter: 3n, ...patch }),
     );
+  const atLimit = prepareShieldedIdentityCounterAuthorization({
+    ...scope,
+    chainId: MAX_UINT64,
+    authorizationStateAddress: `0x${"ff".repeat(20)}`,
+    authorizationCounter: MAX_UINT64 - 1n,
+  });
+  assert.deepEqual(atLimit.publicSignals.slice(1, 3), [MAX_UINT64, (1n << 160n) - 1n]);
+  assert.deepEqual(atLimit.publicSignals.slice(4), [MAX_UINT64 - 1n, MAX_UINT64]);
 });

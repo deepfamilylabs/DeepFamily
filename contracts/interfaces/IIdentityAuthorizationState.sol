@@ -56,16 +56,14 @@ interface IIdentityAuthorizationState {
 
 /**
  * @dev The verifier MUST prove canonical R from identity and its nonzero identity secret,
- *      a canonical sparse-dictionary transition, an exact uint64 increment, and the
- *      authorization nullifier bound to the actual chain and state contract.
- *      An absent counter is zero only with a dictionary non-membership proof. The proof's
- *      dictionary roots authenticate its original witness, not the live execution root:
- *      the state contract independently checks the live alias counter and computes the
- *      actual transition from its own nodes. Unrelated updates cannot stale owner authority.
+ *      an exact uint64 increment, and the authorization nullifier bound to the actual
+ *      chain and state contract. The state contract independently checks the live alias
+ *      counter (zero for an absent identity) and computes the tree transition from its
+ *      own nodes. Neither tree paths nor roots are part of the owner proof.
  */
 interface IIdentityCounterUpdateVerifier {
   function verifyProof(
     bytes calldata proof,
-    uint256[8] calldata inputs
+    uint256[6] calldata inputs
   ) external view returns (bool);
 }

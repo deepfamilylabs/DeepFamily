@@ -30,19 +30,15 @@ async function authFixture() {
       chainId,
       BigInt(await state.getAddress()),
       alias,
-      0n,
-      1n,
       counter,
       counter + 1n,
     ];
     return state.incrementCounter(
       inputs[0],
       alias,
-      0n,
-      1n,
       counter,
       counter + 1n,
-      hre.ethers.AbiCoder.defaultAbiCoder().encode(["uint256[8]"], [inputs]),
+      hre.ethers.AbiCoder.defaultAbiCoder().encode(["uint256[6]"], [inputs]),
     );
   };
   return { state, increment };

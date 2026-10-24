@@ -32,7 +32,7 @@ import {
   encryptShieldedLetter,
   encryptShieldedNote,
   prepareShieldedReceivePresentation,
-  prepareShieldedIdentityAuthorizationIncrement,
+  prepareShieldedIdentityCounterAuthorization,
   readArchiveBlob,
   verifyShieldedNotePayload,
 } from "@deepfamily/protocol-core";
@@ -141,7 +141,10 @@ describe("Receive presentation real-proof canonical pool and letter integration"
           "IdentityAuthorizationVerifierAdapter",
           [await counterVerifier.getAddress()],
         );
-        const state = await deployIdentityAuthorizationState(hre, await counterAdapter.getAddress());
+        const state = await deployIdentityAuthorizationState(
+          hre,
+          await counterAdapter.getAddress(),
+        );
         const lineage = await hre.ethers.deployContract("ShieldedPoolLineageMock");
         const token = await hre.ethers.deployContract("ShieldedPoolTokenMock");
         const poseidon = await hre.ethers.deployContract("PoseidonT3");
@@ -687,12 +690,12 @@ describe("Receive presentation real-proof canonical pool and letter integration"
           recipientBinding: pending.recipientBinding,
         };
         const identity = buildLineageFixture().witness;
-        const transition = prepareShieldedIdentityAuthorizationIncrement({
+        const authorization = prepareShieldedIdentityCounterAuthorization({
           chainId,
           authorizationStateAddress: await state.getAddress(),
           identityCommitment: fundCredential.identityCommitment,
           derivedSecretField: identity.derivedSecretField,
-          state: counterState,
+          authorizationCounter: 0n,
         });
         const privateIdentity = Object.fromEntries(
           [
@@ -710,24 +713,24 @@ describe("Receive presentation real-proof canonical pool and letter integration"
           "shielded_identity_authorization_update",
           {
             ...privateIdentity,
-            ...transition.witness,
+            ...authorization.witness,
           },
-          transition.publicSignals,
+          authorization.publicSignals,
         ).solidityProof;
-        const [authorizationNullifier, , , alias, oldRoot, newRoot, oldCounter, newCounter] =
-          transition.publicSignals;
+        const [authorizationNullifier, , , alias, oldCounter, newCounter] =
+          authorization.publicSignals;
         await recordTransaction(
           "authorizationIncrement",
           state.incrementCounter(
             authorizationNullifier,
             alias,
-            oldRoot,
-            newRoot,
             oldCounter,
             newCounter,
             incrementProof,
           ),
         );
+        const updatedCounterState = buildShieldedIdentityAuthorizationState([[alias, newCounter]]);
+        assert.equal(await state.currentRoot(), updatedCounterState.root);
         // Discard the issuing device's material. Recovery below uses only the original
         // backups plus credentials, after the on-chain counter has changed.
         keys = undefined;
@@ -775,7 +778,7 @@ describe("Receive presentation real-proof canonical pool and letter integration"
               payloadHash: hre.ethers.keccak256(pendingCiphertext),
               checkpointId: 2n,
               asOf: retired.retiredAt,
-              state: transition.nextState,
+              state: updatedCounterState,
               salt: 899n,
             }),
           /revoked/u,
@@ -804,7 +807,7 @@ describe("Receive presentation real-proof canonical pool and letter integration"
           payloadHash: hre.ethers.keccak256(pendingCiphertext),
           checkpointId: 2n,
           asOf: await now(),
-          state: transition.nextState,
+          state: updatedCounterState,
           salt: pendingEnvelope.salt,
         });
         const renewedProof = prover.presentation(renewed);

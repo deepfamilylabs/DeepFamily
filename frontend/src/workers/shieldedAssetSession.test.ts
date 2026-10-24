@@ -245,11 +245,13 @@ describe("receive-code current authorization state", () => {
     const result = await session.authorizeIdentityCounter({ context });
     const input = mocks.ownerProof.mock.calls[0][0];
     expect(input.circuit).toBe("identityAuthorizationUpdate");
+    expect(input.expectedPublicSignals).toHaveLength(6);
     expect(input.witness.oldCounter).toBe("2");
     expect(input.witness.newCounter).toBe("3");
-    expect(input.witness.siblings).toEqual(Array(64).fill("0"));
-    expect(input.witness.oldRoot).not.toBe(String(globalState.root));
-    expect(result.args.slice(1, 6)).toEqual([String(alias), input.witness.oldRoot, input.witness.newRoot, "2", "3"]);
+    for (const field of ["siblings", "oldRoot", "newRoot", "oldKey", "oldValue", "isOld0"])
+      expect(input.witness).not.toHaveProperty(field);
+    expect(result.args).toHaveLength(5);
+    expect(result.args.slice(1, 4)).toEqual([String(alias), "2", "3"]);
   });
 
   it("uses a nonzero current counter and reloads it for every renewal", async () => {

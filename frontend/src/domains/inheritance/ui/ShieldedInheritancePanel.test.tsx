@@ -1237,7 +1237,7 @@ describe("Worker-backed shielded wallet", () => {
   it("submits batch revocation in the signing wallet request scope and regenerates current material", async () => {
     const defaultCall = mocks.call.getMockImplementation();
     let codeNumber = 0;
-    const args = ["1", "2", "3", "4", "0", "1", "0xproof"];
+    const args = ["1", "2", "0", "1", "0xproof"];
     mocks.call.mockImplementation(async (method, params) => method === "receiveCode" ? { code: `code-${++codeNumber}` }
       : method === "authorizeIdentityCounter" ? { address, args } : defaultCall?.(method, params));
     mocks.incrementCounter.mockImplementation(async () => {

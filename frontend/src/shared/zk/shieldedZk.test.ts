@@ -44,7 +44,7 @@ describe("shielded proof public inputs", () => {
       ["anonymousReceivePresentation", 22],
       ["fundReceivePresentation", 23],
       ["attachedReceivePresentation", 25],
-      ["identityAuthorizationUpdate", 8],
+      ["identityAuthorizationUpdate", 6],
       ["shield", 7],
       ["fund", 29],
       ["claim", 27],

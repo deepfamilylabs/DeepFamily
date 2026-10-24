@@ -8,11 +8,11 @@ interface IIdentityAuthorizationGroth16Verifier {
     uint256[2] calldata a,
     uint256[2][2] calldata b,
     uint256[2] calldata c,
-    uint256[8] calldata inputs
+    uint256[6] calldata inputs
   ) external view returns (bool);
 }
 
-/** @notice Adapts the fixed eight-signal Circom owner proof to shared state transport. */
+/** @notice Adapts the fixed six-signal Circom counter authorization to shared state transport. */
 contract IdentityAuthorizationVerifierAdapter is IIdentityCounterUpdateVerifier {
   error InvalidVerifier();
   IIdentityAuthorizationGroth16Verifier public immutable VERIFIER;
@@ -24,7 +24,7 @@ contract IdentityAuthorizationVerifierAdapter is IIdentityCounterUpdateVerifier 
 
   function verifyProof(
     bytes calldata proof,
-    uint256[8] calldata inputs
+    uint256[6] calldata inputs
   ) external view returns (bool) {
     if (proof.length != 256) return false;
     (uint256[2] memory a, uint256[2][2] memory b, uint256[2] memory c) = abi.decode(

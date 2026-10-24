@@ -12,10 +12,23 @@ counter. First use requires no recipient registration or transaction. Credential
 and renewals are proved locally; creation and payment still read the latest shared
 authorization state without filtering RPC events by the recipient's alias. The
 owner can increment the counter with a proof of the
-original identity secrets. This invalidates earlier credentials on this chain
+original identity secrets. The owner circuit exposes exactly
+`[authNullifier, chainId, consumer, aliasR, oldCounter, newCounter]` and constrains the
+uint64 increment, without any global-tree roots or paths. The state contract checks
+the live counter and updates its stored dictionary through
+`incrementCounter(authNullifier, aliasR, oldCounter, newCounter, proof)`.
+`prepareShieldedIdentityCounterAuthorization` is the sole owner-proof preparation
+API; the old global-tree transition APIs and authorization ABI have been removed.
+The replacement development keys and fixed verifier match the six-signal circuit.
+Incrementing the counter invalidates earlier credentials on this chain
 within the checkpoint retirement window of 15 minutes. Credential expiry is checked
 against the execution block and has no grace period. Incrementing the counter does
 not change spending or decryption keys, existing balances, budgets or old letters.
+
+Authorization reads and receive presentations still support complete 64-level
+paths. Owner authorization is independent of tree depth. Distinct aliases with
+identical low 64 bits cannot both be inserted; this separate dictionary capacity
+limit rejects without modifying state.
 
 ## Proof and contract flow
 
