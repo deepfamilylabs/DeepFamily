@@ -3,7 +3,6 @@ import { createHash } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { expect } from "chai";
-import { SHIELDED_POOL_PUBLIC_SIGNAL_COUNTS } from "@deepfamily/protocol-core";
 
 import {
   TESTNET_RELEASE_EVIDENCE_TYPE,
@@ -330,7 +329,7 @@ const bindDeploymentEvidence = (report) => {
 const shieldedProofs = (chainId) =>
   Object.fromEntries(
     Object.entries(SHIELDED_DEPLOYMENT_CIRCUITS).map(([action, spec]) => {
-      const signals = Array(SHIELDED_POOL_PUBLIC_SIGNAL_COUNTS[spec.actionId]).fill("0");
+      const signals = Array(spec.publicSignals).fill("0");
       signals[0] = String(chainId);
       signals[1] = BigInt(SHIELDED_ADDRESSES.shieldedErc20Pool).toString();
       // asOf closes the fund and claim inputs.
@@ -348,9 +347,10 @@ const shieldedProofs = (chainId) =>
           proofSha256: SHIELDED_PROOF_SHA256,
           publicSignals: signals,
           publicSignalsSha256: createHash("sha256").update(JSON.stringify(signals)).digest("hex"),
-          execution: (action === "claim" || action === "claim32") ? "verifier-call" : "transaction",
+          execution: ["claim", "claim32", "privateTransfer4", "unshield4"].includes(action) ? "verifier-call" : "transaction",
           ...((action === "claim" || action === "claim32")
             ? { claimCount: 3 }
+            : ["privateTransfer4", "unshield4"].includes(action) ? {}
             : { transactionLabel: `shielded-action-${action}` }),
         },
       ];
@@ -791,15 +791,15 @@ describe("schema v1 initial-mainnet-release rehearsal evidence", function () {
       protocolGeneration: PROTOCOL_GENERATION,
       goldenVectorSha256: GOLDEN_VECTOR_SHA256,
     });
-    expect(result.publicSummary.finality.revalidatedTransactionCount).to.equal(7);
+    expect(result.publicSummary.finality.revalidatedTransactionCount).to.equal(9);
     expect(result.publicSummary.shielded).to.deep.include({
       manifestSha256: SHIELDED_MANIFEST_SHA256,
-      proofCount: 6,
+      proofCount: 8,
       claimCount: 3,
       lineageDepth: 1,
       noteDepth: 1,
     });
-    expect(result.publicSummary.shielded.verifierCallActions).to.deep.equal(["claim", "claim32"]);
+    expect(result.publicSummary.shielded.verifierCallActions).to.deep.equal(["claim", "claim32", "privateTransfer4", "unshield4"]);
     expect(result.publicSummary.shielded.transactionActions).to.have.length(4);
     expect(result.publicSummary.refund.transactionHash).to.equal(REFUND_TRANSACTION_HASH);
     expect(Object.isFrozen(result)).to.equal(true);

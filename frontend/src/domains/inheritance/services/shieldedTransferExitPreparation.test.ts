@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
   computeShieldedCiphertextHashField,
-  computeShieldedDummyInputNullifier,
   computeShieldedDummyInputNullifierForSlot,
   computeShieldedSpendNullifier,
   createLineageTree,
@@ -434,7 +433,7 @@ describe("local private transfer and unshield preparation", () => {
     ).not.toContain(receiver.personHash);
   });
 
-  it("transfers from the only recovered value note with three distinct bound dummy inputs", async () => {
+  it("transfers a single recovered value note with the single-input circuit", async () => {
     const { input0 } = await walletFixture();
     const commitment = BigInt(input0.commitment);
     input0.wallet.ownedNotes = new Map([[commitment, input0.wallet.ownedNotes.get(commitment)!]]);
@@ -448,28 +447,18 @@ describe("local private transfer and unshield preparation", () => {
       ],
     });
     const ownerSecret = deriveShieldedHeirKeyMaterial(senderSecret).ownerSecret;
-    expect(prepared.witness.inputEnabled).toEqual(["1", "0", "0", "0"]);
+    expect(prepared.witness.inputEnabled).toEqual(["1"]);
     expect(prepared.witness).not.toHaveProperty("hasSecondInput");
-    expect(prepared.witness.inputAmounts).toEqual(["70", ...Array(3).fill("0")]);
-    expect(prepared.witness.inputOwnerSecrets).toEqual([
-      String(ownerSecret),
-      ...Array(3).fill("0"),
-    ]);
-    expect((prepared.witness.inputNonces as string[])[1]).toBe("0");
-    expect((prepared.witness.inputDepths as string[])[1]).toBe("0");
-    expect((prepared.witness.inputSiblings as string[][])[1]).toEqual(Array(32).fill("0"));
-    expect(prepared.data.inputShardIds[1]).toBe(prepared.data.inputShardIds[0]);
-    expect(prepared.data.inputRoots[1]).toBe(prepared.data.inputRoots[0]);
+    expect(prepared.witness.inputAmounts).toEqual(["70"]);
+    expect(prepared.witness.inputOwnerSecrets).toEqual([String(ownerSecret)]);
+    for (const field of ["inputNonces", "inputDepths", "inputIndices", "inputSiblings"])
+      expect(prepared.witness[field]).toHaveLength(1);
+    expect(prepared.data.inputShardIds).toHaveLength(1);
+    expect(prepared.data.inputRoots).toHaveLength(1);
     expect(prepared.data.inputNullifiers).toEqual([
       computeShieldedSpendNullifier(
         { ownerSecret, noteCommitment: commitment },
         { chainId, poolAddress },
-      ),
-      ...Array.from({ length: 3 }, (_, index) =>
-        computeShieldedDummyInputNullifierForSlot(ownerSecret, commitment, index + 1, {
-          chainId,
-          poolAddress,
-        }),
       ),
     ]);
     expect(
@@ -490,7 +479,7 @@ describe("local private transfer and unshield preparation", () => {
         ],
       }),
     ).rejects.toThrow("Invalid private transfer input owner index");
-    input0.wallet.spentNullifiers.add(BigInt(prepared.data.inputNullifiers[1]));
+    input0.wallet.spentNullifiers.add(BigInt(prepared.data.inputNullifiers[0]));
     await expect(
       prepareShieldedPrivateTransfer({
         chainId,
@@ -532,20 +521,14 @@ describe("local private transfer and unshield preparation", () => {
     expect(prepared.witness.amount).toBe("30");
     expect(prepared.witness.recipient).toBe(String(BigInt(recipient)));
     expect(prepared.witness.inputRoots).toEqual(prepared.data.inputRoots.map(String));
-    expect(prepared.witness.inputEnabled).toEqual(["1", ...Array(3).fill("0")]);
-    expect(prepared.witness.inputAmounts).toEqual(["70", ...Array(3).fill("0")]);
+    expect(prepared.witness.inputEnabled).toEqual(["1"]);
+    expect(prepared.witness.inputAmounts).toEqual(["70"]);
     expect(prepared.witness).not.toHaveProperty("ownerSecret");
-    expect(prepared.data.inputRoots[0]).toBe(prepared.data.inputRoots[1]);
+    expect(prepared.data.inputRoots).toHaveLength(1);
     expect(prepared.data.inputNullifiers).toEqual([
       computeShieldedSpendNullifier(
         { ownerSecret, noteCommitment: input0.commitment },
         { chainId, poolAddress },
-      ),
-      ...Array.from({ length: 3 }, (_, index) =>
-        computeShieldedDummyInputNullifierForSlot(ownerSecret, input0.commitment, index + 1, {
-          chainId,
-          poolAddress,
-        }),
       ),
     ]);
     expect(prepared.witness.changeAmount).toBe("40");
@@ -671,8 +654,8 @@ describe("local private transfer and unshield preparation", () => {
     expect(prepared.witness.recipient).toBe(String(BigInt(destination)));
   });
 
-  it("rejects an invalid withdrawal amount, recipient, dummy spend and exposing root", async () => {
-    const { input0 } = await walletFixture();
+  it("rejects an invalid withdrawal amount, recipient, spent input and exposing root", async () => {
+    const { input0, input1 } = await walletFixture();
     const base = { chainId, poolAddress, inputs: [input0], recipient };
     await expect(prepareShieldedUnshield({ ...base, amount: 0n })).rejects.toThrow(
       "must be positive",
@@ -689,7 +672,7 @@ describe("local private transfer and unshield preparation", () => {
     ).rejects.toThrow("must be nonzero");
     const ownerSecret = deriveShieldedHeirKeyMaterial(senderSecret).ownerSecret;
     input0.wallet.spentNullifiers.add(
-      computeShieldedDummyInputNullifier(
+      computeShieldedSpendNullifier(
         {
           ownerSecret,
           noteCommitment: input0.commitment,
@@ -700,6 +683,11 @@ describe("local private transfer and unshield preparation", () => {
     await expect(prepareShieldedUnshield({ ...base, amount: 30n })).rejects.toThrow(
       "already been spent",
     );
+    input0.wallet.spentNullifiers.clear();
+    const twoInputs = { ...base, inputs: [input0, input1], amount: 30n };
+    const fourSlot = await prepareShieldedUnshield(twoInputs);
+    input0.wallet.spentNullifiers.add(BigInt(fourSlot.data.inputNullifiers[2]));
+    await expect(prepareShieldedUnshield(twoInputs)).rejects.toThrow("already been spent");
     input0.wallet.spentNullifiers.clear();
     input0.wallet.shards.set(0n, createLineageTree([BigInt(input0.commitment)]));
     await expect(prepareShieldedUnshield({ ...base, amount: 30n })).rejects.toThrow(

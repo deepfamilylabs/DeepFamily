@@ -121,15 +121,17 @@ async function prepareTransferReceive(pool, data, recipients, inputOwnerSecret) 
   return receive;
 }
 
-/** Build the canonical four slots, including distinct proved placeholders. */
+/** Use the single-input route when possible; pad multiple inputs to four slots. */
 function valueSpendInputs({ notes, ownerSecrets, memberships, roots, chainId, poolAddress }) {
   const scope = { chainId, poolAddress };
-  const fill = (values) => Array.from({ length: 4 }, (_, slot) => String(values[slot] ?? 0n));
+  const capacity = notes.length === 1 ? 1 : 4;
+  const fill = (values) =>
+    Array.from({ length: capacity }, (_, slot) => String(values[slot] ?? 0n));
   return {
     data: {
-      inputShardIds: Array(4).fill(0n),
-      inputRoots: Array.from({ length: 4 }, (_, slot) => roots[slot] ?? roots[0]),
-      inputNullifiers: Array.from({ length: 4 }, (_, slot) =>
+      inputShardIds: Array(capacity).fill(0n),
+      inputRoots: Array.from({ length: capacity }, (_, slot) => roots[slot] ?? roots[0]),
+      inputNullifiers: Array.from({ length: capacity }, (_, slot) =>
         notes[slot]
           ? computeShieldedSpendNullifier(
               { ownerSecret: ownerSecrets[slot], noteCommitment: notes[slot].commitment },
@@ -144,7 +146,9 @@ function valueSpendInputs({ notes, ownerSecrets, memberships, roots, chainId, po
       ),
     },
     witness: {
-      inputEnabled: Array.from({ length: 4 }, (_, slot) => (slot < notes.length ? "1" : "0")),
+      inputEnabled: Array.from({ length: capacity }, (_, slot) =>
+        slot < notes.length ? "1" : "0",
+      ),
       inputOwnerSecrets: fill(ownerSecrets),
       inputAmounts: fill(notes.map((note) => note.amount)),
       inputNonces: fill(notes.map((note) => note.nonce)),
@@ -152,7 +156,7 @@ function valueSpendInputs({ notes, ownerSecrets, memberships, roots, chainId, po
       inputDepths: fill(memberships.map((proof) => proof.depth)),
       inputIndices: fill(memberships.map((proof) => proof.index)),
       inputSiblings: Array.from(
-        { length: 4 },
+        { length: capacity },
         (_, slot) => memberships[slot]?.siblings ?? Array(32).fill("0"),
       ),
     },
@@ -183,7 +187,17 @@ function circuitFiles(action, manifest) {
 }
 
 function checkedCurrentArtifacts(actions) {
-  actions = [...new Set(actions.flatMap((action) => action === "claim" ? ["claim", "claim32"] : [action]))];
+  actions = [
+    ...new Set(
+      actions.flatMap((action) =>
+        action === "claim"
+          ? ["claim", "claim32"]
+          : action === "privateTransfer" || action === "unshield"
+            ? [action, `${action}4`]
+            : [action],
+      ),
+    ),
+  ];
   const manifestFile = path.join(ROOT, currentShieldedCandidateManifest({ root: ROOT }));
   if (!fs.existsSync(manifestFile)) return { missing: [manifestFile] };
   const manifest = JSON.parse(fs.readFileSync(manifestFile, "utf8"));
@@ -245,7 +259,17 @@ function checkedCurrentArtifacts(actions) {
 }
 
 async function deployCurrentGeneratedVerifiers(actions, signer) {
-  actions = [...new Set(actions.flatMap((action) => action === "claim" ? ["claim", "claim32"] : [action]))];
+  actions = [
+    ...new Set(
+      actions.flatMap((action) =>
+        action === "claim"
+          ? ["claim", "claim32"]
+          : action === "privateTransfer" || action === "unshield"
+            ? [action, `${action}4`]
+            : [action],
+      ),
+    ),
+  ];
   // Compile the named contracts matching the current public proving keys and deploy only to
   // Hardhat's in-process test chain. These measurements are never release evidence.
   const compilerModule = path.join(
@@ -354,10 +378,26 @@ function syntheticFullMerklePath(leaf, depth, index, siblingSeed) {
   return { root, siblings, index: index.toString(), depth: depth.toString() };
 }
 
+function valueCircuitAction(action, witness) {
+  return (action === "privateTransfer" || action === "unshield") &&
+    witness.inputEnabled?.length === 4
+    ? `${action}4`
+    : action;
+}
+
 async function prove(action, witness, expectedSignals) {
-  if (action === "claim" && Number(witness.endorsementDepth) <= 32 && Number(witness.trustedDepth) <= 32) {
+  action = valueCircuitAction(action, witness);
+  if (
+    action === "claim" &&
+    Number(witness.endorsementDepth) <= 32 &&
+    Number(witness.trustedDepth) <= 32
+  ) {
     action = "claim32";
-    witness = { ...witness, endorsementSiblings: witness.endorsementSiblings.slice(0, 32), trustedSiblings: witness.trustedSiblings.slice(0, 32) };
+    witness = {
+      ...witness,
+      endorsementSiblings: witness.endorsementSiblings.slice(0, 32),
+      trustedSiblings: witness.trustedSiblings.slice(0, 32),
+    };
   }
   const files = circuitFiles(action);
   const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "deepfamily-shielded-e2e-"));
@@ -394,6 +434,7 @@ async function prove(action, witness, expectedSignals) {
 }
 
 function assertInvalidCircuitWitness(action, witness, expectedFailure) {
+  action = valueCircuitAction(action, witness);
   const files = circuitFiles(action);
   const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "deepfamily-shielded-invalid-"));
   const inputPath = path.join(temporary, "input.json");
@@ -922,8 +963,13 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
     const [signer] = await hre.ethers.getSigners();
     const verifiers = await deployCurrentGeneratedVerifiers(["claim"], signer);
     const adapter = await deployUnifiedVerifierAdapter(hre, verifiers);
-    const [rawA, rawB, rawC] = hre.ethers.AbiCoder.defaultAbiCoder().decode(["uint256[2]", "uint256[2][2]", "uint256[2]"], proof);
-    const a = [...rawA], b = rawB.map((row) => [...row]), c = [...rawC];
+    const [rawA, rawB, rawC] = hre.ethers.AbiCoder.defaultAbiCoder().decode(
+      ["uint256[2]", "uint256[2][2]", "uint256[2]"],
+      proof,
+    );
+    const a = [...rawA],
+      b = rawB.map((row) => [...row]),
+      c = [...rawC];
     expect(await verifiers.claim32.verifyProof(a, b, c, claimSignalsOf(witness))).to.equal(false);
     expect(await adapter.verifyProof(4, 1, proof, claimSignalsOf(witness))).to.equal(true);
     const tampered = claimSignalsOf(witness);
@@ -1109,7 +1155,9 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
       },
       unshieldSignals,
     );
+    expect(unshieldSignals).to.have.length(11);
     expect(await adapter.verifyProof(6, 1, unshieldProof, unshieldSignals)).to.equal(true);
+    expect(await adapter.verifyProof(6, 1, unshieldProof, Array(20).fill(0n))).to.equal(false);
     // Transfer and withdrawal now have the same signal count; their distinct verification
     // keys still reject a proof from the other route.
     expect(await adapter.verifyProof(5, 1, unshieldProof, unshieldSignals)).to.equal(false);
@@ -1123,7 +1171,7 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
     expect(await token.balanceOf(poolAddress)).to.equal(70n);
     expect(await pool.totalShielded()).to.equal(70n);
     expect(await pool.nullifierSpent(spendNullifier)).to.equal(true);
-    expect(await pool.nullifierSpent(dummyNullifier)).to.equal(true);
+    expect(await pool.nullifierSpent(dummyNullifier)).to.equal(false);
     await expect(
       pool.unshield(recipient.address, 30n, unshieldData, unshieldProof),
     ).to.be.revertedWithCustomError(pool, "NullifierAlreadySpent");
@@ -2380,7 +2428,7 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
         pool.privateTransfer(
           {
             ...singleData,
-            inputRoots: [singleRoot, sourceRoot, ...singleData.inputRoots.slice(2)],
+            inputRoots: [sourceRoot],
           },
           singleProof,
         ),

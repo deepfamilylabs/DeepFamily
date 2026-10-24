@@ -6,6 +6,7 @@ import path from "node:path";
 import {
   SHIELDED_POOL_ACTION,
   SHIELDED_POOL_PUBLIC_SIGNAL_COUNTS,
+  SHIELDED_VALUE_PUBLIC_SIGNAL_COUNTS,
 } from "@deepfamily/protocol-core";
 import { CIRCOM_VERSION, CIRCOM_LINUX_X64_SHA256 } from "./circomToolchain.mjs";
 import {
@@ -51,6 +52,7 @@ const suffix = (action) => action[0].toUpperCase() + action.slice(1);
 
 /** Pool action counts mirror ProofConstants.sol; the receive code is verified off-chain. */
 const publicSignalCount = (action) => {
+  if (action === "privateTransfer4" || action === "unshield4") return SHIELDED_VALUE_PUBLIC_SIGNAL_COUNTS[4];
   if (action === "claim32") return SHIELDED_POOL_PUBLIC_SIGNAL_COUNTS[SHIELDED_POOL_ACTION.Claim];
   return RECEIVE_PRESENTATION_CIRCUITS[action]
     ? RECEIVE_PRESENTATION_CIRCUITS[action].hiddenInputs +

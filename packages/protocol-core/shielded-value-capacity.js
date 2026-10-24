@@ -11,8 +11,16 @@ const byAmount = (a, b) => {
   return a.commitment < b.commitment ? -1 : a.commitment > b.commitment ? 1 : 0;
 };
 
-/** Minimize change, then input count, without introducing another transaction. */
+/** Prefer a single covering note; otherwise minimize change within the four-input route. */
 function selectValueInputs(available, target, maxInputs) {
+  // A covering single keeps the default, smaller proving-key download. Pick the
+  // smallest adequate note deterministically before considering combinations.
+  let single;
+  for (const note of available) {
+    if (note.amount < target) break;
+    if (!single || note.amount < single.amount) single = note;
+  }
+  if (single) return [single];
   const greedy = [];
   let greedyTotal = 0n;
   for (const note of available) {
@@ -36,17 +44,8 @@ function selectValueInputs(available, target, maxInputs) {
       bestTotal = total;
     }
   };
-  for (const note of available) {
-    if (note.amount < target) break;
-    consider([note], note.amount);
-  }
-  // Funding still consumes one donor note; an exact multi-input combination
-  // must not add a consolidation when a direct donor note is available.
-  if (maxInputs === 1 || (bestTotal === target && best.length === 1)) return best;
-
-  // A note that already covers the target cannot improve a combination with
-  // other positive notes. Singles and pairs are checked across all candidates.
-  const searchable = available.filter((note) => note.amount < target);
+  // No single covers the target. Check pairs across all permitted candidates.
+  const searchable = available;
   let left = 0;
   let right = searchable.length - 1;
   while (left < right) {
@@ -191,7 +190,7 @@ export function planShieldedValueSpend({ notes, candidateCommitments, amount, ma
     for (const note of inputs) if (seen.has(note.commitment)) usedOriginal.add(note.commitment);
     steps.push({
       kind: final ? "spend" : "merge",
-      capacity: 4,
+      capacity: inputs.length === 1 ? 1 : 4,
       inputCommitments: inputs.map((note) => note.commitment),
       inputAmount: total,
       outputAmounts: [principal, remainder],

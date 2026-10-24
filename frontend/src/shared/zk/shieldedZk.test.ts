@@ -4,6 +4,7 @@ import {
   generateShieldedProof,
   SHIELDED_RECEIVE_LINK_KEYS,
   selectShieldedClaimCircuit,
+  selectShieldedValueCircuit,
 } from "./shieldedZk";
 
 const mocks = vi.hoisted(() => ({
@@ -22,19 +23,19 @@ afterEach(() => {
 
 describe("shielded proof public inputs", () => {
   it("rejects a proof for a different amount, root or recipient before submission", () => {
-    // Unshield: chainId, pool, four shard ids, roots and nullifiers, two
+    // Single-input unshield: chainId, pool, one shard id, root and nullifier, two
     // outputs, two ciphertext hashes, amount, recipient.
-    const expected = Array(20).fill("0");
-    expected[18] = "100";
-    expected[19] = "17";
+    const expected = Array(11).fill("0");
+    expected[9] = "100";
+    expected[10] = "17";
     expect(() => assertShieldedPublicSignals("unshield", [...expected], expected)).not.toThrow();
     const forged = [...expected];
-    forged[19] = "18";
+    forged[10] = "18";
     expect(() => assertShieldedPublicSignals("unshield", forged, expected)).toThrow(
-      "public signal 19",
+      "public signal 10",
     );
-    expect(() => assertShieldedPublicSignals("unshield", expected.slice(0, 19), expected)).toThrow(
-      "20 public signals",
+    expect(() => assertShieldedPublicSignals("unshield", expected.slice(0, 10), expected)).toThrow(
+      "11 public signals",
     );
   });
 
@@ -50,8 +51,10 @@ describe("shielded proof public inputs", () => {
       ["fund", 29],
       ["claim", 15],
       ["claim32", 15],
-      ["privateTransfer", 20],
-      ["unshield", 20],
+      ["privateTransfer", 11],
+      ["privateTransfer4", 20],
+      ["unshield", 11],
+      ["unshield4", 20],
     ] as const) {
       expect(() =>
         assertShieldedPublicSignals(circuit, Array(count).fill("0"), Array(count).fill("0")),
@@ -59,6 +62,41 @@ describe("shielded proof public inputs", () => {
       expect(() =>
         assertShieldedPublicSignals(circuit, Array(count - 1).fill("0"), Array(count).fill("0")),
       ).toThrow(`${count} public signals`);
+    }
+  });
+
+  it("selects the VALUE variant from witness capacity and rejects unsupported shapes", () => {
+    for (const circuit of ["privateTransfer", "unshield"] as const) {
+      expect(selectShieldedValueCircuit(circuit, { inputEnabled: ["1"] })).toBe(circuit);
+      expect(selectShieldedValueCircuit(circuit, { inputEnabled: ["1", "1", "0", "0"] })).toBe(`${circuit}4`);
+      for (const inputEnabled of [[], ["1", "1"], ["1", "1", "1"], Array(5).fill("1")]) {
+        expect(() => selectShieldedValueCircuit(circuit, { inputEnabled })).toThrow("one or four");
+      }
+    }
+  });
+
+  it("downloads only the selected single or four-input VALUE proving artifacts", async () => {
+    mocks.verify.mockResolvedValue(true);
+    const fetch = vi.fn(async () => new Response(JSON.stringify({})));
+    vi.stubGlobal("fetch", fetch);
+    for (const [action, file] of [["privateTransfer", "shielded_private_transfer"], ["unshield", "shielded_unshield"]] as const) {
+      for (const width of [1, 4] as const) {
+        mocks.fetchAsset.mockClear();
+        fetch.mockClear();
+        const expectedPublicSignals = Array(width === 1 ? 11 : 20).fill("0");
+        mocks.fullProve.mockResolvedValue({ proof: {}, publicSignals: expectedPublicSignals });
+        await generateShieldedProof({
+          circuit: action,
+          witness: { inputEnabled: Array(width).fill("1") },
+          expectedPublicSignals,
+        });
+        const selected = width === 1 ? file : `${file}_4`;
+        expect(mocks.fetchAsset.mock.calls).toEqual([
+          [`/zk/shielded/${selected}.wasm`],
+          [`/zk/shielded/${selected}_final.zkey`],
+        ]);
+        expect(fetch).toHaveBeenCalledExactlyOnceWith(`/zk/shielded/${selected}.vkey.json`, { cache: "no-cache", credentials: "same-origin" });
+      }
     }
   });
 

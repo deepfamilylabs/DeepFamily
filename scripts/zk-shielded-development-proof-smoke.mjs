@@ -44,7 +44,7 @@ function runSnarkjs(args) {
   });
 }
 
-/** Check every selected development artifact against the complete six-circuit manifest. */
+/** Check every selected development artifact against the complete configured circuit manifest. */
 export function verifyDevelopmentArtifacts(actions = Object.keys(SHIELDED_CIRCUITS)) {
   const manifestPath = path.join(root, "circuits/shielded-development-manifest.json");
   if (!fs.existsSync(manifestPath)) {

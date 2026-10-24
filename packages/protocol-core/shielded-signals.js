@@ -24,17 +24,21 @@ const INPUT_ARRAYS = ["inputShardIds", "inputRoots", "inputNullifiers"];
 const OUTPUTS = ["outputCommitments", "ciphertextHashes"];
 const LINEAGE = ["endorsementRoot", "trustedRoot", "asOf"];
 
-function inputSlotCount(action) {
-  if (action === SHIELDED_POOL_ACTION.Claim) return 1;
-  return action === SHIELDED_POOL_ACTION.PrivateTransfer || action === SHIELDED_POOL_ACTION.Unshield
-    ? 4
-    : 2;
+function isValueAction(action) {
+  return action === SHIELDED_POOL_ACTION.PrivateTransfer || action === SHIELDED_POOL_ACTION.Unshield;
 }
+
+function inputSlotCount(action) {
+  return action === SHIELDED_POOL_ACTION.Claim || isValueAction(action) ? 1 : 2;
+}
+
+/** VALUE single-input and four-input circuit variants have the same public field order. */
+export const SHIELDED_VALUE_PUBLIC_SIGNAL_COUNTS = Object.freeze({ 1: 11, 4: 20 });
 
 /**
  * Each action's circuit declares exactly these named public inputs, in this order.
  * ShieldedPoolCore._publicSignals builds the same sequence. VALUE transfers and
- * withdrawals always use four input slots; Fund uses two and Claim uses one.
+ * withdrawals default to one input slot and also support four; Fund uses two and Claim uses one.
  */
 export const SHIELDED_POOL_PUBLIC_INPUTS = Object.freeze({
   [SHIELDED_POOL_ACTION.Shield]: Object.freeze([...CONTEXT, ...OUTPUTS, "amount"]),
@@ -126,7 +130,12 @@ function unused(condition, label) {
  */
 export function buildShieldedPoolPublicInputs(input) {
   const action = Number(bigintFrom(input.action, "action", 4n));
-  const width = inputSlotCount(action);
+  const width = isValueAction(action) ? input.inputShardIds?.length : inputSlotCount(action);
+  protocolAssert(
+    !isValueAction(action) || width === 1 || width === 4,
+    "INVALID_SHIELDED_SIGNAL_SHAPE",
+    "VALUE actions require one or four input slots",
+  );
   const names = SHIELDED_POOL_PUBLIC_INPUTS[action];
   const inputShardIds = values(input.inputShardIds, width, "inputShardIds");
   const inputRoots = values(input.inputRoots, width, "inputRoots");

@@ -397,8 +397,8 @@ describe("asset Worker preview and proof boundary", () => {
     expect(mocks.authorizationMode).not.toHaveBeenCalled();
   });
 
-  describe.each(["privateTransfer", "unshield"] as const)("exact balance selection for %s", (action) => {
-    it.each([true, false])("uses only permitted inputs when the exact pair is allowed: %s", async (allowPair) => {
+  describe.each(["privateTransfer", "unshield"] as const)("single-input default and multi-input fallback for %s", (action) => {
+    it.each([true, false])("uses the pair only when no covering single is permitted: %s", async (allowPair) => {
       const session = await unlocked();
       mocks.notes = [
         value(1n, 1n, secretKeys.ownerCommitment),
@@ -419,7 +419,7 @@ describe("asset Worker preview and proof boundary", () => {
         slot: "identity",
         action,
         amount: "3",
-        candidates: allowPair ? ["1", "2", "3"] : ["3"],
+        candidates: allowPair ? ["1", "2"] : ["1", "2", "3"],
         ...(action === "privateTransfer"
           ? { recipientCode: "verified-code" }
           : { publicRecipient: context.familyAddress }),

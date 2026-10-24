@@ -1,6 +1,7 @@
 import {
   SHIELDED_POOL_ACTION,
   SHIELDED_POOL_PUBLIC_SIGNAL_COUNTS,
+  SHIELDED_VALUE_PUBLIC_SIGNAL_COUNTS,
   SHIELDED_RECEIVE_CREDENTIAL_PUBLIC_SIGNAL_COUNTS,
 } from "@deepfamily/protocol-core";
 import type { Groth16Proof } from "./zk";
@@ -20,7 +21,9 @@ export const SHIELDED_CIRCUIT_NAMES = Object.freeze({
   claim: "shielded_claim",
   claim32: "shielded_claim32",
   privateTransfer: "shielded_private_transfer",
+  privateTransfer4: "shielded_private_transfer_4",
   unshield: "shielded_unshield",
+  unshield4: "shielded_unshield_4",
 });
 
 export type ShieldedCircuitName = keyof typeof SHIELDED_CIRCUIT_NAMES;
@@ -39,6 +42,8 @@ const PUBLIC_SIGNAL_COUNTS: Record<ShieldedCircuitName, number> = {
   claim32: SHIELDED_POOL_PUBLIC_SIGNAL_COUNTS[SHIELDED_POOL_ACTION.Claim],
   privateTransfer: SHIELDED_POOL_PUBLIC_SIGNAL_COUNTS[SHIELDED_POOL_ACTION.PrivateTransfer],
   unshield: SHIELDED_POOL_PUBLIC_SIGNAL_COUNTS[SHIELDED_POOL_ACTION.Unshield],
+  privateTransfer4: SHIELDED_VALUE_PUBLIC_SIGNAL_COUNTS[4],
+  unshield4: SHIELDED_VALUE_PUBLIC_SIGNAL_COUNTS[4],
 };
 
 /**
@@ -156,6 +161,19 @@ function claimWitness(witness: ShieldedWitness, circuit: "claim32" | "claim"): S
   return trimmed;
 }
 
+/** Select before downloading artifacts so a single-note spend never fetches the four-input key. */
+export function selectShieldedValueCircuit(
+  circuit: "privateTransfer" | "unshield",
+  witness: ShieldedWitness,
+): "privateTransfer" | "privateTransfer4" | "unshield" | "unshield4" {
+  const enabled = witness.inputEnabled;
+  if (!Array.isArray(enabled) || (enabled.length !== 1 && enabled.length !== 4)) {
+    throw new Error("VALUE proof witness must have one or four input slots");
+  }
+  if (enabled.length === 1) return circuit;
+  return circuit === "privateTransfer" ? "privateTransfer4" : "unshield4";
+}
+
 /** Runs entirely inside the local browser worker; no witness is posted to a prover. */
 export async function generateShieldedProof(input: {
   circuit: ShieldedCircuitName;
@@ -163,7 +181,11 @@ export async function generateShieldedProof(input: {
   expectedPublicSignals: string[];
 }): Promise<{ proof: Groth16Proof; publicSignals: string[] }> {
   const circuit =
-    input.circuit === "claim" ? selectShieldedClaimCircuit(input.witness) : input.circuit;
+    input.circuit === "claim"
+      ? selectShieldedClaimCircuit(input.witness)
+      : input.circuit === "privateTransfer" || input.circuit === "unshield"
+        ? selectShieldedValueCircuit(input.circuit, input.witness)
+        : input.circuit;
   const witness =
     circuit === "claim" || circuit === "claim32"
       ? claimWitness(input.witness, circuit)

@@ -32,6 +32,15 @@ contract ShieldedGroth16VerifierMock {
     return _check(publicSignals[14]);
   }
 
+  function verifyProof(
+    uint256[2] calldata,
+    uint256[2][2] calldata,
+    uint256[2] calldata,
+    uint256[11] calldata publicSignals
+  ) external view returns (bool) {
+    return _check(publicSignals[10]);
+  }
+
   function _check(uint256 lastSignal) private view returns (bool) {
     return accept && lastSignal == expectedLastSignal;
   }

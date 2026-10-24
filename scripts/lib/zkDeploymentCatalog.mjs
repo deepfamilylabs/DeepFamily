@@ -1,3 +1,4 @@
+import { SHIELDED_POOL_PUBLIC_SIGNAL_COUNTS, SHIELDED_VALUE_PUBLIC_SIGNAL_COUNTS } from "@deepfamily/protocol-core";
 import { SHIELDED_CIRCUITS } from "./zkCircuitSelection.mjs";
 
 export const SHIELDED_ACTIONS = Object.freeze([
@@ -12,13 +13,14 @@ export const SHIELDED_ACTIONS = Object.freeze([
 export const SHIELDED_ACTION_PROOF_PURPOSE_BASE = 2;
 
 /**
- * The same five pool action routes and the additional Claim32 verifier are deployed in every environment.
+ * Five pool actions use eight verifier targets: Claim32 and four-input VALUE variants
+ * supplement the default claim and single-input VALUE verifiers.
  * The receive-code circuit is verified in the browser and is never deployed.
  */
 export const SHIELDED_DEPLOYMENT_CIRCUITS = Object.freeze(
   Object.fromEntries(
-    [...SHIELDED_ACTIONS, "claim32"].map((action, index) => {
-      const actionId = action === "claim32" ? 2 : index;
+    [...SHIELDED_ACTIONS, "claim32", "privateTransfer4", "unshield4"].map((action, index) => {
+      const actionId = action === "claim32" ? 2 : action === "privateTransfer4" ? 3 : action === "unshield4" ? 4 : index;
       const suffix = action[0].toUpperCase() + action.slice(1);
       return [
         action,
@@ -28,6 +30,9 @@ export const SHIELDED_DEPLOYMENT_CIRCUITS = Object.freeze(
           verifierContractName: `Shielded${suffix}Verifier`,
           verifierLabel: `shielded${suffix}Verifier`,
           actionId,
+          publicSignals: action === "privateTransfer4" || action === "unshield4"
+            ? SHIELDED_VALUE_PUBLIC_SIGNAL_COUNTS[4]
+            : SHIELDED_POOL_PUBLIC_SIGNAL_COUNTS[actionId],
           proofPurpose: SHIELDED_ACTION_PROOF_PURPOSE_BASE + actionId,
           adapterVerifierGetter: `${action}Verifier`,
         }),

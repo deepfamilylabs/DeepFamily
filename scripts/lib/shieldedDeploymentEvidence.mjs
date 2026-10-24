@@ -41,14 +41,14 @@ export async function assertShieldedDeploymentBindings({
   for (const [purpose, [getter, label]] of Object.entries(
     GROTH16_ADAPTER_VERIFIER_BINDINGS,
   ).entries()) {
-    const [verifier, routedVerifier] = await Promise.all([
-      read(`adapter ${getter}`, () => adapter[getter]()),
-      getter === "claim32Verifier"
-        ? read("adapter claim32 verifier", () => adapter.claim32Verifier())
-        : read(`adapter proof purpose ${purpose}`, () => adapter.verifierForPurpose(purpose)),
-    ]);
+    const verifier = await read(`adapter ${getter}`, () => adapter[getter]());
     same(verifier, addresses[label], `adapter ${getter}`);
-    same(routedVerifier, addresses[label], `adapter proof purpose ${purpose}`);
+    // The canonical purpose lookup exposes defaults; variants route by signal width
+    // (VALUE) or proof verification (Claim32), and have their own immutable getter.
+    if (purpose < 7) {
+      const routedVerifier = await read(`adapter proof purpose ${purpose}`, () => adapter.verifierForPurpose(purpose));
+      same(routedVerifier, addresses[label], `adapter proof purpose ${purpose}`);
+    }
   }
   for (const [pool, key, kind] of [
     [deployed.shieldedErc20Pool, "shieldedErc20Pool", 0n],

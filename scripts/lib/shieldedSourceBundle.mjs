@@ -45,6 +45,8 @@ const SOURCE_EXCLUSIONS = new Set([
   "contracts/ShieldedClaim32Verifier.sol",
   "contracts/ShieldedPrivateTransferVerifier.sol",
   "contracts/ShieldedUnshieldVerifier.sol",
+  "contracts/ShieldedPrivateTransfer4Verifier.sol",
+  "contracts/ShieldedUnshield4Verifier.sol",
   "contracts/ShieldedIdentityAuthorizationUpdateVerifier.sol",
   "contracts/AnonymousReceivePresentationVerifier.sol",
   "contracts/FundReceivePresentationVerifier.sol",

@@ -9,7 +9,7 @@ include "shielded_merkle_common.circom";
 // VALUE spends share their real nullifier formula with every other pool action.
 // Capacity changes only the number of slots, never the authority or spend tag.
 template ShieldedValueInputs(CAPACITY) {
-    assert(CAPACITY == 4);
+    assert(CAPACITY == 1 || CAPACITY == 4);
     signal input poolDomain;
     signal input inputShardIds[CAPACITY];
     signal input inputRoots[CAPACITY];
@@ -99,21 +99,23 @@ template ShieldedValueInputs(CAPACITY) {
         sums[i + 1] <== sums[i] + inputAmounts[i];
     }
     spend[0].out === inputNullifiers[0];
-    // Slot one preserves the existing small-capacity dummy; all further slots
-    // include their fixed slot index in the independent dummy-purpose hash.
-    component dummyOne = Poseidon(3);
-    dummyOne.inputs[0] <== dummyTag.tag;
-    dummyOne.inputs[1] <== inputOwnerSecrets[0];
-    dummyOne.inputs[2] <== note[0].out;
-    inputNullifiers[1] === dummyOne.out + inputEnabled[1] * (spend[1].out - dummyOne.out);
-    component dummy[CAPACITY - 2];
-    for (var i = 2; i < CAPACITY; i++) {
-        dummy[i - 2] = Poseidon(4);
-        dummy[i - 2].inputs[0] <== dummyTag.tag;
-        dummy[i - 2].inputs[1] <== inputOwnerSecrets[0];
-        dummy[i - 2].inputs[2] <== note[0].out;
-        dummy[i - 2].inputs[3] <== i;
-        inputNullifiers[i] === dummy[i - 2].out + inputEnabled[i] * (spend[i].out - dummy[i - 2].out);
+    if (CAPACITY > 1) {
+        // Slot one preserves the existing small-capacity dummy; all further slots
+        // include their fixed slot index in the independent dummy-purpose hash.
+        component dummyOne = Poseidon(3);
+        dummyOne.inputs[0] <== dummyTag.tag;
+        dummyOne.inputs[1] <== inputOwnerSecrets[0];
+        dummyOne.inputs[2] <== note[0].out;
+        inputNullifiers[1] === dummyOne.out + inputEnabled[1] * (spend[1].out - dummyOne.out);
+        component dummy[CAPACITY - 2];
+        for (var i = 2; i < CAPACITY; i++) {
+            dummy[i - 2] = Poseidon(4);
+            dummy[i - 2].inputs[0] <== dummyTag.tag;
+            dummy[i - 2].inputs[1] <== inputOwnerSecrets[0];
+            dummy[i - 2].inputs[2] <== note[0].out;
+            dummy[i - 2].inputs[3] <== i;
+            inputNullifiers[i] === dummy[i - 2].out + inputEnabled[i] * (spend[i].out - dummy[i - 2].out);
+        }
     }
     component sumBits = Num2Bits(130);
     sumBits.in <== sums[CAPACITY];

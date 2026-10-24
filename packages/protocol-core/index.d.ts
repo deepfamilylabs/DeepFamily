@@ -1032,6 +1032,7 @@ export const SHIELDED_POOL_PUBLIC_INPUTS: Readonly<
   Record<number, readonly ShieldedPoolPublicInputName[]>
 >;
 export const SHIELDED_POOL_PUBLIC_SIGNAL_COUNTS: Readonly<Record<number, number>>;
+export const SHIELDED_VALUE_PUBLIC_SIGNAL_COUNTS: Readonly<{ 1: 11; 4: 20 }>;
 export interface ShieldedPoolPublicSignalInput {
   receiveBindings?: readonly [BigNumberish, BigNumberish];
   receiveAuthorizations?: readonly ShieldedReceiveAuthorization[];
@@ -1087,7 +1088,7 @@ export interface ShieldedValueSpendCandidate {
 }
 export interface ShieldedValueSpendStep {
   kind: "merge" | "spend";
-  capacity: 4;
+  capacity: 1 | 4;
   inputCommitments: string[];
   inputAmount: bigint;
   outputAmounts: [bigint, bigint];

@@ -279,7 +279,7 @@ abstract contract ShieldedPoolCore is ReentrancyGuardTransient {
     bool isShield = action == Action.Shield;
     bool isClaim = action == Action.Claim;
     bool isInitialFund = action == Action.Fund && data.fundMode == 0;
-    uint256 capacity = _inputCount(action);
+    uint256 capacity = _inputCount(action, data.inputNullifiers.length);
     if (isShield) capacity = 2;
     if (
       data.inputNullifiers.length != capacity ||
@@ -455,7 +455,7 @@ abstract contract ShieldedPoolCore is ReentrancyGuardTransient {
     uint256 amount,
     address recipient
   ) private view returns (uint256[] memory signals) {
-    uint256 inputs = _inputCount(action);
+    uint256 inputs = _inputCount(action, data.inputNullifiers.length);
     bool isClaim = action == Action.Claim;
     bool hasLineage = isClaim || action == Action.Fund;
     bool hasAmount = action == Action.Shield || action == Action.Unshield;
@@ -549,11 +549,14 @@ abstract contract ShieldedPoolCore is ReentrancyGuardTransient {
     ) revert InvalidFieldElement();
   }
 
-  /** @dev VALUE actions prove four root slots; Fund proves two and Claim proves one. */
-  function _inputCount(Action action) private pure returns (uint256) {
+  /** @dev VALUE actions use one or four slots; Fund uses two and Claim uses one. */
+  function _inputCount(Action action, uint256 valueInputCount) private pure returns (uint256) {
     if (action == Action.Shield) return 0;
     if (action == Action.Claim) return 1;
-    if (action == Action.PrivateTransfer || action == Action.Unshield) return 4;
+    if (action == Action.PrivateTransfer || action == Action.Unshield) {
+      if (valueInputCount != 1 && valueInputCount != 4) revert InvalidActionData();
+      return valueInputCount;
+    }
     return 2;
   }
 

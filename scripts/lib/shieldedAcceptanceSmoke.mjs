@@ -1165,21 +1165,21 @@ export async function runShieldedAcceptanceSmoke({
       "Verifier-only identity claim changed pool state",
     );
 
-    const valuePrivateInputs = (source, membership) => ({
-      inputEnabled: ["1", ...Array(3).fill("0")],
-      inputOwnerSecrets: [String(source.keys.ownerSecret), ...Array(3).fill("0")],
-      inputAmounts: [String(source.amount), ...Array(3).fill("0")],
-      inputNonces: [String(source.nonce), ...Array(3).fill("0")],
-      inputCiphertextHashes: [String(source.ciphertextHashField), ...Array(3).fill("0")],
-      inputDepths: [membership.depth, ...Array(3).fill("0")],
-      inputIndices: [membership.index, ...Array(3).fill("0")],
-      inputSiblings: [membership.siblings, ...Array.from({ length: 3 }, () => Array(32).fill("0"))],
+    const valuePrivateInputs = (source, membership, capacity = 1) => ({
+      inputEnabled: ["1", ...Array(capacity - 1).fill("0")],
+      inputOwnerSecrets: [String(source.keys.ownerSecret), ...Array(capacity - 1).fill("0")],
+      inputAmounts: [String(source.amount), ...Array(capacity - 1).fill("0")],
+      inputNonces: [String(source.nonce), ...Array(capacity - 1).fill("0")],
+      inputCiphertextHashes: [String(source.ciphertextHashField), ...Array(capacity - 1).fill("0")],
+      inputDepths: [membership.depth, ...Array(capacity - 1).fill("0")],
+      inputIndices: [membership.index, ...Array(capacity - 1).fill("0")],
+      inputSiblings: [membership.siblings, ...Array.from({ length: capacity - 1 }, () => Array(32).fill("0"))],
     });
-    const valueData = (source, membership, outputNotes) => ({
+    const valueData = (source, membership, outputNotes, capacity = 1) => ({
       ...zeroData(),
-      inputShardIds: Array(4).fill(membership.shardId),
-      inputRoots: Array(4).fill(membership.root),
-      inputNullifiers: Array.from({ length: 4 }, (_, index) =>
+      inputShardIds: Array(capacity).fill(membership.shardId),
+      inputRoots: Array(capacity).fill(membership.root),
+      inputNullifiers: Array.from({ length: capacity }, (_, index) =>
         index === 0
           ? spend(source)
           : computeShieldedDummyInputNullifierForSlot(
@@ -1192,16 +1192,26 @@ export async function runShieldedAcceptanceSmoke({
       ...outputs(outputNotes),
     });
 
+    const proveFourInputValue = async (action, source, membership, outputNotes, openings, external = {}, credentials) => {
+      const data = valueData(source, membership, outputNotes, 4);
+      const receiverWitness = credentials ? await authorizeReceivers(action, data, credentials) : {};
+      const inputs = publicInputsFor(action, data, external);
+      return prove(`${action}4`, {
+        ...inputs.witness,
+        ...receiverWitness,
+        ...valuePrivateInputs(source, membership, 4),
+        ...openings,
+      }, inputs.signals, { execution: "verifier-call" });
+    };
+
     const transferOutputs = await Promise.all([
       valueNote(heirKeys, 400n),
       valueNote(donorKeys, 100n),
     ]);
     const transferPath = await notePath(publicFundChange);
     const transferData = valueData(publicFundChange, transferPath, transferOutputs);
-    const transferReceiverWitness = await authorizeReceivers("privateTransfer", transferData, [
-      await receiveCodeFor(childMaterial, childKeys, "anonymous"),
-      null,
-    ]);
+    const transferCredentials = [await receiveCodeFor(childMaterial, childKeys, "anonymous"), null];
+    const transferReceiverWitness = await authorizeReceivers("privateTransfer", transferData, transferCredentials);
     const transferInputs = publicInputsFor("privateTransfer", transferData);
     const transferProof = await prove(
       "privateTransfer",
@@ -1215,6 +1225,11 @@ export async function runShieldedAcceptanceSmoke({
       },
       transferInputs.signals,
     );
+    await proveFourInputValue("privateTransfer", publicFundChange, transferPath, transferOutputs, {
+      outputOwnerCommitments: decimals(transferOutputs.map((note) => note.ownerCommitment)),
+      outputAmounts: decimals(transferOutputs.map((note) => note.amount)),
+      outputNonces: decimals(transferOutputs.map((note) => note.nonce)),
+    }, {}, transferCredentials);
     await submit("privateTransfer", transferData, transferProof, transferOutputs);
 
     const unshieldSource = transferOutputs[0];
@@ -1239,6 +1254,11 @@ export async function runShieldedAcceptanceSmoke({
       },
       unshieldInputs.signals,
     );
+    await proveFourInputValue("unshield", unshieldSource, unshieldPath, unshieldOutputs, {
+      changeAmount: "300",
+      changeNonce: String(unshieldOutputs[0].nonce),
+      dummyNonce: String(unshieldOutputs[1].nonce),
+    }, { amount: unshieldedAmount, recipient: signerAddress });
     await submit("unshield", unshieldData, unshieldProof, unshieldOutputs, {
       amount: unshieldedAmount,
       recipient: signerAddress,

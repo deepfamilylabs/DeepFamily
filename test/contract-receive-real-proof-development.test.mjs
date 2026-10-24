@@ -12,7 +12,6 @@ import {
   buildShieldedPoolPublicInputs,
   computeShieldedBudgetNoteCommitment,
   computeShieldedBudgetUseNullifier,
-  computeShieldedDummyInputNullifierForSlot,
   computeShieldedEnrollmentCommitment,
   computeShieldedLetterRelationCommitment,
   computeShieldedOwnerCommitment,
@@ -441,21 +440,14 @@ describe("Receive presentation real-proof canonical pool and letter integration"
         const selfChange = value(donor.amount - 100n, 202n, "d2");
         const transfer = {
           ...zeroData(),
-          inputShardIds: Array(4).fill(0n),
-          inputRoots: Array(4).fill(transferRoot),
-          inputNullifiers: Array.from({ length: 4 }, (_, slot) =>
-            slot === 0
-              ? computeShieldedSpendNullifier(
-                  { ownerSecret: donorSecret, noteCommitment: donor.commitment },
-                  scope,
-                )
-              : computeShieldedDummyInputNullifierForSlot(
-                  donorSecret,
-                  donor.commitment,
-                  slot,
-                  scope,
-                ),
-          ),
+          inputShardIds: [0n],
+          inputRoots: [transferRoot],
+          inputNullifiers: [
+            computeShieldedSpendNullifier(
+              { ownerSecret: donorSecret, noteCommitment: donor.commitment },
+              scope,
+            ),
+          ],
           outputCommitments: [external.commitment, selfChange.commitment],
           outputCiphertexts: [external.ciphertext, selfChange.ciphertext],
         };
@@ -476,7 +468,7 @@ describe("Receive presentation real-proof canonical pool and letter integration"
           proof: prover.presentation(transferPresentation),
         };
         const transferInputs = buildShieldedPoolPublicInputs({ action: 3, ...scope, ...transfer });
-        const first = (value) => [String(value), ...Array(3).fill("0")];
+        const first = (value) => [String(value)];
         const transferProof = prover.circom(
           "shielded_private_transfer",
           {
@@ -488,10 +480,7 @@ describe("Receive presentation real-proof canonical pool and letter integration"
             inputCiphertextHashes: first(donor.ciphertextHashField),
             inputDepths: first(transferPath.depth),
             inputIndices: first(transferPath.index),
-            inputSiblings: [
-              transferPath.siblings,
-              ...Array.from({ length: 3 }, () => Array(32).fill("0")),
-            ],
+            inputSiblings: [transferPath.siblings],
             outputOwnerCommitments: [String(keys.ownerCommitment), String(donorOwner)],
             outputAmounts: ["100", String(selfChange.amount)],
             outputNonces: ["201", "202"],

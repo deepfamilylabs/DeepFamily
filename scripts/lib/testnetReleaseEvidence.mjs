@@ -8,7 +8,6 @@ import { keccak256, toBeHex } from "ethers";
 import {
   SECONDS_PER_DAY,
   MAX_UINT32,
-  SHIELDED_POOL_PUBLIC_SIGNAL_COUNTS,
 } from "@deepfamily/protocol-core";
 import { MAINNET_MIN_DELAY_FLOOR_SECONDS } from "./mainnetReleaseSafety.mjs";
 import {
@@ -1366,7 +1365,7 @@ const requireShieldedAcceptanceEvidence = (report, repositoryRoot, expectedChain
     requireSha256(proof.proofSha256, `shielded.proofs.${action}.proofSha256`);
     if (
       !Array.isArray(proof.publicSignals) ||
-      proof.publicSignals.length !== SHIELDED_POOL_PUBLIC_SIGNAL_COUNTS[spec.actionId] ||
+      proof.publicSignals.length !== spec.publicSignals ||
       proof.publicSignals.some(
         (signal) => typeof signal !== "string" || !/^(?:0|[1-9][0-9]*)$/u.test(signal),
       )
@@ -1392,6 +1391,10 @@ const requireShieldedAcceptanceEvidence = (report, repositoryRoot, expectedChain
       requireExact(proof.claimCount, 3, `shielded.proofs.${action}.claimCount`);
       if (Object.hasOwn(proof, "transactionLabel"))
         throw new Error("Future-maturity claim proof must not claim an executed pool transaction");
+    } else if (action === "privateTransfer4" || action === "unshield4") {
+      requireExact(proof.execution, "verifier-call", `shielded.proofs.${action}.execution`);
+      if (Object.hasOwn(proof, "transactionLabel"))
+        throw new Error("Four-input verifier coverage must not claim an executed pool transaction");
     } else {
       requireExact(proof.execution, "transaction", `shielded.proofs.${action}.execution`);
       requireExact(proof.transactionLabel, label, `shielded.proofs.${action}.transactionLabel`);

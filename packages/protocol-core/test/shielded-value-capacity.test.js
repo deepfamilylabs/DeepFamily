@@ -32,6 +32,7 @@ const assertConservation = (
   const originalInputs = new Set();
   for (const [index, step] of plan.steps.entries()) {
     assert(step.inputCommitments.length > 0 && step.inputCommitments.length <= 4);
+    assert.equal(step.capacity, step.inputCommitments.length === 1 ? 1 : 4);
     assert.equal(new Set(step.inputCommitments).size, step.inputCommitments.length);
     assert(step.inputCommitments.every((commitment) => running.has(commitment)));
     assert.equal(
@@ -59,6 +60,8 @@ const assertConservation = (
 // Exhaustive enumeration is intentionally independent of the production planner and restricted
 // to small fixtures. Compare the objective, leaving equivalent commitment ordering unspecified.
 const optimalDirectSpend = (source, amount) => {
+  const singles = source.filter((note) => note.amount >= amount);
+  if (singles.length) return { total: singles.reduce((best, note) => note.amount < best ? note.amount : best, singles[0].amount), count: 1 };
   let best;
   for (let mask = 1; mask < 2 ** source.length; mask++) {
     const selected = source.filter((_, index) => mask & (1 << index));
@@ -93,12 +96,13 @@ test("planner minimizes change and then input count within one transaction", () 
   assert.equal(plan.steps.length, 1);
   assert.equal(plan.steps[0].capacity, 4);
 });
-test("the user transfer of three consumes the permitted one and two instead of ten", () => {
+test("a sufficient permitted note uses the single-input route even if a combination is exact", () => {
   const source = notes([10000, 1000, 100, 10, 1, 2, 20, 200, 2000, 20000]);
   const plan = planShieldedValueSpend({ notes: source, amount: 3n, maxInputs: 4 });
   assert.equal(plan.steps.length, 1);
-  assert.deepEqual(new Set(plan.selectedCommitments), new Set(["5", "6"]));
-  assert.deepEqual(plan.steps[0].outputAmounts, [3n, 0n]);
+  assert.deepEqual(plan.selectedCommitments, ["4"]);
+  assert.equal(plan.steps[0].capacity, 1);
+  assert.deepEqual(plan.steps[0].outputAmounts, [3n, 7n]);
   assertConservation(source, plan);
 });
 test("exact combinations cannot consume notes outside the allowed candidate boundary", () => {
@@ -127,16 +131,16 @@ test("equal exact amounts prefer fewer inputs", () => {
   assert.equal(sum(selectedAmounts(source, plan)), 7n);
   assertConservation(source, plan);
 });
-test("without an exact sum the planner compares combination change against a single note", () => {
+test("a covering single keeps the small circuit even when a pair has less change", () => {
   for (const [amounts, expectedInput] of [
     [[8, 5, 4], 8n],
-    [[10, 4, 4], 8n],
+    [[10, 4, 4], 10n],
   ]) {
     const source = notes(amounts);
     const plan = planShieldedValueSpend({ notes: source, amount: 7n, maxInputs: 4 });
     assert.equal(plan.steps.length, 1);
     assert.equal(plan.steps[0].inputAmount, expectedInput);
-    assert.deepEqual(plan.steps[0].outputAmounts, [7n, 1n]);
+    assert.deepEqual(plan.steps[0].outputAmounts, [7n, expectedInput - 7n]);
     assertConservation(source, plan);
   }
 });
@@ -149,12 +153,12 @@ test("an exact sum requiring nine inputs cannot add a merge when one note alread
   assertConservation(source, plan);
 });
 test("an exact sum using the full four-input capacity still fits one transaction", () => {
-  const source = notes([...Array(4).fill(1), 20]);
+  const source = notes(Array(4).fill(1));
   const plan = planShieldedValueSpend({ notes: source, amount: 4n, maxInputs: 4 });
   assert.equal(plan.steps.length, 1);
   assert.equal(plan.steps[0].inputCommitments.length, 4);
   assert.deepEqual(plan.steps[0].outputAmounts, [4n, 0n]);
-  assert(!plan.selectedCommitments.includes("5"));
+  assert.equal(plan.steps[0].capacity, 4);
   assertConservation(source, plan);
 });
 test("single-input funding keeps its direct transaction instead of merging an exact combination", () => {
@@ -173,10 +177,10 @@ test("single-input funding keeps its direct transaction instead of merging an ex
 });
 test("decimal token amounts remain exact above JavaScript integer precision", () => {
   const unit = 10n ** 18n;
-  const source = notes([unit, unit / 10n, unit / 5n]);
+  const source = notes([unit / 10n, unit / 5n]);
   const plan = planShieldedValueSpend({ notes: source, amount: (unit * 3n) / 10n, maxInputs: 4 });
   assert.equal(plan.steps.length, 1);
-  assert.deepEqual(new Set(plan.selectedCommitments), new Set(["2", "3"]));
+  assert.deepEqual(new Set(plan.selectedCommitments), new Set(["1", "2"]));
   assert.deepEqual(plan.steps[0].outputAmounts, [(unit * 3n) / 10n, 0n]);
   assertConservation(source, plan);
 });
@@ -200,7 +204,7 @@ test("selection is deterministic across note and candidate ordering, including e
     assertConservation(source, actual);
   }
 });
-test("small deterministic fixtures match an exhaustive minimum-change and input-count oracle", () => {
+test("small fixtures match an exhaustive single-first, then minimum-change oracle", () => {
   let seed = 0x5eed;
   const next = () => {
     seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
@@ -276,7 +280,8 @@ test("planner previews all merges and single-input funding without importing uns
     maxInputs: 1,
   });
   assert.equal(plan.steps.at(-1).inputCommitments.length, 1);
-  assert(plan.steps.every((step) => step.capacity === 4));
+  assert.equal(plan.steps.at(-1).capacity, 1);
+  assert(plan.steps.filter((step) => step.kind === "merge").every((step) => step.capacity === 4));
   assert(
     plan.steps
       .filter((step) => step.kind === "merge")

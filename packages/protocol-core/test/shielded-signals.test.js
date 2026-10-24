@@ -4,6 +4,7 @@ import {
   SHIELDED_POOL_ACTION,
   SHIELDED_POOL_PUBLIC_INPUTS,
   SHIELDED_POOL_PUBLIC_SIGNAL_COUNTS,
+  SHIELDED_VALUE_PUBLIC_SIGNAL_COUNTS,
   buildShieldedPoolPublicInputs,
   buildShieldedPoolPublicSignals,
   encodePublicShieldedBudgetEnvelope,
@@ -48,10 +49,33 @@ test("each pool action has the verifier input count in ProofConstants.sol", () =
       Shield: 7,
       Fund: 29,
       Claim: 15,
-      PrivateTransfer: 20,
-      Unshield: 20,
+      PrivateTransfer: 11,
+      Unshield: 11,
     },
   );
+});
+
+
+test("VALUE actions support the single-input default and reject mixed variant widths", () => {
+  for (const action of [SHIELDED_POOL_ACTION.PrivateTransfer, SHIELDED_POOL_ACTION.Unshield]) {
+    for (const width of [1, 4]) {
+      const input = {
+        ...valueBase,
+        action,
+        inputShardIds: valueBase.inputShardIds.slice(0, width),
+        inputRoots: valueBase.inputRoots.slice(0, width),
+        inputNullifiers: valueBase.inputNullifiers.slice(0, width),
+      };
+      const { signals, witness } = buildShieldedPoolPublicInputs(input);
+      assert.equal(signals.length, SHIELDED_VALUE_PUBLIC_SIGNAL_COUNTS[width]);
+      assert.equal(witness.inputShardIds.length, width);
+      assert.deepEqual(signals.slice(2, 2 + width), input.inputShardIds.map(BigInt));
+      assert.throws(
+        () => buildShieldedPoolPublicSignals({ ...input, inputNullifiers: width === 1 ? [1, 2, 3, 4] : [1] }),
+        (error) => error.code === "INVALID_SHIELDED_SIGNAL_SHAPE",
+      );
+    }
+  }
 });
 
 test("claim signals follow the circuit's named public inputs", () => {

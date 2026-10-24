@@ -591,18 +591,15 @@ describe("shielded pool asset-worker proof submission", () => {
     expect(f.methods.privateTransfer).toHaveBeenCalledOnce();
   });
 
-  it("routes canonical four-input actions to their contract methods", async () => {
+  it("routes single-input and four-input actions to their contract methods", async () => {
     for (const action of ["privateTransfer", "unshield"] as const) {
-      const f = fixture();
-      const data = {
-        ...f.common.data,
-        inputShardIds: Array(4).fill(0n),
-        inputRoots: Array(4).fill(123n),
-        inputNullifiers: Array.from({ length: 4 }, (_, i) => BigInt(i + 1)),
-      };
-      if (action === "privateTransfer") await submitPrivateTransfer({ ...f.common, data });
-      else await submitUnshield({ ...f.common, data, recipient: RECIPIENT, amount: 75n });
-      expect(f.methods[action]).toHaveBeenCalledOnce();
+      for (const width of [1, 4]) {
+        const f = fixture();
+        const data = actionData(width);
+        if (action === "privateTransfer") await submitPrivateTransfer({ ...f.common, data });
+        else await submitUnshield({ ...f.common, data, recipient: RECIPIENT, amount: 75n });
+        expect(f.methods[action]).toHaveBeenCalledOnce();
+      }
     }
   });
 
@@ -613,7 +610,7 @@ describe("shielded pool asset-worker proof submission", () => {
         action === "privateTransfer"
           ? submitPrivateTransfer(f.common)
           : submitUnshield({ ...f.common, recipient: RECIPIENT, amount: 75n });
-      await expect(pending).rejects.toThrow("inputShardIds must have 4 values");
+      await expect(pending).rejects.toThrow("VALUE actions require one or four input slots");
       expect(f.methods[action]).not.toHaveBeenCalled();
       expect(f.estimateGas).not.toHaveBeenCalled();
     }

@@ -40,6 +40,16 @@ interface IGroth16Verifier7 {
   ) external view returns (bool);
 }
 
+/** @dev Generated verifier interface for the single-input VALUE circuits. */
+interface IGroth16Verifier11 {
+  function verifyProof(
+    uint256[2] calldata a,
+    uint256[2][2] calldata b,
+    uint256[2] calldata c,
+    uint256[11] calldata publicSignals
+  ) external view returns (bool);
+}
+
 /** @dev Generated verifier interface for the fifteen-signal claim circuit. */
 interface IGroth16Verifier15 {
   function verifyProof(
@@ -94,15 +104,18 @@ contract Groth16VerifierAdapter is IProofVerifierAdapter {
   address public immutable claim32Verifier;
   address public immutable privateTransferVerifier;
   address public immutable unshieldVerifier;
+  address public immutable privateTransfer4Verifier;
+  address public immutable unshield4Verifier;
 
   /**
-   * @param shieldedVerifiers Five pool actions in enum order, followed by Claim32. A zero
+   * @param shieldedVerifiers Five default pool actions in enum order, followed by Claim32,
+   *                          PrivateTransfer4 and Unshield4. A zero
    *                          address explicitly disables a route.
    */
   constructor(
     address _personVerifier,
     address _disclosureBindingVerifier,
-    address[6] memory shieldedVerifiers
+    address[8] memory shieldedVerifiers
   ) {
     _validateVerifier(_personVerifier);
     _validateVerifier(_disclosureBindingVerifier);
@@ -119,6 +132,8 @@ contract Groth16VerifierAdapter is IProofVerifierAdapter {
     privateTransferVerifier = shieldedVerifiers[3];
     unshieldVerifier = shieldedVerifiers[4];
     claim32Verifier = shieldedVerifiers[5];
+    privateTransfer4Verifier = shieldedVerifiers[6];
+    unshield4Verifier = shieldedVerifiers[7];
   }
 
   /** @notice Returns a known route's verifier, or zero when the route was explicitly disabled. */
@@ -163,7 +178,19 @@ contract Groth16VerifierAdapter is IProofVerifierAdapter {
     }
 
     address verifier = verifierForPurpose(purpose);
-    if (publicSignals.length != _publicSignalsLength(purpose)) revert MalformedProofData();
+    if (
+      purpose == ProofConstants.PROOF_PURPOSE_SHIELDED_PRIVATE_TRANSFER &&
+      publicSignals.length == ProofConstants.SHIELDED_PRIVATE_TRANSFER_4_PUBLIC_SIGNALS_LEN
+    ) {
+      verifier = privateTransfer4Verifier;
+    } else if (
+      purpose == ProofConstants.PROOF_PURPOSE_SHIELDED_UNSHIELD &&
+      publicSignals.length == ProofConstants.SHIELDED_UNSHIELD_4_PUBLIC_SIGNALS_LEN
+    ) {
+      verifier = unshield4Verifier;
+    } else if (publicSignals.length != _publicSignalsLength(purpose)) {
+      revert MalformedProofData();
+    }
     if (verifier == address(0)) revert VerifierNotConfigured(purpose);
 
     (uint256[2] memory a, uint256[2][2] memory b, uint256[2] memory c) = abi.decode(
@@ -210,6 +237,11 @@ contract Groth16VerifierAdapter is IProofVerifierAdapter {
       uint256[7] memory signals7;
       for (uint256 i = 0; i < length; ++i) signals7[i] = publicSignals[i];
       return IGroth16Verifier7(verifier).verifyProof(a, b, c, signals7);
+    }
+    if (length == 11) {
+      uint256[11] memory signals11;
+      for (uint256 i = 0; i < length; ++i) signals11[i] = publicSignals[i];
+      return IGroth16Verifier11(verifier).verifyProof(a, b, c, signals11);
     }
     if (length == 29) {
       uint256[29] memory signals29;

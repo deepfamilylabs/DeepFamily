@@ -1,4 +1,4 @@
-// Run with: node --test circuits/test/shielded_private_transfer.test.mjs
+// Run with: node --test circuits/test/shielded_private_transfer_4.test.mjs
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
@@ -201,7 +201,7 @@ async function compile(directory, name) {
 test("private transfer circuit", async (t) => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), "deepfamily-policy-transfer-"));
   try {
-    const transfer = await compile(directory, "shielded_private_transfer");
+    const transfer = await compile(directory, "shielded_private_transfer_4");
     const validTransfer = privateTransferFixture();
     const validSingleTransfer = singleInputPrivateTransferFixture();
     await t.test(

@@ -1557,7 +1557,9 @@
       "artifactSha256": null,
       "runtimeSha256": null,
       "fundVerifierImmutable": null,
-      "claim32VerifierImmutable": null
+      "claim32VerifierImmutable": null,
+      "privateTransfer4VerifierImmutable": null,
+      "unshield4VerifierImmutable": null
     },
     "deepFamilyReader": {
       "address": null,
@@ -1604,6 +1606,16 @@
         "runtimeSha256": null
       },
       "claim32": {
+        "address": null,
+        "artifactSha256": null,
+        "runtimeSha256": null
+      },
+      "privateTransfer4": {
+        "address": null,
+        "artifactSha256": null,
+        "runtimeSha256": null
+      },
+      "unshield4": {
         "address": null,
         "artifactSha256": null,
         "runtimeSha256": null

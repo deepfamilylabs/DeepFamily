@@ -166,7 +166,7 @@ test("shield and unshield boundary circuits", async (t) => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), "deepfamily-shielded-value-"));
   try {
     const shield = await compileCircuit(directory, "shielded_shield");
-    const unshield = await compileCircuit(directory, "shielded_unshield");
+    const unshield = await compileCircuit(directory, "shielded_unshield_4");
     const deposit = shieldFixture();
     const withdrawal = unshieldFixture();
 

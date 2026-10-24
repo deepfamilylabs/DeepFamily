@@ -351,6 +351,50 @@ describe("ShieldedErc20Pool contract boundaries", function () {
     expect(await pool.nullifierSpent(981n)).to.equal(true);
   });
 
+  it("executes single-input VALUE actions and rejects capacity changes before spending", async () => {
+    const { pool, recipient, token } = await setup();
+    const deposit = actionData();
+    await pool.shield(100n, deposit, await proofFor(pool, 0, deposit, 100n));
+    const root = (await pool.noteShard(0)).root;
+    const transfer = actionData({
+      inputShardIds: [0n],
+      inputRoots: [root],
+      inputNullifiers: [401n],
+      outputCommitments: [4031n, 4032n],
+    });
+    const proof = await proofFor(pool, 3, transfer);
+    const padded = valueActionData(transfer);
+    await expect(pool.privateTransfer(padded, proof)).to.be.revertedWithCustomError(
+      pool,
+      "InvalidZKProof",
+    );
+    await expect(
+      pool.privateTransfer({ ...transfer, inputRoots: [root, root] }, proof),
+    ).to.be.revertedWithCustomError(pool, "InvalidActionData");
+    await expect(pool.privateTransfer(transfer, proof))
+      .to.emit(pool, "ActionExecuted")
+      .withArgs(3, 0n, 0n);
+    expect(await pool.nullifierCount()).to.equal(1n);
+    await expect(
+      pool.privateTransfer(padded, await proofFor(pool, 3, padded)),
+    ).to.be.revertedWithCustomError(pool, "NullifierAlreadySpent");
+    const exit = actionData({
+      inputShardIds: [0n],
+      inputRoots: [(await pool.noteShard(0)).root],
+      inputNullifiers: [402n],
+      outputCommitments: [4041n, 4042n],
+    });
+    await pool.unshield(
+      recipient.address,
+      30n,
+      exit,
+      await proofFor(pool, 4, exit, 30n, recipient.address),
+    );
+    expect(await pool.nullifierCount()).to.equal(2n);
+    expect(await pool.totalShielded()).to.equal(70n);
+    expect(await token.balanceOf(recipient.address)).to.equal(30n);
+  });
+
   it("routes four-slot VALUE proofs and spends every real and placeholder nullifier", async () => {
     const { pool, recipient } = await setup();
     const deposit = actionData();

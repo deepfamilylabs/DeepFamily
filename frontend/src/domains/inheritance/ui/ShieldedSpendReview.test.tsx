@@ -59,17 +59,17 @@ function renderReview(props: ShieldedSpendReviewProps) {
 }
 
 describe("ShieldedSpendReview", () => {
-  it.each(["privateTransfer", "unshield"] as const)("shows the exact 1 + 2 selection in one %s without change", (action) => {
+  it.each(["privateTransfer", "unshield"] as const)("shows the covering single note and its change for %s", (action) => {
     renderReview(reviewProps("3", action));
     const review = screen.getByRole("region", { name: "余额使用预览" });
     expect(within(review).getByText("允许使用：9 笔，共 31,333 DEEP")).toBeTruthy();
-    expect(within(review).getByText("本次计划实际使用：2 笔，共 3 DEEP")).toBeTruthy();
-    expect(within(review).getByText("本步使用 2 笔，共 3 DEEP")).toBeTruthy();
-    expect(within(review).getByText("第 4 笔余额 · 1 DEEP")).toBeTruthy();
-    expect(within(review).getByText("第 8 笔余额 · 2 DEEP")).toBeTruthy();
-    expect(within(review).queryByText("第 3 笔余额 · 10 DEEP")).toBeNull();
+    expect(within(review).getByText("本次计划实际使用：1 笔，共 10 DEEP")).toBeTruthy();
+    expect(within(review).getByText("本步使用 1 笔，共 10 DEEP")).toBeTruthy();
+    expect(within(review).getByText("第 3 笔余额 · 10 DEEP")).toBeTruthy();
+    expect(within(review).queryByText("第 4 笔余额 · 1 DEEP")).toBeNull();
+    expect(within(review).queryByText("第 8 笔余额 · 2 DEEP")).toBeNull();
     expect(within(review).getByText("共 1 笔交易；每步最多使用 4 笔余额，逐步确认。")).toBeTruthy();
-    expect(within(review).getByText("找零（仍归你所有）").parentElement!.textContent).toBe("找零（仍归你所有）0 DEEP");
+    expect(within(review).getByText("找零（仍归你所有）").parentElement!.textContent).toBe("找零（仍归你所有）7 DEEP");
     // The amount heads the review once and closes the final step once.
     expect(within(review).getAllByText("3 DEEP")).toHaveLength(1);
     expect(within(review).getByText("3", { selector: "span" })).toBeTruthy();

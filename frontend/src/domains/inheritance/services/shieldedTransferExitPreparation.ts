@@ -266,25 +266,34 @@ function publicInputs(
   }).witness;
 }
 
-/** Every VALUE proof has four slots; disabled private openings are zero-filled. */
+/** Single-note spends use the smaller circuit; other spends pad to four slots. */
+function valueInputCapacity(count: number): 1 | 4 {
+  return count === 1 ? 1 : 4;
+}
+
 function valueInputWitness(opened: readonly OpenedValueInput[]): ShieldedWitness {
+  const capacity = valueInputCapacity(opened.length);
   return {
-    inputEnabled: Array.from({ length: 4 }, (_, index) => (index < opened.length ? "1" : "0")),
-    inputOwnerSecrets: Array.from({ length: 4 }, (_, index) =>
+    inputEnabled: Array.from({ length: capacity }, (_, index) => (index < opened.length ? "1" : "0")),
+    inputOwnerSecrets: Array.from({ length: capacity }, (_, index) =>
       String(opened[index]?.ownerSecret ?? 0n),
     ),
-    inputAmounts: Array.from({ length: 4 }, (_, index) => String(opened[index]?.note.amount ?? 0n)),
-    inputNonces: Array.from({ length: 4 }, (_, index) => String(opened[index]?.note.nonce ?? 0n)),
-    inputCiphertextHashes: Array.from({ length: 4 }, (_, index) =>
+    inputAmounts: Array.from({ length: capacity }, (_, index) =>
+      String(opened[index]?.note.amount ?? 0n),
+    ),
+    inputNonces: Array.from({ length: capacity }, (_, index) =>
+      String(opened[index]?.note.nonce ?? 0n),
+    ),
+    inputCiphertextHashes: Array.from({ length: capacity }, (_, index) =>
       String(opened[index]?.ciphertextHashField ?? 0n),
     ),
-    inputDepths: Array.from({ length: 4 }, (_, index) =>
+    inputDepths: Array.from({ length: capacity }, (_, index) =>
       String(opened[index]?.path.proofDepth ?? 0),
     ),
-    inputIndices: Array.from({ length: 4 }, (_, index) =>
+    inputIndices: Array.from({ length: capacity }, (_, index) =>
       String(opened[index]?.path.proofIndex ?? 0n),
     ),
-    inputSiblings: Array.from({ length: 4 }, (_, index) =>
+    inputSiblings: Array.from({ length: capacity }, (_, index) =>
       decimal(opened[index]?.path.siblings ?? Array<bigint>(32).fill(0n)),
     ),
   };
@@ -364,9 +373,10 @@ export async function prepareShieldedPrivateTransfer(input: {
       return encryptValueOutput(note, destination.viewingKey, ctx, destination.selfHpkeIkm);
     }),
   )) as [PreparedShieldedValueOutput, PreparedShieldedValueOutput];
-  const paths = Array.from({ length: 4 }, (_, index) => opened[index] ?? first);
+  const capacity = valueInputCapacity(opened.length);
+  const paths = Array.from({ length: capacity }, (_, index) => opened[index] ?? first);
   const nullifiers = Array.from(
-    { length: 4 },
+    { length: capacity },
     (_, index) =>
       opened[index]?.nullifier ??
       computeShieldedDummyInputNullifierForSlot(
@@ -447,8 +457,9 @@ export async function prepareShieldedUnshield(input: {
   const outputs = (await Promise.all(
     notes.map((note) => encryptValueOutput(note, viewingKey, ctx, opened.hpkeIkm)),
   )) as [PreparedShieldedValueOutput, PreparedShieldedValueOutput];
+  const capacity = valueInputCapacity(allOpened.length);
   const nullifiers = Array.from(
-    { length: 4 },
+    { length: capacity },
     (_, index) =>
       allOpened[index]?.nullifier ??
       computeShieldedDummyInputNullifierForSlot(
@@ -461,7 +472,7 @@ export async function prepareShieldedUnshield(input: {
   if (nullifiers.some((nullifier) => sources[0].wallet.spentNullifiers.has(nullifier)))
     throw new Error("Input value note has already been spent");
   const data = actionData(
-    Array.from({ length: 4 }, (_, index) => allOpened[index] ?? opened),
+    Array.from({ length: capacity }, (_, index) => allOpened[index] ?? opened),
     nullifiers,
     outputs,
   );

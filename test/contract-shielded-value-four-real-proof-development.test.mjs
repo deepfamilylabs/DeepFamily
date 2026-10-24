@@ -34,7 +34,13 @@ describe("development-key real proofs for four-input VALUE routes", function () 
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), "deepfamily-value-four-real-"));
     try {
       const generated = {};
-      for (const action of ["shield", "privateTransfer", "unshield"]) {
+      for (const action of [
+        "shield",
+        "privateTransfer",
+        "unshield",
+        "privateTransfer4",
+        "unshield4",
+      ]) {
         const contract = action[0].toUpperCase() + action.slice(1);
         generated[action] = await hre.ethers.deployContract(`Shielded${contract}Verifier`);
       }
@@ -93,6 +99,11 @@ describe("development-key real proofs for four-input VALUE routes", function () 
         receiveAuthorizations: emptyShieldedReceiveAuthorizations(),
       });
       const prove = (action, witness, expected) => {
+        if (
+          (action === "privateTransfer" || action === "unshield") &&
+          witness.inputEnabled.length === 4
+        )
+          action += "4";
         const circuit = manifest.circuits[action].source;
         const input = path.join(directory, `${action}.input.json`);
         const proof = path.join(directory, `${action}.proof.json`);
@@ -174,8 +185,7 @@ describe("development-key real proofs for four-input VALUE routes", function () 
           siblings: [...p.siblings, ...Array(32 - p.siblings.length).fill(0n)],
         };
       };
-      const buildInputs = async (notes) => {
-        const capacity = 4;
+      const buildInputs = async (notes, capacity = 4) => {
         const paths = await Promise.all(notes.map(pathFor));
         const fill = (values) =>
           Array.from({ length: capacity }, (_, i) => String(values[i] ?? 0n));
@@ -257,6 +267,39 @@ describe("development-key real proofs for four-input VALUE routes", function () 
         pool,
         "NullifierAlreadySpent",
       );
+      // A genuine single-input proof spends the same first note, so replay is blocked
+      // even when switching verifier capacity after the four-input transfer.
+      const singleReplayInput = await buildInputs(sources.slice(0, 1), 1);
+      const singleReplayOutputs = await Promise.all([value(10n), value(0n)]);
+      const singleReplayData = { ...data(singleReplayOutputs), ...singleReplayInput.data };
+      const singleReplayPublic = buildShieldedPoolPublicInputs({
+        action: 3,
+        ...scope,
+        ...singleReplayData,
+      });
+      const singleReplayProof = prove(
+        "privateTransfer",
+        {
+          ...singleReplayPublic.witness,
+          ...singleReplayInput.witness,
+          receiveAuthorizationAliases: ["0", "0"],
+          receiveSalts: ["0", "0"],
+          receiveKeyModes: ["0", "0"],
+          receiveViewKeyLo: ["0", "0"],
+          receiveViewKeyHi: ["0", "0"],
+          outputOwnerCommitments: [String(owner), String(owner)],
+          outputAmounts: ["10", "0"],
+          outputNonces: singleReplayOutputs.map((note) => String(note.nonce)),
+        },
+        singleReplayPublic.signals,
+      );
+      assert.equal(singleReplayPublic.signals.length, 11);
+      expect(
+        await adapter.verifyProof(5, 1, singleReplayProof, singleReplayPublic.signals),
+      ).to.equal(true);
+      await expect(
+        pool.privateTransfer(singleReplayData, singleReplayProof),
+      ).to.be.revertedWithCustomError(pool, "NullifierAlreadySpent");
       await token.mint(signer.address, 60n);
       await token.approve(scope.poolAddress, 60n);
       const exitSources = outputs.map((note, i) => ({ ...note, leafIndex: 8 + i }));

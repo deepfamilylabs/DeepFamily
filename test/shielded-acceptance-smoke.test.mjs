@@ -79,7 +79,12 @@ describe("integrated shielded acceptance smoke", function () {
       proofArtifacts,
     });
     assert.equal(result.status, "passed");
-    assert.equal(Object.keys(result.proofs).length, 6);
+    assert.equal(Object.keys(result.proofs).length, 8);
+    for (const action of ["privateTransfer", "unshield"]) {
+      assert.equal(result.proofs[action].publicSignals.length, 11);
+      assert.equal(result.proofs[`${action}4`].publicSignals.length, 20);
+      assert.equal(result.proofs[`${action}4`].execution, "verifier-call");
+    }
     assert.equal(result.scenario.fundLabel, "shielded-action-fund");
     assert.equal(result.scenario.receiveCode.verified, true);
     assert.equal(result.proofs.claim.execution, "verifier-call");

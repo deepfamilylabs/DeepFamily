@@ -88,7 +88,7 @@ test("four-input VALUE constraints and canonical nullifiers", async (t) => {
   const output = fs.mkdtempSync(path.join(os.tmpdir(), "deepfamily-shielded-value-four-"));
   t.after(() => fs.rmSync(output, { recursive: true, force: true }));
   const calculators = {};
-  for (const circuit of ["shielded_private_transfer", "shielded_unshield"]) {
+  for (const circuit of ["shielded_private_transfer_4", "shielded_unshield_4"]) {
     execFileSync(
       path.join(root, "bin/circom"),
       [
@@ -108,8 +108,8 @@ test("four-input VALUE constraints and canonical nullifiers", async (t) => {
       singleThread: true,
     });
   }
-  const transfer = calculators.shielded_private_transfer;
-  const unshield = calculators.shielded_unshield;
+  const transfer = calculators.shielded_private_transfer_4;
+  const unshield = calculators.shielded_unshield_4;
   await t.test(
     "all four inputs support complete 32-sibling paths and enforce their bounds",
     async () => {
