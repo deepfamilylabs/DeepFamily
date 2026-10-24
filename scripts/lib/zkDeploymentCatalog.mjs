@@ -59,6 +59,12 @@ export const receiveDeploymentConstructorArgs = (property, addresses) => {
   }
 };
 
+/** Libraries needed to reconstruct and deploy the canonical current-state SMT. */
+export const receiveDeploymentLibraries = (property, addresses) =>
+  property === "identityAuthorizationState"
+    ? { PoseidonT3: addresses.poseidonT3, PoseidonT4: addresses.poseidonT4 }
+    : {};
+
 /** Runtime immutables and their canonical deployment address keys. */
 export const RECEIVE_DEPLOYMENT_IMMUTABLES = Object.freeze({
   identityAuthorizationUpdateVerifier: {},

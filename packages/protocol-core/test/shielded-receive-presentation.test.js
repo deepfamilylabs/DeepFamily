@@ -8,6 +8,7 @@ import {
   emptyShieldedReceiveAuthorizations,
   prepareShieldedReceivePresentation,
   rebuildShieldedIdentityAuthorizationState,
+  getShieldedIdentityAuthorizationWitness,
 } from "../index.js";
 
 const credential = {
@@ -98,6 +99,37 @@ test("current state rejects revoked code and renewed code retains original recip
     "fund",
   );
   assert.throws(() => prepareShieldedReceivePresentation({ ...request, credential: fund }));
+});
+
+test("presentation accepts only an alias-bound path checked against its trusted root", () => {
+  const authorizationWitness = getShieldedIdentityAuthorizationWitness(request.state, 13n);
+  const pathRequest = {
+    ...request,
+    state: undefined,
+    authorizationWitness,
+    authorizationStateRoot: request.state.root,
+  };
+  assert.deepEqual(
+    prepareShieldedReceivePresentation(pathRequest),
+    prepareShieldedReceivePresentation(request),
+  );
+  for (const patch of [
+    { authorizationStateRoot: undefined },
+    { authorizationStateRoot: 1n },
+    { authorizationWitness: { ...authorizationWitness, authorizationAlias: 14n } },
+    { authorizationWitness: { ...authorizationWitness, oldValue: 1n } },
+  ])
+    assert.throws(() => prepareShieldedReceivePresentation({ ...pathRequest, ...patch }));
+  const state = buildShieldedIdentityAuthorizationState([[13n, 1n]]);
+  assert.throws(
+    () =>
+      prepareShieldedReceivePresentation({
+        ...pathRequest,
+        authorizationWitness: getShieldedIdentityAuthorizationWitness(state, 13n),
+        authorizationStateRoot: state.root,
+      }),
+    /revoked/u,
+  );
 });
 
 test("money action digest binds all operation fields and excludes the attached proofs", () => {

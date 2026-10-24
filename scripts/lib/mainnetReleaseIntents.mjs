@@ -3,7 +3,7 @@ import {
   MAINNET_TRANSACTION_LABELS,
 } from "./mainnetReleaseSafety.mjs";
 import { MAINNET_DEPLOYMENT_NONCE_OFFSETS } from "./protocolDeploymentProjection.mjs";
-import { SHIELDED_DEPLOYMENT_CIRCUITS, RECEIVE_DEPLOYMENT_CONTRACTS, receiveDeploymentConstructorArgs } from "./zkDeploymentCatalog.mjs";
+import { SHIELDED_DEPLOYMENT_CIRCUITS, RECEIVE_DEPLOYMENT_CONTRACTS, receiveDeploymentConstructorArgs, receiveDeploymentLibraries } from "./zkDeploymentCatalog.mjs";
 
 const PERSON_RELATION_CIRCUIT_ID = 1;
 const DISCLOSURE_BINDING_CIRCUIT_ID = 1;
@@ -291,7 +291,7 @@ export const buildMainnetReleaseIntents = async ({
   const receiveAddresses = { ...addresses, deepFamily: addresses.deepFamilyProxy };
   for (const {contractName, property} of RECEIVE_DEPLOYMENT_CONTRACTS) {
     if (property === "privateLetterArchive") continue;
-    await pushDeployment(property, contractName, receiveDeploymentConstructorArgs(property, receiveAddresses));
+    await pushDeployment(property, contractName, receiveDeploymentConstructorArgs(property, receiveAddresses), linkBytecode({ ethers, artifact: artifact[contractName], libraries: receiveDeploymentLibraries(property, receiveAddresses) }));
   }
   const nativePoolBytecode = linkBytecode({
     ethers,

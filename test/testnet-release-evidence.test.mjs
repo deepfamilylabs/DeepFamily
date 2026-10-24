@@ -110,7 +110,7 @@ const SHIELDED_ADDRESSES = Object.fromEntries(
     (record) =>
       record.transactionLabel.startsWith("shielded") ||
       RECEIVE_DEPLOYMENT_CONTRACTS.some(({ property }) => property === record.property) ||
-      ["poseidonT3", "poseidonT6", "deepFamilyLineageIndex"].includes(record.transactionLabel),
+      ["poseidonT3", "poseidonT4", "poseidonT6", "deepFamilyLineageIndex"].includes(record.transactionLabel),
   ).map((record, index) => [
     record.property === "shieldedErc20Pool" ? "shieldedErc20Pool" : record.transactionLabel,
     address(200 + index),

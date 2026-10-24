@@ -1238,9 +1238,11 @@ not a cap on the amount paid. The pool never combines independently known histor
 which could represent qualifications that never coexisted. `isKnownRoot` remains a separate
 per-tree history view with a one-hour window; it does not authorize pool actions.
 
-Only the proxy may call the `on*` hooks. Clients rebuild both trees by replaying every
-`LeafWritten` event in order and authenticate their roots, checkpoint ID and timestamp at the
-same scanned block. Proof preparation and submission recheck checkpoint acceptance, not equality
+Only the proxy may call the `on*` hooks. The index stores current tree nodes and exposes
+`getMerkleProof`, `versionParents` and `getEndorsementMetadata`. Clients read selected family
+records and paths at one fixed block, recompute their leaves and paths, and authenticate the
+paired checkpoint. Parent openings remain available even when a parent record is not registered.
+An explicit legacy replay API can still independently reconstruct the trees from `LeafWritten`. Proof preparation and submission recheck checkpoint acceptance, not equality
 with the latest roots, while retaining block-reorganization and spent-nullifier checks.
 
 The contract links the PoseidonT3–T6 libraries from `poseidon-solidity`. They are compiled without
@@ -1289,6 +1291,28 @@ Each budget fixes a positive integer number of days per period at initial fundin
 For a single claim input, the second witness is zero, the shard/root repeats the first, and the second nullifier is secret-bound padding. `privateTransfer` and `unshield` each use one eight-slot circuit supporting one to eight real inputs. Real VALUE inputs must have positive uint128 amounts and share one owner, chain and pool; VALUE carries no permanent budget keyMode. Eight-slot enabled inputs are contiguous, disabled openings are zero, and their public shard/root repeat the first. Placeholder nullifiers are distinct by slot; real spend nullifiers depend on the owner secret and note commitment. Input sums are bounded to 131 bits, both outputs to uint128; withdrawal has one change and a zero dummy. Initial `fund` and all `claim` calls require `lineageCheckpointId` identifying one accepted root pair and a fresh `asOf`. The checkpoint ID is lookup metadata authenticated by the proof-bound roots and timestamp; it does not add a circuit public signal. Other actions, including continuation funding, require a zero checkpoint ID. The two-hour proof lifetime and initial eligibility delay remain separate from the 15-minute checkpoint retirement window. Initial funding constrains endorsement `writtenAt ≤ asOf`; the claim circuit binds its range, while the frontend checks that comparison and the authentic index checkpoint indirectly enforces it through `writtenAt <= createdAt <= asOf`. Encrypted-output correctness is not proved by binding its ciphertext hash.
 
 The pool's five generated business verifiers and DeepFamily share the seven-route Groth16VerifierAdapter. The adapter constructor takes the five pool verifiers in action order. Receive presentations use a separate immutable action router: action 3 selects the fixed Fund issuer, action 4 selects the anonymous issuer. Every canonical pool and the private-letter archive shares the same IdentityAuthorizationState.
+
+The authorization state now retains the current compressed SMT nodes and `authorizationCounter`
+per alias, with `getCounterProof(alias)` returning a member/non-member path at the selected block.
+A counter update reuses existing node IDs and updates only its path. New aliases allocate the
+necessary leaves and branches; previous hash versions are not appended as new nodes on every update.
+The contract links PoseidonT3 and PoseidonT4, pinned throughout deployment and runtime evidence.
+
+`incrementCounter` retains its existing proof-input ABI. Its `oldRoot` and `newRoot` parameters
+are roots of the verifier's ownership statement; they are not instructions to install a root.
+The verifier unconditionally binds the canonical identity alias, identity secret, actual chain
+and consumer, exact counters and authorization nullifier. The contract separately checks the live
+alias counter, rejects reused authorization, and atomically recomputes the actual root from stored
+nodes. This permits constant-size singleton ownership statements and concurrent preparation for
+different aliases without regenerating the existing proof keys. `CounterIncremented` emits the
+actual prior and resulting roots; receipt consumers must not substitute the proof-statement roots.
+Existing checkpoint creation/retirement and the 15-minute acceptance window are unchanged.
+
+This deployment change does not migrate immutable old state/pool instances. Old counters must not
+be reset, since doing so would re-enable old credentials. Direct path reads also expose the queried
+alias to a third-party RPC. Chain checkpoint/nullifier history still grows with updates; this change
+alone does not establish an unlimited write capacity or low transaction fees.
+
 
 | Action            | Purpose | Signals | Public inputs, in order                                                                                                                                                                   |
 | ----------------- | ------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

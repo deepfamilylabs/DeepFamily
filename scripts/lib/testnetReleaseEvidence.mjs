@@ -687,6 +687,7 @@ const requireTerminalGovernanceEvidence = ({
       "token",
       "verifierAdapter",
       "poseidonT3",
+      "poseidonT4",
       "poseidonT6",
       "deepFamilyLineageIndex",
       "shieldedVerifiers",
@@ -962,7 +963,7 @@ const requireTerminalGovernanceEvidence = ({
         );
     }
   }
-  for (const field of ["poseidonT3", "poseidonT6", "deepFamilyLineageIndex"])
+  for (const field of ["poseidonT3", "poseidonT4", "poseidonT6", "deepFamilyLineageIndex"])
     requireSameAddress(
       shieldedRecords[field],
       expectedBindings[field],

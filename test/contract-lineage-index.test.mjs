@@ -132,12 +132,22 @@ describe("DeepFamily lineage index", function () {
       childIdentity.identityCommitment,
     );
     expect(await lineageIndex.parentsDigestOf(family.childHash, 1)).to.equal(parentsDigest);
+    // A parent's commitment may appear in a child version without that parent
+    // having its own person record. Direct reads must retain that exact opening.
+    expect(await lineageIndex.identityCommitmentOf(spouseIdentity.personHash)).to.equal(0n);
+    expect(await lineageIndex.versionParents(family.childHash, 1)).to.deep.equal([
+      rootIdentity.identityCommitment,
+      spouseIdentity.identityCommitment,
+    ]);
     const [indexed] = await lineageIndex.queryFilter(
       lineageIndex.filters.VersionIndexed(family.childHash, 1),
     );
     expect(indexed.args.identityCommitment).to.equal(childIdentity.identityCommitment);
     expect(indexed.args.fatherIdentityCommitment).to.equal(rootIdentity.identityCommitment);
     expect(indexed.args.motherIdentityCommitment).to.equal(spouseIdentity.identityCommitment);
+    expect(
+      await lineageIndex.getEndorsementMetadata(family.childHash, second.address),
+    ).to.deep.equal([0n, 0n]);
 
     // Each new version makes its submitter a trusted endorser of that version.
     const [rootTrustedExists, rootTrustedIndex] = await lineageIndex.trustedLeafIndex(
@@ -158,6 +168,9 @@ describe("DeepFamily lineage index", function () {
     const endorsed = await (
       await deepFamily.connect(second).endorseVersion(family.childHash, 1)
     ).wait();
+    expect(
+      await lineageIndex.getEndorsementMetadata(family.childHash, second.address),
+    ).to.deep.equal([1n, await blockTime(endorsed)]);
     await expectTreesMirrored(lineageIndex);
     const [endorsementExists, endorsementIndex] = await lineageIndex.endorsementLeafIndex(
       family.childHash,
@@ -183,13 +196,45 @@ describe("DeepFamily lineage index", function () {
       tag: "child-v2",
     });
     await expectTreesMirrored(lineageIndex);
-    await (await deepFamily.connect(second).endorseVersion(family.childHash, 2)).wait();
+    expect(await lineageIndex.versionParents(family.childHash, 2)).to.deep.equal([
+      rootIdentity.identityCommitment,
+      0n,
+    ]);
+    expect(await lineageIndex.versionParents(family.childHash, 1)).to.deep.equal([
+      rootIdentity.identityCommitment,
+      spouseIdentity.identityCommitment,
+    ]);
+    const switched = await (
+      await deepFamily.connect(second).endorseVersion(family.childHash, 2)
+    ).wait();
+    const switchedMetadata = await lineageIndex.getEndorsementMetadata(
+      family.childHash,
+      second.address,
+    );
+    expect([...switchedMetadata]).to.deep.equal([2n, await blockTime(switched)]);
+    expect(
+      await lineageIndex.getEndorsementMetadata(family.childHash, second.address, {
+        blockTag: endorsed.blockNumber,
+      }),
+    ).to.deep.equal([1n, await blockTime(endorsed)]);
     await expectTreesMirrored(lineageIndex);
     const [, switchedIndex] = await lineageIndex.endorsementLeafIndex(
       family.childHash,
       second.address,
     );
     expect(switchedIndex).to.equal(endorsementIndex);
+    expect((await lineageIndex.getMerkleProof(ENDORSEMENT_TREE, switchedIndex)).leaf).to.equal(
+      computeLineageEndorsementLeaf({
+        identityCommitment: childIdentity.identityCommitment,
+        parentsDigest: computeLineageParentsDigest({
+          fatherIdentityCommitment: rootIdentity.identityCommitment,
+          motherIdentityCommitment: 0n,
+        }),
+        versionIndex: switchedMetadata.versionIndex,
+        endorser: second.address,
+        writtenAt: switchedMetadata.writtenAt,
+      }),
+    );
 
     await (await deepFamily.connect(third).endorseVersion(family.rootHash, 1)).wait();
     await (await deepFamily.connect(manager).endorseVersion(family.childHash, 1)).wait();
@@ -198,6 +243,9 @@ describe("DeepFamily lineage index", function () {
     expect(rightmostEndorsement.proofDepth).to.equal(1n);
     expect(rightmostEndorsement.proofIndex).to.equal(1n);
     await (await deepFamily.connect(second).cancelEndorsement(family.childHash)).wait();
+    expect(
+      await lineageIndex.getEndorsementMetadata(family.childHash, second.address),
+    ).to.deep.equal([0n, 0n]);
     await expectTreesMirrored(lineageIndex);
     expect(
       (await replayedTree(lineageIndex, ENDORSEMENT_TREE)).leaves[Number(endorsementIndex)],
@@ -205,12 +253,28 @@ describe("DeepFamily lineage index", function () {
     const endorsementWithZeroSibling = await lineageIndex.getMerkleProof(ENDORSEMENT_TREE, 1);
     expect(endorsementWithZeroSibling.siblings[0]).to.equal(0n);
     // Endorsing again after a cancellation reuses the cleared slot.
-    await (await deepFamily.connect(second).endorseVersion(family.childHash, 1)).wait();
+    const renewed = await (
+      await deepFamily.connect(second).endorseVersion(family.childHash, 1)
+    ).wait();
+    const renewedMetadata = await lineageIndex.getEndorsementMetadata(
+      family.childHash,
+      second.address,
+    );
+    expect([...renewedMetadata]).to.deep.equal([1n, await blockTime(renewed)]);
     const [, reusedIndex] = await lineageIndex.endorsementLeafIndex(
       family.childHash,
       second.address,
     );
     expect(reusedIndex).to.equal(endorsementIndex);
+    expect((await lineageIndex.getMerkleProof(ENDORSEMENT_TREE, reusedIndex)).leaf).to.equal(
+      computeLineageEndorsementLeaf({
+        identityCommitment: childIdentity.identityCommitment,
+        parentsDigest,
+        versionIndex: renewedMetadata.versionIndex,
+        endorser: second.address,
+        writtenAt: renewedMetadata.writtenAt,
+      }),
+    );
 
     await (
       await deepFamily.connect(manager).addTrustedEndorser(family.rootHash, 1, second.address)

@@ -1,11 +1,22 @@
 import { emptyShieldedReceiveAuthorizations } from "@deepfamily/protocol-core";
 
+/** Deploy the exact linked SMT implementation used by production deployments. */
+export async function identityAuthorizationStateFactory(hre) {
+  const poseidonT3 = await hre.ethers.deployContract("PoseidonT3");
+  const poseidonT4 = await hre.ethers.deployContract("PoseidonT4");
+  return hre.ethers.getContractFactory("IdentityAuthorizationState", {
+    libraries: { PoseidonT3: await poseidonT3.getAddress(), PoseidonT4: await poseidonT4.getAddress() },
+  });
+}
+
+export async function deployIdentityAuthorizationState(hre, verifier) {
+  return (await identityAuthorizationStateFactory(hre)).deploy(verifier);
+}
+
 /** TEST ONLY: isolates money-proof soundness from receive-presentation soundness. */
 export async function deployMockReceiveAuthorization(hre) {
   const counterVerifier = await hre.ethers.deployContract("IdentityCounterVerifierMock");
-  const authorizationState = await hre.ethers.deployContract("IdentityAuthorizationState", [
-    await counterVerifier.getAddress(),
-  ]);
+  const authorizationState = await deployIdentityAuthorizationState(hre, await counterVerifier.getAddress());
   const receiveVerifier = await hre.ethers.deployContract("PrivateLetterVerifierMock");
   return {
     authorizationState,

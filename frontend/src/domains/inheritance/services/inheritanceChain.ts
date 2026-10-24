@@ -2,12 +2,15 @@ import {
   computeLineageEndorsementLeaf,
   computeLineageParentsDigest,
   computeLineageTrustedLeaf,
-  replayLineageTree,
+  createLineageTree,
   type LineageTree,
 } from "@deepfamily/protocol-core";
 import { isError, type ethers } from "ethers";
 import { getEventScanConfig } from "../../../shared/config/env";
 import { InheritanceError } from "../model/inheritanceErrors";
+
+export { loadTargetedLineageSnapshot, LineageSnapshotLimitError } from "./targetedInheritanceChain";
+export type { TargetedLineageRequest } from "./targetedInheritanceChain";
 
 export const ENDORSEMENT_TREE = 0;
 export const TRUSTED_TREE = 1;
@@ -49,6 +52,37 @@ export type LineageSnapshot = {
   endorsements: Map<string, Map<string, LatestEndorsement>>;
 };
 
+type VerifiedSnapshot = { snapshot: LineageSnapshot; requestId: number };
+const snapshotCache = new WeakMap<
+  ethers.Provider,
+  WeakMap<ethers.Provider, Map<string, VerifiedSnapshot>>
+>();
+let nextRequestId = 0;
+
+/** Copies contain no mutable tree, map, set, version or endorsement owned by the cache. */
+function copySnapshot(snapshot: LineageSnapshot): LineageSnapshot {
+  return {
+    ...snapshot,
+    versions: new Map(
+      [...snapshot.versions].map(([person, versions]) => [
+        person,
+        versions.map((version) => ({ ...version })),
+      ]),
+    ),
+    trustedEndorsers: new Map(
+      [...snapshot.trustedEndorsers].map(([version, accounts]) => [version, new Set(accounts)]),
+    ),
+    endorsements: new Map(
+      [...snapshot.endorsements].map(([person, endorsements]) => [
+        person,
+        new Map([...endorsements].map(([account, endorsement]) => [account, { ...endorsement }])),
+      ]),
+    ),
+    endorsementTree: snapshot.endorsementTree.clone(),
+    trustedTree: snapshot.trustedTree.clone(),
+  };
+}
+
 function providerOf(contract: ethers.Contract): ethers.Provider {
   const provider = contract.runner?.provider;
   if (!provider) throw new Error("Contract has no provider for event scans");
@@ -86,6 +120,12 @@ async function scanEvents(
       toBlock: end,
     });
     for (const log of logs) {
+      if (log.removed || log.blockNumber < start || log.blockNumber > end) {
+        throw new InheritanceError(
+          "snapshotMismatch",
+          "Lineage event scan returned an invalid range",
+        );
+      }
       const parsed = contract.interface.parseLog(log);
       if (!parsed) continue;
       events.push({
@@ -105,8 +145,7 @@ const lower = (value: unknown) => String(value).toLowerCase();
 const trustedKey = (personHash: string, versionIndex: number) =>
   `${lower(personHash)}:${versionIndex}`;
 
-function collectVersions(events: ScannedEvent[]): Map<string, IndexedVersion[]> {
-  const versions = new Map<string, IndexedVersion[]>();
+function collectVersions(events: ScannedEvent[], versions = new Map<string, IndexedVersion[]>()) {
   for (const event of events) {
     if (event.name !== "VersionIndexed") continue;
     const personHash = lower(event.args.personHash);
@@ -123,8 +162,7 @@ function collectVersions(events: ScannedEvent[]): Map<string, IndexedVersion[]> 
   return versions;
 }
 
-function collectTrustedEndorsers(events: ScannedEvent[]): Map<string, Set<string>> {
-  const trusted = new Map<string, Set<string>>();
+function collectTrustedEndorsers(events: ScannedEvent[], trusted = new Map<string, Set<string>>()) {
   for (const event of events) {
     if (event.name !== "TrustedEndorserAdded" && event.name !== "TrustedEndorserRemoved") continue;
     const key = trustedKey(String(event.args.personHash), Number(event.args.versionIndex));
@@ -158,9 +196,9 @@ async function loadLineageCheckpoint(lineageIndex: ethers.Contract, blockNumber:
 }
 
 /**
- * Rebuilds both lineage trees from `LeafWritten`, the versions from `VersionIndexed`, and each
- * endorser's latest endorsement from DeepFamily, all up to one block, then checks the rebuilt
- * roots against the index at that block.
+ * Reuses an isolated verified snapshot and applies every subsequent event. A changed anchor
+ * or a backwards-moving head triggers a full replay. Roots and the paired checkpoint are
+ * authenticated at one block before any new snapshot is published to the memory cache.
  */
 export async function loadLineageSnapshot(
   lineageIndex: ethers.Contract,
@@ -168,29 +206,72 @@ export async function loadLineageSnapshot(
   options: ScanOptions = {},
 ): Promise<LineageSnapshot> {
   const provider = providerOf(lineageIndex);
-  const blockNumber = await provider.getBlockNumber();
+  const familyProvider = providerOf(deepFamily);
+  const requestId = ++nextRequestId;
+  const fromBlock = Math.max(0, options.fromBlock ?? getEventScanConfig().fromBlock);
+  const [network, familyNetwork, indexAddress, familyAddress, blockNumber] = await Promise.all([
+    provider.getNetwork(),
+    familyProvider === provider ? undefined : familyProvider.getNetwork(),
+    lineageIndex.getAddress(),
+    deepFamily.getAddress(),
+    provider.getBlockNumber(),
+  ]);
+  if (familyNetwork && familyNetwork.chainId !== network.chainId) {
+    throw new InheritanceError("snapshotMismatch", "Family history provider uses another chain");
+  }
+  const key = `${network.chainId}:${lower(indexAddress)}:${lower(familyAddress)}:${fromBlock}`;
+  let families = snapshotCache.get(provider);
+  if (!families) {
+    families = new WeakMap();
+    snapshotCache.set(provider, families);
+  }
+  let cache = families.get(familyProvider);
+  if (!cache) {
+    cache = new Map();
+    families.set(familyProvider, cache);
+  }
+  const previous = cache.get(key);
   const anchor = await provider.getBlock(blockNumber);
   if (!anchor?.hash) throw new Error("Lineage snapshot block is unavailable");
+  let base = previous?.snapshot;
+  if (base) {
+    const unchanged =
+      blockNumber >= base.blockNumber &&
+      (await provider.getBlock(base.blockNumber))?.hash === base.blockHash;
+    if (!unchanged) {
+      // A concurrent request may already have installed a newer, verified snapshot.
+      if (cache.get(key) === previous) cache.delete(key);
+      base = undefined;
+    }
+  }
+  const working = base ? copySnapshot(base) : undefined;
+  const scanOptions = {
+    ...options,
+    fromBlock: base ? Math.max(fromBlock, base.blockNumber + 1) : fromBlock,
+  };
   const { checkpointId, checkpoint } = await loadLineageCheckpoint(lineageIndex, blockNumber);
   const [indexEvents, familyEvents] = await Promise.all([
-    scanEvents(lineageIndex, ["LeafWritten", "VersionIndexed"], blockNumber, options),
+    scanEvents(lineageIndex, ["LeafWritten", "VersionIndexed"], blockNumber, scanOptions),
     scanEvents(
       deepFamily,
       ["PersonVersionEndorsed", "TrustedEndorserAdded", "TrustedEndorserRemoved"],
       blockNumber,
-      options,
+      scanOptions,
     ),
   ]);
 
-  const writes: Array<Array<{ leafIndex: bigint; leaf: bigint }>> = [[], []];
+  const endorsementTree = working?.endorsementTree ?? createLineageTree();
+  const trustedTree = working?.trustedTree ?? createLineageTree();
   for (const event of indexEvents) {
     if (event.name !== "LeafWritten") continue;
     const treeId = Number(event.args.treeId);
     if (treeId !== ENDORSEMENT_TREE && treeId !== TRUSTED_TREE) continue;
-    writes[treeId].push({ leafIndex: BigInt(event.args.leafIndex), leaf: BigInt(event.args.leaf) });
+    const tree = treeId === ENDORSEMENT_TREE ? endorsementTree : trustedTree;
+    const leafIndex = BigInt(event.args.leafIndex);
+    const leaf = BigInt(event.args.leaf);
+    if (leafIndex === tree.sizeBigInt) tree.insert(leaf);
+    else tree.update(leafIndex, leaf);
   }
-  const endorsementTree = replayLineageTree(writes[ENDORSEMENT_TREE]);
-  const trustedTree = replayLineageTree(writes[TRUSTED_TREE]);
   for (const [treeId, tree] of [
     [ENDORSEMENT_TREE, endorsementTree],
     [TRUSTED_TREE, trustedTree],
@@ -225,7 +306,7 @@ export async function loadLineageSnapshot(
     throw new InheritanceError("snapshotMismatch", "Lineage snapshot block was reorganized");
 
   // A later endorsement by the same account replaces the earlier one, as the index's slot does.
-  const endorsements = new Map<string, Map<string, LatestEndorsement>>();
+  const endorsements = working?.endorsements ?? new Map<string, Map<string, LatestEndorsement>>();
   for (const event of familyEvents) {
     if (event.name !== "PersonVersionEndorsed") continue;
     const personHash = lower(event.args.personHash);
@@ -237,18 +318,27 @@ export async function loadLineageSnapshot(
     endorsements.set(personHash, byEndorser);
   }
 
-  return {
+  const snapshot: LineageSnapshot = {
     blockNumber,
     blockHash: anchor.hash,
     timestamp: BigInt(anchor.timestamp),
     checkpointId,
     checkpointCreatedAt: BigInt(checkpoint.createdAt),
-    versions: collectVersions(indexEvents),
-    trustedEndorsers: collectTrustedEndorsers(familyEvents),
+    versions: collectVersions(indexEvents, working?.versions),
+    trustedEndorsers: collectTrustedEndorsers(familyEvents, working?.trustedEndorsers),
     endorsementTree,
     trustedTree,
     endorsements,
   };
+  const latest = cache.get(key);
+  if (
+    !latest ||
+    latest.snapshot.blockNumber < blockNumber ||
+    (latest.snapshot.blockNumber === blockNumber && latest.requestId < requestId)
+  ) {
+    cache.set(key, { snapshot, requestId });
+  }
+  return copySnapshot(snapshot);
 }
 
 /** One way the heir is a legit child of the root: an endorsement by a trusted endorser. */

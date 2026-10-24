@@ -88,6 +88,15 @@ class LineageTree {
     return Array.from(this.#nodes[0].values());
   }
 
+  /** Copy a verified public tree without rehashing leaves or sharing mutable maps. */
+  clone() {
+    const tree = new LineageTree();
+    tree.#nodes = this.#nodes.map((nodes) => new Map(nodes));
+    tree.#size = this.#size;
+    tree.#depth = this.#depth;
+    return tree;
+  }
+
   indexOf(leaf) {
     for (const [index, value] of this.#nodes[0]) {
       if (value === leaf) return compactNumber(index);

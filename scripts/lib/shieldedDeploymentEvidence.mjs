@@ -12,6 +12,7 @@ export function shieldedDeploymentBindings(addresses) {
         "token",
         "deepFamily",
         "poseidonT3",
+        "poseidonT4",
         "poseidonT6",
         "deepFamilyLineageIndex",
         "groth16VerifierAdapter",

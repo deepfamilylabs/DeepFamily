@@ -1,3 +1,4 @@
+import { deployIdentityAuthorizationState } from "./helpers/shieldedReceiveAuthorization.mjs";
 import "../hardhat-test-setup.mjs";
 import assert from "node:assert/strict";
 import fs from "node:fs";
@@ -139,9 +140,7 @@ describe("Receive presentation real-proof canonical pool and letter integration"
           "IdentityAuthorizationVerifierAdapter",
           [await counterVerifier.getAddress()],
         );
-        const state = await hre.ethers.deployContract("IdentityAuthorizationState", [
-          await counterAdapter.getAddress(),
-        ]);
+        const state = await deployIdentityAuthorizationState(hre, await counterAdapter.getAddress());
         const lineage = await hre.ethers.deployContract("ShieldedPoolLineageMock");
         const token = await hre.ethers.deployContract("ShieldedPoolTokenMock");
         const poseidon = await hre.ethers.deployContract("PoseidonT3");

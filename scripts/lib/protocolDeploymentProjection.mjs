@@ -103,6 +103,7 @@ export const buildPlannedProtocolDeploymentEvidence = ({
     ...Object.fromEntries(RECEIVE_DEPLOYMENT_CONTRACTS.map(({property}) => [property, withHashes(deploymentBindings[property], artifacts?.[property])])),
     token: deploymentBindings.token,
     poseidonT3: deploymentBindings.poseidonT3,
+    poseidonT4: deploymentBindings.poseidonT4,
     poseidonT6: deploymentBindings.poseidonT6,
     deepFamilyLineageIndex: deploymentBindings.deepFamilyLineageIndex,
     shieldedVerifiers: Object.freeze(

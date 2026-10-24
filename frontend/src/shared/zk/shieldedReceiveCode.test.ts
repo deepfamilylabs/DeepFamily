@@ -40,7 +40,11 @@ vi.mock("../clients/contractFactory", () => ({
 }));
 vi.mock("../clients/shieldedIdentityAuthorizationChain", () => ({
   createIdentityAuthorizationContract: () => ({}),
-  loadShieldedIdentityAuthorizationState: mocks.authorizationState,
+  loadShieldedIdentityAuthorizationWitness: async (_contract: unknown, alias: bigint) => {
+    const { getShieldedIdentityAuthorizationWitness } = await vi.importActual<typeof import("@deepfamily/protocol-core")>("@deepfamily/protocol-core");
+    const result = await mocks.authorizationState();
+    return { ...result, stateRoot: result.state.root, witness: getShieldedIdentityAuthorizationWitness(result.state, alias) };
+  },
 }));
 
 const receiveOptions = { context: { rpcUrl: "http://localhost:8545", chainId: "31337", factoryAddress: "0x1111111111111111111111111111111111111111" }, expiresAt: "2000000000" };

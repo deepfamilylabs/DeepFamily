@@ -78,10 +78,20 @@ interface IDeepFamilyLineageIndex is IERC165 {
     bytes32 personHash,
     uint256 versionIndex
   ) external view returns (uint256);
+  /** @notice Exact version parent openings, including parents not independently registered. */
+  function versionParents(
+    bytes32 personHash,
+    uint256 versionIndex
+  ) external view returns (uint256 fatherIdentityCommitment, uint256 motherIdentityCommitment);
   function endorsementLeafIndex(
     bytes32 personHash,
     address endorser
   ) external view returns (bool exists, uint256 leafIndex);
+  /** @notice Current endorsement opening; cancellation returns version/time zero. */
+  function getEndorsementMetadata(
+    bytes32 personHash,
+    address endorser
+  ) external view returns (uint256 versionIndex, uint64 writtenAt);
   function trustedLeafIndex(
     bytes32 personHash,
     uint256 versionIndex,

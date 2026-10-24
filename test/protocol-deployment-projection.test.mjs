@@ -166,6 +166,20 @@ describe("planned production protocol deployment projection", function () {
     expect(inspected.artifacts.shieldedErc20Pool.runtimeBytecode).to.include(
       plannedAddresses.poseidonT3.slice(2).toLowerCase(),
     );
+    expect(inspected.deployments.poseidonT4).to.equal(plannedAddresses.poseidonT4);
+    for (const name of ["poseidonT3", "poseidonT4"])
+      expect(inspected.artifacts.identityAuthorizationState.runtimeBytecode).to.include(
+        plannedAddresses[name].slice(2).toLowerCase(),
+      );
+    expect(PROTOCOL_DEPLOYMENT_ARTIFACTS.identityAuthorizationState.libraryFields).to.deep.equal([
+      "PoseidonT3", "PoseidonT4",
+    ]);
+    const wrongStateLibrary = inspectProtocolDeploymentArtifact({
+      artifactName: "identityAuthorizationState",
+      immutableValues: { VERIFIER: plannedAddresses.identityAuthorizationVerifierAdapter },
+      libraries: { PoseidonT3: plannedAddresses.poseidonT3, PoseidonT4: plannedAddresses.poseidonT6 },
+    });
+    expect(wrongStateLibrary.runtimeSha256).not.to.equal(inspected.artifacts.identityAuthorizationState.runtimeSha256);
     expect(PROTOCOL_DEPLOYMENT_ARTIFACTS.shieldedErc20Pool.libraryFields).to.deep.equal([
       "PoseidonT3",
     ]);

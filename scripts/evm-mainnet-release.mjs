@@ -19,7 +19,7 @@ import {
   INTEGRATED_DEPLOYMENT_RECORDS,
   SHIELDED_DEPLOYMENT_CIRCUITS,
   RECEIVE_DEPLOYMENT_CONTRACTS,
-  receiveDeploymentConstructorArgs,
+  receiveDeploymentConstructorArgs, receiveDeploymentLibraries,
   integratedDeploymentAddresses,
 } from "./lib/zkDeploymentCatalog.mjs";
 import { assertImplementationMatchesArtifact } from "../tasks/lib/timelockUpgrade.mjs";
@@ -571,6 +571,11 @@ const assertProtocolTerminalState = async ({
       spec.verifierContractName,
       addresses[spec.verifierLabel],
       { needsLibraries: false },
+    ]),
+    ...RECEIVE_DEPLOYMENT_CONTRACTS.map(({ contractName, property }) => [
+      contractName,
+      addresses[property],
+      { libraries: receiveDeploymentLibraries(property, addresses) },
     ]),
     ...["ShieldedErc20Pool", "ShieldedNativePool", "ShieldedPoolFactory"].map((name) => [
       name,
@@ -1564,6 +1569,7 @@ export const main = async (chainProfile) => {
             contractName,
             addresses[property],
             receiveDeploymentConstructorArgs(property, addresses),
+            receiveDeploymentLibraries(property, addresses),
           ),
         ),
       )),

@@ -30,6 +30,7 @@ contract DeepFamilyLineageIndex is ERC165, IDeepFamilyLineageIndex {
   error EndorsementNotIndexed();
   error TreeCapacityExceeded();
   error InvalidLeafIndex();
+  error EndorsementTimeOverflow();
 
   uint8 public constant ENDORSEMENT_TREE = 0;
   uint8 public constant TRUSTED_TREE = 1;
@@ -57,9 +58,21 @@ contract DeepFamilyLineageIndex is ERC165, IDeepFamilyLineageIndex {
   mapping(bytes32 personHash => uint256 identityCommitment) private _identityCommitments;
   mapping(bytes32 personHash => mapping(uint256 versionIndex => uint256 digest))
     private _parentsDigests;
+  struct VersionParents {
+    uint256 fatherIdentityCommitment;
+    uint256 motherIdentityCommitment;
+  }
+  mapping(bytes32 personHash => mapping(uint256 versionIndex => VersionParents parents))
+    private _versionParents;
   // Slots hold leafIndex + 1, so zero means "never indexed".
   mapping(bytes32 personHash => mapping(address endorser => uint256 slot))
     private _endorsementSlots;
+  struct EndorsementMetadata {
+    uint256 versionIndex;
+    uint64 writtenAt;
+  }
+  mapping(bytes32 personHash => mapping(address endorser => EndorsementMetadata metadata))
+    private _endorsementMetadata;
   mapping(bytes32 personHash => mapping(uint256 versionIndex => mapping(address account => uint256 slot)))
     private _trustedSlots;
   uint256 public override currentCheckpointId;
@@ -104,6 +117,10 @@ contract DeepFamilyLineageIndex is ERC165, IDeepFamilyLineageIndex {
       revert IdentityCommitmentMismatch();
     }
     _identityCommitments[personHash] = identityCommitment;
+    _versionParents[personHash][versionIndex] = VersionParents(
+      fatherIdentityCommitment,
+      motherIdentityCommitment
+    );
     _parentsDigests[personHash][versionIndex] = PoseidonT4.hash(
       [DOMAIN_PARENTS, fatherIdentityCommitment, motherIdentityCommitment]
     );
@@ -143,10 +160,15 @@ contract DeepFamilyLineageIndex is ERC165, IDeepFamilyLineageIndex {
   ) external override onlyDeepFamily {
     uint256 digest = _parentsDigests[personHash][versionIndex];
     if (digest == 0) revert UnknownVersion();
+    if (block.timestamp > type(uint64).max) revert EndorsementTimeOverflow();
     // Bits 0..159 hold the endorser and bits 160..223 the write time; both fit one field element.
     uint256 endorserAndTime = (block.timestamp << 160) | uint256(uint160(endorser));
     uint256 leaf = PoseidonT6.hash(
       [DOMAIN_ENDORSEMENT_LEAF, _identityOf(personHash), digest, versionIndex, endorserAndTime]
+    );
+    _endorsementMetadata[personHash][endorser] = EndorsementMetadata(
+      versionIndex,
+      uint64(block.timestamp)
     );
     uint256 slot = _endorsementSlots[personHash][endorser];
     if (slot != 0) {
@@ -163,6 +185,7 @@ contract DeepFamilyLineageIndex is ERC165, IDeepFamilyLineageIndex {
     uint256 slot = _endorsementSlots[personHash][endorser];
     if (slot == 0) revert EndorsementNotIndexed();
     _write(ENDORSEMENT_TREE, slot - 1, 0);
+    delete _endorsementMetadata[personHash][endorser];
   }
 
   // ========== Views ==========
@@ -240,12 +263,33 @@ contract DeepFamilyLineageIndex is ERC165, IDeepFamilyLineageIndex {
     return _parentsDigests[personHash][versionIndex];
   }
 
+  function versionParents(
+    bytes32 personHash,
+    uint256 versionIndex
+  )
+    external
+    view
+    override
+    returns (uint256 fatherIdentityCommitment, uint256 motherIdentityCommitment)
+  {
+    VersionParents storage parents = _versionParents[personHash][versionIndex];
+    return (parents.fatherIdentityCommitment, parents.motherIdentityCommitment);
+  }
+
   function endorsementLeafIndex(
     bytes32 personHash,
     address endorser
   ) external view override returns (bool exists, uint256 leafIndex) {
     uint256 slot = _endorsementSlots[personHash][endorser];
     return slot == 0 ? (false, 0) : (true, slot - 1);
+  }
+
+  function getEndorsementMetadata(
+    bytes32 personHash,
+    address endorser
+  ) external view override returns (uint256 versionIndex, uint64 writtenAt) {
+    EndorsementMetadata storage metadata = _endorsementMetadata[personHash][endorser];
+    return (metadata.versionIndex, metadata.writtenAt);
   }
 
   function trustedLeafIndex(

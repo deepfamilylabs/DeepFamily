@@ -92,7 +92,7 @@ import {
   INTEGRATED_DEPLOYMENT_RECORDS,
   SHIELDED_DEPLOYMENT_CIRCUITS,
   RECEIVE_DEPLOYMENT_CONTRACTS,
-  receiveDeploymentConstructorArgs,
+  receiveDeploymentConstructorArgs, receiveDeploymentLibraries,
   integratedDeploymentAddresses,
 } from "./lib/zkDeploymentCatalog.mjs";
 import {
@@ -1984,6 +1984,7 @@ export const main = async (chainProfile) => {
           contractName,
           addresses[property],
           receiveDeploymentConstructorArgs(property, addresses),
+            receiveDeploymentLibraries(property, addresses),
         ),
       );
     }
@@ -3679,6 +3680,7 @@ export const main = async (chainProfile) => {
         reader: terminalProtocolDeployment.reader,
         proofRoutes: terminalProtocolDeployment.proofRoutes,
         poseidonT3: terminalProtocolDeployment.poseidonT3,
+        poseidonT4: terminalProtocolDeployment.poseidonT4,
         poseidonT6: terminalProtocolDeployment.poseidonT6,
         deepFamilyLineageIndex: terminalProtocolDeployment.deepFamilyLineageIndex,
         shieldedVerifiers: terminalProtocolDeployment.shieldedVerifiers,
@@ -3809,6 +3811,7 @@ export const main = async (chainProfile) => {
         archive: terminalProtocolDeployment.archive,
         proofRoutes: terminalProtocolDeployment.proofRoutes,
         poseidonT3: terminalProtocolDeployment.poseidonT3,
+        poseidonT4: terminalProtocolDeployment.poseidonT4,
         poseidonT6: terminalProtocolDeployment.poseidonT6,
         deepFamilyLineageIndex: terminalProtocolDeployment.deepFamilyLineageIndex,
         shieldedVerifiers: terminalProtocolDeployment.shieldedVerifiers,

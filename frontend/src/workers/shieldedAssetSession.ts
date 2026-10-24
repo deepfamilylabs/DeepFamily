@@ -14,8 +14,7 @@ import {
   equalHexConstantTime,
   planShieldedValueSpend,
   computeShieldedAuthorizationAlias,
-  getShieldedIdentityAuthorizationWitness,
-  prepareShieldedIdentityAuthorizationIncrement,
+  prepareShieldedIdentityCounterAuthorization,
   decodeShieldedReceiveCredential, computeShieldedReceiveCredentialBinding, computeShieldedReceiveActionHash,
   emptyShieldedReceiveAuthorizations, prepareShieldedReceivePresentation, generateShieldedRandomField,
   splitShieldedViewPublicKey, createShieldedLetterEnvelope, computeShieldedLetterRelationCommitment,
@@ -72,7 +71,7 @@ import {
 } from "../domains/inheritance/services/shieldedWalletRecovery";
 import {
   findHeirLegitimacy,
-  loadLineageSnapshot,
+  loadTargetedLineageSnapshot,
 } from "../domains/inheritance/services/inheritanceChain";
 import { listShieldedClaimBudgetOptions } from "../domains/inheritance/services/shieldedClaimOverview";
 import {
@@ -97,7 +96,7 @@ import {
   discoverShieldedFactoryPools,
   withShieldedRecoveryTimeout,
 } from "../domains/inheritance/services/shieldedAssetRegistry";
-import { createIdentityAuthorizationContract, loadShieldedIdentityAuthorizationState } from "../domains/inheritance/services/shieldedIdentityAuthorizationChain";
+import { createIdentityAuthorizationContract, loadShieldedIdentityAuthorizationWitness } from "../domains/inheritance/services/shieldedIdentityAuthorizationChain";
 
 import { createPrivateLetterContract, readPrivateLetters } from "../domains/inheritance/services/privateLetterChain";
 import { proveShieldedReceivePresentation } from "../shared/zk/shieldedReceivePresentation";
@@ -169,6 +168,7 @@ export class ShieldedAssetSession {
   // Chain, factory, family, lineage and RPC are fixed for a session; the pool may change.
   private baseScope = "";
   private poolScope = "";
+  private contextProvider: JsonRpcProvider | null = null;
   private wallets = new Map<ShieldedKeySlot, LocalShieldedWalletSnapshot>();
   private summary: ShieldedWalletSummary | null = null;
   private policyDrafts = new Map<string, ReturnType<typeof createShieldedPolicyDescriptor>>();
@@ -223,6 +223,8 @@ export class ShieldedAssetSession {
     this.policyDrafts.clear();
     this.baseScope = "";
     this.poolScope = "";
+    this.contextProvider?.destroy();
+    this.contextProvider = null;
   }
 
   private keys(slot: ShieldedKeySlot, requireVerified = true): Keys {
@@ -338,66 +340,77 @@ export class ShieldedAssetSession {
       !this.baseScope || baseScope === this.baseScope,
       "Protocol context changed. Lock and unlock in the new context.",
     );
-    const provider = new JsonRpcProvider(ctx.rpcUrl);
-    requireValue(
-      (await provider.getNetwork()).chainId === BigInt(ctx.chainId),
-      "RPC chain does not match the wallet context.",
-    );
-    const factory = createShieldedPoolFactoryContract(ctx.factoryAddress, provider);
-    const family = createDeepFamilyContract(ctx.familyAddress, provider);
-    const [lineageAddress, verifierAddress, familyLineage] = await Promise.all([
-      factory.LINEAGE_INDEX(),
-      factory.VERIFIER(),
-      family.lineageIndex(),
-    ]);
-    requireValue(
-      getAddress(lineageAddress) === getAddress(ctx.lineageIndexAddress) &&
-        getAddress(familyLineage) === getAddress(lineageAddress),
-      "Factory and family lineage configuration do not match.",
-    );
-    const pool =
-      ctx.assetKind === "native"
-        ? createShieldedNativePoolContract(ctx.poolAddress, provider)
-        : createShieldedErc20PoolContract(ctx.poolAddress, provider);
-    const [version, lineage, verifier, kind, asset] = await Promise.all([
-      pool.protocolVersion(),
-      pool.LINEAGE_INDEX(),
-      pool.VERIFIER(),
-      pool.assetKind(),
-      ctx.assetKind === "native"
-        ? Promise.resolve("0x0000000000000000000000000000000000000000")
-        : pool.TOKEN(),
-    ]);
-    requireValue(
-      Number(version) === SHIELDED_POOL_PROTOCOL_VERSION &&
-        getAddress(lineage) === getAddress(lineageAddress) &&
-        getAddress(verifier) === getAddress(verifierAddress) &&
-        Number(kind) === (ctx.assetKind === "native" ? 1 : 0) &&
-        getAddress(await factory.poolFor(asset)) === getAddress(ctx.poolAddress),
-      "Pool does not belong to the selected protocol.",
-    );
-    requireValue(
-      credentialsEpoch === this.credentialsEpoch,
-      "Credentials session was replaced or locked.",
-    );
-    if (this.poolScope && poolScope !== this.poolScope) {
-      // Identity and the independent key root serve every pool of this factory. History,
-      // prepared witnesses and policy drafts belong to one pool and are dropped.
-      this.wallets.clear();
-      this.summary = null;
-      this.pending = null;
-      this.policyDrafts.clear();
+    // Reuse the provider so verified public event snapshots survive between actions.
+    const createdProvider = this.contextProvider === null;
+    const provider = this.contextProvider ?? new JsonRpcProvider(ctx.rpcUrl);
+    try {
+      requireValue(
+        (await provider.getNetwork()).chainId === BigInt(ctx.chainId),
+        "RPC chain does not match the wallet context.",
+      );
+      const factory = createShieldedPoolFactoryContract(ctx.factoryAddress, provider);
+      const family = createDeepFamilyContract(ctx.familyAddress, provider);
+      const [lineageAddress, verifierAddress, familyLineage] = await Promise.all([
+        factory.LINEAGE_INDEX(),
+        factory.VERIFIER(),
+        family.lineageIndex(),
+      ]);
+      requireValue(
+        getAddress(lineageAddress) === getAddress(ctx.lineageIndexAddress) &&
+          getAddress(familyLineage) === getAddress(lineageAddress),
+        "Factory and family lineage configuration do not match.",
+      );
+      const pool =
+        ctx.assetKind === "native"
+          ? createShieldedNativePoolContract(ctx.poolAddress, provider)
+          : createShieldedErc20PoolContract(ctx.poolAddress, provider);
+      const [version, lineage, verifier, kind, asset] = await Promise.all([
+        pool.protocolVersion(),
+        pool.LINEAGE_INDEX(),
+        pool.VERIFIER(),
+        pool.assetKind(),
+        ctx.assetKind === "native"
+          ? Promise.resolve("0x0000000000000000000000000000000000000000")
+          : pool.TOKEN(),
+      ]);
+      requireValue(
+        Number(version) === SHIELDED_POOL_PROTOCOL_VERSION &&
+          getAddress(lineage) === getAddress(lineageAddress) &&
+          getAddress(verifier) === getAddress(verifierAddress) &&
+          Number(kind) === (ctx.assetKind === "native" ? 1 : 0) &&
+          getAddress(await factory.poolFor(asset)) === getAddress(ctx.poolAddress),
+        "Pool does not belong to the selected protocol.",
+      );
+      requireValue(
+        credentialsEpoch === this.credentialsEpoch,
+        "Credentials session was replaced or locked.",
+      );
+      if (this.poolScope && poolScope !== this.poolScope) {
+        // Identity and the independent key root serve every pool of this factory. History,
+        // prepared witnesses and policy drafts belong to one pool and are dropped.
+        this.wallets.clear();
+        this.summary = null;
+        this.pending = null;
+        this.policyDrafts.clear();
+      }
+      this.baseScope = baseScope;
+      this.poolScope = poolScope;
+      this.contextProvider = provider;
+      return {
+        provider,
+        factory,
+        pool,
+        verifierAddress: getAddress(verifierAddress).toLowerCase(),
+        lineageIndex: createLineageIndexContract(ctx.lineageIndexAddress, provider),
+        family,
+      };
+    } catch (cause) {
+      if (createdProvider) {
+        provider.destroy();
+        if (this.contextProvider === provider) this.contextProvider = null;
+      }
+      throw cause;
     }
-    this.baseScope = baseScope;
-    this.poolScope = poolScope;
-    return {
-      provider,
-      factory,
-      pool,
-      verifierAddress: getAddress(verifierAddress).toLowerCase(),
-      lineageIndex: createLineageIndexContract(ctx.lineageIndexAddress, provider),
-      family,
-    };
   }
 
   private async installRoot(
@@ -725,8 +738,8 @@ export class ShieldedAssetSession {
     const envelope = createShieldedLetterEnvelope({ body: params.body, salt, attachment: budgetReference });
     const ciphertext = await encryptShieldedLetter({ chainId: ctx.chainId, lettersAddress: ctx.lettersAddress, messageId,
       recipientPublicKey: getBytes(verified.viewingKey), envelope });
-    const state = await loadShieldedIdentityAuthorizationState(createIdentityAuthorizationContract(authorizationAddress, env.provider));
-    const presentation = prepareShieldedReceivePresentation({ credential, salt, state: state.state, checkpointId: state.checkpointId,
+    const state = await loadShieldedIdentityAuthorizationWitness(createIdentityAuthorizationContract(authorizationAddress, env.provider), credential.authorizationAlias, { chainId: ctx.chainId, authorizationStateAddress: authorizationAddress });
+    const presentation = prepareShieldedReceivePresentation({ credential, salt, authorizationWitness: state.witness, authorizationStateRoot: state.stateRoot, checkpointId: state.checkpointId,
       asOf: state.asOf, chainId: ctx.chainId, consumer: ctx.lettersAddress, action: attachment ? 2 : 1, messageId,
       payloadHash: computeShieldedLetterCiphertextHash(ciphertext) });
     const expected = [...presentation.publicSignals, ...(attachment ? [BigInt(attachment.pool), BigInt(attachment.noteRoot), BigInt(attachment.relationCommitment)] : [])];
@@ -771,14 +784,15 @@ export class ShieldedAssetSession {
     const keys = this.keys(params.slot);
     requireValue(params.context && params.expiresAt, "Receive code requires a chain and expiry.");
     const { provider, pool } = await this.context(params.context);
-    const state = await loadShieldedIdentityAuthorizationState(createIdentityAuthorizationContract(await pool.AUTHORIZATION_STATE(), provider));
     const alias = computeShieldedAuthorizationAlias(this.identity);
+    const address = String(await pool.AUTHORIZATION_STATE());
+    const state = await loadShieldedIdentityAuthorizationWitness(createIdentityAuthorizationContract(address, provider), alias, { chainId: params.context.chainId, authorizationStateAddress: address });
     const result = await createShieldedReceiveCode({
       ...serializeIdentity(this.identity),
       keyMode: keys.keyMode,
       keyMaterial: keys,
       disclosure: params.disclosure ?? "anonymous",
-      authorizationCounter: getShieldedIdentityAuthorizationWitness(state.state, alias).authorizationCounter,
+      authorizationCounter: state.witness.authorizationCounter,
       expiresAt: params.expiresAt,
     });
     return { code: result.code };
@@ -788,8 +802,8 @@ export class ShieldedAssetSession {
     requireValue(this.identity, "Unlock the identity owner credentials first.");
     const { provider, pool } = await this.context(params.context);
     const address = String(await pool.AUTHORIZATION_STATE());
-    const snapshot = await loadShieldedIdentityAuthorizationState(createIdentityAuthorizationContract(address, provider));
-    const transition = prepareShieldedIdentityAuthorizationIncrement({ ...this.identity, state: snapshot.state, chainId: params.context.chainId, authorizationStateAddress: address });
+    const snapshot = await loadShieldedIdentityAuthorizationWitness(createIdentityAuthorizationContract(address, provider), computeShieldedAuthorizationAlias(this.identity), { chainId: params.context.chainId, authorizationStateAddress: address });
+    const transition = prepareShieldedIdentityCounterAuthorization({ ...this.identity, authorizationCounter: snapshot.witness.authorizationCounter, chainId: params.context.chainId, authorizationStateAddress: address });
     const identity = this.identity;
     const { proof } = await generateShieldedProof({ circuit: "identityAuthorizationUpdate", expectedPublicSignals: transition.publicSignals.map(String), witness: {
       ...transition.witness,
@@ -824,17 +838,11 @@ export class ShieldedAssetSession {
       parentVersions: [],
       children: [],
     };
-    const lineage = this.identity
-      ? await loadLineageSnapshot(lineageIndex, family).catch((cause: unknown) => {
-          summary.familyRecordsError =
-            cause instanceof InheritanceError && cause.code === "lineageIncompatible"
-              ? "incompatible"
-              : "unavailable";
-          return null;
-        })
-      : null;
-    current();
-    if (this.identity) summary.familyRecordsAvailable = !!lineage;
+    const recoveredSlots: Array<{
+      slot: ShieldedKeySlot;
+      wallet: LocalShieldedWalletSnapshot;
+      notes: ReturnType<typeof listUnspentRecoveredShieldedNotes>;
+    }> = [];
     const seenNotes = new Set<string>();
     this.wallets.clear();
     for (const slot of ["identity", "independent"] as const) {
@@ -852,6 +860,7 @@ export class ShieldedAssetSession {
       current();
       this.wallets.set(slot, wallet);
       const notes = listUnspentRecoveredShieldedNotes(wallet, keys);
+      recoveredSlots.push({ slot, wallet, notes });
       for (const event of notes) {
         if (seenNotes.has(String(event.commitment))) continue;
         seenNotes.add(String(event.commitment));
@@ -947,6 +956,29 @@ export class ShieldedAssetSession {
             : {}),
         });
       }
+    }
+    const lineage = this.identity
+      ? await loadTargetedLineageSnapshot(lineageIndex, family, {
+          blockNumber: toBlock,
+          parentIdentityCommitments: [this.identity.identityCommitment],
+          eligibility: recoveredSlots.flatMap(({ notes }) => notes.flatMap(({ note }) =>
+            note.kind === "budget" && note.rootVersionIndex <= BigInt(Number.MAX_SAFE_INTEGER)
+              ? [{ heirIdentityCommitment: this.identity!.identityCommitment,
+                  rootIdentityCommitment: note.rootIdentityCommitment,
+                  rootVersionIndex: Number(note.rootVersionIndex) }]
+              : [],
+          )),
+        }).catch((cause: unknown) => {
+          summary.familyRecordsError =
+            cause instanceof InheritanceError && cause.code === "lineageIncompatible"
+              ? "incompatible"
+              : "unavailable";
+          return null;
+        })
+      : null;
+    current();
+    if (this.identity) summary.familyRecordsAvailable = !!lineage;
+    for (const { slot, wallet, notes } of recoveredSlots) {
       if (!this.identity || !lineage) continue;
       const eligible = notes.filter(
         (event) =>
@@ -1192,7 +1224,11 @@ export class ShieldedAssetSession {
             fundMode: 0,
             policy,
             lineageIndex: env.lineageIndex,
-            lineage: await loadLineageSnapshot(env.lineageIndex, env.family),
+            lineage: await loadTargetedLineageSnapshot(env.lineageIndex, env.family, {
+              eligibility: [{ heirIdentityCommitment: await env.lineageIndex.identityCommitmentOf(request.publicRecipient),
+                rootIdentityCommitment: policy!.rootIdentityCommitment,
+                rootVersionIndex: Number(policy!.rootVersionIndex) }],
+            }),
           };
       recipient = request.publicRecipient;
     }
@@ -1226,7 +1262,14 @@ export class ShieldedAssetSession {
           ),
         "Select 1 to 12 strictly increasing, due and unpaid periods from the preview.",
       );
-      const lineage = await loadLineageSnapshot(env.lineageIndex, env.family);
+      const budget = wallet.ownedNotes.get(BigInt(claim.budgets[0]))?.note;
+      requireValue(budget?.kind === "budget", "The selected budget is unavailable.");
+      requireValue(budget.rootVersionIndex <= BigInt(Number.MAX_SAFE_INTEGER), "The budget root version is unsupported.");
+      const lineage = await loadTargetedLineageSnapshot(env.lineageIndex, env.family, {
+        eligibility: [{ heirIdentityCommitment: this.identity.identityCommitment,
+          rootIdentityCommitment: budget.rootIdentityCommitment,
+          rootVersionIndex: Number(budget.rootVersionIndex) }],
+      });
       const result = await prepareShieldedClaim({
         ...scope,
         identity: serializeIdentity(this.identity),
@@ -1450,11 +1493,12 @@ export class ShieldedAssetSession {
       );
     }
     if (pending.receive?.length) {
-      const state = await loadShieldedIdentityAuthorizationState(createIdentityAuthorizationContract(await env.pool.AUTHORIZATION_STATE(), env.provider));
+      const authorizationAddress = String(await env.pool.AUTHORIZATION_STATE());
       const payloadHash = computeShieldedReceiveActionHash(pending.prepared.data);
       const authorizations = [...emptyShieldedReceiveAuthorizations()];
       for (const item of pending.receive) {
-        const presentation = prepareShieldedReceivePresentation({ ...item, state: state.state, checkpointId: state.checkpointId, asOf: state.asOf,
+        const state = await loadShieldedIdentityAuthorizationWitness(createIdentityAuthorizationContract(authorizationAddress, env.provider), item.credential.authorizationAlias, { chainId: params.context.chainId, authorizationStateAddress: authorizationAddress });
+        const presentation = prepareShieldedReceivePresentation({ ...item, authorizationWitness: state.witness, authorizationStateRoot: state.stateRoot, checkpointId: state.checkpointId, asOf: state.asOf,
           chainId: params.context.chainId, consumer: params.context.poolAddress, action: pending.actionId === SHIELDED_POOL_ACTION.Fund ? 3 : 4,
           messageId: item.slot, payloadHash });
         const proof = await proveShieldedReceivePresentation(presentation.request, presentation.publicSignals);

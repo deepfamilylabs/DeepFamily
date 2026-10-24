@@ -1,6 +1,8 @@
+import { deployIdentityAuthorizationState, identityAuthorizationStateFactory } from "./helpers/shieldedReceiveAuthorization.mjs";
 import "../hardhat-test-setup.mjs";
 import { expect } from "chai";
 import hre from "hardhat";
+import { buildShieldedIdentityAuthorizationState } from "@deepfamily/protocol-core";
 import { readArchiveBlob } from "../packages/protocol-core/archive.js";
 
 // These tests deliberately use exact-input mocks to isolate contract boundary checks.
@@ -16,9 +18,7 @@ async function now() {
 
 async function fixture() {
   const counterVerifier = await hre.ethers.deployContract("IdentityCounterVerifierMock");
-  const state = await hre.ethers.deployContract("IdentityAuthorizationState", [
-    await counterVerifier.getAddress(),
-  ]);
+  const state = await deployIdentityAuthorizationState(hre, await counterVerifier.getAddress());
   const verifier = await hre.ethers.deployContract("PrivateLetterVerifierMock");
   const family = await hre.ethers.deployContract("ArchiveCallerHarness");
   const factory = await hre.ethers.deployContract("PrivateLetterPoolFactoryMock", [
@@ -116,14 +116,14 @@ describe("Shared identity authorization counter state", function () {
     for (const name of ["advance", "setRoot", "setVerifier", "initialize", "owner"]) {
       expect(state.interface.hasFunction(name)).to.equal(false);
     }
-    const State = await hre.ethers.getContractFactory("IdentityAuthorizationState");
+    const State = await identityAuthorizationStateFactory(hre);
     await expect(State.deploy(hre.ethers.ZeroAddress)).to.be.revertedWithCustomError(
       State,
       "InvalidVerifier",
     );
   });
 
-  it("binds owner authorization to actual context and commits an exact current-root increment", async () => {
+  it("binds owner authorization to actual context and commits the canonical current dictionary increment", async () => {
     const context = await hre.networkHelpers.loadFixture(fixture);
     const prepared = await update(context);
     for (const index of [0, 1, 2, 3, 4, 5, 6, 7]) {
@@ -135,13 +135,13 @@ describe("Shared identity authorization counter state", function () {
     }
     expect(await context.state.currentCheckpointId()).to.equal(1n);
     await prepared.execute();
-    expect(await context.state.currentRoot()).to.equal(prepared.values.newRoot);
+    expect(await context.state.currentRoot()).to.equal(buildShieldedIdentityAuthorizationState([[prepared.values.aliasR, 1n]]).root);
     expect(await context.state.authorizationUsed(prepared.values.authorizationNullifier)).to.equal(
       true,
     );
     await expect(prepared.execute()).to.be.revertedWithCustomError(
       context.state,
-      "StaleCounterRoot",
+      "AuthorizationAlreadyUsed",
     );
     const replay = await update(context, {
       authorizationNullifier: prepared.values.authorizationNullifier,
@@ -153,7 +153,7 @@ describe("Shared identity authorization counter state", function () {
     for (const values of [
       { newCounter: 2n },
       { oldCounter: (1n << 64n) - 1n, newCounter: 0n },
-      { newRoot: prepared.values.newRoot },
+      { oldRoot: 700n, newRoot: 700n },
     ]) {
       await expect((await update(context, values)).execute()).to.be.revertedWithCustomError(
         context.state,
@@ -181,28 +181,25 @@ describe("Shared identity authorization counter state", function () {
     ).to.be.revertedWithCustomError(context.state, "CheckpointExpired");
   });
 
-  it("does not renew the first retirement if a verifier-approved root reappears under another ID", async () => {
+  it("never installs caller-selected proof roots or extends an actual root's retirement", async () => {
     const context = await hre.networkHelpers.loadFixture(fixture);
     await (await update(context, { newRoot: 700n })).execute();
     const original = await context.state.getCheckpoint(2n);
+    expect(original.root).not.to.equal(700n);
     await (await update(context, { newRoot: 701n })).execute();
     const retired = await context.state.getCheckpoint(2n);
     await hre.networkHelpers.time.increase(10);
-    // Such a recurrence is unreachable for a sound monotonic counter proof; the mock
-    // exercises the contract's defensive first-retirement rule anyway.
-    await (await update(context, { newRoot: 700n })).execute();
-    expect(await context.state.firstRetiredAtByRoot(700n)).to.equal(retired.retiredAt);
-    expect(await context.state.validateCheckpoint(2n, original.createdAt)).to.equal(700n);
-    const repeatedId = await context.state.currentCheckpointId();
-    await expect(
-      context.state.validateCheckpoint(repeatedId, await now()),
-    ).to.be.revertedWithCustomError(context.state, "InvalidStateTime");
-    await (await update(context, { newRoot: 702n })).execute();
-    expect(await context.state.firstRetiredAtByRoot(700n)).to.equal(retired.retiredAt);
+    // The verifier mock accepts the exact inputs, but proof roots are not state setters.
+    await (await update(context, { oldRoot: original.root, newRoot: 700n })).execute();
+    expect(await context.state.firstRetiredAtByRoot(original.root)).to.equal(retired.retiredAt);
+    expect(await context.state.validateCheckpoint(2n, original.createdAt)).to.equal(original.root);
+    const current = await context.state.getCheckpoint(await context.state.currentCheckpointId());
+    expect(current.root).not.to.equal(original.root);
+    expect(current.root).not.to.equal(700n);
     await hre.networkHelpers.time.increaseTo(Number(retired.retiredAt + 900n));
-    await expect(
-      context.state.validateCheckpoint(2n, original.createdAt),
-    ).to.be.revertedWithCustomError(context.state, "CheckpointExpired");
+    await expect(context.state.validateCheckpoint(2n, original.createdAt)).to.be.revertedWithCustomError(
+      context.state, "CheckpointExpired",
+    );
   });
 
   it("rejects missing checkpoints and state times outside their actual lifetime", async () => {

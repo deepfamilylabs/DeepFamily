@@ -14,7 +14,7 @@ import {
 import {
   SHIELDED_DEPLOYMENT_CIRCUITS,
   RECEIVE_DEPLOYMENT_CONTRACTS,
-  receiveDeploymentConstructorArgs,
+  receiveDeploymentConstructorArgs, receiveDeploymentLibraries,
   integratedDeploymentAddresses,
 } from "../scripts/lib/zkDeploymentCatalog.mjs";
 
@@ -206,7 +206,7 @@ describe("eSpace Mainnet resumable deployment integration", function () {
     const receiveAddresses = Object.fromEntries(intents.filter((intent) => intent.kind === "deployment").map(({label, predictedAddress}) => [label, predictedAddress]));
     receiveAddresses.deepFamily = address("deepFamilyProxy");
     for (const {contractName, property} of RECEIVE_DEPLOYMENT_CONTRACTS) {
-      requests[property] = await (await ethers.getContractFactory(contractName, deployer)).getDeployTransaction(...receiveDeploymentConstructorArgs(property, receiveAddresses));
+      requests[property] = await (await ethers.getContractFactory(contractName, { signer: deployer, libraries: receiveDeploymentLibraries(property, receiveAddresses) })).getDeployTransaction(...receiveDeploymentConstructorArgs(property, receiveAddresses));
     }
     const nativePool = await ethers.getContractFactory("ShieldedNativePool", {
       signer: deployer,

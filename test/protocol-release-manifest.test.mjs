@@ -282,6 +282,7 @@ const createProductionFixture = () => {
     disclosureBindingVerifier: ADDRESSES.disclosureVerifier,
     token: address(10),
     poseidonT3: address(11),
+    poseidonT4: address(14),
     poseidonT6: address(12),
     deepFamilyLineageIndex: address(13),
     ...Object.fromEntries(
@@ -576,6 +577,7 @@ const acceptanceReportForManifest = (manifest) => ({
     ...Object.fromEntries(
       [
         "poseidonT3",
+        "poseidonT4",
         "poseidonT6",
         "deepFamilyLineageIndex",
         "shieldedVerifiers",

@@ -13,9 +13,8 @@ import {
   computeShieldedAuthorizationAlias,
   computeShieldedReceiveActionHash,
   emptyShieldedReceiveAuthorizations,
-  getShieldedIdentityAuthorizationWitness,
+  verifyShieldedIdentityAuthorizationWitness,
   prepareShieldedReceivePresentation,
-  rebuildShieldedIdentityAuthorizationState,
   computeLineageEndorsementLeaf,
   computeLineageParentsDigest,
   computeLineageTrustedLeaf,
@@ -227,38 +226,46 @@ export async function runShieldedAcceptanceSmoke({
     keyMaterials.push(keys);
     return { ...keys, viewingKey: await deriveShieldedViewPublicKey(keys.hpkeIkm) };
   };
-  const loadAuthorizationState = async () => {
+  const loadAuthorizationWitness = async (alias) => {
     const contract = deployed.identityAuthorizationState;
     assert.ok(contract, "Integrated deployment has no shared authorization state");
     const block = await provider.getBlock("latest");
+    assert.ok(block?.hash, "Authorization checkpoint block is unavailable");
     const overrides = { blockTag: block.number };
-    const creation = Number(await contract.creationBlock(overrides));
-    const events = await contract.queryFilter(
-      contract.filters.CounterIncremented(),
-      creation,
-      block.number,
-    );
-    const state = rebuildShieldedIdentityAuthorizationState(
-      events,
-      await contract.currentRoot(overrides),
-    );
+    const [stateRoot, checkpointId, proof] = await Promise.all([
+      contract.currentRoot(overrides), contract.currentCheckpointId(overrides),
+      contract.getCounterProof(alias, overrides),
+    ]);
+    assert.equal(typeof proof.isOld0, "boolean", "Authorization empty flag is not canonical");
+    assert.equal(typeof proof.absent, "boolean", "Authorization absent flag is not canonical");
+    const authorizationWitness = verifyShieldedIdentityAuthorizationWitness({
+      authorizationAlias: alias, authorizationCounter: proof.authorizationCounter,
+      stateRoot: proof.stateRoot, depth: proof.depth, siblings: Array.from(proof.siblings),
+      oldKey: proof.oldKey, oldValue: proof.oldValue,
+      isOld0: proof.isOld0 ? 1n : 0n, absent: proof.absent ? 1n : 0n,
+    }, stateRoot, alias);
+    const checkpoint = await contract.getCheckpoint(checkpointId, overrides);
+    assert.equal(BigInt(checkpoint.root), BigInt(stateRoot), "Authorization checkpoint root differs");
+    assert.ok(BigInt(checkpoint.createdAt) <= BigInt(block.timestamp), "Authorization checkpoint is future-dated");
+    assert.equal(BigInt(checkpoint.retiredAt), 0n, "Current authorization checkpoint is retired");
+    assert.equal((await provider.getBlock(block.number))?.hash, block.hash, "Authorization checkpoint reorganized");
     return {
-      state,
-      checkpointId: await contract.currentCheckpointId(overrides),
+      authorizationWitness,
+      authorizationStateRoot: stateRoot,
+      checkpointId,
       asOf: BigInt(block.timestamp),
     };
   };
   const receiveCodeFor = async (material, keys, disclosure = "fund") => {
     const action = disclosure === "fund" ? "fundReceiveCredential" : "anonymousReceiveCredential";
     const files = candidate.circuits[action];
-    const checkpoint = await loadAuthorizationState();
     const alias = computeShieldedAuthorizationAlias(material);
+    const checkpoint = await loadAuthorizationWitness(alias);
     const statement = {
       disclosure,
       ...(disclosure === "fund" ? { identityCommitment: material.identityCommitment } : {}),
       authorizationAlias: alias,
-      authorizationCounter: getShieldedIdentityAuthorizationWitness(checkpoint.state, alias)
-        .authorizationCounter,
+      authorizationCounter: checkpoint.authorizationWitness.authorizationCounter,
       expiresAt: checkpoint.asOf + 86400n,
       ownerCommitment: keys.ownerCommitment,
       viewingKey: keys.viewingKey,
@@ -310,7 +317,6 @@ export async function runShieldedAcceptanceSmoke({
     return decoded;
   };
   const authorizeReceivers = async (action, data, credentials) => {
-    const checkpoint = await loadAuthorizationState();
     const hash = computeShieldedReceiveActionHash(data);
     const fields =
       action === "fund"
@@ -324,6 +330,7 @@ export async function runShieldedAcceptanceSmoke({
           };
     for (const [slot, credential] of credentials.entries()) {
       if (!credential) continue;
+      const checkpoint = await loadAuthorizationWitness(credential.authorizationAlias);
       const salt = generateShieldedRandomField();
       const prepared = prepareShieldedReceivePresentation({
         credential,

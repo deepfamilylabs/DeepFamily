@@ -479,6 +479,42 @@ The two-hour proof freshness and initial eligibility delay are separate rules. Q
 revocation can take up to 15 minutes to take full effect, including collection of mature unpaid
 budget periods during that window.
 
+Lineage and authorization preparation read authenticated current paths directly from the chain.
+There is no project index server. `loadTargetedLineageSnapshot` loads only the selected parents,
+children and budget qualifications, using the index's `getMerkleProof`, `versionParents` and
+`getEndorsementMetadata` views. Unspecified parent-version references (version zero) remain
+eligible candidates, and a co-parent need not have a registered record. Each fetched leaf and
+physical slot is checked locally against the paired roots at one fixed block. Per-request family
+metadata limits fail explicitly; they never turn an incomplete load into an eligibility result.
+
+`loadShieldedIdentityAuthorizationWitness` reads `getCounterProof(alias)` at one fixed block,
+checks the current checkpoint, recomputes the membership/non-membership path locally, and checks
+the block hash and scope again. No authorization events or full state Map are needed for code
+creation, receive presentations, or revocation. Missing or invalid paths reject the operation;
+they never imply counter zero. Authorization proofs use constant-size empty/singleton dictionary
+statements to authenticate the owner, scope and expected counter using the existing circuit.
+Their statement roots are not live state roots. The authorization contract checks the live
+counter and computes the actual updated root from its stored nodes. Different identities' updates
+do not invalidate one another's prepared owner proofs; same-identity counter conflicts still fail.
+The legacy event-replay and mutable-Map APIs remain available for explicit compatibility and
+independent verification, but ordinary asset and short-lived code Workers do not call them.
+
+These direct chain calls disclose the queried people, endorsers and authorization alias to the
+RPC operator, even though `eth_call` is not a published transaction. Use a self-operated chain node
+to avoid sharing query interests with a third party. Identity secrets and view keys remain local.
+This is a different privacy boundary from downloading all public events without target filters.
+
+The asset session reuses its provider and clears it when locked. Paths and selected-family state
+remain in the secret-bearing Worker session; there is no persistent contact/path-interest cache.
+New deployments need the updated lineage and authorization contracts and synced ABIs. Immutable
+existing deployments do not gain these views automatically; do not reset old counters or silently
+fall back to old contracts. The 15-minute checkpoint retirement rules remain in force.
+
+This removes whole-history replay for lineage and authorization, not all wallet recovery work.
+Shielded note/ciphertext discovery, pool nullifier scans and letter recovery still have their own
+history costs. Chain storage, path-update gas and checkpoint history also require separate
+capacity planning; a bounded path read is not evidence of one hundred million deployed records.
+
 See the [independent-key specification](shielded-independent-key-spec.md), [contract interfaces](contracts.md#shielded-inheritance-contracts) and [circuit specification](zk-proofs.md#shielded-inheritance-circuits) for precise protocol definitions and their verification boundaries.
 
 ### Workers (crypto, ZK and asset sessions)

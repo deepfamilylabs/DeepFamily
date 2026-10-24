@@ -35,6 +35,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock("ethers", async (original) => ({
   ...(await original<typeof import("ethers")>()),
   JsonRpcProvider: class {
+    destroy() {}
     getNetwork = async () => ({ chainId: 31337n });
     getBlockNumber = async () => 12;
     getBlock = mocks.getBlock;
@@ -62,7 +63,7 @@ vi.mock("@deepfamily/protocol-core", async (original) => ({
 }));
 vi.mock("../shared/clients/contractFactory", () => ({
   createDeepFamilyContract: () => ({ lineageIndex: async () => mocks.lineage }),
-  createLineageIndexContract: () => ({ root: mocks.lineageRoot, isKnownCheckpoint: mocks.knownCheckpoint }),
+  createLineageIndexContract: () => ({ root: mocks.lineageRoot, isKnownCheckpoint: mocks.knownCheckpoint, identityCommitmentOf: async () => 31n }),
   createShieldedPoolFactoryContract: () => ({
     LINEAGE_INDEX: async () => mocks.lineage,
     VERIFIER: async () => mocks.verifier,
@@ -82,9 +83,10 @@ vi.mock("../shared/clients/contractFactory", () => ({
 vi.mock("../shared/zk/shieldedReceivePresentation", () => ({ proveShieldedReceivePresentation: mocks.receipt }));
 vi.mock("../domains/inheritance/services/shieldedIdentityAuthorizationChain", () => ({
   createIdentityAuthorizationContract: () => ({}),
-  loadShieldedIdentityAuthorizationState: async () => {
-    const { buildShieldedIdentityAuthorizationState } = await import("@deepfamily/protocol-core");
-    return { state: buildShieldedIdentityAuthorizationState(), checkpointId: 1n, asOf: 1000n, blockNumber: 12 };
+  loadShieldedIdentityAuthorizationWitness: async (_contract: unknown, alias: bigint) => {
+    const { createShieldedIdentityAuthorizationTree } = await import("@deepfamily/protocol-core");
+    const tree = createShieldedIdentityAuthorizationTree();
+    return { stateRoot: tree.root, witness: tree.getWitness(alias), checkpointId: 1n, asOf: 1000n, blockNumber: 12 };
   },
 }));
 vi.mock("../shared/zk/shieldedReceiveCode", () => ({
@@ -115,7 +117,7 @@ vi.mock("../domains/inheritance/services/shieldedFundingPreparation", async (ori
   validateShieldedFundingDestination: mocks.fundingDestination,
 }));
 vi.mock("../domains/inheritance/services/inheritanceChain", () => ({
-  loadLineageSnapshot: async () => ({ timestamp: 1000n, checkpointId: 7n, versions: new Map(), endorsements: new Map(), trustedEndorsers: new Map() }),
+  loadTargetedLineageSnapshot: async () => ({ timestamp: 1000n, checkpointId: 7n, versions: new Map(), endorsements: new Map(), trustedEndorsers: new Map() }),
   findHeirLegitimacy: () => [],
 }));
 const blockHash = `0x${"aa".repeat(32)}`;
@@ -286,8 +288,13 @@ async function timeBoundPreview(action: "fund" | "claim") {
     // Claim eligibility and witness construction have dedicated integration tests.
     // Supply their public summary while retaining the real recovered wallet/session.
     const recover = session.recover.bind(session);
-    vi.spyOn(session, "recover").mockImplementation(async (params) => ({
-      ...(await recover(params)),
+    vi.spyOn(session, "recover").mockImplementation(async (params) => {
+      const summary = await recover(params);
+      const results = mocks.recover.mock.results;
+      const wallet = await results[results.length - 1].value;
+      // This boundary fixture supplies the budget scope consumed by the targeted lineage loader.
+      wallet.ownedNotes.set(1n, { note: { kind: "budget", rootIdentityCommitment: 31n, rootVersionIndex: 1n } });
+      return { ...summary,
       claims: [{
         handle: "identity:budget",
         slot: "identity",
@@ -297,7 +304,7 @@ async function timeBoundPreview(action: "fund" | "claim") {
         amountPerPeriod: "10",
         status: "ready",
       }],
-    }));
+    }; });
   }
   const request = {
     context,

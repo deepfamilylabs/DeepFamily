@@ -56,7 +56,7 @@ export type PrepareShieldedClaimInput = {
   identity: IdentityMaterialV1Result;
   keyMaterial: ShieldedKeyMaterial;
   wallet: LocalShieldedWalletSnapshot;
-  /** Reconstructed from unfiltered public events at one checkpoint and block. */
+  /** Authenticated selected lineage paths at one paired checkpoint and block. */
   lineage: LineageSnapshot;
   budgetCommitment: BigNumberish;
   secondBudgetCommitment?: BigNumberish;
@@ -174,7 +174,7 @@ async function encryptOwnOutput<T extends ShieldedBudgetNotePayload | ShieldedVa
 }
 
 /**
- * Build a claim entirely from local plaintext and locally replayed public trees.
+ * Build a claim from local plaintext and authenticated lineage paths.
  * The snapshot checkpoint remains usable for its bounded retirement window.
  * The witness and private notes must never be sent to a server or RPC.
  */

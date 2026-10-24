@@ -37,7 +37,10 @@ const mocks = vi.hoisted(() => ({
   loadLineage: vi.fn(),
   readLetters: vi.fn(),
   network: vi.fn(),
+  providers: [] as object[],
+  providerDestroy: vi.fn(),
   authorizationState: vi.fn(),
+  ownerProof: vi.fn(),
   lineage: "0x1111111111111111111111111111111111111111",
   verifier: "0x2222222222222222222222222222222222222222",
   pool: "0x3333333333333333333333333333333333333333",
@@ -50,6 +53,8 @@ vi.mock("ethers", async (importOriginal) => {
   return {
     ...actual,
     JsonRpcProvider: class {
+      constructor() { mocks.providers.push(this); }
+      destroy = mocks.providerDestroy;
       getNetwork = mocks.network;
       getBlockNumber = async () => 12;
       getBlock = async () => ({ hash: `0x${"aa".repeat(32)}`, timestamp: 1000 });
@@ -81,7 +86,11 @@ vi.mock("../shared/clients/contractFactory", () => ({
 }));
 vi.mock("../domains/inheritance/services/shieldedIdentityAuthorizationChain", () => ({
   createIdentityAuthorizationContract: () => ({}),
-  loadShieldedIdentityAuthorizationState: mocks.authorizationState,
+  loadShieldedIdentityAuthorizationWitness: async (_contract: unknown, alias: bigint) => {
+    const { getShieldedIdentityAuthorizationWitness } = await vi.importActual<typeof import("@deepfamily/protocol-core")>("@deepfamily/protocol-core");
+    const result = await mocks.authorizationState();
+    return { ...result, stateRoot: result.state.root, witness: getShieldedIdentityAuthorizationWitness(result.state, alias) };
+  },
 }));
 vi.mock("../domains/inheritance/services/privateLetterChain", () => ({
   createPrivateLetterContract: () => ({ POOL_FACTORY: async () => mocks.factory, AUTHORIZATION_STATE: async () => mocks.verifier }),
@@ -91,7 +100,7 @@ vi.mock("../shared/zk/shieldedReceiveCode", () => ({
   createShieldedReceiveCode: mocks.receive,
   verifyShieldedReceiveCode: vi.fn(),
 }));
-vi.mock("../shared/zk/shieldedZk", () => ({ generateShieldedProof: vi.fn() }));
+vi.mock("../shared/zk/shieldedZk", () => ({ generateShieldedProof: mocks.ownerProof }));
 vi.mock("../domains/inheritance/services/shieldedAssetRegistry", async (importOriginal) => ({
   ...(await importOriginal<
     typeof import("../domains/inheritance/services/shieldedAssetRegistry")
@@ -105,7 +114,7 @@ vi.mock("../domains/inheritance/services/shieldedWalletRecovery", async (importO
   recoverLocalShieldedWallet: mocks.recover,
 }));
 vi.mock("../domains/inheritance/services/inheritanceChain", () => ({
-  loadLineageSnapshot: mocks.loadLineage,
+  loadTargetedLineageSnapshot: mocks.loadLineage,
   findHeirLegitimacy: () => [],
 }));
 
@@ -138,6 +147,7 @@ vi.setConfig({ testTimeout: 30_000 });
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.providers.length = 0;
   mocks.network.mockReset().mockResolvedValue({ chainId: 31337n });
   mocks.authorizationState.mockReset().mockResolvedValue({ state: buildShieldedIdentityAuthorizationState(), checkpointId: 1n, asOf: 1000n, blockNumber: 12 });
   mocks.independentKeyIdentity
@@ -193,6 +203,26 @@ describe("receive-code current authorization state", () => {
     expect(mocks.authorizationState).toHaveBeenCalledOnce();
   });
 
+  it("authorizes the live counter with a constant-size ownership statement", async () => {
+    const session = new ShieldedAssetSession();
+    await session.unlockIdentity(identityParams());
+    const alias = computeShieldedAuthorizationAlias({ identityCommitment: 31n, derivedSecretField: 13n });
+    const globalState = buildShieldedIdentityAuthorizationState([[alias, 2n], [alias ^ (1n << 63n), 1n]]);
+    mocks.authorizationState.mockResolvedValueOnce({ state: globalState, checkpointId: 4n, asOf: 1000n, blockNumber: 12 });
+    mocks.ownerProof.mockResolvedValueOnce({ proof: {
+      protocol: "groth16", curve: "bn128", pi_a: ["1", "2", "1"],
+      pi_b: [["1", "2"], ["3", "4"], ["1", "0"]], pi_c: ["1", "2", "1"],
+    } });
+    const result = await session.authorizeIdentityCounter({ context });
+    const input = mocks.ownerProof.mock.calls[0][0];
+    expect(input.circuit).toBe("identityAuthorizationUpdate");
+    expect(input.witness.oldCounter).toBe("2");
+    expect(input.witness.newCounter).toBe("3");
+    expect(input.witness.siblings).toEqual(Array(64).fill("0"));
+    expect(input.witness.oldRoot).not.toBe(String(globalState.root));
+    expect(result.args.slice(1, 6)).toEqual([String(alias), input.witness.oldRoot, input.witness.newRoot, "2", "3"]);
+  });
+
   it("uses a nonzero current counter and reloads it for every renewal", async () => {
     const session = new ShieldedAssetSession();
     await session.unlockIdentity(identityParams());
@@ -211,6 +241,79 @@ describe("receive-code current authorization state", () => {
     mocks[dependency].mockRejectedValue(new Error("RPC unavailable"));
     await expect(session.receiveCode({ slot: "identity", context, expiresAt: "2000000000" })).rejects.toThrow("RPC unavailable");
     expect(mocks.receive).not.toHaveBeenCalled();
+  });
+});
+
+describe("verified event replay provider lifecycle", () => {
+  const issue = (session: ShieldedAssetSession) =>
+    session.receiveCode({ slot: "identity", context, expiresAt: "2000000000" });
+
+  it("reuses its provider while rereading current chain state, then releases it on clear", async () => {
+    const session = new ShieldedAssetSession();
+    await session.unlockIdentity(identityParams());
+    await issue(session);
+    await issue(session);
+    expect(mocks.providers).toHaveLength(1);
+    expect(mocks.network).toHaveBeenCalledTimes(2);
+    expect(mocks.authorizationState).toHaveBeenCalledTimes(2);
+    expect(mocks.providerDestroy).not.toHaveBeenCalled();
+    session.clear();
+    expect(mocks.providerDestroy).toHaveBeenCalledOnce();
+    await session.unlockIdentity(identityParams());
+    await issue(session);
+    expect(mocks.providers).toHaveLength(2);
+  });
+
+  it("disposes a failed initial provider and validates the next connection afresh", async () => {
+    const session = new ShieldedAssetSession();
+    await session.unlockIdentity(identityParams());
+    mocks.network.mockResolvedValueOnce({ chainId: 1n });
+    await expect(issue(session)).rejects.toThrow("RPC chain");
+    expect(mocks.providerDestroy).toHaveBeenCalledOnce();
+    expect(mocks.authorizationState).not.toHaveBeenCalled();
+    await issue(session);
+    expect(mocks.providers).toHaveLength(2);
+    expect(mocks.authorizationState).toHaveBeenCalledOnce();
+  });
+
+  it("fails closed on a reused provider's RPC error and retries without replacing the session", async () => {
+    const session = new ShieldedAssetSession();
+    await session.unlockIdentity(identityParams());
+    await issue(session);
+    mocks.network.mockRejectedValueOnce(new Error("RPC unavailable"));
+    await expect(issue(session)).rejects.toThrow("RPC unavailable");
+    expect(mocks.authorizationState).toHaveBeenCalledOnce();
+    await issue(session);
+    expect(mocks.providers).toHaveLength(1);
+    expect(mocks.authorizationState).toHaveBeenCalledTimes(2);
+    expect(mocks.providerDestroy).not.toHaveBeenCalled();
+  });
+
+  it("does not reuse a verified connection for a different RPC endpoint", async () => {
+    const session = new ShieldedAssetSession();
+    await session.unlockIdentity(identityParams());
+    await issue(session);
+    await expect(session.receiveCode({
+      slot: "identity", context: { ...context, rpcUrl: "http://other-rpc.invalid" }, expiresAt: "2000000000",
+    })).rejects.toThrow("Protocol context changed");
+    expect(mocks.providers).toHaveLength(1);
+    expect(mocks.authorizationState).toHaveBeenCalledOnce();
+  });
+
+  it("does not reinstall an initial connection after its credentials were cleared", async () => {
+    const session = new ShieldedAssetSession();
+    await session.unlockIdentity(identityParams());
+    let release!: (network: { chainId: bigint }) => void;
+    mocks.network.mockImplementationOnce(() => new Promise((resolve) => { release = resolve; }));
+    const pending = issue(session);
+    session.clear();
+    release({ chainId: 31337n });
+    await expect(pending).rejects.toThrow("Credentials session was replaced or locked");
+    expect(mocks.providerDestroy).toHaveBeenCalledOnce();
+    expect(mocks.authorizationState).not.toHaveBeenCalled();
+    await session.unlockIdentity(identityParams());
+    await issue(session);
+    expect(mocks.providers).toHaveLength(2);
   });
 });
 

@@ -142,6 +142,29 @@ test("replay rejects a write that skips past the end of the tree", () => {
   );
 });
 
+test("cloned lineage trees retain proofs and isolate inserts and rewrites", () => {
+  const original = createLineageTree([7n, 0n, 9n]);
+  const root = original.root;
+  const copy = original.clone();
+  assert.equal(copy.root, root);
+  assert.equal(copy.depth, original.depth);
+  assert.equal(copy.sizeBigInt, original.sizeBigInt);
+  for (let index = 0n; index < original.sizeBigInt; index++)
+    assert.deepEqual(copy.generateProof(index), original.generateProof(index));
+  copy.update(0n, 11n);
+  copy.insert(13n);
+  assert.equal(original.root, root);
+  assert.deepEqual(original.leaves, [7n, 0n, 9n]);
+  const copyRoot = copy.root;
+  original.update(2n, 15n);
+  assert.equal(copy.root, copyRoot);
+  assert.deepEqual(copy.leaves, [11n, 0n, 9n, 13n]);
+  const empty = createLineageTree();
+  empty.clone().insert(1n);
+  assert.equal(empty.sizeBigInt, 0n);
+  assert.equal(empty.root, 0n);
+});
+
 test("invalid insert leaves tree size, depth, and root unchanged", () => {
   const tree = createLineageTree([1n]);
   assert.throws(

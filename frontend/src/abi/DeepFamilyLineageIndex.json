@@ -21,6 +21,11 @@
     },
     {
       "inputs": [],
+      "name": "EndorsementTimeOverflow",
+      "type": "error"
+    },
+    {
+      "inputs": [],
       "name": "IdentityCommitmentMismatch",
       "type": "error"
     },
@@ -326,6 +331,35 @@
           "internalType": "uint256",
           "name": "retiredAt",
           "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "personHash",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "address",
+          "name": "endorser",
+          "type": "address"
+        }
+      ],
+      "name": "getEndorsementMetadata",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "versionIndex",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint64",
+          "name": "writtenAt",
+          "type": "uint64"
         }
       ],
       "stateMutability": "view",
@@ -676,6 +710,35 @@
         {
           "internalType": "uint256",
           "name": "leafIndex",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "personHash",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "uint256",
+          "name": "versionIndex",
+          "type": "uint256"
+        }
+      ],
+      "name": "versionParents",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "fatherIdentityCommitment",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "motherIdentityCommitment",
           "type": "uint256"
         }
       ],

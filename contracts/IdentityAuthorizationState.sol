@@ -2,23 +2,27 @@
 pragma solidity ^0.8.24;
 
 import {IIdentityAuthorizationState, IIdentityCounterUpdateVerifier} from "./interfaces/IIdentityAuthorizationState.sol";
+import {PoseidonT3} from "poseidon-solidity/PoseidonT3.sol";
+import {PoseidonT4} from "poseidon-solidity/PoseidonT4.sol";
 
 /**
  * @notice Immutable, proof-authorized counter state shared by every canonical pool and letter
  *         archive. Updates publish R and counters, but never publish the identity behind R.
  * @dev There is no owner, initializer, root setter, or verifier replacement entry point.
- *      Off-chain mirrors rebuild the sparse dictionary from CounterIncremented events.
+ *      Current dictionary nodes are retained for direct proof queries. Their stable IDs
+ *      are reused by counter updates; only new aliases allocate leaves and branches.
  */
 contract IdentityAuthorizationState is IIdentityAuthorizationState {
   error InvalidVerifier();
   error InvalidFieldElement();
-  error StaleCounterRoot();
+  error StaleAuthorizationCounter();
   error InvalidCounterIncrement();
   error AuthorizationAlreadyUsed();
   error InvalidCounterProof();
   error UnknownCheckpoint();
   error InvalidStateTime();
   error CheckpointExpired();
+  error AuthorizationPathCollision();
 
   uint256 public constant SNARK_SCALAR_FIELD =
     21888242871839275222246405745257275088548364400416034343698204186575808495617;
@@ -29,6 +33,22 @@ contract IdentityAuthorizationState is IIdentityAuthorizationState {
   mapping(uint256 checkpointId => Checkpoint checkpoint) private _checkpoints;
   mapping(uint256 root => uint64 firstRetiredAt) public firstRetiredAtByRoot;
   mapping(uint256 authorizationNullifier => bool used) public authorizationUsed;
+  mapping(uint256 aliasR => uint64 counter) public override authorizationCounter;
+
+  // Zero ID is the empty subtree. Positive-counter nodes are leaves; zero-counter
+  // nodes are branches. Child IDs/counter share one slot; hashes and full alias keys
+  // each need one slot. Nodes are mutable current state, not historical hash objects.
+  struct Node {
+    uint256 hash;
+    uint256 key;
+    uint64 counter;
+    uint64 left;
+    uint64 right;
+  }
+
+  mapping(uint64 nodeId => Node node) private _nodes;
+  uint64 private _rootNodeId;
+  uint64 public nodeCount;
 
   event CounterIncremented(
     uint256 indexed checkpointId,
@@ -56,10 +76,39 @@ contract IdentityAuthorizationState is IIdentityAuthorizationState {
     return _checkpoints[checkpointId];
   }
 
+  /** @notice Fetch at one block tag alongside the checkpoint; no history replay is needed. */
+  function getCounterProof(
+    uint256 aliasR
+  ) external view override returns (CounterProof memory result) {
+    if (aliasR == 0 || aliasR >= SNARK_SCALAR_FIELD) revert InvalidFieldElement();
+    result.stateRoot = currentRoot();
+    uint64 nodeId = _rootNodeId;
+    while (nodeId != 0) {
+      Node storage node = _nodes[nodeId];
+      if (node.counter != 0) {
+        result.oldKey = node.key;
+        result.oldValue = node.counter;
+        if (node.key == aliasR) result.authorizationCounter = node.counter;
+        break;
+      }
+      uint256 depth = result.depth;
+      if (depth >= 64) revert AuthorizationPathCollision();
+      bool right = ((aliasR >> depth) & 1) != 0;
+      result.siblings[depth] = _nodes[right ? node.left : node.right].hash;
+      nodeId = right ? node.right : node.left;
+      result.depth = depth + 1;
+    }
+    result.isOld0 = nodeId == 0;
+    result.absent = result.authorizationCounter == 0;
+  }
+
   /**
    * @notice Increment exactly one identity counter with its owner's ZK authorization.
    * @dev The verifier, rather than a caller-selected wallet, authenticates the identity secret.
-   *      A concurrently superseded root must be reproved against the current dictionary.
+   *      The existing owner proof also authenticates a dictionary transition. Its roots
+   *      may be stale: ownership, scope and counter remain authenticated unconditionally.
+   *      The live counter is checked here and the actual root is computed from stored
+   *      nodes, so proofs for different aliases do not invalidate one another.
    */
   function incrementCounter(
     uint256 authorizationNullifier,
@@ -70,7 +119,6 @@ contract IdentityAuthorizationState is IIdentityAuthorizationState {
     uint64 newCounter,
     bytes calldata proof
   ) external {
-    if (oldRoot != currentRoot()) revert StaleCounterRoot();
     if (uint256(newCounter) != uint256(oldCounter) + 1 || newRoot == oldRoot)
       revert InvalidCounterIncrement();
     if (
@@ -78,9 +126,11 @@ contract IdentityAuthorizationState is IIdentityAuthorizationState {
       aliasR >= SNARK_SCALAR_FIELD ||
       authorizationNullifier == 0 ||
       authorizationNullifier >= SNARK_SCALAR_FIELD ||
+      oldRoot >= SNARK_SCALAR_FIELD ||
       newRoot >= SNARK_SCALAR_FIELD
     ) revert InvalidFieldElement();
     if (authorizationUsed[authorizationNullifier]) revert AuthorizationAlreadyUsed();
+    if (authorizationCounter[aliasR] != oldCounter) revert StaleAuthorizationCounter();
     uint256[8] memory inputs = [
       authorizationNullifier,
       block.chainid,
@@ -97,22 +147,88 @@ contract IdentityAuthorizationState is IIdentityAuthorizationState {
       revert InvalidCounterProof();
     }
 
+    uint256 actualOldRoot = currentRoot();
+    _writeCounter(aliasR, newCounter);
+    uint256 actualNewRoot = _nodes[_rootNodeId].hash;
+    if (actualNewRoot == actualOldRoot) revert InvalidCounterIncrement();
+    authorizationCounter[aliasR] = newCounter;
     authorizationUsed[authorizationNullifier] = true;
     Checkpoint storage previous = _checkpoints[currentCheckpointId];
     uint64 retiredAt = uint64(block.timestamp);
     previous.retiredAt = retiredAt;
-    if (firstRetiredAtByRoot[oldRoot] == 0) firstRetiredAtByRoot[oldRoot] = retiredAt;
+    if (firstRetiredAtByRoot[actualOldRoot] == 0) firstRetiredAtByRoot[actualOldRoot] = retiredAt;
     uint256 checkpointId = ++currentCheckpointId;
-    _checkpoints[checkpointId] = Checkpoint(newRoot, retiredAt, 0);
+    _checkpoints[checkpointId] = Checkpoint(actualNewRoot, retiredAt, 0);
     emit CounterIncremented(
       checkpointId,
       aliasR,
       oldCounter,
       newCounter,
-      oldRoot,
-      newRoot,
+      actualOldRoot,
+      actualNewRoot,
       authorizationNullifier
     );
+  }
+
+  function _newLeaf(uint256 key, uint64 counter) private returns (uint64 nodeId) {
+    nodeId = ++nodeCount;
+    Node storage node = _nodes[nodeId];
+    node.key = key;
+    node.counter = counter;
+    node.hash = PoseidonT4.hash([key, uint256(counter), uint256(1)]);
+  }
+
+  function _newBranch(uint64 left, uint64 right) private returns (uint64 nodeId) {
+    nodeId = ++nodeCount;
+    Node storage node = _nodes[nodeId];
+    node.left = left;
+    node.right = right;
+    node.hash = PoseidonT3.hash([_nodes[left].hash, _nodes[right].hash]);
+  }
+
+  /** @dev Iterative low-bit-first insertion/update, identical to the Circom dictionary. */
+  function _writeCounter(uint256 key, uint64 counter) private {
+    uint64[64] memory ancestors;
+    uint256 depth;
+    uint64 nodeId = _rootNodeId;
+    while (nodeId != 0 && _nodes[nodeId].counter == 0) {
+      if (depth >= 64) revert AuthorizationPathCollision();
+      ancestors[depth] = nodeId;
+      nodeId = ((key >> depth) & 1) != 0 ? _nodes[nodeId].right : _nodes[nodeId].left;
+      ++depth;
+    }
+
+    uint64 updated;
+    if (nodeId == 0) {
+      updated = _newLeaf(key, counter);
+    } else if (_nodes[nodeId].key == key) {
+      Node storage leaf = _nodes[nodeId];
+      leaf.counter = counter;
+      leaf.hash = PoseidonT4.hash([key, uint256(counter), uint256(1)]);
+      updated = nodeId;
+    } else {
+      uint256 oldKey = _nodes[nodeId].key;
+      uint256 split = depth;
+      while (split < 64 && ((oldKey >> split) & 1) == ((key >> split) & 1)) ++split;
+      if (split == 64) revert AuthorizationPathCollision();
+      uint64 next = _newLeaf(key, counter);
+      updated = ((key >> split) & 1) != 0 ? _newBranch(nodeId, next) : _newBranch(next, nodeId);
+      while (split > depth) {
+        --split;
+        updated = ((key >> split) & 1) != 0 ? _newBranch(0, updated) : _newBranch(updated, 0);
+      }
+    }
+
+    while (depth != 0) {
+      --depth;
+      uint64 parentId = ancestors[depth];
+      Node storage parent = _nodes[parentId];
+      if (((key >> depth) & 1) != 0) parent.right = updated;
+      else parent.left = updated;
+      parent.hash = PoseidonT3.hash([_nodes[parent.left].hash, _nodes[parent.right].hash]);
+      updated = parentId;
+    }
+    _rootNodeId = updated;
   }
 
   function validateCheckpoint(

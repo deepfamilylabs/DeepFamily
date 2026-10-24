@@ -7,6 +7,7 @@ import { buildShieldedReceiveCredentialPublicSignals } from "./shielded-receive-
 import {
   buildShieldedIdentityAuthorizationState,
   getShieldedIdentityAuthorizationWitness,
+  verifyShieldedIdentityAuthorizationWitness,
 } from "./shielded-identity-authorization.js";
 
 export const SHIELDED_RECEIVE_PRESENTATION_ACTION = Object.freeze({
@@ -102,7 +103,14 @@ export function prepareShieldedReceivePresentation(input) {
   const hashBytes = getBytes(input.payloadHash);
   check(hashBytes.length === 32, "Receive operation hash must be 32 bytes");
   const hash = BigInt(hexlify(hashBytes));
-  const lookup = getShieldedIdentityAuthorizationWitness(input.state, signals[0]);
+  const lookup =
+    input.authorizationWitness === undefined
+      ? getShieldedIdentityAuthorizationWitness(input.state, signals[0])
+      : verifyShieldedIdentityAuthorizationWitness(
+          input.authorizationWitness,
+          input.authorizationStateRoot,
+          signals[0],
+        );
   check(lookup.authorizationCounter === signals[1], "Receive credential has been revoked");
   const binding = computeShieldedReceiveCredentialBinding(input);
   const publicSignals = [

@@ -4,7 +4,7 @@ import {
   INTEGRATED_DEPLOYMENT_RECORDS,
   SHIELDED_DEPLOYMENT_CIRCUITS,
   RECEIVE_DEPLOYMENT_CONTRACTS,
-  receiveDeploymentConstructorArgs,
+  receiveDeploymentConstructorArgs, receiveDeploymentLibraries,
   integratedDeploymentContract,
 } from "../scripts/lib/zkDeploymentCatalog.mjs";
 import { assertImplementationMatchesArtifact } from "../tasks/lib/timelockUpgrade.mjs";
@@ -884,11 +884,11 @@ export const deployIntegratedSystem = async (
   }
 
   const receive = {};
-  const receiveAddresses = { deepFamily: deepFamilyAddress };
+  const receiveAddresses = { deepFamily: deepFamilyAddress, poseidonT3: lineageLibraries.PoseidonT3, poseidonT4: lineageLibraries.PoseidonT4 };
   for (const { contractName, property } of RECEIVE_DEPLOYMENT_CONTRACTS) {
     if (property === "privateLetterArchive") continue;
     receive[property] = await deployContract(property,
-      await ethers.getContractFactory(contractName, deployer),
+      await ethers.getContractFactory(contractName, { signer: deployer, libraries: receiveDeploymentLibraries(property, receiveAddresses) }),
       receiveDeploymentConstructorArgs(property, receiveAddresses));
     receiveAddresses[property] = await receive[property].getAddress();
   }
@@ -1194,7 +1194,9 @@ export const ensureIntegratedSystem = async (
               contractName: record.contractName,
               deployment: record.deployment,
               spec:
-                record.contractName === "DeepFamilyLineageIndex"
+                record.contractName === "IdentityAuthorizationState"
+                  ? { libraries: { PoseidonT3: libraries.PoseidonT3, PoseidonT4: libraries.PoseidonT4 } }
+                  : record.contractName === "DeepFamilyLineageIndex"
                   ? { libraries }
                   : ["ShieldedErc20Pool", "ShieldedNativePool", "ShieldedPoolFactory"].includes(
                         record.contractName,

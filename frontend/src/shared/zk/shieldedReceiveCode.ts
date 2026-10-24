@@ -12,7 +12,6 @@ import {
   deriveShieldedViewPublicKey,
   encodeShieldedReceiveCredential,
   wipeBytes,
-  getShieldedIdentityAuthorizationWitness,
   wrapIdentityCommitmentAsPersonHash,
   type IdentityFields,
   type ShieldedReceiveCredentialProof,
@@ -21,7 +20,7 @@ import { JsonRpcProvider, hexlify, getBigInt, getBytes, type BigNumberish } from
 // @ts-ignore snarkjs does not publish complete browser typings.
 import * as snarkjs from "snarkjs";
 import { getFundingPassphraseError } from "../crypto/passphraseStrength";
-import { createIdentityAuthorizationContract, loadShieldedIdentityAuthorizationState } from "../clients/shieldedIdentityAuthorizationChain";
+import { createIdentityAuthorizationContract, loadShieldedIdentityAuthorizationWitness } from "../clients/shieldedIdentityAuthorizationChain";
 import { createShieldedPoolFactoryContract } from "../clients/contractFactory";
 import { generateShieldedProof, SHIELDED_RECEIVE_CREDENTIAL_VERIFICATION_KEYS } from "./shieldedZk";
 
@@ -153,13 +152,14 @@ export async function createShieldedReceiveCodeFromCredentials(input: {
     try {
     if ((await provider.getNetwork()).chainId !== BigInt(input.context.chainId)) throw new Error("Receive code chain mismatch");
     const factory = createShieldedPoolFactoryContract(input.context.factoryAddress, provider);
-    const state = await loadShieldedIdentityAuthorizationState(createIdentityAuthorizationContract(await factory.AUTHORIZATION_STATE(), provider));
     const alias = computeShieldedAuthorizationAlias(material);
+    const address = String(await factory.AUTHORIZATION_STATE());
+    const state = await loadShieldedIdentityAuthorizationWitness(createIdentityAuthorizationContract(address, provider), alias, { chainId: input.context.chainId, authorizationStateAddress: address });
     return await createShieldedReceiveCode({
       ...material,
       keyMode: 0,
       disclosure: input.disclosure,
-      authorizationCounter: getShieldedIdentityAuthorizationWitness(state.state, alias).authorizationCounter,
+      authorizationCounter: state.witness.authorizationCounter,
       expiresAt: input.expiresAt,
       keyMaterial: deriveShieldedHeirKeyMaterial(material.derivedSecretField),
     });

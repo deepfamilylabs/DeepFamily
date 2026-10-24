@@ -559,6 +559,7 @@ export interface LineageTree {
   readonly size: number | bigint;
   readonly sizeBigInt: bigint;
   readonly leaves: bigint[];
+  clone(): LineageTree;
   insert(leaf: BigNumberish): void;
   update(index: BigNumberish, leaf: BigNumberish): void;
   indexOf(leaf: bigint): number | bigint;
@@ -1312,13 +1313,29 @@ export interface ShieldedIdentityAuthorizationState {
   root: bigint;
   entries: Map<bigint, bigint>;
 }
+export interface ShieldedIdentityAuthorizationTree {
+  readonly root: bigint;
+  getCounter(authorizationAlias: BigNumberish): bigint;
+  getWitness(authorizationAlias: BigNumberish): ShieldedIdentityAuthorizationWitness;
+  increment(
+    authorizationAlias: BigNumberish,
+    oldCounter: BigNumberish,
+    newCounter: BigNumberish,
+  ): void;
+  clone(): ShieldedIdentityAuthorizationTree;
+  snapshot(): ShieldedIdentityAuthorizationState;
+}
+export function createShieldedIdentityAuthorizationTree(
+  entries?: Iterable<readonly [BigNumberish, BigNumberish]>,
+): ShieldedIdentityAuthorizationTree;
 export function buildShieldedIdentityAuthorizationState(
   entries?: Iterable<readonly [BigNumberish, BigNumberish]>,
 ): ShieldedIdentityAuthorizationState;
 export function getShieldedIdentityAuthorizationWitness(
   state: ShieldedIdentityAuthorizationState,
   authorizationAlias: BigNumberish,
-): {
+): ShieldedIdentityAuthorizationWitness;
+export interface ShieldedIdentityAuthorizationWitness {
   authorizationAlias: bigint;
   authorizationCounter: bigint;
   stateRoot: bigint;
@@ -1329,6 +1346,37 @@ export function getShieldedIdentityAuthorizationWitness(
   isOld0: bigint;
   fnc: bigint;
   absent: bigint;
+}
+export type ShieldedIdentityAuthorizationWitnessInput = {
+  [K in keyof Omit<ShieldedIdentityAuthorizationWitness, "siblings" | "fnc">]: BigNumberish;
+} & { siblings: BigNumberish[]; fnc?: BigNumberish };
+export function verifyShieldedIdentityAuthorizationWitness(
+  input: ShieldedIdentityAuthorizationWitnessInput,
+  expectedRoot: BigNumberish,
+  expectedAlias?: BigNumberish,
+): ShieldedIdentityAuthorizationWitness;
+export function prepareShieldedIdentityAuthorizationIncrementFromWitness(input: {
+  authorizationWitness: ShieldedIdentityAuthorizationWitnessInput;
+  authorizationStateRoot: BigNumberish;
+  chainId: BigNumberish;
+  authorizationStateAddress: string;
+  identityCommitment: BigNumberish;
+  derivedSecretField: BigNumberish;
+}): {
+  newRoot: bigint;
+  publicSignals: bigint[];
+  witness: Record<string, string | string[]>;
+};
+export function prepareShieldedIdentityCounterAuthorization(input: {
+  authorizationCounter: BigNumberish;
+  chainId: BigNumberish;
+  authorizationStateAddress: string;
+  identityCommitment: BigNumberish;
+  derivedSecretField: BigNumberish;
+}): {
+  newRoot: bigint;
+  publicSignals: bigint[];
+  witness: Record<string, string | string[]>;
 };
 export function prepareShieldedIdentityAuthorizationIncrement(input: {
   state: ShieldedIdentityAuthorizationState;
@@ -1371,7 +1419,9 @@ export function emptyShieldedReceiveAuthorizations(): [
 ];
 export function prepareShieldedReceivePresentation(input: {
   credential: ShieldedReceiveCredentialStatement & { proof: ShieldedReceiveCredentialProof };
-  state: ShieldedIdentityAuthorizationState;
+  state?: ShieldedIdentityAuthorizationState;
+  authorizationWitness?: ShieldedIdentityAuthorizationWitnessInput;
+  authorizationStateRoot?: BigNumberish;
   chainId: BigNumberish;
   consumer: string;
   action: BigNumberish;

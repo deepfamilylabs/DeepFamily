@@ -60,7 +60,7 @@ import {
   validateKdfDeviceMatrixV2Evidence,
 } from "./kdfReleaseEvidence.mjs";
 import { inspectZkReleaseArtifacts, readCanonicalJsonFile } from "./zkArtifactTrust.mjs";
-import { SHIELDED_DEPLOYMENT_CIRCUITS, RECEIVE_DEPLOYMENT_CONTRACTS, RECEIVE_DEPLOYMENT_IMMUTABLES } from "./zkDeploymentCatalog.mjs";
+import { SHIELDED_DEPLOYMENT_CIRCUITS, RECEIVE_DEPLOYMENT_CONTRACTS, RECEIVE_DEPLOYMENT_IMMUTABLES, receiveDeploymentLibraries } from "./zkDeploymentCatalog.mjs";
 
 export const GROTH16_ADAPTER_VERIFIER_BINDINGS = Object.freeze({
   personVerifier: "personCommitmentVerifier",
@@ -150,6 +150,7 @@ export const PROTOCOL_DEPLOYMENT_ARTIFACTS = Object.freeze({
   ...Object.fromEntries(RECEIVE_DEPLOYMENT_CONTRACTS.map(({ contractName, property }) => [property, Object.freeze({
     path: `artifacts/contracts/${contractName}.sol/${contractName}.json`, contractName,
     sourceName: `contracts/${contractName}.sol`, immutableFields: Object.freeze(Object.keys(RECEIVE_DEPLOYMENT_IMMUTABLES[property])),
+    libraryFields: Object.freeze(Object.keys(receiveDeploymentLibraries(property, {}))),
   })])),
 });
 
@@ -998,6 +999,7 @@ export const inspectProtocolDeploymentArtifacts = ({ root = process.cwd(), deplo
     ),
     ...Object.fromEntries(RECEIVE_DEPLOYMENT_CONTRACTS.map(({property}) => [property, inspectProtocolDeploymentArtifact({
       root, artifactName: property, immutableValues: deployments?.[property]?.immutables ?? {},
+      libraries: receiveDeploymentLibraries(property, deployments ?? {}),
     })])),
     shieldedErc20Pool: inspectProtocolDeploymentArtifact({
       root,
@@ -1082,6 +1084,7 @@ const SHIELDED_RECORD_HASH_KEYS = Object.freeze(["artifactSha256", "runtimeSha25
 const SHIELDED_DEPLOYMENT_KEYS = Object.freeze([
   "token",
   "poseidonT3",
+  "poseidonT4",
   "poseidonT6",
   "deepFamilyLineageIndex",
   "shieldedVerifiers",
@@ -1133,6 +1136,7 @@ const assertShieldedDeploymentShape = (deployments) => {
 export const shieldedDeploymentBindingsFromAddresses = (addresses) => ({
   token: addresses?.token,
   poseidonT3: addresses?.poseidonT3,
+  poseidonT4: addresses?.poseidonT4,
   poseidonT6: addresses?.poseidonT6,
   deepFamilyLineageIndex: addresses?.deepFamilyLineageIndex,
   ...Object.fromEntries(RECEIVE_DEPLOYMENT_CONTRACTS.map(({property}) => [property, {
@@ -1176,7 +1180,7 @@ export const shieldedDeploymentBindingsFromAddresses = (addresses) => ({
 export const protocolShieldedDeploymentEvidenceFromRecords = (deployments) => {
   assertShieldedDeploymentShape(deployments);
   const addressFields = Object.fromEntries(
-    ["token", "poseidonT3", "poseidonT6", "deepFamilyLineageIndex"].map((field) => [
+    ["token", "poseidonT3", "poseidonT4", "poseidonT6", "deepFamilyLineageIndex"].map((field) => [
       field,
       assertAddress(deployments[field], `deployment ${field}`),
     ]),
@@ -1375,6 +1379,7 @@ export const protocolDeploymentEvidenceFromAcceptanceReport = (report) => {
         ...Object.fromEntries(RECEIVE_DEPLOYMENT_CONTRACTS.map(({property}) => [property, terminal?.[property]])),
         token: addresses?.token,
         poseidonT3: terminal?.poseidonT3,
+        poseidonT4: terminal?.poseidonT4,
         poseidonT6: terminal?.poseidonT6,
         deepFamilyLineageIndex: terminal?.deepFamilyLineageIndex,
         shieldedVerifiers: terminal?.shieldedVerifiers,

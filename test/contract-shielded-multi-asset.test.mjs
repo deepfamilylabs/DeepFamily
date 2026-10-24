@@ -1,3 +1,4 @@
+import { deployIdentityAuthorizationState } from "./helpers/shieldedReceiveAuthorization.mjs";
 import "../hardhat-test-setup.mjs";
 import { expect } from "chai";
 import hre from "hardhat";
@@ -63,9 +64,7 @@ async function setup({ native = false, precision = 18 } = {}) {
   const lineage = await hre.ethers.deployContract("ShieldedPoolLineageMock");
   const verifier = await hre.ethers.deployContract("ShieldedPoolVerifierMock");
   const counterVerifier = await hre.ethers.deployContract("IdentityCounterVerifierMock");
-  const authorizationState = await hre.ethers.deployContract("IdentityAuthorizationState", [
-    await counterVerifier.getAddress(),
-  ]);
+  const authorizationState = await deployIdentityAuthorizationState(hre, await counterVerifier.getAddress());
   const receiveVerifier = await hre.ethers.deployContract("PrivateLetterVerifierMock");
   const poseidon = await hre.ethers.deployContract("PoseidonT3");
   await Promise.all([token, lineage, verifier, poseidon].map((c) => c.waitForDeployment()));
@@ -481,9 +480,7 @@ describe("immutable multi-asset shielded pool boundaries", function () {
       await setup({ native: true });
     const Factory = await hre.ethers.getContractFactory("ShieldedPoolFactory", { libraries });
     const counterVerifier = await hre.ethers.deployContract("IdentityCounterVerifierMock");
-    const otherState = await hre.ethers.deployContract("IdentityAuthorizationState", [
-      await counterVerifier.getAddress(),
-    ]);
+    const otherState = await deployIdentityAuthorizationState(hre, await counterVerifier.getAddress());
     const otherVerifier = await hre.ethers.deployContract("PrivateLetterVerifierMock");
     const args = [
       await token.getAddress(),
