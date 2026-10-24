@@ -275,25 +275,23 @@ describe("receive-code current authorization state", () => {
 
 describe("verified event replay provider lifecycle", () => {
   it.each(["rebuild", "chain"] as const)(
-    "requires a fresh secret session when switching from %s",
+    "preserves the unlocked session and provider when switching from %s",
     async (stateReadMode) => {
       const session = new ShieldedAssetSession();
       await session.unlockIdentity(identityParams());
       await session.receiveCode({ slot: "identity", context: { ...context, stateReadMode }, expiresAt: "2000000000" });
+      const state = session.state();
       const nextMode = stateReadMode === "chain" ? "rebuild" : "chain";
       mocks.network.mockClear();
       mocks.authorizationState.mockClear();
       await expect(session.receiveCode({
         slot: "identity", context: { ...context, stateReadMode: nextMode }, expiresAt: "2000000000",
-      })).rejects.toThrow("Protocol context changed");
-      expect(mocks.network).not.toHaveBeenCalled();
-      expect(mocks.authorizationState).not.toHaveBeenCalled();
-      session.clear();
-      await session.unlockIdentity(identityParams());
-      await expect(session.receiveCode({
-        slot: "identity", context: { ...context, stateReadMode: nextMode }, expiresAt: "2000000000",
       })).resolves.toEqual({ code: "public-code" });
       expect(mocks.authorizationState).toHaveBeenCalledWith(nextMode, expect.any(Object));
+      expect(session.state()).toEqual(state);
+      expect(mocks.identity).toHaveBeenCalledOnce();
+      expect(mocks.providers).toHaveLength(1);
+      expect(mocks.providerDestroy).not.toHaveBeenCalled();
     },
   );
 
@@ -2413,7 +2411,7 @@ describe("ephemeral asset Worker independent key lifecycle", () => {
     const internals = (session: ShieldedAssetSession) =>
       session as unknown as { summary: unknown; wallets: Map<string, unknown> };
 
-    it("keeps identity and the independent key root but drops the previous pool's history", async () => {
+    it.each(["pool", "read mode"] as const)("keeps identity and the independent key root but drops history after a %s change", async (change) => {
       const session = new ShieldedAssetSession();
       const keys = await deriveShieldedIndependentKeyMaterial({
         independentKeyRoot: fixedRoot,
@@ -2436,17 +2434,18 @@ describe("ephemeral asset Worker independent key lifecycle", () => {
       expect(internals(session).summary).not.toBeNull();
       const before = session.state();
 
-      mocks.canonicalPool = otherPoolContext.poolAddress;
+      const nextContext = change === "pool" ? otherPoolContext : { ...context, stateReadMode: "chain" as const };
+      mocks.canonicalPool = nextContext.poolAddress;
       const exported = await session.call("exportRecoveryMaterial", {
         format: "shieldedKey" as const,
-        context: otherPoolContext,
+        context: nextContext,
       });
       expect(exported.material).toBe(encodeShieldedIndependentKey(fixedRoot));
       expect(internals(session).summary).toBeNull();
       expect(internals(session).wallets.size).toBe(0);
       expect(session.state()).toEqual(before);
-      assertPublic(await session.call("receiveCode", { slot: "independent", context: otherPoolContext, expiresAt: "2000000000" }));
-      const summary = await session.call("recover", { context: otherPoolContext });
+      assertPublic(await session.call("receiveCode", { slot: "independent", context: nextContext, expiresAt: "2000000000" }));
+      const summary = await session.call("recover", { context: nextContext });
       expect(summary.sessionState).toEqual(before);
       expect(mocks.identity).toHaveBeenCalledOnce();
     });

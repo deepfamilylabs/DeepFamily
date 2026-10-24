@@ -1905,7 +1905,8 @@
     "privateLetters": {
       "title": "私密家书",
       "write": "写信",
-      "inbox": "信箱 · 从链上恢复",
+      "inbox": "信箱",
+      "refresh": "刷新信箱",
       "notConfigured": "当前网络尚未配置私密家书合约。",
       "writeHint": "使用有效的匿名收款码；正文为纯文本，落款直接写在正文中。",
       "budget": "关联私密预算",

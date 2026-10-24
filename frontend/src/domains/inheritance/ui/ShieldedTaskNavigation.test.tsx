@@ -39,10 +39,10 @@ describe("ShieldedTaskNavigation", () => {
       within(navigation)
         .getAllByRole("button")
         .map((button) => button.textContent),
-    ).toEqual(["存款", "转账", "提现", "存入", "领取"]);
+    ).toEqual(["存款", "转账", "提现", "存入", "领取", "写信", "信箱"]);
     expect(within(navigation).getByRole("group", { name: "私密资产" })).toBeTruthy();
     const budgets = within(navigation).getByRole("group", { name: "子女预算" });
-    expect(within(navigation).getAllByRole("group")).toHaveLength(2);
+    expect(within(navigation).getAllByRole("group")).toHaveLength(3);
     expect(within(budgets).getAllByRole("button").map((button) => button.textContent)).toEqual([
       "存入", "领取",
     ]);
@@ -52,6 +52,12 @@ describe("ShieldedTaskNavigation", () => {
     expect(screen.getByRole("button", { name: "存款" }).getAttribute("aria-current")).toBeNull();
     fireEvent.click(within(budgets).getByRole("button", { name: "领取" }));
     expect(onActionChange).toHaveBeenCalledWith("claim");
+    const letters = within(navigation).getByRole("group", { name: "私密家书" });
+    expect(within(letters).getAllByRole("button").map((button) => button.textContent)).toEqual(["写信", "信箱"]);
+    fireEvent.click(within(letters).getByRole("button", { name: "写信" }));
+    expect(onActionChange).toHaveBeenCalledWith("writeLetter");
+    fireEvent.click(within(letters).getByRole("button", { name: "信箱" }));
+    expect(onActionChange).toHaveBeenCalledWith("letterInbox");
   });
 
   it("counts claimable periods on the claim task without changing its name", () => {

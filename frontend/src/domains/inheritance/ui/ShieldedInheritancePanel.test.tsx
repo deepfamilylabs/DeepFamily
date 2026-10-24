@@ -596,31 +596,76 @@ describe("Worker-backed shielded wallet", () => {
     expect(screen.queryByLabelText(label("action"))).toBeNull();
     expect(screen.queryByRole("navigation", { name: "shielded.actionsTitle" })).toBeNull();
     expect(mocks.call).not.toHaveBeenCalled();
-    expect((screen.getByRole("radio", { name: "shielded.stateReadMode.rebuild" }) as HTMLInputElement).checked).toBe(true);
-    expect((screen.getByRole("radio", { name: "shielded.stateReadMode.chain" }) as HTMLInputElement).checked).toBe(false);
+    expect(screen.queryByRole("group", { name: "shielded.stateReadMode.title" })).toBeNull();
+    expect(screen.queryByRole("region", { name: "shielded.privateLetters.title" })).toBeNull();
   });
-  it("requires an explicit chain choice before unlock and forwards it to recovery", async () => {
+  it("unlocks with default local reconstruction before showing the read-mode controls", async () => {
     await renderPanel();
-    fireEvent.click(screen.getByRole("radio", { name: "shielded.stateReadMode.chain" }));
-    expect(mocks.configUpdate).toHaveBeenCalledWith({ stateReadMode: "chain" });
+    expect(screen.queryByRole("radio", { name: "shielded.stateReadMode.chain" })).toBeNull();
+    expect(mocks.configUpdate).not.toHaveBeenCalled();
     expect(mocks.call).not.toHaveBeenCalled();
     fireEvent.change(screen.getByLabelText("identity passphrase"), { target: { value: "secret" } });
     fireEvent.click(screen.getByRole("button", { name: "shielded.unlock" }));
     await waitFor(() => expect(mocks.call).toHaveBeenCalledWith("recover", {
-      context: expect.objectContaining({ stateReadMode: "chain" }),
+      context: expect.objectContaining({ stateReadMode: "rebuild" }),
     }));
+    expect((screen.getByRole("radio", { name: "shielded.stateReadMode.rebuild" }) as HTMLInputElement).checked).toBe(true);
   });
-  it("locks the unlocked session and invalidates recovery data when the read mode changes", async () => {
+  it("refreshes in the selected read mode while preserving the unlocked keys and current task", async () => {
+    mocks.independentKey = { ...independentKey, recoveryVerified: true };
+    const previousCall = mocks.call.getMockImplementation()!;
+    const previousWallet = {
+      ...emptyWallet,
+      notes: [{ commitment: "21", ownerCommitment: "1", slot: "identity", kind: "value", amount: "3000000000000000000" }],
+    };
+    let finish!: (wallet: typeof previousWallet) => void;
+    const refreshed = new Promise<typeof previousWallet>((resolve) => { finish = resolve; });
+    mocks.call.mockImplementation((method, params) => method === "recover"
+      ? params.context.stateReadMode === "chain" ? refreshed : previousWallet
+      : previousCall(method, params));
     await renderUnlockedPanel();
+    const currentKey = mocks.independentKey;
+    chooseAction("unshield");
+    fireEvent.change(screen.getByLabelText("shielded.fields.amount"), { target: { value: "1.25" } });
+    selectValue("21");
+    const candidate = document.querySelector<HTMLInputElement>('input[value="21"]')!;
+    const task = taskPanel();
+    const navigation = taskNavigation();
+    const overview = walletSelection().closest("section")!;
+    const previousSibling = overview.previousElementSibling;
+    const balance = cardBalance("identity", "balanceAmount");
     expect(mocks.call).toHaveBeenCalledWith("recover", { context: expect.objectContaining({ stateReadMode: "rebuild" }) });
     fireEvent.click(screen.getByRole("radio", { name: "shielded.stateReadMode.chain" }));
-    expect(mocks.lock).toHaveBeenCalled();
-    expect(mocks.identity).toBeNull();
-    expect(mocks.credentials).toBeNull();
-    expect(screen.queryByRole("navigation", { name: "shielded.actionsTitle" })).toBeNull();
-    expect(screen.getByRole("button", { name: "shielded.unlock" })).toBeTruthy();
+    await waitFor(() => expect(mocks.call).toHaveBeenCalledWith("recover", { context: expect.objectContaining({ stateReadMode: "chain" }) }));
+    expect(cardBalance("identity", "balanceAmount")).toBe(balance);
+    expect(document.querySelector('input[value="21"]')).toBe(candidate);
+    expect(candidate.checked).toBe(true);
+    expect(taskPanel()).toBe(task);
+    expect(taskNavigation()).toBe(navigation);
+    expect(screen.queryByText("shielded.stages.recovering")).toBeNull();
+    act(() => {
+      for (const listener of mocks.syncListeners) listener({ domain: "authorization", phase: "download", completed: 1, total: 3 });
+    });
+    expect(overview.previousElementSibling).toBe(previousSibling);
+    expect(previousSibling?.contains(screen.getByRole("region", { name: "shielded.publicStateSync.title" }))).toBe(true);
+    await act(async () => finish({
+      ...previousWallet,
+      notes: [{ ...previousWallet.notes[0], amount: "2000000000000000000" }],
+    }));
+    await waitUntilIdle();
+    expect(cardBalance("identity", "balanceAmount")).not.toBe(balance);
+    expect(document.querySelector('input[value="21"]')).toBe(candidate);
+    expect(candidate.checked).toBe(true);
+    expect(screen.queryByRole("region", { name: "shielded.publicStateSync.title" })).toBeNull();
+    expect(mocks.lock).not.toHaveBeenCalled();
+    expect(mocks.identity).toEqual(identity);
+    expect(mocks.independentKey).toEqual(currentKey);
+    expect(navButton("unshield").getAttribute("aria-current")).toBe("true");
+    expect((screen.getByLabelText("shielded.fields.amount") as HTMLInputElement).value).toBe("1.25");
+    expect(screen.queryByRole("button", { name: "shielded.unlock" })).toBeNull();
     expect((screen.getByRole("radio", { name: "shielded.stateReadMode.chain" }) as HTMLInputElement).checked).toBe(true);
-    expect(mocks.call.mock.calls.filter(([method]) => method === "recover")).toHaveLength(1);
+    expect(mocks.configUpdate).toHaveBeenCalledWith({ stateReadMode: "chain" });
+    expect(mocks.call.mock.calls.filter(([method]) => method === "recover")).toHaveLength(2);
   });
   it("forwards the selected read mode to the recipient code generator", async () => {
     mocks.stateReadMode = "chain";
@@ -674,40 +719,42 @@ describe("Worker-backed shielded wallet", () => {
   });
   it.each([
     ["native", "CFX"], ["erc20", "DEEP"], ["erc20", "TEST"],
-  ] as const)("sends a standalone letter with only a valid code and transaction wallet in the %s %s context", async (assetKind, assetSymbol) => {
+  ] as const)("sends a standalone letter from the unlocked workspace in the %s %s context", async (assetKind, assetSymbol) => {
     mocks.lettersAddress = "0x1111111111111111111111111111111111111111";
     const preparedLetter = { delivery: { messageId: "7", checkpointId: "1", asOf: "900", expiresAt: "1200", recipientBinding: "9" }, ciphertext: "0x010203", proof: "0x1234" };
+    await renderUnlockedPanel(signer, { ...modules, assetKind, assetSymbol });
+    const originalCall = mocks.call.getMockImplementation()!;
     mocks.call.mockImplementation(async (method: string) => {
       if (method === "prepareLetter") return preparedLetter;
-      throw new Error(`Unexpected Worker method: ${method}`);
+      return originalCall(method);
     });
-    await renderPanel(signer, { ...modules, assetKind, assetSymbol });
-    expect((screen.getByRole("button", { name: "shielded.privateLetters.inbox" }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole("button", { name: "shielded.privateLetters.inbox" }) as HTMLButtonElement).disabled).toBe(false);
     fireEvent.click(screen.getByRole("button", { name: "shielded.privateLetters.write" }));
     fireEvent.change(screen.getByLabelText("shielded.privateLetters.recipientCode"), { target: { value: "valid-anonymous-code" } });
-    fireEvent.change(screen.getByLabelText("shielded.privateLetters.body"), { target: { value: "Letter without a sender identity or deposit" } });
+    fireEvent.change(screen.getByLabelText("shielded.privateLetters.body"), { target: { value: "Letter without a deposit" } });
     fireEvent.click(screen.getByRole("button", { name: "shielded.privateLetters.send" }));
     await screen.findByText("shielded.privateLetters.sent: 0xletter");
-    expect(mocks.call).toHaveBeenCalledExactlyOnceWith("prepareLetter", {
+    expect(mocks.call).toHaveBeenCalledWith("prepareLetter", {
       context: expect.objectContaining({ chainId: "31337", assetKind, lettersAddress: mocks.lettersAddress }),
-      code: "valid-anonymous-code", body: "Letter without a sender identity or deposit", budgetCommitment: undefined,
+      code: "valid-anonymous-code", body: "Letter without a deposit", budgetCommitment: undefined,
     }, expect.anything());
     expect(mocks.submitLetter).toHaveBeenCalledWith(expect.objectContaining({ signer, letter: preparedLetter, address: mocks.lettersAddress }));
-    expect(mocks.identity).toBeNull();
-    expect(mocks.credentials).toBeNull();
-    expect(screen.getByRole("button", { name: "shielded.unlock" })).toBeTruthy();
+    expect(mocks.identity).toEqual(identity);
+    expect(screen.queryByRole("button", { name: "shielded.unlock" })).toBeNull();
   });
-  it("lists every task in its two groups and shows both wallets with the current one marked", async () => {
+  it("lists every task in its three groups and shows both wallets with the current one marked", async () => {
     await renderUnlockedPanel();
     expect(within(taskNavigation()).getAllByRole("group").map((group) =>
       group.getAttribute("aria-labelledby") && document.getElementById(group.getAttribute("aria-labelledby")!)?.textContent,
-    )).toEqual(["shielded.groups.wallet", "shielded.groups.inheritance"]);
+    )).toEqual(["shielded.groups.wallet", "shielded.groups.inheritance", "shielded.privateLetters.title"]);
     expect(within(taskNavigation()).getAllByRole("button").map((button) => button.textContent)).toEqual([
       "shielded.actions.shield",
       "shielded.actions.privateTransfer",
       "shielded.actions.unshield",
       "shielded.actions.fund",
       "shielded.actions.claim",
+      "shielded.privateLetters.write",
+      "shielded.privateLetters.inbox",
     ]);
     expect(screen.queryByLabelText("identity passphrase")).toBeNull();
     expect(within(walletSelection()).getAllByRole("radio")).toHaveLength(2);
@@ -729,6 +776,32 @@ describe("Worker-backed shielded wallet", () => {
     expect(navButton("shield").getAttribute("aria-current")).toBe("true");
     expect(mocks.lock).not.toHaveBeenCalled();
     expect(mocks.identity).toEqual(identity);
+  });
+  it("opens letters in the task area and reads the inbox only after selecting its navigation entry", async () => {
+    mocks.lettersAddress = "0x1111111111111111111111111111111111111111";
+    await renderUnlockedPanel();
+    const originalCall = mocks.call.getMockImplementation()!;
+    mocks.call.mockImplementation(async (method, ...args) => method === "recoverLetters"
+      ? { letters: [{ messageId: "7", body: "A private family letter", registeredAt: "1000", attachment: null }], unavailable: 0 }
+      : originalCall(method, ...args));
+    const letters = within(taskNavigation()).getByRole("group", { name: "shielded.privateLetters.title" });
+    expect(screen.queryByLabelText("shielded.privateLetters.body")).toBeNull();
+    fireEvent.click(within(letters).getByRole("button", { name: "shielded.privateLetters.write" }));
+    expect(screen.getByRole("region", { name: "shielded.privateLetters.write" }).contains(screen.getByLabelText("shielded.privateLetters.body"))).toBe(true);
+    expect(within(letters).getByRole("button", { name: "shielded.privateLetters.write" }).getAttribute("aria-current")).toBe("true");
+    expect(navButton("shield").getAttribute("aria-current")).toBeNull();
+    expect(mocks.call.mock.calls.filter(([method]) => method === "recoverLetters")).toHaveLength(0);
+
+    fireEvent.click(within(letters).getByRole("button", { name: "shielded.privateLetters.inbox" }));
+    await screen.findByText("A private family letter");
+    expect(screen.getByRole("region", { name: "shielded.privateLetters.inbox" })).toBeTruthy();
+    expect(mocks.call.mock.calls.filter(([method]) => method === "recoverLetters")).toHaveLength(1);
+    fireEvent.click(screen.getByRole("button", { name: "shielded.privateLetters.refresh" }));
+    await waitUntilIdle();
+    expect(mocks.call.mock.calls.filter(([method]) => method === "recoverLetters")).toHaveLength(2);
+    chooseAction("shield");
+    expect(screen.queryByText("A private family letter")).toBeNull();
+    expect(navButton("shield").getAttribute("aria-current")).toBe("true");
   });
   it("selects the wallet and its claim task with one phone tab tap while keeping repeated taps harmless", async () => {
     mocks.independentKey = { ...independentKey, recoveryVerified: true };

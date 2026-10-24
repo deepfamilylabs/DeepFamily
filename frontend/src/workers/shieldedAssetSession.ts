@@ -31,7 +31,7 @@ import {
   encodeShieldedIndependentKey,
   decodeShieldedIndependentKey,
 } from "@deepfamily/protocol-core";
-import { normalizeShieldedStateReadMode } from "../shared/config/shieldedStateReadMode";
+import { normalizeShieldedStateReadMode, type ShieldedStateReadMode } from "../shared/config/shieldedStateReadMode";
 import { JsonRpcProvider, getAddress, getBigInt, getBytes, hexlify, randomBytes, ZeroAddress, type BigNumberish } from "ethers";
 import {
   createDeepFamilyContract,
@@ -170,6 +170,7 @@ export class ShieldedAssetSession {
   // Chain, factory, family, lineage and RPC are fixed for a session; the pool may change.
   private baseScope = "";
   private poolScope = "";
+  private stateReadMode: ShieldedStateReadMode | null = null;
   private contextProvider: JsonRpcProvider | null = null;
   private wallets = new Map<ShieldedKeySlot, LocalShieldedWalletSnapshot>();
   private summary: ShieldedWalletSummary | null = null;
@@ -225,6 +226,7 @@ export class ShieldedAssetSession {
     this.policyDrafts.clear();
     this.baseScope = "";
     this.poolScope = "";
+    this.stateReadMode = null;
     this.contextProvider?.destroy();
     this.contextProvider = null;
   }
@@ -337,7 +339,6 @@ export class ShieldedAssetSession {
       ctx.familyAddress.toLowerCase(),
       ctx.lineageIndexAddress.toLowerCase(),
       ctx.rpcUrl,
-      stateReadMode,
     ].join(":");
     const poolScope = ctx.poolAddress.toLowerCase();
     requireValue(
@@ -389,9 +390,9 @@ export class ShieldedAssetSession {
         credentialsEpoch === this.credentialsEpoch,
         "Credentials session was replaced or locked.",
       );
-      if (this.poolScope && poolScope !== this.poolScope) {
-        // Identity and the independent key root serve every pool of this factory. History,
-        // prepared witnesses and policy drafts belong to one pool and are dropped.
+      if (this.poolScope && (poolScope !== this.poolScope || stateReadMode !== this.stateReadMode)) {
+        // Preserve identity and key roots while dropping history, prepared
+        // witnesses and policy drafts from the previous pool or read mode.
         this.wallets.clear();
         this.summary = null;
         this.pending = null;
@@ -399,6 +400,7 @@ export class ShieldedAssetSession {
       }
       this.baseScope = baseScope;
       this.poolScope = poolScope;
+      this.stateReadMode = stateReadMode;
       this.contextProvider = provider;
       return {
         provider,

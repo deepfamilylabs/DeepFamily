@@ -2,7 +2,7 @@ import { useId } from "react";
 import { useTranslation } from "react-i18next";
 import type { ShieldedStateReadMode } from "../../../shared/config/shieldedStateReadMode";
 
-/** This public preference is visible before unlocking or any automatic recovery. */
+/** Public read preference shown inside the unlocked workspace. */
 export function ShieldedStateReadModeControl({
   value,
   disabled,

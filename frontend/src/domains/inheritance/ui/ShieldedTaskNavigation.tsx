@@ -6,24 +6,29 @@ import {
   ArrowUpFromLine,
   CalendarClock,
   HandCoins,
+  Inbox,
+  MailPlus,
   type LucideProps,
 } from "lucide-react";
 import type { ShieldedAssetActionRequest } from "../../../shared/workers/shieldedAssetWorkerTypes";
 
-type Action = ShieldedAssetActionRequest["action"];
+export type ShieldedTask = ShieldedAssetActionRequest["action"] | "writeLetter" | "letterInbox";
 
-const GROUPS: readonly { key: "wallet" | "inheritance"; actions: readonly Action[] }[] =
+const GROUPS: readonly { key: "wallet" | "inheritance" | "letters"; actions: readonly ShieldedTask[] }[] =
   [
     { key: "wallet", actions: ["shield", "privateTransfer", "unshield"] },
     { key: "inheritance", actions: ["fund", "claim"] },
+    { key: "letters", actions: ["writeLetter", "letterInbox"] },
   ];
 
-const ICONS: Record<Action, ComponentType<LucideProps>> = {
+const ICONS: Record<ShieldedTask, ComponentType<LucideProps>> = {
   shield: ArrowDownToLine,
   privateTransfer: ArrowLeftRight,
   unshield: ArrowUpFromLine,
   fund: HandCoins,
   claim: CalendarClock,
+  writeLetter: MailPlus,
+  letterInbox: Inbox,
 };
 
 /**
@@ -37,11 +42,11 @@ export function ShieldedTaskNavigation({
   claimablePeriods,
   onActionChange,
 }: {
-  action: Action;
+  action: ShieldedTask;
   busy: boolean;
   symbol: string;
   claimablePeriods: number;
-  onActionChange: (action: Action) => void;
+  onActionChange: (action: ShieldedTask) => void;
 }) {
   const { t } = useTranslation();
   const id = useId();
@@ -62,7 +67,7 @@ export function ShieldedTaskNavigation({
               id={`${id}-${group.key}`}
               className="hidden px-3 pb-1.5 text-xs font-semibold text-ink-muted lg:block"
             >
-              {t(`shielded.groups.${group.key}`)}
+              {group.key === "letters" ? t("shielded.privateLetters.title") : t(`shielded.groups.${group.key}`)}
             </span>
             {group.actions.map((item) => {
               const Icon = ICONS[item];
@@ -89,7 +94,9 @@ export function ShieldedTaskNavigation({
                     aria-hidden="true"
                   />
                   <span className="lg:flex-1 lg:text-left">
-                    {t(`shielded.actions.${item}`, { symbol })}
+                    {item === "writeLetter" ? t("shielded.privateLetters.write")
+                      : item === "letterInbox" ? t("shielded.privateLetters.inbox")
+                      : t(`shielded.actions.${item}`, { symbol })}
                   </span>
                   {count > 0 ? (
                     <span

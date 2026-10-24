@@ -26,9 +26,8 @@ const context: ShieldedWorkerContext = {
 };
 const letter = { delivery: { messageId: "7", checkpointId: "1", asOf: "900", expiresAt: "1200", recipientBinding: "9" }, ciphertext: "0x010203", proof: "0x1234" };
 const tr = (key: string) => `shielded.privateLetters.${key}`;
-const props = () => ({ context, signer: {} as Signer, disabled: false, wallet: null, recoveryReady: true, budgetCommitment: "", onBudgetChange: vi.fn() });
+const props = () => ({ mode: "write" as const, context, signer: {} as Signer, disabled: false, wallet: null, recoveryReady: true, budgetCommitment: "", onBudgetChange: vi.fn() });
 function fillLetter() {
-  fireEvent.click(screen.getByRole("button", { name: tr("write") }));
   fireEvent.change(screen.getByLabelText(tr("recipientCode")), { target: { value: "anonymous-code" } });
   fireEvent.change(screen.getByLabelText(tr("body")), { target: { value: "Private letter text" } });
 }
@@ -37,8 +36,8 @@ afterEach(cleanup);
 
 describe("private letter composer", () => {
   it("explains missing recovery keys before offering inbox recovery", () => {
-    render(<PrivateLettersPanel {...props()} recoveryReady={false} />);
-    expect((screen.getByRole("button", { name: tr("inbox") }) as HTMLButtonElement).disabled).toBe(true);
+    render(<PrivateLettersPanel {...props()} mode="inbox" recoveryReady={false} />);
+    expect((screen.getByRole("button", { name: tr("refresh") }) as HTMLButtonElement).disabled).toBe(true);
     expect(screen.getByText(tr("recoveryKeysRequired"))).toBeTruthy();
     expect(mocks.worker).not.toHaveBeenCalled();
   });
@@ -47,7 +46,7 @@ describe("private letter composer", () => {
     const initial = { ...props(), budgetCommitment: "73", composeRequest: 1 };
     const view = render(<PrivateLettersPanel {...initial} />);
     expect(screen.getByLabelText(tr("budget"))).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: tr("write") }));
+    view.rerender(<PrivateLettersPanel {...initial} mode="inbox" recoveryReady={false} />);
     expect(screen.queryByLabelText(tr("budget"))).toBeNull();
     view.rerender(<PrivateLettersPanel {...initial} composeRequest={2} />);
     expect((screen.getByLabelText(tr("budget")) as HTMLSelectElement).value).toBe("73");
@@ -87,8 +86,7 @@ describe("private letter composer", () => {
 
   it("removes recovered plaintext as soon as the secret session locks", async () => {
     mocks.worker.mockResolvedValue({ letters: [{ messageId: "7", body: "Recovered private text", registeredAt: "1000", attachment: null }], unavailable: 0 });
-    render(<PrivateLettersPanel {...props()} />);
-    fireEvent.click(screen.getByRole("button", { name: tr("inbox") }));
+    render(<PrivateLettersPanel {...props()} mode="inbox" />);
     await screen.findByText("Recovered private text");
     act(() => mocks.lock?.());
     await waitFor(() => expect(screen.queryByText("Recovered private text")).toBeNull());
@@ -97,11 +95,31 @@ describe("private letter composer", () => {
   it("clears the old inbox when the recovered identity or key is replaced", async () => {
     mocks.worker.mockResolvedValue({ letters: [{ messageId: "7", body: "Old key's private text", registeredAt: "1000", attachment: null }], unavailable: 0 });
     const initial = props();
-    const view = render(<PrivateLettersPanel {...initial} sessionScope="original-key" />);
-    fireEvent.click(screen.getByRole("button", { name: tr("inbox") }));
+    const view = render(<PrivateLettersPanel {...initial} mode="inbox" sessionScope="original-key" />);
     await screen.findByText("Old key's private text");
-    view.rerender(<PrivateLettersPanel {...initial} sessionScope="replacement-key" />);
+    mocks.worker.mockResolvedValue({ letters: [], unavailable: 0 });
+    view.rerender(<PrivateLettersPanel {...initial} mode="inbox" sessionScope="replacement-key" />);
     expect(screen.queryByText("Old key's private text")).toBeNull();
+    await screen.findByText(tr("emptyInbox"));
+  });
+
+  it("keeps verified letters visible until a read-mode refresh returns", async () => {
+    const oldLetter = { messageId: "7", body: "Verified private letter", registeredAt: "1000", attachment: null };
+    mocks.worker.mockResolvedValue({ letters: [oldLetter], unavailable: 0 });
+    const initial = props();
+    const view = render(<PrivateLettersPanel {...initial} mode="inbox" />);
+    await screen.findByText(oldLetter.body);
+    let finish!: (value: { letters: typeof oldLetter[]; unavailable: number }) => void;
+    mocks.worker.mockReturnValueOnce(new Promise((resolve) => { finish = resolve; }));
+    view.rerender(<PrivateLettersPanel {...initial} mode="inbox" context={{ ...context, stateReadMode: "chain" }} />);
+    expect(screen.getByText(oldLetter.body)).toBeTruthy();
+    expect(mocks.worker).toHaveBeenLastCalledWith("recoverLetters", {
+      context: expect.objectContaining({ stateReadMode: "chain" }),
+    }, expect.anything());
+    await act(async () => finish({ letters: [{ ...oldLetter, body: "Newly verified private letter" }], unavailable: 0 }));
+    expect(screen.queryByText(oldLetter.body)).toBeNull();
+    expect(screen.getByText("Newly verified private letter")).toBeTruthy();
+    expect(mocks.worker).toHaveBeenCalledTimes(2);
   });
 
   it.each(["connection event", "signer update"])("invalidates a pending send on a wallet %s and keeps the next operation busy", async change => {
@@ -120,7 +138,7 @@ describe("private letter composer", () => {
     expect((screen.getByLabelText(tr("body")) as HTMLTextAreaElement).value).toBe("");
     expect((screen.getByLabelText(tr("recipientCode")) as HTMLTextAreaElement).value).toBe("");
     expect(initial.onBusyChange.mock.calls).toEqual([[true], [false]]);
-    fireEvent.click(screen.getByRole("button", { name: tr("inbox") }));
+    view.rerender(<PrivateLettersPanel {...initial} mode="inbox" />);
     await act(async () => finishSend(letter));
     expect(mocks.submit).not.toHaveBeenCalled();
     expect(initial.onBusyChange.mock.calls).toEqual([[true], [false], [true]]);
@@ -132,10 +150,9 @@ describe("private letter composer", () => {
     let finish!: (value: { letters: []; unavailable: number }) => void;
     mocks.worker.mockReturnValue(new Promise(resolve => { finish = resolve; }));
     const initial = { ...props(), onBusyChange: vi.fn() };
-    const view = render(<PrivateLettersPanel {...initial} />);
-    fireEvent.click(screen.getByRole("button", { name: tr("inbox") }));
+    const view = render(<PrivateLettersPanel {...initial} mode="inbox" />);
     act(() => { mocks.walletGeneration++; mocks.walletChange?.(); });
-    view.rerender(<PrivateLettersPanel {...initial} signer={{} as Signer} />);
+    view.rerender(<PrivateLettersPanel {...initial} mode="inbox" signer={{} as Signer} />);
     expect(initial.onBusyChange.mock.calls).toEqual([[true]]);
     await act(async () => finish({ letters: [], unavailable: 0 }));
     expect(screen.getByText(tr("emptyInbox"))).toBeTruthy();

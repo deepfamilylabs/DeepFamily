@@ -93,14 +93,14 @@ import {
   WarningNotice,
   shortHex,
 } from "./inheritanceControls";
-import { PrivateLettersPanel } from "./PrivateLettersPanel";
+import { PrivateLettersPanel, type PrivateLetterView } from "./PrivateLettersPanel";
 import { ShieldedStateReadModeControl } from "./ShieldedStateReadModeControl";
 import { ShieldedPublicStateSyncStatus } from "./ShieldedPublicStateSyncStatus";
 import {
   subscribePublicStateSyncProgress,
   type PublicStateSyncProgress,
 } from "../../../shared/workers/publicStateSyncProgress";
-import { ShieldedTaskNavigation } from "./ShieldedTaskNavigation";
+import { ShieldedTaskNavigation, type ShieldedTask } from "./ShieldedTaskNavigation";
 import {
   ShieldedAssetOverview,
   type ShieldedOverviewWallet,
@@ -150,6 +150,7 @@ export interface ShieldedPanelNavigation {
   /** Pins an independent payment choice to the key the user actually selected. */
   keyFingerprint?: string;
   action: Action;
+  letterView?: PrivateLetterView | null;
   /** The first scan or a user choice has settled the task; later pools keep it. */
   taskChosen?: boolean;
 }
@@ -201,6 +202,7 @@ export function ShieldedInheritancePanel({
   const mounted = useRef(false),
     signatureRequest = useRef(0);
   const activeOperation = useRef<{ scope: OperationScope } | null>(null);
+  const letterOperationPending = useRef(false);
   const [spendReview, setSpendReview] = useState<SpendReview | null>(null);
   // A confirmed plan stays on screen while its first step is proven and sent.
   const [executingReview, setExecutingReview] = useState<SpendReview | null>(null);
@@ -231,6 +233,8 @@ export function ShieldedInheritancePanel({
   const acceptPublicSyncProgress = useRef(false);
   const [publicSyncProgress, setPublicSyncProgress] = useState<Partial<Record<PublicStateSyncProgress["domain"], PublicStateSyncProgress>>>({});
   const [publicSyncPaused, setPublicSyncPaused] = useState(false);
+  const [readModeRefreshing, setReadModeRefreshing] = useState(false);
+  const readModeRefreshScope = useRef<string | null>(null);
   const [transactionHash, setTransactionHash] = useState(""),
     [transactionPending, setTransactionPending] = useState(false);
   const [transactionLabel, setTransactionLabel] = useState("");
@@ -292,6 +296,7 @@ export function ShieldedInheritancePanel({
       ? "privateTransfer"
       : (navigation?.action ?? "shield"),
   );
+  const [letterView, setLetterView] = useState<PrivateLetterView | null>(navigation?.letterView ?? null);
   const [amounts, setAmounts] = useState<Partial<Record<Action, string>>>({});
   const amount = amounts[action] ?? "";
   const setAmount = (value: string) => setAmounts((previous) => ({ ...previous, [action]: value }));
@@ -309,9 +314,10 @@ export function ShieldedInheritancePanel({
       slot,
       keyFingerprint: selectedKeyFingerprint,
       action,
+      letterView,
       taskChosen,
     });
-  }, [slot, selectedKeyFingerprint, action, taskChosen, onNavigationChange]);
+  }, [slot, selectedKeyFingerprint, action, letterView, taskChosen, onNavigationChange]);
   const [entry, setEntry] = useState<ShieldedFundingEntry>("privateIndependent");
   const [rootVersion, setRootVersion] = useState(""),
     [periodDays, setPeriodDays] = useState("30"),
@@ -328,6 +334,7 @@ export function ShieldedInheritancePanel({
   function openBudgetLetter(commitment: string) {
     setLetterBudget(commitment);
     setLetterComposeRequest(value => value + 1);
+    setLetterView("write");
   }
   const [ownCode, setOwnCode] = useState("");
   const [codeDisclosure, setCodeDisclosure] = useState<"anonymous" | "fund">("anonymous");
@@ -394,7 +401,13 @@ export function ShieldedInheritancePanel({
   };
   const contextKey = JSON.stringify(context),
     contextRef = useRef(contextKey);
-  const previousContextKey = useRef(contextKey);
+  const protocolContextKey = JSON.stringify({ ...context, stateReadMode: undefined });
+  const ownerContextKey = JSON.stringify([
+    session.credentials?.handle,
+    session.identity?.handle,
+    session.independentKey?.keyFingerprint,
+  ]);
+  const previousContext = useRef({ contextKey, protocolContextKey, ownerContextKey });
   contextRef.current = contextKey;
   const draftKey = JSON.stringify([
     contextKey,
@@ -624,6 +637,8 @@ export function ShieldedInheritancePanel({
       signatureRequest.current++;
       activeSignatureRequest.current = null;
       activeOperation.current = null;
+      letterOperationPending.current = false;
+      readModeRefreshScope.current = null;
       acceptPublicSyncProgress.current = false;
       clear();
       if (mounted.current) {
@@ -631,6 +646,7 @@ export function ShieldedInheritancePanel({
         setStage("");
         setError("");
         setCodeError("");
+        setReadModeRefreshing(false);
         clearTransactionFeedback(true);
         latestSession.current.setBusy(false);
         setWalletSection("balances");
@@ -652,6 +668,8 @@ export function ShieldedInheritancePanel({
     return () => {
       // After a real unmount, mounted.current already rejects late results.
       mounted.current = false;
+      letterOperationPending.current = false;
+      readModeRefreshScope.current = null;
       cancelSpendReview();
       signatureRequest.current++;
       clear();
@@ -672,20 +690,56 @@ export function ShieldedInheritancePanel({
     setPublicSyncPaused(false);
   }), []);
   useEffect(() => {
-    if (previousContextKey.current !== contextKey) {
-      previousContextKey.current = contextKey;
+    const preserveView = previousContext.current.contextKey !== contextKey &&
+      previousContext.current.protocolContextKey === protocolContextKey &&
+      previousContext.current.ownerContextKey === ownerContextKey;
+    if (previousContext.current.contextKey !== contextKey) {
+      const protocolChanged = previousContext.current.protocolContextKey !== protocolContextKey;
       setPublicSyncProgress({});
       setPublicSyncPaused(false);
-      lockRef.current();
-      receiptTracking.current = null;
-      setTransactionHash("");
-      setTransactionLabel("");
-      setTransactionPending(false);
-      setTransactionResult(null);
+      if (protocolChanged) {
+        lockRef.current();
+        receiptTracking.current = null;
+        setTransactionHash("");
+        setTransactionLabel("");
+        setTransactionPending(false);
+        setTransactionResult(null);
+      } else {
+        // Read strategy changes invalidate prepared work, not the unlocked keys.
+        if (preserveView && (session.identity || independentKeyReady)) {
+          readModeRefreshScope.current = contextKey;
+          setReadModeRefreshing(true);
+        } else {
+          readModeRefreshScope.current = null;
+          setReadModeRefreshing(false);
+        }
+        cancelSpendReview();
+        activeOperation.current = null;
+        acceptPublicSyncProgress.current = letterOperationPending.current;
+        autoRecoveryBlocked.current = false;
+        clearRef.current();
+        if (!letterOperationPending.current) {
+          setBusy(false);
+          latestSession.current.setBusy(false);
+        }
+        setStage("");
+        setError("");
+        setCodeError("");
+        setProgress(null);
+        setExecutingReview(null);
+        setCompletedSpendSteps([]);
+        setPlanCount(0);
+        void cancelShieldedAssetPreview().catch(() => undefined);
+      }
     }
-    setWallet(null);
-    setDiscovery(null);
-    setCandidates([]);
+    previousContext.current = { contextKey, protocolContextKey, ownerContextKey };
+    if (!preserveView) {
+      setWallet(null);
+      setDiscovery(null);
+      setCandidates([]);
+      readModeRefreshScope.current = null;
+      setReadModeRefreshing(false);
+    }
     setOwnCode("");
     draftPolicy.current = null;
   }, [
@@ -693,6 +747,8 @@ export function ShieldedInheritancePanel({
     session.identity?.handle,
     session.independentKey?.keyFingerprint,
     contextKey,
+    protocolContextKey,
+    ownerContextKey,
   ]);
   useEffect(() => {
     if (!pendingRecord || receiptTracking.current?.id === pendingRecord.id) return;
@@ -999,11 +1055,14 @@ export function ShieldedInheritancePanel({
     signatureRequest.current++;
     activeSignatureRequest.current = null;
     activeOperation.current = null;
+    letterOperationPending.current = false;
+    readModeRefreshScope.current = null;
     acceptPublicSyncProgress.current = false;
     setBusy(false);
     setStage("");
     setError("");
     setCodeError("");
+    setReadModeRefreshing(false);
     clearTransactionFeedback(true);
     latestSession.current.setBusy(false);
     clearSecretInputs();
@@ -1011,6 +1070,7 @@ export function ShieldedInheritancePanel({
     setWalletSection("balances");
     setOwnCode("");
     setLetterBudget("");
+    setLetterView(null);
     setWalletScreen("workspace");
     setPlanCount(0);
     setProgress(null);
@@ -1145,6 +1205,7 @@ export function ShieldedInheritancePanel({
     }, "");
   }
   function chooseAction(next: Action) {
+    setLetterView(null);
     clearSecretInputs();
     setTaskChosen(true);
     draftPolicy.current = null;
@@ -1183,8 +1244,13 @@ export function ShieldedInheritancePanel({
   function finishIndependentKeyRecovery(state: ShieldedAssetSessionState) {
     if (state.independentKey?.recoveryVerified && !state.independentKey.backupRequired) returnToTask(state);
   }
-  function navigateToAction(next: Action) {
-    if (next !== action) chooseAction(next);
+  function navigateToAction(next: ShieldedTask) {
+    if (next === "writeLetter" || next === "letterInbox") {
+      cancelSpendReview();
+      chooseAction(action);
+      setWalletSection("balances");
+      setLetterView(next === "writeLetter" ? "write" : "inbox");
+    } else if (next !== action || letterView) chooseAction(next);
   }
   async function requestSignature(intent: "create" | "restore") {
     await run(async (current) => {
@@ -1394,53 +1460,63 @@ export function ShieldedInheritancePanel({
    * every verified factory pool, where history can also confirm a candidate root.
    */
   async function recover(allPools = false) {
-    await run(async (current) => {
-      if (allPools) setDiscovery(null);
-      const result = await shieldedAssetWorkerCall("recover", { context });
-      let recoveredState = result.sessionState;
-      if (current()) {
-        if (result.sessionState) latestSession.current.update(result.sessionState);
-        setWallet(result);
-        setRecoveryScanned(true);
-        setCandidates([]);
-        if (!taskChosen && session.identity) {
-          setTaskChosen(true);
-          const next = result.notes.some(
-            (note) =>
-              note.kind === "budget" &&
-              note.slot === slot &&
-              BigInt(note.amountPerPeriod ?? "0") > 0n &&
-              BigInt(note.amount) >= BigInt(note.amountPerPeriod ?? "0"),
-          )
-            ? "claim"
-            : result.notes.some(
-                  (note) => note.kind === "value" && note.slot === slot && BigInt(note.amount) > 0n,
-                )
-              ? "privateTransfer"
-              : "shield";
-          setAction(next);
+    const refreshingReadMode = readModeRefreshScope.current === contextKey;
+    try {
+      await run(async (current) => {
+        if (allPools) setDiscovery(null);
+        const result = await shieldedAssetWorkerCall("recover", { context });
+        let recoveredState = result.sessionState;
+        if (current()) {
+          if (result.sessionState) latestSession.current.update(result.sessionState);
+          setWallet(result);
+          setRecoveryScanned(true);
+          setCandidates((previous) => refreshingReadMode
+            ? previous.filter((commitment) => result.notes.some((note) => note.kind === "value" && note.commitment === commitment))
+            : []);
+          if (!taskChosen && session.identity) {
+            setTaskChosen(true);
+            const next = result.notes.some(
+              (note) =>
+                note.kind === "budget" &&
+                note.slot === slot &&
+                BigInt(note.amountPerPeriod ?? "0") > 0n &&
+                BigInt(note.amount) >= BigInt(note.amountPerPeriod ?? "0"),
+            )
+              ? "claim"
+              : result.notes.some(
+                    (note) => note.kind === "value" && note.slot === slot && BigInt(note.amount) > 0n,
+                  )
+                ? "privateTransfer"
+                : "shield";
+            setAction(next);
+          }
         }
+        if (!allPools || !current()) return;
+        const found = await shieldedAssetWorkerCall(
+          "discover",
+          { context },
+          { timeoutMs: 1_200_000 },
+        );
+        if (!current()) return;
+        if (found.sessionState) latestSession.current.update(found.sessionState);
+        setDiscovery(found);
+        recoveredState = found.sessionState ?? recoveredState;
+        if (walletScreen === "manage" && accessFlow === "restore" && recoveredState)
+          finishIndependentKeyRecovery(recoveredState);
+      }, t("shielded.stages.recovering"));
+    } finally {
+      if (mounted.current && contextRef.current === contextKey && readModeRefreshScope.current === contextKey) {
+        readModeRefreshScope.current = null;
+        setReadModeRefreshing(false);
       }
-      if (!allPools || !current()) return;
-      const found = await shieldedAssetWorkerCall(
-        "discover",
-        { context },
-        { timeoutMs: 1_200_000 },
-      );
-      if (!current()) return;
-      if (found.sessionState) latestSession.current.update(found.sessionState);
-      setDiscovery(found);
-      recoveredState = found.sessionState ?? recoveredState;
-      if (walletScreen === "manage" && accessFlow === "restore" && recoveredState)
-        finishIndependentKeyRecovery(recoveredState);
-    }, t("shielded.stages.recovering"));
+    }
   }
   useEffect(() => {
     if (!session.identity && !independentKeyReady) {
       autoRecoveryScope.current = "";
       return;
     }
-    if (autoRecoveryBlocked.current || walletScreen !== "workspace" || busy || activeOperation.current)
+    if (autoRecoveryBlocked.current || walletScreen !== "workspace" || busy || activeOperation.current || letterOperationPending.current)
       return;
     const scope = JSON.stringify([
       contextKey,
@@ -2052,7 +2128,7 @@ export function ShieldedInheritancePanel({
         </p>
       ) : null}
       {progressList ??
-        (stage && !executingReview ? (
+        (stage && !executingReview && !readModeRefreshing ? (
           <p role="status" className="text-sm text-ink-muted">
             {stage}
           </p>
@@ -2230,7 +2306,35 @@ export function ShieldedInheritancePanel({
 
   let composer: ReactNode;
   let receipt: ReactNode;
-  if (action === "fund") {
+  if (letterView) {
+    composer = (
+      <>
+        <PrivateLettersPanel
+          mode={letterView}
+          titleId={taskTitleId}
+          context={context}
+          signer={signer ?? null}
+          disabled={busy || submissionPending}
+          wallet={wallet}
+          recoveryReady={!!session.identity || !!session.independentKey}
+          sessionScope={JSON.stringify([session.credentials?.handle, session.identity?.handle, session.independentKey?.keyFingerprint])}
+          budgetCommitment={letterBudget}
+          composeRequest={letterComposeRequest}
+          onBudgetChange={setLetterBudget}
+          onBusyChange={(value) => {
+            letterOperationPending.current = value;
+            acceptPublicSyncProgress.current = value;
+            if (value) { setPublicSyncProgress({}); setPublicSyncPaused(false); }
+            setBusy(value);
+            latestSession.current.setBusy(value);
+          }}
+          beginWalletRequest={() => latestSession.current.beginWalletRequest()}
+        />
+        {taskFeedback}
+      </>
+    );
+    receipt = null;
+  } else if (action === "fund") {
     const fundingVersion = selectedPolicy?.rootVersionIndex ?? rootVersion;
     const heirs = listShieldedFundingHeirs(wallet, policyHandle, fundingVersion, localRecipientLabels);
     const heirIndex = heirs.findIndex(
@@ -2770,12 +2874,11 @@ export function ShieldedInheritancePanel({
   const stateReadModeControl = (
     <ShieldedStateReadModeControl
       value={normalizeShieldedStateReadMode(config.stateReadMode)}
-      disabled={busy || submissionPending || !!executingReview}
+      disabled={busy || readModeRefreshing || submissionPending || !!executingReview || letterOperationPending.current}
       onChange={(stateReadMode) => {
-        if (busy || submissionPending || executingReview || stateReadMode === context.stateReadMode) return;
-        // Stop both secret-processing Workers synchronously before changing the
-        // mode, so queued old-mode work cannot start more identity-specific reads.
-        lock();
+        if (busy || readModeRefreshing || submissionPending || executingReview || letterOperationPending.current || stateReadMode === context.stateReadMode) return;
+        readModeRefreshScope.current = JSON.stringify({ ...context, stateReadMode });
+        setReadModeRefreshing(true);
         config.update({ stateReadMode });
       }}
     />
@@ -2803,7 +2906,6 @@ export function ShieldedInheritancePanel({
       {!showWorkspace ? (
         <div className="mx-auto w-full max-w-[45rem] space-y-6">
           {head}
-          {stateReadModeControl}
           {publicSyncStatus}
           <div
             ref={accessRegion}
@@ -2816,8 +2918,15 @@ export function ShieldedInheritancePanel({
       ) : (
         <div className="space-y-6">
           {head}
-          {stateReadModeControl}
-          {publicSyncStatus}
+          <div className="relative" aria-busy={readModeRefreshing || undefined}>
+            {stateReadModeControl}
+            {readModeRefreshing && publicSyncStatus ? (
+              <div className="absolute inset-x-0 top-full z-20 mt-2 max-h-[60dvh] overflow-y-auto rounded-[20px] shadow-lg">
+                {publicSyncStatus}
+              </div>
+            ) : null}
+          </div>
+          {readModeRefreshing ? null : publicSyncStatus}
           <ShieldedAssetOverview
             person={{
               name: session.identity?.identity.fullName ?? tr("independentKeyTitle"),
@@ -2841,11 +2950,11 @@ export function ShieldedInheritancePanel({
               ) : undefined
             }
             symbol={symbol}
-            busy={busy}
+            busy={busy || readModeRefreshing}
             onRecover={() => void recover(true)}
             onLock={exitSession}
             wallets={overviewWallets}
-            selectionDisabled={busy || submissionPending}
+            selectionDisabled={busy || readModeRefreshing || submissionPending}
             onSelectWallet={selectWallet}
             independentKeyState={independentKeyState}
             onReceiveCode={openReceiveCode}
@@ -2858,8 +2967,8 @@ export function ShieldedInheritancePanel({
           ) : null}
           <div className="flex flex-wrap items-start gap-x-8 gap-y-5">
             <ShieldedTaskNavigation
-              action={action}
-              busy={busy}
+              action={letterView === "write" ? "writeLetter" : letterView === "inbox" ? "letterInbox" : action}
+              busy={busy || readModeRefreshing}
               symbol={symbol}
               claimablePeriods={claimablePeriods}
               onActionChange={navigateToAction}
@@ -2871,7 +2980,7 @@ export function ShieldedInheritancePanel({
                 tabIndex={-1}
                 aria-labelledby={taskTitleId}
                 className={`min-w-0 ${
-                  action === "privateTransfer" || action === "unshield"
+                  !letterView && (action === "privateTransfer" || action === "unshield")
                     ? "flex-[999_1_26.25rem]"
                     : "flex-[999_1_27.5rem]"
                 } rounded-[20px] border border-hairline bg-surface p-5 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary/40 sm:p-7`}
@@ -2906,9 +3015,6 @@ export function ShieldedInheritancePanel({
           </ShieldedWalletSheet>
         </div>
       )}
-      <div className={showWorkspace ? undefined : "mx-auto w-full max-w-[45rem]"}>
-        <PrivateLettersPanel context={context} signer={signer ?? null} disabled={busy || submissionPending} wallet={wallet} recoveryReady={!!session.identity || !!session.independentKey} sessionScope={JSON.stringify([session.credentials?.handle, session.identity?.handle, session.independentKey?.keyFingerprint])} budgetCommitment={letterBudget} composeRequest={letterComposeRequest} onBudgetChange={setLetterBudget} onBusyChange={(value) => { acceptPublicSyncProgress.current = value; if (value) { setPublicSyncProgress({}); setPublicSyncPaused(false); } setBusy(value); latestSession.current.setBusy(value); }} beginWalletRequest={() => latestSession.current.beginWalletRequest()} />
-      </div>
     </div>
   );
 }

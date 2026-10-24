@@ -57,10 +57,15 @@ authenticated relation commitment. The UI does not display a mismatching referen
 as a budget attachment. Funding and letter submission are separate transactions:
 retrying an attachment never repeats a successful deposit.
 
-The standalone composer is available before identity unlock: a valid anonymous
-receive credential and a transaction wallet suffice to write. Reading an inbox
-requires the original receiving keys. Wallet or key-session changes invalidate
-pending submissions and clear locally displayed plaintext.
+The inheritance page places Private letters below Child budgets in the unlocked
+workspace's task rail. Write a letter and Inbox are separate entries; they use the
+same task area as deposits and claims. The inbox reads when selected and provides
+an explicit refresh action. A budget attachment entry selects the write task with
+that budget. A standalone letter proof requires a valid anonymous
+receive credential and a transaction wallet; it does not require the sender's
+identity secrets. Reading an inbox requires the original receiving keys. Wallet
+or key-session changes invalidate pending submissions and clear locally displayed
+plaintext.
 
 The inbox reconstructs authenticated letter records and Archive bytes from chain
 events, then decrypts locally using the original identity/key recovery materials.

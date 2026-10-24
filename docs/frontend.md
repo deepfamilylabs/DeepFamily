@@ -516,10 +516,21 @@ progress advances; explicit caller deadlines are unchanged and stalled tasks sti
 The RPC must retain the pinned block while pages are downloaded. Rebuilding current state can
 still require substantial traffic, disk and verification time; it is not a constant-size first sync.
 
-Users may explicitly select chain paths (`stateReadMode: "chain"`) before unlocking. The choice
-is persisted as a public preference, with a missing or invalid saved value defaulting to rebuild.
-Changing it clears the unlocked session, previews and codes and terminates both asset and ZK
-Workers; the user must unlock again. A request already sent to an RPC cannot be withdrawn.
+The locked page shows the unlock form; read-mode controls and private letters appear in the
+unlocked workspace. The task rail lists Private letters below Child budgets, with separate
+Write a letter and Inbox entries that open in the shared task area. Entering the inbox reads
+letters once; its refresh button explicitly reads again. Budget attachment entries open the
+write task with the selected private budget. Initial recovery uses local reconstruction unless
+a read preference was previously saved. Users may explicitly select chain paths (`stateReadMode: "chain"`) inside
+the workspace. The choice is persisted as a public preference, with a missing or invalid saved
+value defaulting to rebuild.
+Changing it preserves the unlocked identity, independent key and current task. The page drops
+old previews, codes and read results and refreshes through the selected mode without another
+unlock. The asset Worker reuses its provider and drops pool snapshots and policy drafts when
+the read mode changes. Switching is disabled while work or a transaction is pending.
+During a read-mode refresh, the last verified wallet and inbox views and available selections
+remain visible until the replacement is ready. Synchronization progress floats below the read-mode
+control so it does not move the wallet cards or task forms.
 The mode is carried through recovery, receive-code creation (including convenient recipient
 codes), letters, funding, claims, receive presentations and revocation. Stale results and previews
 from another mode cannot be reused.

@@ -1905,7 +1905,8 @@
     "privateLetters": {
       "title": "Private letters",
       "write": "Write a letter",
-      "inbox": "Inbox · restore from chain",
+      "inbox": "Inbox",
+      "refresh": "Refresh inbox",
       "notConfigured": "Private letters are not configured for this network.",
       "writeHint": "Use a valid anonymous receive code. Write your signature in the plain-text body.",
       "budget": "Attached private budget",
