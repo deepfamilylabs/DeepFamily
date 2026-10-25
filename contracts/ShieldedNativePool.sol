@@ -9,11 +9,12 @@ contract ShieldedNativePool is ShieldedPoolCore {
   error NativeTransferFailed();
 
   constructor(
-    address lineageIndex,
-    address verifier,
-    address authorizationState,
-    address receiveVerifier
-  ) ShieldedPoolCore(lineageIndex, verifier, authorizationState, receiveVerifier) {}
+    address boundaryVerifier,
+    address registry,
+    address fundVerifier,
+    address claimVerifier,
+    address transferVerifier
+  ) ShieldedPoolCore(boundaryVerifier, registry, fundVerifier, claimVerifier, transferVerifier) {}
 
   function assetKind() external pure override returns (uint8) {
     return 1;
@@ -26,7 +27,7 @@ contract ShieldedNativePool is ShieldedPoolCore {
   ) external payable nonReentrant {
     _validateAmount(amount);
     if (msg.value != amount) revert UnexpectedNativeValue();
-    _execute(Action.Shield, data, proof, amount, address(0));
+    _verifyBoundary(Action.Shield, data, proof, amount, address(0));
     totalShielded += amount;
     _assertCollateral();
     _appendOutputs(Action.Shield, data);

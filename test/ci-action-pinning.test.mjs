@@ -59,7 +59,7 @@ describe("CI action supply-chain policy", function () {
 
     const manifest = JSON.parse(await readFile("package.json", "utf8"));
     expect(manifest.scripts["test:circuits"]).to.equal(
-      "node --test circuits/test/shielded_*.test.mjs",
+      "node --test circuits/test/*.test.mjs",
     );
     expect(manifest.scripts.check).to.match(/^npm run test:circuits && /);
     expect(manifest.scripts.test).not.to.include("test:circuits");

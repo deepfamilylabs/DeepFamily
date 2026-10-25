@@ -1,0 +1,669 @@
+{
+  "_format": "hh3-artifact-1",
+  "contractName": "ReceiveRegistry",
+  "sourceName": "contracts/ReceiveRegistry.sol",
+  "abi": [
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "source",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "issueVerifier",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "codeVerifier",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "capabilityVerifier",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "constructor"
+    },
+    {
+      "inputs": [],
+      "name": "CodeExpired",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "CodeRevoked",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "DuplicateCredential",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "InvalidCode",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "InvalidDependency",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "InvalidField",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "InvalidLeafIndex",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "InvalidPage",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "InvalidProof",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint8",
+          "name": "role",
+          "type": "uint8"
+        }
+      ],
+      "name": "QualificationRevoked",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "StaleSourceRoot",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "TreeCapacityExceeded",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "UnknownIssuanceRoot",
+      "type": "error"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "leafIndex",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "credential",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "root",
+          "type": "uint256"
+        }
+      ],
+      "name": "CredentialIssued",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "revocationTag",
+          "type": "uint256"
+        }
+      ],
+      "name": "ReceiveCodeRevoked",
+      "type": "event"
+    },
+    {
+      "inputs": [],
+      "name": "CAPABILITY_VERIFIER",
+      "outputs": [
+        {
+          "internalType": "contract IFixedProofVerifier",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "CODE_VERIFIER",
+      "outputs": [
+        {
+          "internalType": "contract IFixedProofVerifier",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "ISSUE_VERIFIER",
+      "outputs": [
+        {
+          "internalType": "contract IFixedProofVerifier",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "MAX_CREDENTIALS",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "MAX_PAGE_SIZE",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "SNARK_SCALAR_FIELD",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "SOURCE",
+      "outputs": [
+        {
+          "internalType": "contract IEligibilitySource",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "credentialCount",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "start",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "limit",
+          "type": "uint256"
+        }
+      ],
+      "name": "getCredentialPage",
+      "outputs": [
+        {
+          "internalType": "uint256[]",
+          "name": "leaves",
+          "type": "uint256[]"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "leafIndex",
+          "type": "uint256"
+        }
+      ],
+      "name": "getCredentialProof",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "leaf",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "root",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "index",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "depth",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256[]",
+          "name": "siblings",
+          "type": "uint256[]"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "revocationTag",
+          "type": "uint256"
+        }
+      ],
+      "name": "isCodeRevoked",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "credential",
+          "type": "uint256"
+        }
+      ],
+      "name": "isCredentialIssued",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "issued",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "root",
+          "type": "uint256"
+        }
+      ],
+      "name": "isKnownIssuanceRoot",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "issuanceDepth",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "issuanceRoot",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "credential",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "sourceRoot",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "trustedRoot",
+          "type": "uint256"
+        },
+        {
+          "internalType": "bytes",
+          "name": "proof",
+          "type": "bytes"
+        }
+      ],
+      "name": "registerCredential",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "leafIndex",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "root",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "secret",
+          "type": "uint256"
+        }
+      ],
+      "name": "revokeCode",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "tag",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "root",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "nonce",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "childTag",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "endorsementTag",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "trustedTag",
+          "type": "uint256"
+        }
+      ],
+      "name": "validateBudgetRoleStatus",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "components": [
+            {
+              "internalType": "uint256",
+              "name": "codeAlias",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "commonBinding",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "revocationTag",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "nonce",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "ownerCommitment",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "viewKeyLo",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "viewKeyHi",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint64",
+              "name": "expiresAt",
+              "type": "uint64"
+            }
+          ],
+          "internalType": "struct IReceiveRegistry.Code",
+          "name": "code",
+          "type": "tuple"
+        },
+        {
+          "components": [
+            {
+              "internalType": "uint256",
+              "name": "issuanceRoot",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "parentVersion",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "capabilityBinding",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "familyTag",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "childTag",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "endorsementTag",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "trustedTag",
+              "type": "uint256"
+            }
+          ],
+          "internalType": "struct IReceiveRegistry.Capability",
+          "name": "capability",
+          "type": "tuple"
+        },
+        {
+          "internalType": "bytes",
+          "name": "codeProof",
+          "type": "bytes"
+        },
+        {
+          "internalType": "bytes",
+          "name": "capabilityProof",
+          "type": "bytes"
+        }
+      ],
+      "name": "verifyBudgetCapability",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "components": [
+            {
+              "internalType": "uint256",
+              "name": "codeAlias",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "commonBinding",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "revocationTag",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "nonce",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "ownerCommitment",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "viewKeyLo",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "viewKeyHi",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint64",
+              "name": "expiresAt",
+              "type": "uint64"
+            }
+          ],
+          "internalType": "struct IReceiveRegistry.Code",
+          "name": "code",
+          "type": "tuple"
+        },
+        {
+          "internalType": "bytes",
+          "name": "codeProof",
+          "type": "bytes"
+        }
+      ],
+      "name": "verifyReceive",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    }
+  ],
+  "inputSourceName": "project/contracts/ReceiveRegistry.sol"
+}

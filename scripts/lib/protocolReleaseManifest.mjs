@@ -60,17 +60,11 @@ import {
   validateKdfDeviceMatrixV2Evidence,
 } from "./kdfReleaseEvidence.mjs";
 import { inspectZkReleaseArtifacts, readCanonicalJsonFile } from "./zkArtifactTrust.mjs";
-import { SHIELDED_DEPLOYMENT_CIRCUITS, RECEIVE_DEPLOYMENT_CONTRACTS, RECEIVE_DEPLOYMENT_IMMUTABLES, receiveDeploymentLibraries } from "./zkDeploymentCatalog.mjs";
+import { SHIELDED_DEPLOYMENT_CIRCUITS, PROTOCOL_DEPLOYMENT_CIRCUITS, RECEIVE_DEPLOYMENT_CONTRACTS, RECEIVE_DEPLOYMENT_IMMUTABLES, receiveDeploymentLibraries } from "./zkDeploymentCatalog.mjs";
 
 export const GROTH16_ADAPTER_VERIFIER_BINDINGS = Object.freeze({
   personVerifier: "personCommitmentVerifier",
   disclosureBindingVerifier: "disclosureBindingVerifier",
-  ...Object.fromEntries(
-    Object.entries(SHIELDED_DEPLOYMENT_CIRCUITS).map(([action, spec]) => [
-      `${action}Verifier`,
-      spec.verifierLabel,
-    ]),
-  ),
 });
 
 export const GROTH16_ADAPTER_IMMUTABLE_FIELDS = Object.freeze(
@@ -126,25 +120,42 @@ export const PROTOCOL_DEPLOYMENT_ARTIFACTS = Object.freeze({
       }),
     ]),
   ),
+  shieldedBoundaryVerifierAdapter: Object.freeze({
+    path: "artifacts/contracts/adapters/ShieldedBoundaryVerifierAdapter.sol/ShieldedBoundaryVerifierAdapter.json",
+    contractName: "ShieldedBoundaryVerifierAdapter", sourceName: "contracts/adapters/ShieldedBoundaryVerifierAdapter.sol",
+    immutableFields: Object.freeze(["shieldVerifier", "unshieldVerifier", "unshield4Verifier"]),
+  }),
+  ...Object.fromEntries(Object.entries(PROTOCOL_DEPLOYMENT_CIRCUITS).flatMap(([action, spec]) => [
+    [spec.generatedLabel, Object.freeze({
+      path: `artifacts/contracts/generated/protocol/${spec.contract}.sol/${spec.contract}.json`,
+      contractName: spec.contract, sourceName: `contracts/generated/protocol/${spec.contract}.sol`, immutableFields: Object.freeze([]),
+    })],
+    [spec.adapterLabel, Object.freeze({
+      path: "artifacts/contracts/FixedGroth16Verifier.sol/FixedGroth16Verifier.json",
+      contractName: "FixedGroth16Verifier", sourceName: "contracts/FixedGroth16Verifier.sol",
+      immutableFields: Object.freeze(["VERIFIER", "PUBLIC_SIGNAL_COUNT", "VERIFY_SELECTOR"]),
+      immutableTypes: Object.freeze({ PUBLIC_SIGNAL_COUNT: "uint8", VERIFY_SELECTOR: "bytes4" }),
+    })],
+  ])),
   shieldedErc20Pool: Object.freeze({
     path: "artifacts/contracts/ShieldedErc20Pool.sol/ShieldedErc20Pool.json",
     contractName: "ShieldedErc20Pool",
     sourceName: "contracts/ShieldedErc20Pool.sol",
-    immutableFields: Object.freeze(["TOKEN", "LINEAGE_INDEX", "VERIFIER", "AUTHORIZATION_STATE", "RECEIVE_VERIFIER"]),
+    immutableFields: Object.freeze(["TOKEN", "VERIFIER", "RECEIVE_REGISTRY", "FUND_VERIFIER", "CLAIM_VERIFIER", "TRANSFER_VERIFIER"]),
     libraryFields: Object.freeze(["PoseidonT3"]),
   }),
   shieldedNativePool: Object.freeze({
     path: "artifacts/contracts/ShieldedNativePool.sol/ShieldedNativePool.json",
     contractName: "ShieldedNativePool",
     sourceName: "contracts/ShieldedNativePool.sol",
-    immutableFields: Object.freeze(["LINEAGE_INDEX", "VERIFIER", "AUTHORIZATION_STATE", "RECEIVE_VERIFIER"]),
+    immutableFields: Object.freeze(["VERIFIER", "RECEIVE_REGISTRY", "FUND_VERIFIER", "CLAIM_VERIFIER", "TRANSFER_VERIFIER"]),
     libraryFields: Object.freeze(["PoseidonT3"]),
   }),
   shieldedPoolFactory: Object.freeze({
     path: "artifacts/contracts/ShieldedPoolFactory.sol/ShieldedPoolFactory.json",
     contractName: "ShieldedPoolFactory",
     sourceName: "contracts/ShieldedPoolFactory.sol",
-    immutableFields: Object.freeze(["DEEP_TOKEN", "LINEAGE_INDEX", "VERIFIER", "NATIVE_POOL", "AUTHORIZATION_STATE", "RECEIVE_VERIFIER"]),
+    immutableFields: Object.freeze(["DEEP_TOKEN", "VERIFIER", "NATIVE_POOL", "RECEIVE_REGISTRY", "FUND_VERIFIER", "CLAIM_VERIFIER", "TRANSFER_VERIFIER"]),
     libraryFields: Object.freeze(["PoseidonT3"]),
   }),
   ...Object.fromEntries(RECEIVE_DEPLOYMENT_CONTRACTS.map(({ contractName, property }) => [property, Object.freeze({
@@ -786,6 +797,10 @@ const encodeImmutableAddress = (value, length, label) => {
 
 const encodeImmutableValue = (value, length, label, type = "address") => {
   if (type === "address") return encodeImmutableAddress(value, length, label);
+  if (type === "bytes4") {
+    assert(typeof value === "string" && /^0x[0-9a-f]{8}$/iu.test(value), `${label} must be bytes4`);
+    return value.slice(2).toLowerCase().padEnd(length * 2, "0");
+  }
   assert(
     type === "uint8" && Number.isSafeInteger(value) && value >= 0 && value <= 255,
     `${label} must be uint8`,
@@ -1001,15 +1016,28 @@ export const inspectProtocolDeploymentArtifacts = ({ root = process.cwd(), deplo
       root, artifactName: property, immutableValues: deployments?.[property]?.immutables ?? {},
       libraries: receiveDeploymentLibraries(property, deployments ?? {}),
     })])),
+    shieldedBoundaryVerifierAdapter: inspectProtocolDeploymentArtifact({
+      root, artifactName: "shieldedBoundaryVerifierAdapter",
+      immutableValues: Object.fromEntries(["shieldVerifier", "unshieldVerifier", "unshield4Verifier"].map(getter => [getter, deployments?.shieldedBoundaryVerifierAdapter?.[`${getter}Immutable`]])),
+    }),
+    generatedVerifiers: Object.fromEntries(Object.entries(PROTOCOL_DEPLOYMENT_CIRCUITS).map(([action, spec]) => [action,
+      inspectProtocolDeploymentArtifact({ root, artifactName: spec.generatedLabel, immutableValues: {} })])),
+    protocolVerifiers: Object.fromEntries(Object.entries(PROTOCOL_DEPLOYMENT_CIRCUITS).map(([action, spec]) => [action,
+      inspectProtocolDeploymentArtifact({ root, artifactName: spec.adapterLabel, immutableValues: {
+        VERIFIER: deployments?.protocolVerifiers?.[action]?.verifierImmutable,
+        PUBLIC_SIGNAL_COUNT: spec.publicSignals,
+        VERIFY_SELECTOR: id(`verifyProof(uint256[2],uint256[2][2],uint256[2],uint256[${spec.publicSignals}])`).slice(0,10),
+      } })])),
     shieldedErc20Pool: inspectProtocolDeploymentArtifact({
       root,
       artifactName: "shieldedErc20Pool",
       immutableValues: {
         TOKEN: deployments?.shieldedErc20Pool?.tokenImmutable,
-        LINEAGE_INDEX: deployments?.shieldedErc20Pool?.lineageIndexImmutable,
+        RECEIVE_REGISTRY: deployments?.shieldedErc20Pool?.receiveRegistryImmutable,
         VERIFIER: deployments?.shieldedErc20Pool?.verifierAdapterImmutable,
-        AUTHORIZATION_STATE: deployments?.shieldedErc20Pool?.authorizationStateImmutable,
-        RECEIVE_VERIFIER: deployments?.shieldedErc20Pool?.receiveVerifierImmutable,
+        FUND_VERIFIER: deployments?.shieldedErc20Pool?.fundVerifierImmutable,
+        CLAIM_VERIFIER: deployments?.shieldedErc20Pool?.claimVerifierImmutable,
+        TRANSFER_VERIFIER: deployments?.shieldedErc20Pool?.transferVerifierImmutable,
       },
       libraries: { PoseidonT3: deployments?.poseidonT3 },
     }),
@@ -1017,10 +1045,11 @@ export const inspectProtocolDeploymentArtifacts = ({ root = process.cwd(), deplo
       root,
       artifactName: "shieldedNativePool",
       immutableValues: {
-        LINEAGE_INDEX: deployments?.shieldedNativePool?.lineageIndexImmutable,
+        RECEIVE_REGISTRY: deployments?.shieldedNativePool?.receiveRegistryImmutable,
         VERIFIER: deployments?.shieldedNativePool?.verifierAdapterImmutable,
-        AUTHORIZATION_STATE: deployments?.shieldedNativePool?.authorizationStateImmutable,
-        RECEIVE_VERIFIER: deployments?.shieldedNativePool?.receiveVerifierImmutable,
+        FUND_VERIFIER: deployments?.shieldedNativePool?.fundVerifierImmutable,
+        CLAIM_VERIFIER: deployments?.shieldedNativePool?.claimVerifierImmutable,
+        TRANSFER_VERIFIER: deployments?.shieldedNativePool?.transferVerifierImmutable,
       },
       libraries: { PoseidonT3: deployments?.poseidonT3 },
     }),
@@ -1029,11 +1058,12 @@ export const inspectProtocolDeploymentArtifacts = ({ root = process.cwd(), deplo
       artifactName: "shieldedPoolFactory",
       immutableValues: {
         DEEP_TOKEN: deployments?.shieldedPoolFactory?.deepTokenImmutable,
-        LINEAGE_INDEX: deployments?.shieldedPoolFactory?.lineageIndexImmutable,
+        RECEIVE_REGISTRY: deployments?.shieldedPoolFactory?.receiveRegistryImmutable,
         VERIFIER: deployments?.shieldedPoolFactory?.verifierAdapterImmutable,
         NATIVE_POOL: deployments?.shieldedPoolFactory?.nativePoolImmutable,
-        AUTHORIZATION_STATE: deployments?.shieldedPoolFactory?.authorizationStateImmutable,
-        RECEIVE_VERIFIER: deployments?.shieldedPoolFactory?.receiveVerifierImmutable,
+        FUND_VERIFIER: deployments?.shieldedPoolFactory?.fundVerifierImmutable,
+        CLAIM_VERIFIER: deployments?.shieldedPoolFactory?.claimVerifierImmutable,
+        TRANSFER_VERIFIER: deployments?.shieldedPoolFactory?.transferVerifierImmutable,
       },
       libraries: { PoseidonT3: deployments?.poseidonT3 },
     }),
@@ -1087,6 +1117,9 @@ const SHIELDED_DEPLOYMENT_KEYS = Object.freeze([
   "poseidonT4",
   "poseidonT6",
   "deepFamilyLineageIndex",
+  "shieldedBoundaryVerifierAdapter",
+  "generatedVerifiers",
+  "protocolVerifiers",
   "shieldedVerifiers",
   "shieldedErc20Pool",
   "shieldedNativePool",
@@ -1107,6 +1140,13 @@ const assertShieldedDeploymentShape = (deployments) => {
       `${action} shielded verifier deployment`,
     );
   }
+  assertExactKeys(deployments.shieldedBoundaryVerifierAdapter,
+    ["address", "shieldVerifierImmutable", "unshieldVerifierImmutable", "unshield4VerifierImmutable", ...SHIELDED_RECORD_HASH_KEYS], "boundary verifier adapter");
+  for (const kind of ["generatedVerifiers", "protocolVerifiers"]) {
+    assertExactKeys(deployments[kind], Object.keys(PROTOCOL_DEPLOYMENT_CIRCUITS), kind);
+    for (const action of Object.keys(PROTOCOL_DEPLOYMENT_CIRCUITS))
+      assertExactKeys(deployments[kind][action], ["address", ...(kind === "protocolVerifiers" ? ["verifierImmutable"] : []), ...SHIELDED_RECORD_HASH_KEYS], `${kind}.${action}`);
+  }
   for (const [key, extra] of [
     ["shieldedErc20Pool", ["tokenImmutable"]],
     ["shieldedNativePool", []],
@@ -1117,10 +1157,11 @@ const assertShieldedDeploymentShape = (deployments) => {
       [
         "address",
         ...extra,
-        "lineageIndexImmutable",
+        "receiveRegistryImmutable",
         "verifierAdapterImmutable",
-        "authorizationStateImmutable",
-        "receiveVerifierImmutable",
+        "fundVerifierImmutable",
+        "claimVerifierImmutable",
+        "transferVerifierImmutable",
         ...SHIELDED_RECORD_HASH_KEYS,
       ],
       `${key} deployment`,
@@ -1133,7 +1174,9 @@ const assertShieldedDeploymentShape = (deployments) => {
 };
 
 /** The complete immutable bindings used by deployments, projections and acceptance evidence. */
-export const shieldedDeploymentBindingsFromAddresses = (addresses) => ({
+export const shieldedDeploymentBindingsFromAddresses = (inputAddresses = {}) => {
+  const addresses = { ...inputAddresses, lineageIndex: inputAddresses.deepFamilyLineageIndex };
+  return ({
   token: addresses?.token,
   poseidonT3: addresses?.poseidonT3,
   poseidonT4: addresses?.poseidonT4,
@@ -1149,32 +1192,44 @@ export const shieldedDeploymentBindingsFromAddresses = (addresses) => ({
       { address: addresses?.[spec.verifierLabel] },
     ]),
   ),
+  shieldedBoundaryVerifierAdapter: {
+    address: addresses?.shieldedBoundaryVerifierAdapter,
+    shieldVerifierImmutable: addresses?.shieldedShieldVerifier,
+    unshieldVerifierImmutable: addresses?.shieldedUnshieldVerifier,
+    unshield4VerifierImmutable: addresses?.shieldedUnshield4Verifier,
+  },
+  generatedVerifiers: Object.fromEntries(Object.entries(PROTOCOL_DEPLOYMENT_CIRCUITS).map(([action, spec]) => [action, {address: addresses?.[spec.generatedLabel]}])),
+  protocolVerifiers: Object.fromEntries(Object.entries(PROTOCOL_DEPLOYMENT_CIRCUITS).map(([action, spec]) => [action, {address: addresses?.[spec.adapterLabel], verifierImmutable: addresses?.[spec.generatedLabel]}])),
   shieldedErc20Pool: {
     address: addresses?.shieldedErc20Pool,
     tokenImmutable: addresses?.token,
-    lineageIndexImmutable: addresses?.deepFamilyLineageIndex,
-    verifierAdapterImmutable: addresses?.groth16VerifierAdapter,
-    authorizationStateImmutable: addresses?.identityAuthorizationState,
-    receiveVerifierImmutable: addresses?.receivePresentationVerifierRouter,
+    receiveRegistryImmutable: addresses?.receiveRegistry,
+    verifierAdapterImmutable: addresses?.shieldedBoundaryVerifierAdapter,
+    fundVerifierImmutable: addresses?.protocolFundVerifier,
+    claimVerifierImmutable: addresses?.protocolClaimVerifier,
+    transferVerifierImmutable: addresses?.protocolTransferVerifier,
   },
   shieldedNativePool: {
     address: addresses?.shieldedNativePool,
-    lineageIndexImmutable: addresses?.deepFamilyLineageIndex,
-    verifierAdapterImmutable: addresses?.groth16VerifierAdapter,
-    authorizationStateImmutable: addresses?.identityAuthorizationState,
-    receiveVerifierImmutable: addresses?.receivePresentationVerifierRouter,
+    receiveRegistryImmutable: addresses?.receiveRegistry,
+    verifierAdapterImmutable: addresses?.shieldedBoundaryVerifierAdapter,
+    fundVerifierImmutable: addresses?.protocolFundVerifier,
+    claimVerifierImmutable: addresses?.protocolClaimVerifier,
+    transferVerifierImmutable: addresses?.protocolTransferVerifier,
   },
   shieldedPoolFactory: {
     address: addresses?.shieldedPoolFactory,
     deepTokenImmutable: addresses?.token,
-    lineageIndexImmutable: addresses?.deepFamilyLineageIndex,
-    verifierAdapterImmutable: addresses?.groth16VerifierAdapter,
-    authorizationStateImmutable: addresses?.identityAuthorizationState,
-    receiveVerifierImmutable: addresses?.receivePresentationVerifierRouter,
+    receiveRegistryImmutable: addresses?.receiveRegistry,
+    verifierAdapterImmutable: addresses?.shieldedBoundaryVerifierAdapter,
+    fundVerifierImmutable: addresses?.protocolFundVerifier,
+    claimVerifierImmutable: addresses?.protocolClaimVerifier,
+    transferVerifierImmutable: addresses?.protocolTransferVerifier,
     nativePoolImmutable: addresses?.shieldedNativePool,
     deepPool: addresses?.shieldedErc20Pool,
   },
 });
+};
 
 /** Normalize and check every shielded address, artifact and immutable relationship. */
 export const protocolShieldedDeploymentEvidenceFromRecords = (deployments) => {
@@ -1199,16 +1254,28 @@ export const protocolShieldedDeploymentEvidenceFromRecords = (deployments) => {
       ),
     ]),
   );
-  const adapterAddress = assertAddress(
-    deployments.groth16VerifierAdapter?.address,
-    "Groth16VerifierAdapter address",
-  );
+  const boundary = normalizeRecord(deployments.shieldedBoundaryVerifierAdapter, "ShieldedBoundaryVerifierAdapter");
+  for (const [action, spec] of Object.entries(SHIELDED_DEPLOYMENT_CIRCUITS)) {
+    boundary[`${action}VerifierImmutable`] = assertAddress(boundary[`${action}VerifierImmutable`], `${action} boundary route`);
+    assert(boundary[`${action}VerifierImmutable`] === verifiers[action].address, `${action} boundary route must bind its verifier`);
+  }
+  const generatedVerifiers = {}, protocolVerifiers = {};
+  for (const [action, spec] of Object.entries(PROTOCOL_DEPLOYMENT_CIRCUITS)) {
+    generatedVerifiers[action] = Object.freeze(normalizeRecord(deployments.generatedVerifiers[action], spec.contract));
+    const record = normalizeRecord(deployments.protocolVerifiers[action], spec.adapterLabel);
+    record.verifierImmutable = assertAddress(record.verifierImmutable, `${action} fixed verifier`);
+    assert(record.verifierImmutable === generatedVerifiers[action].address, `${action} adapter must bind its generated verifier`);
+    protocolVerifiers[action] = Object.freeze(record);
+  }
+  const adapterAddress = boundary.address;
   const pool = normalizeRecord(deployments.shieldedErc20Pool, "ShieldedErc20Pool");
   const nativePool = normalizeRecord(deployments.shieldedNativePool, "ShieldedNativePool");
   const factory = normalizeRecord(deployments.shieldedPoolFactory, "ShieldedPoolFactory");
   const receive = Object.fromEntries(RECEIVE_DEPLOYMENT_CONTRACTS.map(({contractName, property}) => [property, normalizeRecord(deployments[property], contractName)]));
   const receiveAddresses = Object.fromEntries(Object.entries(receive).map(([property, record]) => [property, record.address]));
-  Object.assign(receiveAddresses, { deepFamily: deployments.deepFamilyProxy, shieldedPoolFactory: factory.address });
+  Object.assign(receiveAddresses, { deepFamily: deployments.deepFamilyProxy, lineageIndex: addressFields.deepFamilyLineageIndex });
+  for (const [action, spec] of Object.entries(PROTOCOL_DEPLOYMENT_CIRCUITS))
+    receiveAddresses[spec.adapterLabel] = deployments.protocolVerifiers?.[action]?.address;
   for (const {property} of RECEIVE_DEPLOYMENT_CONTRACTS) {
     const values = {};
     for (const [getter, key] of Object.entries(RECEIVE_DEPLOYMENT_IMMUTABLES[property])) {
@@ -1219,23 +1286,20 @@ export const protocolShieldedDeploymentEvidenceFromRecords = (deployments) => {
     Object.freeze(receive[property]);
   }
   for (const record of [pool, nativePool, factory]) {
-    for (const field of ["lineageIndexImmutable", "verifierAdapterImmutable", "authorizationStateImmutable", "receiveVerifierImmutable"])
+    for (const field of ["receiveRegistryImmutable", "verifierAdapterImmutable", "fundVerifierImmutable", "claimVerifierImmutable", "transferVerifierImmutable"])
       record[field] = assertAddress(record[field], `pool/factory ${field}`);
-    assert(
-      record.lineageIndexImmutable === addressFields.deepFamilyLineageIndex &&
-        record.verifierAdapterImmutable === adapterAddress,
-      record === pool
-        ? "ShieldedErc20Pool must bind the declared token, lineage and common verifier adapter"
-        : "Shielded pools/factory must bind the declared lineage and common verifier adapter",
-    );
-    assert(record.authorizationStateImmutable === receive.identityAuthorizationState.address &&
-      record.receiveVerifierImmutable === receive.receivePresentationVerifierRouter.address,
-      "Shielded pools/factory must bind the shared identity authorization state and receive verifier");
+    assert(record.verifierAdapterImmutable === adapterAddress,
+      "Shielded pools/factory must bind the declared VALUE boundary verifier");
+    assert(record.receiveRegistryImmutable === receive.receiveRegistry.address,
+      "Shielded pools/factory must bind the shared receiving registry");
+    for (const [field, action] of [["fundVerifierImmutable", "fund"], ["claimVerifierImmutable", "claim"], ["transferVerifierImmutable", "transfer"]])
+      assert(record[field] === assertAddress(deployments.protocolVerifiers?.[action]?.address, `${action} verifier`),
+        `Shielded pools/factory must bind the ${action} verifier`);
   }
   pool.tokenImmutable = assertAddress(pool.tokenImmutable, "pool tokenImmutable");
   assert(
     pool.tokenImmutable === addressFields.token,
-    "ShieldedErc20Pool must bind the declared token, lineage and common verifier adapter",
+    "ShieldedErc20Pool must bind the declared token, registry and boundary verifier",
   );
   factory.deepTokenImmutable = assertAddress(
     factory.deepTokenImmutable,
@@ -1257,6 +1321,8 @@ export const protocolShieldedDeploymentEvidenceFromRecords = (deployments) => {
     ...Object.values(addressFields),
     ...Object.values(verifiers).map((record) => record.address),
     adapterAddress,
+    ...Object.values(generatedVerifiers).map(record => record.address),
+    ...Object.values(protocolVerifiers).map(record => record.address),
     pool.address,
     nativePool.address,
     factory.address,
@@ -1269,6 +1335,9 @@ export const protocolShieldedDeploymentEvidenceFromRecords = (deployments) => {
   return Object.freeze({
     ...addressFields,
     shieldedVerifiers: Object.freeze(verifiers),
+    shieldedBoundaryVerifierAdapter: Object.freeze(boundary),
+    generatedVerifiers: Object.freeze(generatedVerifiers),
+    protocolVerifiers: Object.freeze(protocolVerifiers),
     shieldedErc20Pool: Object.freeze(pool),
     shieldedNativePool: Object.freeze(nativePool),
     shieldedPoolFactory: Object.freeze(factory),
@@ -1284,13 +1353,6 @@ const normalizeGroth16AdapterRecord = (record, verifiers, { terminal = false } =
       assertAddress(record?.[terminal ? getter : `${getter}Immutable`], `${label} ${getter}`),
     ]),
   );
-  for (const [action, spec] of Object.entries(SHIELDED_DEPLOYMENT_CIRCUITS)) {
-    assert(
-      bindings[`${action}VerifierImmutable`] ===
-        assertAddress(verifiers?.[action]?.address, `${spec.verifierContractName} address`),
-      `${label} ${action} must bind its exact verifier`,
-    );
-  }
   return Object.freeze({
     address: assertAddress(record?.address, `${label} address`),
     ...bindings,
@@ -1383,6 +1445,9 @@ export const protocolDeploymentEvidenceFromAcceptanceReport = (report) => {
         poseidonT6: terminal?.poseidonT6,
         deepFamilyLineageIndex: terminal?.deepFamilyLineageIndex,
         shieldedVerifiers: terminal?.shieldedVerifiers,
+        shieldedBoundaryVerifierAdapter: terminal?.shieldedBoundaryVerifierAdapter,
+        generatedVerifiers: terminal?.generatedVerifiers,
+        protocolVerifiers: terminal?.protocolVerifiers,
         groth16VerifierAdapter: adapter,
         shieldedErc20Pool: terminal?.shieldedErc20Pool,
         shieldedNativePool: terminal?.shieldedNativePool,
@@ -2069,6 +2134,11 @@ export const inspectProtocolReleaseManifest = ({
         spec.verifierContractName,
         deployments.shieldedVerifiers[action],
         deploymentArtifacts.shieldedVerifiers?.[action],
+      ]),
+      ["ShieldedBoundaryVerifierAdapter", deployments.shieldedBoundaryVerifierAdapter, deploymentArtifacts.shieldedBoundaryVerifierAdapter],
+      ...Object.entries(PROTOCOL_DEPLOYMENT_CIRCUITS).flatMap(([action, spec]) => [
+        [spec.contract, deployments.generatedVerifiers[action], deploymentArtifacts.generatedVerifiers?.[action]],
+        [spec.adapterLabel, deployments.protocolVerifiers[action], deploymentArtifacts.protocolVerifiers?.[action]],
       ]),
       ...RECEIVE_DEPLOYMENT_CONTRACTS.map(({contractName, property}) => [contractName, deployments[property], deploymentArtifacts[property]]),
       ["ShieldedErc20Pool", deployments.shieldedErc20Pool, deploymentArtifacts.shieldedErc20Pool],

@@ -23,18 +23,14 @@ export async function resolveShieldedAssetPool(
   factory: Contract,
   asset: Pick<ShieldedAsset, "address" | "kind">,
   provider: JsonRpcProvider,
-  lineageIndex: string,
   options: { blockTag?: number } = {},
 ): Promise<{ pool: Contract; poolAddress: string; poolDeploymentBlock: number } | null> {
   const overrides = options.blockTag === undefined ? {} : { blockTag: options.blockTag };
-  const [registeredPool, factoryLineage, factoryVerifier] = await Promise.all([
+  const [registeredPool, factoryRegistry, factoryVerifier] = await Promise.all([
     factory.poolFor(asset.address, overrides) as Promise<string>,
-    factory.LINEAGE_INDEX(overrides) as Promise<string>,
+    factory.RECEIVE_REGISTRY(overrides) as Promise<string>,
     factory.VERIFIER(overrides) as Promise<string>,
   ]);
-  if (getAddress(factoryLineage) !== getAddress(lineageIndex)) {
-    throw new Error("Asset factory configuration does not match the selected protocol");
-  }
   const poolAddress = getAddress(registeredPool);
   if (poolAddress === ZeroAddress) {
     if (asset.kind === "native") throw new Error("Native asset pool is not registered");
@@ -44,10 +40,10 @@ export async function resolveShieldedAssetPool(
     asset.kind === "native"
       ? createShieldedNativePoolContract(poolAddress, provider)
       : createShieldedErc20PoolContract(poolAddress, provider);
-  const [kind, version, poolLineage, poolVerifier, token, creationBlock] = await Promise.all([
+  const [kind, version, poolRegistry, poolVerifier, token, creationBlock] = await Promise.all([
     pool.assetKind(overrides) as Promise<bigint>,
     pool.protocolVersion(overrides) as Promise<bigint>,
-    pool.LINEAGE_INDEX(overrides) as Promise<string>,
+    pool.RECEIVE_REGISTRY(overrides) as Promise<string>,
     pool.VERIFIER(overrides) as Promise<string>,
     asset.kind === "erc20"
       ? (pool.TOKEN(overrides) as Promise<string>)
@@ -57,8 +53,7 @@ export async function resolveShieldedAssetPool(
   if (
     BigInt(kind) !== (asset.kind === "native" ? 1n : 0n) ||
     BigInt(version) !== BigInt(SHIELDED_POOL_PROTOCOL_VERSION) ||
-    getAddress(poolLineage) !== getAddress(lineageIndex) ||
-    getAddress(factoryLineage) !== getAddress(lineageIndex) ||
+    getAddress(poolRegistry) !== getAddress(factoryRegistry) ||
     getAddress(poolVerifier) !== getAddress(factoryVerifier) ||
     getAddress(token) !== asset.address
   ) {
@@ -186,7 +181,7 @@ export async function discoverShieldedFactoryPools(
   provider: JsonRpcProvider,
   options: {
     factoryDeploymentBlock: number;
-    lineageIndexAddress: string;
+    registryAddress: string;
     verifierAddress: string;
     chainId?: bigint;
     toBlock?: number;
@@ -214,12 +209,12 @@ export async function discoverShieldedFactoryPools(
   const anchor = await bounded(provider.getBlock(toBlock));
   if (!anchor?.hash) throw new Error("Factory discovery anchor unavailable");
   const overrides = { blockTag: toBlock };
-  const [lineage, verifier] = await Promise.all([
-    bounded(factory.LINEAGE_INDEX(overrides) as Promise<string>),
+  const [registry, verifier] = await Promise.all([
+    bounded(factory.RECEIVE_REGISTRY(overrides) as Promise<string>),
     bounded(factory.VERIFIER(overrides) as Promise<string>),
   ]);
   if (
-    getAddress(lineage) !== getAddress(options.lineageIndexAddress) ||
+    getAddress(registry) !== getAddress(options.registryAddress) ||
     getAddress(verifier) !== getAddress(options.verifierAddress)
   )
     throw new Error("Factory configuration does not match trusted deployment");
@@ -284,7 +279,6 @@ export async function discoverShieldedFactoryPools(
             factory,
             { address: item.assetAddress, kind },
             provider,
-            options.lineageIndexAddress,
             { blockTag: toBlock },
           ),
         );

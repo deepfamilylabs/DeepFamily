@@ -1,1 +1,0 @@
-export { IDENTITY_AUTHORIZATION_ABI, createIdentityAuthorizationContract, loadShieldedIdentityAuthorizationState, loadShieldedIdentityAuthorizationWitness, loadShieldedIdentityAuthorizationWitnessForMode } from "../../../shared/clients/shieldedIdentityAuthorizationChain";

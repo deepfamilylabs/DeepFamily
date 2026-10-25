@@ -1,9 +1,6 @@
-import type { ShieldedStateReadMode } from "../config/shieldedStateReadMode";
 import type { Groth16Proof } from "../zk/zk";
 import { serializeWorkerError } from "./workerErrors";
 import { isPublicStateSyncProgress, publishPublicStateSyncProgress, type PublicStateSyncProgress } from "./publicStateSyncProgress";
-import type { ShieldedReceiveCodeCheck } from "../zk/shieldedReceiveCode";
-import type { IdentityFields } from "@deepfamily/protocol-core";
 import type {
   DisclosureBindingProofParameters,
   PersonRelationProofParameters,
@@ -26,14 +23,7 @@ type ZkWorkerCallMap = {
     params: { proof: Groth16Proof; publicSignals: string[] };
     result: { ok: boolean };
   };
-  createShieldedReceiveCodeFromCredentials: {
-    params: { identity: IdentityFields; rawPassphrase: string; disclosure?: "anonymous" | "fund"; context: { rpcUrl: string; chainId: string; factoryAddress: string; stateReadMode?: ShieldedStateReadMode }; expiresAt: string };
-    result: { code: string; personHash: string };
-  };
-  verifyShieldedReceiveCode: {
-    params: { code: string };
-    result: ShieldedReceiveCodeCheck;
-  };
+
 };
 
 type ZkWorkerRequest = { id: number; method: keyof ZkWorkerCallMap; params: any };

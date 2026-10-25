@@ -1,15 +1,10 @@
 #!/usr/bin/env node
 
 import { execFileSync } from "node:child_process";
-import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import {
-  parseCircuitArguments,
-  selectCircuitNames,
-  SHIELDED_CIRCUIT_NAMES,
-} from "./lib/zkCircuitSelection.mjs";
+import { parseCircuitArguments, selectCircuitNames } from "./lib/zkCircuitSelection.mjs";
 
 const PERSON_SUBMITTER = "0x1234567890123456789012345678901234567890";
 const CHECKS = Object.freeze({
@@ -73,39 +68,22 @@ export const parseArguments = parseCircuitArguments;
 export const buildZkCheckCommands = ({
   root = process.cwd(),
   circuit = "all",
-  verifyCeremonies = true,
 } = {}) => {
-  if (typeof verifyCeremonies !== "boolean") {
-    throw new TypeError("verifyCeremonies must be a boolean");
-  }
-  if (!verifyCeremonies && circuit !== "all") {
-    throw new Error("Separating ceremony verification requires the complete circuit bundle");
-  }
   const resolvedRoot = path.resolve(root);
-  const hasShieldedSetupRecord = fs.existsSync(
-    path.join(resolvedRoot, "circuits", "shielded-production-manifest.json"),
-  );
   const selected = selectCircuitNames(circuit);
-  const core = selected.filter((name) => !name.startsWith("shielded:"));
-  const shielded = selected.filter((name) => name.startsWith("shielded:"));
+  const core = selected.filter((name) => Object.hasOwn(CHECKS, name));
+  const protocol = selected.filter((name) => name.startsWith("protocol:"));
+  const boundaries = selected.filter((name) => name.startsWith("shielded:"));
+  const script = (check, filename, extra = []) =>
+    Object.freeze({
+      circuit: "canonical",
+      check,
+      executable: process.execPath,
+      args: Object.freeze([path.join(resolvedRoot, "scripts", filename), ...extra]),
+      cwd: resolvedRoot,
+    });
   return Object.freeze([
-    ...(circuit === "all"
-      ? [
-          ["build", "zk-build.mjs"],
-          ["artifacts", "check-zk-artifacts.mjs"],
-          ["ceremony", "zk-ceremony-verify.mjs"],
-        ]
-          .filter(([check]) => verifyCeremonies || check !== "ceremony")
-          .map(([check, script]) =>
-            Object.freeze({
-              circuit: "all",
-              check,
-              executable: process.execPath,
-              args: Object.freeze([path.join(resolvedRoot, "scripts", script)]),
-              cwd: resolvedRoot,
-            }),
-          )
-      : []),
+    ...(circuit === "all" ? [script("build", "zk-build.mjs")] : []),
     ...core.flatMap((name) =>
       CHECKS[name].map((check) =>
         Object.freeze({
@@ -117,56 +95,18 @@ export const buildZkCheckCommands = ({
         }),
       ),
     ),
-    // The complete check verifies this ceremony in its shared setup-record step.
-    ...(shielded.length === 0 || (circuit === "all" && hasShieldedSetupRecord)
-      ? []
-      : hasShieldedSetupRecord
-        ? [
-            Object.freeze({
-              circuit: "shielded",
-              check: "production-ceremony",
-              executable: process.execPath,
-              args: Object.freeze([
-                path.join(resolvedRoot, "scripts", "zk-shielded-production-check.mjs"),
-              ]),
-              cwd: resolvedRoot,
-            }),
-          ]
-        : shielded.length === SHIELDED_CIRCUIT_NAMES.length
-          ? [
-              Object.freeze({
-                circuit: "shielded",
-                check: "development-artifacts-and-proof-smoke",
-                executable: process.execPath,
-                args: Object.freeze([
-                  path.join(resolvedRoot, "scripts", "zk-shielded-development-proof-smoke.mjs"),
-                ]),
-                cwd: resolvedRoot,
-              }),
-            ]
-          : shielded.map((name) => {
-              const action = name.slice("shielded:".length);
-              const hasProofFixture = ["fund", "claim"].includes(action);
-              return Object.freeze({
-                circuit: name,
-                check: hasProofFixture ? "development-proof-smoke" : "development-artifacts",
-                executable: process.execPath,
-                args: Object.freeze([
-                  path.join(resolvedRoot, "scripts", "zk-shielded-development-proof-smoke.mjs"),
-                  ...(hasProofFixture ? [action] : ["--artifact", action]),
-                ]),
-                cwd: resolvedRoot,
-              });
-            })),
-    ...(circuit === "all"
+    ...(boundaries.length || protocol.length
+      ? [script("development-artifact-hashes", "check-protocol-artifacts.mjs")]
+      : []),
+    ...(protocol.length
       ? [
           Object.freeze({
-            circuit: "receive",
-            check: "current-artifacts-and-proof-smoke",
+            circuit: "protocol",
+            check: "real-proofs-and-public-binding",
             executable: process.execPath,
             args: Object.freeze([
-              path.join(resolvedRoot, "scripts", "receive-proof-smoke.mjs"),
-              "--current",
+              "--test",
+              path.join(resolvedRoot, "test/protocol-real-proof.test.mjs"),
             ]),
             cwd: resolvedRoot,
           }),
@@ -178,14 +118,13 @@ export const buildZkCheckCommands = ({
 export const runZkCheck = ({
   root = process.cwd(),
   circuit = "all",
-  verifyCeremonies = true,
   runner = defaultRunner,
 } = {}) => {
   if (typeof runner !== "function") {
     throw new TypeError("runner must be a function");
   }
 
-  const commands = buildZkCheckCommands({ root, circuit, verifyCeremonies });
+  const commands = buildZkCheckCommands({ root, circuit });
   for (const command of commands) {
     runner(command);
   }
@@ -194,13 +133,14 @@ export const runZkCheck = ({
 
 const printUsage = () => {
   console.log(`Usage:
-  node scripts/zk-check.mjs [--circuit <all|core|person|disclosure|shielded|shielded:action>]
+  node scripts/zk-check.mjs [--circuit <all|core|person|disclosure|shielded|shielded:action|protocol|protocol:action>]
 
-The default check rebuilds all circuits, validates artifact hashes and derived verifiers,
-verifies recorded setup ceremonies, then checks real proofs, constraints and receive presentations.
+The default check rebuilds the 13 canonical relations, checks identity proofs/constraints,
+validates local artifact hashes and checks all eight protocol Groth16 statements.
+Development artifact verification is not production ceremony approval.
 Every step reuses the current keys; no check generates replacement keys.
-Use --circuit to run the existing focused proof and constraint checks without rebuilding or
-requiring the complete bundle. Setup also uses these focused checks while installing artifacts.`);
+Use --circuit to select checks without rebuilding. Receiving and boundary checks authenticate
+the complete pinned bundle and its prior local compilation; run zk:build after source changes.`);
 };
 
 export const main = (argv = process.argv.slice(2)) => {

@@ -20,14 +20,14 @@ vi.mock("../../../shared/clients/contractFactory", () => ({
 const provider = {} as JsonRpcProvider;
 const factory = {
   poolFor: vi.fn(async () => POOL),
-  LINEAGE_INDEX: async () => LINEAGE,
+  RECEIVE_REGISTRY: async () => LINEAGE,
   VERIFIER: async () => VERIFIER,
 } as unknown as Contract;
 const pool = (kind: bigint, token = ASSET) => ({
   assetKind: async () => kind,
   protocolVersion: async () => BigInt(SHIELDED_POOL_PROTOCOL_VERSION),
   creationBlock: async () => 42n,
-  LINEAGE_INDEX: async () => LINEAGE,
+  RECEIVE_REGISTRY: async () => LINEAGE,
   VERIFIER: async () => VERIFIER,
   TOKEN: vi.fn(async () => token),
 });
@@ -71,7 +71,7 @@ describe("complete recovery discovery and hostile token isolation", () => {
       getAddress: async () => factoryAddress,
       poolFor,
       poolCount: count,
-      LINEAGE_INDEX: vi.fn(async () => LINEAGE),
+      RECEIVE_REGISTRY: vi.fn(async () => LINEAGE),
       VERIFIER: vi.fn(async () => VERIFIER),
     } as unknown as Contract;
     mocks.native.mockReturnValue({ ...pool(1n), creationBlock: async () => 3n });
@@ -91,7 +91,7 @@ describe("complete recovery discovery and hostile token isolation", () => {
       logs,
       options: {
         factoryDeploymentBlock: 4,
-        lineageIndexAddress: LINEAGE,
+        registryAddress: LINEAGE,
         verifierAddress: VERIFIER,
         chainId: 31337n,
         toBlock: 10,
@@ -232,7 +232,7 @@ describe("canonical multi-asset discovery", () => {
   it("supports native assets without calling ERC-20 interfaces", async () => {
     const asset = await readShieldedAsset(ZeroAddress, provider, "CFX", { blockTag: 10 });
     expect(asset).toMatchObject({ kind: "native", symbol: "CFX", decimals: 18, token: null });
-    expect(await resolveShieldedAssetPool(factory, asset, provider, LINEAGE)).toMatchObject({
+    expect(await resolveShieldedAssetPool(factory, asset, provider)).toMatchObject({
       poolDeploymentBlock: 42,
     });
     expect(mocks.token).not.toHaveBeenCalled();
@@ -319,18 +319,18 @@ describe("canonical multi-asset discovery", () => {
   it("leaves an unknown asset ready for permissionless creation", async () => {
     vi.mocked(factory.poolFor).mockResolvedValue(ZeroAddress);
     const asset = await readShieldedAsset(ASSET, provider, "CFX", { blockTag: 10 });
-    expect(await resolveShieldedAssetPool(factory, asset, provider, LINEAGE)).toBeNull();
+    expect(await resolveShieldedAssetPool(factory, asset, provider)).toBeNull();
   });
   it.each([
     { TOKEN: async () => ZeroAddress },
     { assetKind: async () => 1n },
     { protocolVersion: async () => 2n },
-    { LINEAGE_INDEX: async () => ZeroAddress },
+    { RECEIVE_REGISTRY: async () => ZeroAddress },
     { VERIFIER: async () => ZeroAddress },
   ])("rejects a pool with mismatching immutable configuration %s", async (changes) => {
     mocks.erc20.mockReturnValue({ ...pool(0n), ...changes });
     const asset = await readShieldedAsset(ASSET, provider, "CFX", { blockTag: 10 });
-    await expect(resolveShieldedAssetPool(factory, asset, provider, LINEAGE)).rejects.toThrow(
+    await expect(resolveShieldedAssetPool(factory, asset, provider)).rejects.toThrow(
       "configuration",
     );
   });

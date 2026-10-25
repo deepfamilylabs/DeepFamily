@@ -1,4 +1,3 @@
-import type { ShieldedStateReadMode } from "./shieldedStateReadMode";
 
 export function getViteEnv(): Record<string, unknown> {
   return (import.meta.env || {}) as Record<string, unknown>;
@@ -136,11 +135,6 @@ export function getShieldedPoolFactoryDeploymentBlock(chainId: number): number {
   return Number.isSafeInteger(block) && block >= 0 ? block : 0;
 }
 
-/** Only an explicit deployment setting enables recipient-specific chain reads. */
-export function getShieldedStateReadMode(): ShieldedStateReadMode {
-  return getStringEnv("VITE_SHIELDED_STATE_READ_MODE").trim() === "chain" ? "chain" : "rebuild";
-}
-
 export function getDefaultRootHash(): string {
   return getStringEnv("VITE_ROOT_PERSON_HASH");
 }
@@ -174,10 +168,10 @@ export function getEventScanConfig() {
 }
 
 /** Authenticated private-letter archive for the selected chain. */
-export function getPrivateLetterArchiveAddress(chainId: number): string {
-  return getPerChainEnv("VITE_PRIVATE_LETTER_ARCHIVE_ADDRESS", chainId);
+export function getLetterArchiveAddress(chainId: number): string {
+  return getPerChainEnv("VITE_LETTER_ARCHIVE_ADDRESS", chainId);
 }
-export function getPrivateLetterArchiveDeploymentBlock(chainId: number): number {
-  const block = Number(getPerChainEnv("VITE_PRIVATE_LETTER_ARCHIVE_FROM_BLOCK", chainId));
+export function getLetterArchiveDeploymentBlock(chainId: number): number {
+  const block = Number(getPerChainEnv("VITE_LETTER_ARCHIVE_FROM_BLOCK", chainId));
   return Number.isSafeInteger(block) && block >= 0 ? block : 0;
 }

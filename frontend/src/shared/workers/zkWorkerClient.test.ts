@@ -58,23 +58,13 @@ describe("ZK worker lifecycle", () => {
   it("does not return credentials from a failed structured clone", async () => {
     const secret = "zk-dispatch-secret-8Q!";
     const post = vi.spyOn(FakeWorker.prototype, "postMessage").mockImplementationOnce((request) => {
-      const passphrase = request.params.rawPassphrase;
+      const passphrase = request.params.proof.pi_a[0];
       throw Object.assign(new Error(encodeURIComponent(passphrase)), { name: passphrase });
     });
     try {
       await expect(
-        zkWorkerCall("createShieldedReceiveCodeFromCredentials", {
-          identity: {
-            fullName: "Alice",
-            gender: 0,
-            birthYear: 2000,
-            birthMonth: 1,
-            birthDay: 1,
-            isBirthBC: false,
-          },
-          rawPassphrase: secret,
-          context: { rpcUrl: "http://localhost:8545", chainId: "31337", factoryAddress: "0x1111111111111111111111111111111111111111" },
-          expiresAt: "2000000000",
+        zkWorkerCall("verifyPersonRelationProof", {
+          proof: { pi_a: [secret, "2", "1"] } as any, publicSignals: ["1"],
         }),
       ).rejects.toThrow("Local cryptographic operation failed");
       expect(FakeWorker.instances[0].terminate).toHaveBeenCalledOnce();
@@ -83,14 +73,11 @@ describe("ZK worker lifecycle", () => {
     }
   });
 
-  it("publishes sync progress without settling credentials generation or triggering idle cleanup", async () => {
+  it("publishes sync progress without settling proof verification or triggering idle cleanup", async () => {
     const listener = vi.fn();
     unsubscribeProgress = subscribePublicStateSyncProgress(listener);
-    const call = zkWorkerCall("createShieldedReceiveCodeFromCredentials", {
-      identity: { fullName: "Alice", gender: 0, birthYear: 2000, birthMonth: 1, birthDay: 1, isBirthBC: false },
-      rawPassphrase: "private-progress-secret",
-      context: { rpcUrl: "http://localhost:8545", chainId: "31337", factoryAddress: `0x${"11".repeat(20)}` },
-      expiresAt: "2000000000",
+    const call = zkWorkerCall("verifyPersonRelationProof", {
+      proof: {} as any, publicSignals: ["1"],
     });
     const worker = FakeWorker.instances[0];
     const progress = { domain: "authorization", phase: "download", completed: 2, total: 3, resumed: true };
@@ -104,8 +91,8 @@ describe("ZK worker lifecycle", () => {
     expect(worker.terminate).not.toHaveBeenCalled();
     expect(worker.messages).toHaveLength(1);
     expect(worker.messages[0].params).toBeUndefined();
-    worker.emit("message", { id: worker.messages[0].id, ok: true, result: { code: "code", personHash: "hash" } });
-    await expect(call).resolves.toEqual({ code: "code", personHash: "hash" });
+    worker.emit("message", { id: worker.messages[0].id, ok: true, result: { ok: true } });
+    await expect(call).resolves.toEqual({ ok: true });
     expect(worker.terminate).toHaveBeenCalledOnce();
   });
 

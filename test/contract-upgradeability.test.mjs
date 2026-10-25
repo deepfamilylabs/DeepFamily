@@ -6,14 +6,14 @@ import { deployIntegratedFixture } from "./fixtures/integrated.mjs";
 describe("UUPS upgradeability", function () {
   this.timeout(60_000);
 
-  const deployV2Impl = async (poseidonT5, adultAgeGate) => {
-    const V2 = await hre.ethers.getContractFactory("DeepFamilyV2Mock", {
+  const deployUpgradeImplementation = async (poseidonT5, adultAgeGate) => {
+    const Upgrade = await hre.ethers.getContractFactory("DeepFamilyUpgradeMock", {
       libraries: {
         PoseidonT5: await poseidonT5.getAddress(),
         AdultAgeGate: await adultAgeGate.getAddress(),
       },
     });
-    const impl = await V2.deploy();
+    const impl = await Upgrade.deploy();
     await impl.waitForDeployment();
     return impl;
   };
@@ -34,30 +34,30 @@ describe("UUPS upgradeability", function () {
     const ownerBefore = await deepFamily.owner();
     const nameBefore = await deepFamily.name();
 
-    const v2Impl = await deployV2Impl(poseidonT5, adultAgeGate);
-    await (await deepFamily.upgradeToAndCall(await v2Impl.getAddress(), "0x")).wait();
+    const upgradeImplementation = await deployUpgradeImplementation(poseidonT5, adultAgeGate);
+    await (await deepFamily.upgradeToAndCall(await upgradeImplementation.getAddress(), "0x")).wait();
 
-    const v2 = await hre.ethers.getContractAt("DeepFamilyV2Mock", proxyAddress);
+    const upgraded = await hre.ethers.getContractAt("DeepFamilyUpgradeMock", proxyAddress);
 
     // Pre-existing storage is preserved across the upgrade.
-    expect(await v2.protocolEndorsementFeeBps()).to.equal(feeBefore);
-    expect(await v2.owner()).to.equal(ownerBefore);
-    expect(await v2.name()).to.equal(nameBefore);
+    expect(await upgraded.protocolEndorsementFeeBps()).to.equal(feeBefore);
+    expect(await upgraded.owner()).to.equal(ownerBefore);
+    expect(await upgraded.name()).to.equal(nameBefore);
 
     // New behavior + new storage works.
-    expect(await v2.version()).to.equal("V2");
-    await (await v2.setNewValue(42)).wait();
-    expect(await v2.newValue()).to.equal(42n);
+    expect(await upgraded.version()).to.equal("upgraded");
+    await (await upgraded.setNewValue(42)).wait();
+    expect(await upgraded.newValue()).to.equal(42n);
   });
 
   it("rejects upgrades from a non-owner", async () => {
     const { deepFamily, poseidonT5, adultAgeGate } =
       await hre.networkHelpers.loadFixture(deployIntegratedFixture);
     const [, other] = await hre.ethers.getSigners();
-    const v2Impl = await deployV2Impl(poseidonT5, adultAgeGate);
+    const upgradeImplementation = await deployUpgradeImplementation(poseidonT5, adultAgeGate);
 
     await expect(
-      deepFamily.connect(other).upgradeToAndCall(await v2Impl.getAddress(), "0x"),
+      deepFamily.connect(other).upgradeToAndCall(await upgradeImplementation.getAddress(), "0x"),
     ).to.be.revertedWithCustomError(deepFamily, "OwnableUnauthorizedAccount");
   });
 
@@ -74,7 +74,7 @@ describe("UUPS upgradeability", function () {
     const { poseidonT5, adultAgeGate, token } =
       await hre.networkHelpers.loadFixture(deployIntegratedFixture);
     const [owner] = await hre.ethers.getSigners();
-    const impl = await deployV2Impl(poseidonT5, adultAgeGate);
+    const impl = await deployUpgradeImplementation(poseidonT5, adultAgeGate);
 
     await expect(
       impl.initialize(await token.getAddress(), await owner.getAddress()),
@@ -99,16 +99,16 @@ describe("UUPS upgradeability", function () {
     await (await deepFamily.transferOwnership(timelockAddress)).wait();
     expect(await deepFamily.owner()).to.equal(timelockAddress);
 
-    const v2Impl = await deployV2Impl(poseidonT5, adultAgeGate);
-    const v2ImplAddress = await v2Impl.getAddress();
+    const upgradeImplementation = await deployUpgradeImplementation(poseidonT5, adultAgeGate);
+    const upgradeImplementationAddress = await upgradeImplementation.getAddress();
 
     // The ex-owner can no longer upgrade directly.
     await expect(
-      deepFamily.connect(deployer).upgradeToAndCall(v2ImplAddress, "0x"),
+      deepFamily.connect(deployer).upgradeToAndCall(upgradeImplementationAddress, "0x"),
     ).to.be.revertedWithCustomError(deepFamily, "OwnableUnauthorizedAccount");
 
-    const data = deepFamily.interface.encodeFunctionData("upgradeToAndCall", [v2ImplAddress, "0x"]);
-    const salt = hre.ethers.id("upgrade-main-v2");
+    const data = deepFamily.interface.encodeFunctionData("upgradeToAndCall", [upgradeImplementationAddress, "0x"]);
+    const salt = hre.ethers.id("upgrade-main");
 
     // Schedule the upgrade through the timelock.
     await (
@@ -128,12 +128,12 @@ describe("UUPS upgradeability", function () {
       await timelock.connect(roleHolder).execute(proxyAddress, 0, data, hre.ethers.ZeroHash, salt)
     ).wait();
 
-    const v2 = await hre.ethers.getContractAt("DeepFamilyV2Mock", proxyAddress);
+    const upgraded = await hre.ethers.getContractAt("DeepFamilyUpgradeMock", proxyAddress);
     // New behavior + storage works, owner is still the timelock, and prior storage survives.
-    expect(await v2.version()).to.equal("V2");
-    await (await v2.setNewValue(7)).wait();
-    expect(await v2.newValue()).to.equal(7n);
-    expect(await v2.owner()).to.equal(timelockAddress);
-    expect(await v2.name()).to.equal("DeepFamily");
+    expect(await upgraded.version()).to.equal("upgraded");
+    await (await upgraded.setNewValue(7)).wait();
+    expect(await upgraded.newValue()).to.equal(7n);
+    expect(await upgraded.owner()).to.equal(timelockAddress);
+    expect(await upgraded.name()).to.equal("DeepFamily");
   });
 });

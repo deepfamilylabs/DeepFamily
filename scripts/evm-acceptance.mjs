@@ -1,3 +1,4 @@
+import { receivingVerificationEntries } from "./lib/receivingVerificationEntries.mjs";
 import { fileURLToPath } from "node:url";
 import {
   appendDfsStoryRecord,
@@ -79,7 +80,7 @@ import {
   protocolRuntimeBytecodeSha256,
   GROTH16_ADAPTER_IMMUTABLE_FIELDS,
 } from "./lib/protocolReleaseManifest.mjs";
-import { verifyAllProductionCeremonies } from "./zk-ceremony-verify.mjs";
+import { verifyProductionCeremony } from "./zk-ceremony-verify.mjs";
 import { assertReleaseCheckBoundary } from "./lib/releaseCheckBoundary.mjs";
 import {
   TESTNET_RELEASE_EVIDENCE_TYPE,
@@ -87,7 +88,7 @@ import {
   validateTestnetReleaseEvidence,
 } from "./lib/testnetReleaseEvidence.mjs";
 import { publishTestnetReleaseEvidence } from "./lib/releaseEvidencePublisher.mjs";
-import { loadCandidateArtifacts } from "./lib/shieldedArtifacts.mjs";
+import { inspectProtocolProductionArtifacts } from "./lib/protocolProductionArtifacts.mjs";
 import {
   INTEGRATED_DEPLOYMENT_RECORDS,
   SHIELDED_DEPLOYMENT_CIRCUITS,
@@ -101,7 +102,7 @@ import {
   shieldedDeploymentEvidence,
 } from "./lib/shieldedDeploymentEvidence.mjs";
 import { verifyShieldedReceipts } from "./lib/shieldedReceipts.mjs";
-import { runShieldedAcceptanceSmoke } from "./lib/shieldedAcceptanceSmoke.mjs";
+
 
 const { addPersonVersion, mintPersonVersionNFT } = seedHelpers;
 
@@ -940,7 +941,7 @@ export const main = async (chainProfile) => {
       environment: process.env,
       root: process.cwd(),
     });
-    ceremonyVerification = await verifyAllProductionCeremonies({
+    ceremonyVerification = await verifyProductionCeremony({
       root: process.cwd(),
       ptauPath: resolveProductionPtauPath(),
     });
@@ -1090,7 +1091,7 @@ export const main = async (chainProfile) => {
     requireProduction: config.acceptanceMode === "release-rehearsal",
     requireBuiltR1cs: true,
   });
-  const shieldedCandidate = loadCandidateArtifacts({ root: process.cwd() });
+  const shieldedCandidate = inspectProtocolProductionArtifacts({ root: process.cwd() });
   if (
     config.acceptanceMode === "release-rehearsal" &&
     shieldedCandidate.manifest.productionReady !== true
@@ -1882,7 +1883,6 @@ export const main = async (chainProfile) => {
       const governedVerifierCandidate = await deploy("Groth16VerifierAdapter", runDeployer, [
         addresses.personCommitmentVerifier,
         addresses.disclosureBindingVerifier,
-        Object.values(SHIELDED_DEPLOYMENT_CIRCUITS).map((spec) => addresses[spec.verifierLabel]),
       ]);
       addresses.governedVerifierCandidate = await governedVerifierCandidate.getAddress();
       assertCondition(
@@ -1930,7 +1930,6 @@ export const main = async (chainProfile) => {
         [
           addresses.personCommitmentVerifier,
           addresses.disclosureBindingVerifier,
-          Object.values(SHIELDED_DEPLOYMENT_CIRCUITS).map((spec) => addresses[spec.verifierLabel]),
         ],
       ),
       await verificationEntry(hre.artifacts, "DeepFamily", addresses.deepFamilyImplementation, [], {
@@ -1968,69 +1967,7 @@ export const main = async (chainProfile) => {
         },
       ),
     );
-    for (const [action, spec] of Object.entries(SHIELDED_DEPLOYMENT_CIRCUITS)) {
-      initialVerificationEntries.push(
-        await verificationEntry(
-          hre.artifacts,
-          spec.verifierContractName,
-          addresses[spec.verifierLabel],
-        ),
-      );
-    }
-    for (const { contractName, property } of RECEIVE_DEPLOYMENT_CONTRACTS) {
-      initialVerificationEntries.push(
-        await verificationEntry(
-          hre.artifacts,
-          contractName,
-          addresses[property],
-          receiveDeploymentConstructorArgs(property, addresses),
-            receiveDeploymentLibraries(property, addresses),
-        ),
-      );
-    }
-    initialVerificationEntries.push(
-      await verificationEntry(
-        hre.artifacts,
-        "ShieldedErc20Pool",
-        addresses.shieldedErc20Pool,
-        [
-          addresses.token,
-          addresses.deepFamilyLineageIndex,
-          addresses.groth16VerifierAdapter,
-          addresses.identityAuthorizationState,
-          addresses.receivePresentationVerifierRouter,
-        ],
-        { PoseidonT3: addresses.poseidonT3 },
-      ),
-    );
-    initialVerificationEntries.push(
-      await verificationEntry(
-        hre.artifacts,
-        "ShieldedNativePool",
-        addresses.shieldedNativePool,
-        [
-          addresses.deepFamilyLineageIndex,
-          addresses.groth16VerifierAdapter,
-          addresses.identityAuthorizationState,
-          addresses.receivePresentationVerifierRouter,
-        ],
-        { PoseidonT3: addresses.poseidonT3 },
-      ),
-      await verificationEntry(
-        hre.artifacts,
-        "ShieldedPoolFactory",
-        addresses.shieldedPoolFactory,
-        [
-          addresses.token,
-          addresses.deepFamilyLineageIndex,
-          addresses.groth16VerifierAdapter,
-          addresses.shieldedNativePool,
-          addresses.identityAuthorizationState,
-          addresses.receivePresentationVerifierRouter,
-        ],
-        { PoseidonT3: addresses.poseidonT3 },
-      ),
-    );
+    initialVerificationEntries.push(...await receivingVerificationEntries(hre.artifacts,addresses,verificationEntry));
     if (config.runGovernanceLifecycle) {
       initialVerificationEntries.push({
         ...(await verificationEntry(
@@ -2040,9 +1977,6 @@ export const main = async (chainProfile) => {
           [
             addresses.personCommitmentVerifier,
             addresses.disclosureBindingVerifier,
-            Object.values(SHIELDED_DEPLOYMENT_CIRCUITS).map(
-              (spec) => addresses[spec.verifierLabel],
-            ),
           ],
         )),
         label: "GovernedVerifierCandidate",
@@ -2580,26 +2514,8 @@ export const main = async (chainProfile) => {
         expectedSelectors: [STORY_ALREADY_SEALED_SELECTOR],
       },
     );
-    currentStep = "real-zk-shielded-business";
-    report.shielded = await runShieldedAcceptanceSmoke({
-      root: process.cwd(),
-      connection,
-      deployed,
-      signer: runDeployer,
-      person,
-      father,
-      mother,
-      personResult: addResult,
-      recordTx,
-      proofArtifacts: personProofArtifactPaths,
-    });
-    report.shielded.receipts = await verifyShieldedReceipts({
-      provider,
-      expectedChainId: EXPECTED_CHAIN_ID,
-      poolAddress: addresses.shieldedErc20Pool,
-      fundTxHash: report.transactions["shielded-action-fund"].hash,
-    });
-    await addStep("real-zk-shielded-business", report.shielded);
+    // Full protocol acceptance remains closed until current proof keys have a production ceremony.
+    inspectProtocolProductionArtifacts({ root: process.cwd() });
 
     await recordTx(
       "cancel-endorsement",
@@ -2674,20 +2590,20 @@ export const main = async (chainProfile) => {
       await addStep("delayed-deep-treasury-transfer", report.treasury);
 
       currentStep = "upgrade-candidate";
-      await assertImplementationStorageSafe(hre, "DeepFamily", "DeepFamilyV2Mock");
-      const v2 = await deploy("DeepFamilyV2Mock", runDeployer, [], {
+      await assertImplementationStorageSafe(hre, "DeepFamily", "DeepFamilyUpgradeMock");
+      const upgradedImplementation = await deploy("DeepFamilyUpgradeMock", runDeployer, [], {
         libraries: {
           PoseidonT5: addresses.poseidonT5,
           AdultAgeGate: addresses.adultAgeGate,
         },
       });
-      const v2Address = await v2.getAddress();
+      const upgradeAddress = await upgradedImplementation.getAddress();
       await assertImplementationMatchesArtifact({
         connection,
         ethers,
         hre,
-        contractName: "DeepFamilyV2Mock",
-        implementation: v2Address,
+        contractName: "DeepFamilyUpgradeMock",
+        implementation: upgradeAddress,
         spec: {
           needsLibraries: true,
           libraryAddresses: {
@@ -2696,11 +2612,11 @@ export const main = async (chainProfile) => {
           },
         },
       });
-      report.addresses.deepFamilyV2 = v2Address;
+      report.addresses.deepFamilyUpgraded = upgradeAddress;
       await saveReport();
 
       const candidateVerificationEntries = [
-        await verificationEntry(hre.artifacts, "DeepFamilyV2Mock", v2Address, [], {
+        await verificationEntry(hre.artifacts, "DeepFamilyUpgradeMock", upgradeAddress, [], {
           PoseidonT5: addresses.poseidonT5,
           AdultAgeGate: addresses.adultAgeGate,
         }),
@@ -2723,7 +2639,7 @@ export const main = async (chainProfile) => {
 
       currentStep = "timelocked-upgrade";
       await expectRevert(
-        () => deepFamily.connect(runDeployer).upgradeToAndCall.staticCall(v2Address, "0x"),
+        () => deepFamily.connect(runDeployer).upgradeToAndCall.staticCall(upgradeAddress, "0x"),
         "Direct deployer UUPS upgrade",
         {
           expectedErrorNames: ["OwnableUnauthorizedAccount"],
@@ -2738,10 +2654,10 @@ export const main = async (chainProfile) => {
       const upgradeOperation = await scheduleOperation({
         label: "uups-upgrade",
         target: addresses.deepFamily,
-        data: deepFamily.interface.encodeFunctionData("upgradeToAndCall", [v2Address, "0x"]),
+        data: deepFamily.interface.encodeFunctionData("upgradeToAndCall", [upgradeAddress, "0x"]),
         salt: deriveUpgradeSalt(ethers, {
           target: addresses.deepFamily,
-          implementation: v2Address,
+          implementation: upgradeAddress,
           initData: "0x",
         }),
         signers: [ownerA, ownerB],
@@ -2754,51 +2670,51 @@ export const main = async (chainProfile) => {
         addresses.deepFamily,
       );
       assertCondition(
-        implementationAfter === ethers.getAddress(v2Address),
+        implementationAfter === ethers.getAddress(upgradeAddress),
         "ERC-1967 implementation slot was not updated",
       );
-      const deepFamilyV2 = await ethers.getContractAt(
-        "DeepFamilyV2Mock",
+      const deepFamilyUpgraded = await ethers.getContractAt(
+        "DeepFamilyUpgradeMock",
         addresses.deepFamily,
         runDeployer,
       );
-      assertCondition((await deepFamilyV2.version()) === "V2", "Upgraded proxy does not expose V2");
+      assertCondition((await deepFamilyUpgraded.version()) === "upgraded", "Upgraded proxy does not expose upgraded");
       assertCondition(
-        (await deepFamilyV2.owner()) === timelockAddress,
+        (await deepFamilyUpgraded.owner()) === timelockAddress,
         "Upgrade changed DeepFamily owner",
       );
       assertCondition(
-        (await deepFamilyV2.personVersionsCount(personHash)) === 1n &&
-          (await deepFamilyV2.versionToTokenId(personHash, 1)) === tokenId,
+        (await deepFamilyUpgraded.personVersionsCount(personHash)) === 1n &&
+          (await deepFamilyUpgraded.versionToTokenId(personHash, 1)) === tokenId,
         "Upgrade did not preserve person/NFT state",
       );
       assertCondition(
-        (await deepFamilyV2.DEEP_FAMILY_TOKEN_CONTRACT()) === addresses.token &&
+        (await deepFamilyUpgraded.DEEP_FAMILY_TOKEN_CONTRACT()) === addresses.token &&
           (await token.deepFamilyContract()) === addresses.deepFamily &&
           (await token.owner()) === ethers.ZeroAddress,
         "Upgrade changed Token wiring",
       );
       assertCondition(
-        (await deepFamilyV2.verifierRegistry(
+        (await deepFamilyUpgraded.verifierRegistry(
           PERSON_RELATION_PURPOSE,
           RELEASE_PERSON_RELATION_CIRCUIT_ID,
         )) === addresses.groth16VerifierAdapter &&
-          (await deepFamilyV2.verifierRegistry(
+          (await deepFamilyUpgraded.verifierRegistry(
             DISCLOSURE_BINDING_PURPOSE,
             RELEASE_DISCLOSURE_BINDING_CIRCUIT_ID,
           )) === addresses.groth16VerifierAdapter &&
-          (await deepFamilyV2.verifierRegistry(
+          (await deepFamilyUpgraded.verifierRegistry(
             PERSON_RELATION_PURPOSE,
             GOVERNED_PERSON_RELATION_CIRCUIT_ID,
           )) === addresses.governedVerifierCandidate,
         "Upgrade changed verifier routes",
       );
       assertCondition(
-        (await deepFamilyV2.protocolEndorsementFeeBps()) === activeProtocolFee,
+        (await deepFamilyUpgraded.protocolEndorsementFeeBps()) === activeProtocolFee,
         "Upgrade changed the governed endorsement fee",
       );
       assertCondition(
-        (await deepFamilyV2.endorsedVersionIndex(personHash, runDeployer.address)) === 0n,
+        (await deepFamilyUpgraded.endorsedVersionIndex(personHash, runDeployer.address)) === 0n,
         "Upgrade changed the cancelled endorsement state",
       );
       const storyStateAfterUpgrade = await deepFamilyReader.getStoryState(tokenId);
@@ -2808,10 +2724,10 @@ export const main = async (chainProfile) => {
           storyStateAfterUpgrade.recordsHead === storyState.recordsHead,
         "Upgrade changed the sealed story state",
       );
-      await recordTx("v2-set-new-value", await deepFamilyV2.setNewValue(42));
+      await recordTx("upgrade-set-new-value", await deepFamilyUpgraded.setNewValue(42));
       assertCondition(
-        (await deepFamilyV2.newValue()) === 42n,
-        "V2 appended storage is not writable",
+        (await deepFamilyUpgraded.newValue()) === 42n,
+        "Upgraded appended storage is not writable",
       );
       report.upgrade = {
         storageLayoutSafe: true,
@@ -2819,7 +2735,7 @@ export const main = async (chainProfile) => {
         operationId: upgradeOperation.operationId,
         implementationBefore,
         implementationAfter,
-        version: "V2",
+        version: "upgraded",
         ownerPreserved: true,
         businessStatePreserved: true,
         keyWiringPreserved: true,
@@ -3028,14 +2944,14 @@ export const main = async (chainProfile) => {
           ethers,
           oldTimelock: timelock,
           oldTimelockAddress: timelockAddress,
-          deepFamily: deepFamilyV2,
+          deepFamily: deepFamilyUpgraded,
           deepFamilyAddress: addresses.deepFamily,
           tokenAddress: addresses.token,
           newTimelockAddress: replacementTimelockAddress,
         }),
       );
       const postMigrationFee = activeProtocolFee === 504n ? 505n : activeProtocolFee + 1n;
-      const postMigrationFeeData = deepFamilyV2.interface.encodeFunctionData(
+      const postMigrationFeeData = deepFamilyUpgraded.interface.encodeFunctionData(
         "updateEndorsementFee",
         [postMigrationFee],
       );
@@ -3230,7 +3146,7 @@ export const main = async (chainProfile) => {
       );
       await recordTx(
         "migration-window-endorsement",
-        await deepFamilyV2.connect(runDeployer).endorseVersion(personHash, 1),
+        await deepFamilyUpgraded.connect(runDeployer).endorseVersion(personHash, 1),
       );
       const oldTreasuryBeforeOwnerMigration = await token.balanceOf(timelockAddress);
       assertCondition(
@@ -3239,7 +3155,7 @@ export const main = async (chainProfile) => {
       );
       await recordTx(
         "migration-window-cancel-endorsement",
-        await deepFamilyV2.connect(runDeployer).cancelEndorsement(personHash),
+        await deepFamilyUpgraded.connect(runDeployer).cancelEndorsement(personHash),
       );
 
       await Promise.all([
@@ -3268,7 +3184,7 @@ export const main = async (chainProfile) => {
         replacementTimelockAddress,
       );
       assertCondition(
-        (await deepFamilyV2.owner()) === replacementTimelockAddress,
+        (await deepFamilyUpgraded.owner()) === replacementTimelockAddress,
         "DeepFamily ownership did not migrate to the replacement Timelock",
       );
       assertCondition(oldTreasuryAfterOwnerMigration === 0n, "Retired Timelock still holds DEEP");
@@ -3359,7 +3275,7 @@ export const main = async (chainProfile) => {
         safeContext: replacementSafeContext,
       });
       assertCondition(
-        (await deepFamilyV2.protocolEndorsementFeeBps()) === postMigrationFee,
+        (await deepFamilyUpgraded.protocolEndorsementFeeBps()) === postMigrationFee,
         "Replacement Safe and Timelock could not execute post-migration governance",
       );
 
@@ -3395,13 +3311,13 @@ export const main = async (chainProfile) => {
       report.productionParity.sharedGovernanceOperationBuildersMatched = true;
       await addStep("safe-delay-timelock-and-treasury-migrations", report.governanceLifecycle);
       governanceLifecycleTerminalContext = {
-        deepFamilyV2,
+        deepFamilyUpgraded,
         postMigrationFee,
         replacementSafeAddress,
         replacementTimelock,
         replacementTimelockAddress,
         updatedRetiredTimelockDelay,
-        v2Address,
+        upgradeAddress,
       };
     }
 
@@ -3505,13 +3421,13 @@ export const main = async (chainProfile) => {
         "Diagnostic governance lifecycle terminal context is unavailable",
       );
       const {
-        deepFamilyV2,
+        deepFamilyUpgraded,
         postMigrationFee,
         replacementSafeAddress,
         replacementTimelock,
         replacementTimelockAddress,
         updatedRetiredTimelockDelay,
-        v2Address,
+        upgradeAddress,
       } = governanceLifecycleTerminalContext;
       const terminalPrimarySafeProfile = await terminalRead("terminal primary Safe profile", () =>
         assertCanonicalSafeProfile({
@@ -3553,38 +3469,38 @@ export const main = async (chainProfile) => {
         () => replacementTimelock.getMinDelay(),
       );
       const terminalDeepFamilyOwner = await terminalRead("terminal DeepFamily owner", () =>
-        deepFamilyV2.owner(),
+        deepFamilyUpgraded.owner(),
       );
       const terminalDeepFamilyImplementation = await terminalRead(
         "terminal DeepFamily implementation",
         () => implementationAddress(ethers, provider, addresses.deepFamily),
       );
       const terminalPersonVerifier = await terminalRead("terminal person verifier", () =>
-        deepFamilyV2.verifierRegistry(PERSON_RELATION_PURPOSE, RELEASE_PERSON_RELATION_CIRCUIT_ID),
+        deepFamilyUpgraded.verifierRegistry(PERSON_RELATION_PURPOSE, RELEASE_PERSON_RELATION_CIRCUIT_ID),
       );
       const terminalGovernedPersonVerifier = await terminalRead(
         "terminal governed person verifier",
         () =>
-          deepFamilyV2.verifierRegistry(
+          deepFamilyUpgraded.verifierRegistry(
             PERSON_RELATION_PURPOSE,
             GOVERNED_PERSON_RELATION_CIRCUIT_ID,
           ),
       );
       const terminalDisclosureVerifier = await terminalRead("terminal disclosure verifier", () =>
-        deepFamilyV2.verifierRegistry(
+        deepFamilyUpgraded.verifierRegistry(
           DISCLOSURE_BINDING_PURPOSE,
           RELEASE_DISCLOSURE_BINDING_CIRCUIT_ID,
         ),
       );
       const terminalProtocolFee = await terminalRead("terminal protocol fee", () =>
-        deepFamilyV2.protocolEndorsementFeeBps(),
+        deepFamilyUpgraded.protocolEndorsementFeeBps(),
       );
       const terminalTokenOwner = await terminalRead("terminal token owner", () => token.owner());
       const terminalTokenBinding = await terminalRead("terminal token binding", () =>
         token.deepFamilyContract(),
       );
       const terminalDeepFamilyToken = await terminalRead("terminal protocol token binding", () =>
-        deepFamilyV2.DEEP_FAMILY_TOKEN_CONTRACT(),
+        deepFamilyUpgraded.DEEP_FAMILY_TOKEN_CONTRACT(),
       );
       const terminalRetiredTreasuryBalance = await terminalRead(
         "terminal retired treasury balance",
@@ -3612,7 +3528,7 @@ export const main = async (chainProfile) => {
         "DeepFamily terminal owner is not replacement Timelock",
       );
       assertCondition(
-        ethers.getAddress(terminalDeepFamilyImplementation) === v2Address,
+        ethers.getAddress(terminalDeepFamilyImplementation) === upgradeAddress,
         "DeepFamily terminal implementation is not the verified V2 candidate",
       );
       assertCondition(

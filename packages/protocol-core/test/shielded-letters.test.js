@@ -4,8 +4,6 @@ import { getBytes, keccak256 } from "ethers";
 import { poseidon3 } from "poseidon-lite";
 import { SNARK_SCALAR_FIELD } from "../constants.js";
 import { predictArchiveSegmentCount } from "../archive.js";
-import { deriveShieldedHeirKeyMaterial } from "../shielded-inheritance.js";
-import { deriveShieldedIndependentKeyMaterial } from "../shielded-independent-key.js";
 import { deriveShieldedViewPublicKey } from "../shielded-hpke.js";
 import {
   SHIELDED_LETTER_ENVELOPE_VERSION,
@@ -22,14 +20,14 @@ import {
   normalizeShieldedLetterScope,
   splitShieldedLetterCiphertextHash,
 } from "../shielded-letters.js";
-import { independentKeyVector } from "./shielded-independent-key.fixture.js";
 
 const LETTERS = "0x0000000000000000000000000000000000000001";
+const testKey = value => ({hpkeIkm: new Uint8Array(32).fill(Number(value))});
 const POOL = "0x0000000000000000000000000000000000000002";
 const OTHER_LETTERS = "0x0000000000000000000000000000000000000003";
 const context = { chainId: 1030n, lettersAddress: LETTERS, messageId: 44n };
 const attachment = { chainId: 1030n, poolAddress: POOL, budgetCommitment: 987n };
-const key = deriveShieldedHeirKeyMaterial(13n);
+const key = testKey(13n);
 const publicKey = await deriveShieldedViewPublicKey(key.hpkeIkm);
 const isCode = (code) => (error) => error.code === code;
 
@@ -156,14 +154,10 @@ test("letter ciphertexts cross Archive segment and uint16 payload boundaries", a
   }
 });
 
-test("actual HPKE recovery reuses both existing key modes without new secrets", async () => {
-  const independent = await deriveShieldedIndependentKeyMaterial({
-    independentKeyRoot: independentKeyVector.independentKeyRoot,
-    independentKeyIdentitySecret: independentKeyVector.independentKeyIdentitySecret,
-  });
-  for (const material of [key, independent]) {
+test("actual HPKE recovery restores distinct recipient keys", async () => {
+  for (const material of [key, testKey(14n)]) {
     const receivingKey = await deriveShieldedViewPublicKey(material.hpkeIkm);
-    const envelope = createShieldedLetterEnvelope({ body: "旧信仍可恢复", salt: 77n });
+    const envelope = createShieldedLetterEnvelope({ body: "家书可恢复", salt: 77n });
     const ciphertext = await encrypt(envelope, { recipientPublicKey: receivingKey });
     // Restore the same IKM on a fresh context; no code, counter, expiration,
     // sender material or extra recovery token is accepted by this API.
@@ -202,7 +196,7 @@ test("wrong key, chain, contract, message id and altered bytes fail closed", asy
   const badEnc = ciphertext.slice();
   badEnc[10] ^= 1;
   for (const input of [
-    { hpkeIkm: deriveShieldedHeirKeyMaterial(14n).hpkeIkm },
+    { hpkeIkm: testKey(14n).hpkeIkm },
     { chainId: 1031n },
     { lettersAddress: OTHER_LETTERS },
     { messageId: 45n },

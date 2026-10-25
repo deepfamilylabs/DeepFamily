@@ -8,6 +8,9 @@ import {
   deployIntegratedSystem,
   ensureIntegratedSystem,
 } from "../hardhat/integratedDeployment.mjs";
+import { inspectSnarkjsRuntime } from "../scripts/lib/snarkjsToolchain.mjs";
+import { PROTOCOL_DEVELOPMENT_MANIFEST } from "../scripts/protocol-zk-development.mjs";
+import { BOUNDARY_DEVELOPMENT_MANIFEST } from "../scripts/lib/canonicalBoundaryArtifacts.mjs";
 import {
   assertImplementationStorageSafe,
   assertImplementationMatchesArtifact,
@@ -20,6 +23,46 @@ import {
   explorerApiKeyForNetwork,
   selectedHardhatNetwork,
 } from "../tasks/lib/explorerVerification.mjs";
+
+async function copyProtocolInputs(root, directory) {
+  // These tests write and retire complete deployment workspaces. Copy all
+  // hash-checked protocol inputs instead of aliasing the caller's artifact tree.
+  const manifest = JSON.parse(await fs.readFile(path.join(root, PROTOCOL_DEVELOPMENT_MANIFEST), "utf8"));
+  const boundaries = JSON.parse(await fs.readFile(path.join(root, BOUNDARY_DEVELOPMENT_MANIFEST), "utf8"));
+  const files = new Set([PROTOCOL_DEVELOPMENT_MANIFEST, BOUNDARY_DEVELOPMENT_MANIFEST, manifest.compiler.path]);
+  for (const entry of Object.values(manifest.circuits)) {
+    files.add(`zk-artifacts/protocol/${entry.source}_js/${entry.source}.wasm`);
+    for (const file of [...Object.keys(entry.sources), ...Object.keys(entry.compiled), ...Object.keys(entry.setup.artifacts)]) {
+      if (!file.startsWith("node_modules/")) files.add(file);
+    }
+  }
+  for (const action of ["shield", "unshield", "unshield4"]) {
+    const entry = boundaries.circuits[action];
+    files.add(`circuits/${entry.source}.circom`);
+    files.add(`zk-artifacts/shielded/${entry.source}.r1cs`);
+    files.add(entry.verifierPath);
+    for (const suffix of [".wasm", "_final.zkey", ".vkey.json"]) files.add(`frontend/public/zk/shielded/${entry.source}${suffix}`);
+  }
+  for (const file of files) {
+    const target = path.join(directory, file);
+    await fs.mkdir(path.dirname(target), { recursive: true });
+    await fs.copyFile(path.join(root, file), target);
+  }
+  await fs.mkdir(path.join(directory,"node_modules"));
+  for (const instance of inspectSnarkjsRuntime({root}).instances) {
+    await fs.cp(instance.sourcePath, path.join(directory,"node_modules",instance.relativePath), {recursive:true});
+  }
+  const includePackages = new Set(Object.values(manifest.circuits).flatMap(entry => Object.keys(entry.sources)).filter(file => file.startsWith("node_modules/")).map(file => {
+    const parts = file.split("/");
+    return parts.slice(1,parts[1].startsWith("@") ? 3 : 2).join("/");
+  }));
+  for (const name of includePackages) {
+    const destination=path.join(directory,"node_modules",name);
+    try { await fs.lstat(destination); continue; } catch {}
+    await fs.mkdir(path.dirname(destination),{recursive:true});
+    await fs.symlink(path.join(root,"node_modules",name),destination,"dir");
+  }
+}
 
 // Covers the upgrade-tooling layer that the contract-level UUPS tests
 // (test/contract-upgradeability.test.mjs) do not reach: the storage / bytecode safety gates
@@ -65,8 +108,8 @@ describe("Upgrade tooling & governance deploy path", function () {
         },
       });
 
-      expect(Object.keys(deployed.transactionReceipts)).to.have.length(37);
-      expect(observed.size).to.equal(37);
+      expect(Object.keys(deployed.transactionReceipts)).to.have.length(45);
+      expect(observed.size).to.equal(45);
       for (const [label, receipt] of Object.entries(deployed.transactionReceipts)) {
         expect(observed.get(label)).to.equal(receipt.hash);
       }
@@ -84,7 +127,7 @@ describe("Upgrade tooling & governance deploy path", function () {
           deploymentDirectory,
         });
         const files = (await fs.readdir(deploymentDirectory)).sort();
-        expect(files).to.have.length(32);
+        expect(files).to.have.length(39);
         expect(files).to.include.members([
           "DeepFamilyArchive.json",
           "DeepFamilyReader.json",
@@ -95,11 +138,9 @@ describe("Upgrade tooling & governance deploy path", function () {
           "ShieldedErc20Pool.json",
           "ShieldedNativePool.json",
           "ShieldedPoolFactory.json",
-          "ShieldedFundVerifier.json",
-          "ShieldedClaim64Verifier.json",
-          "ShieldedClaim32Verifier.json",
-          "ShieldedPrivateTransferVerifier.json",
-          "ShieldedPrivateTransfer4Verifier.json",
+          "EligibilitySource.json", "ReceiveRegistry.json", "LetterArchive.json",
+          "BudgetDepositVerifier.json", "BudgetClaimVerifier.json", "ValueTransferVerifier.json",
+          "ShieldedBoundaryVerifierAdapter.json",
           "ShieldedUnshieldVerifier.json",
           "ShieldedUnshield4Verifier.json",
           "Groth16VerifierAdapter.json",
@@ -157,13 +198,13 @@ describe("Upgrade tooling & governance deploy path", function () {
       expect(
         buildImplementationVerificationCommand({
           networkName: "confluxTestnet",
-          sourceName: "contracts/DeepFamilyV2.sol",
-          contractName: "DeepFamilyV2",
+          sourceName: "contracts/DeepFamilyUpgrade.sol",
+          contractName: "DeepFamilyUpgrade",
           implementation,
         }),
       ).to.equal(
         "npx hardhat --config hardhat.config.mjs --build-profile production verify " +
-          "--network confluxTestnet --contract contracts/DeepFamilyV2.sol:DeepFamilyV2 " +
+          "--network confluxTestnet --contract contracts/DeepFamilyUpgrade.sol:DeepFamilyUpgrade " +
           implementation,
       );
     });
@@ -171,8 +212,8 @@ describe("Upgrade tooling & governance deploy path", function () {
     it("stops a freshly deployed candidate before scheduling and explains the two-step flow", function () {
       const guidance = candidateVerificationGuidance({
         networkName: "conflux",
-        sourceName: "contracts/DeepFamilyV2.sol",
-        contractName: "DeepFamilyV2",
+        sourceName: "contracts/DeepFamilyUpgrade.sol",
+        contractName: "DeepFamilyUpgrade",
         implementation,
         freshlyDeployed: true,
       });
@@ -189,8 +230,8 @@ describe("Upgrade tooling & governance deploy path", function () {
     it("requires a real Etherscan key and verification before multisig submission", function () {
       const guidance = candidateVerificationGuidance({
         networkName: "sepolia",
-        sourceName: "contracts/DeepFamilyV2.sol",
-        contractName: "DeepFamilyV2",
+        sourceName: "contracts/DeepFamilyUpgrade.sol",
+        contractName: "DeepFamilyUpgrade",
         implementation,
         freshlyDeployed: false,
       });
@@ -206,8 +247,8 @@ describe("Upgrade tooling & governance deploy path", function () {
 
   describe("storage-layout safety gate (assertImplementationStorageSafe)", function () {
     it("accepts a storage-safe append-only implementation", async () => {
-      // Must not throw: V2Mock appends after the existing variables (committed baseline).
-      await assertImplementationStorageSafe(hre, "DeepFamily", "DeepFamilyV2Mock");
+      // Must not throw: UpgradeMock appends after the existing variables (committed baseline).
+      await assertImplementationStorageSafe(hre, "DeepFamily", "DeepFamilyUpgradeMock");
     });
 
     it("rejects a storage-incompatible implementation", async () => {
@@ -380,7 +421,7 @@ describe("Upgrade tooling & governance deploy path", function () {
     });
   });
 
-  describe("GOVERNANCE_TIMELOCK_ADDRESS deploy handover (live-network path)", function () {
+  describe("governance owner validation and local handover", function () {
     const TIMELOCK_ENV = "GOVERNANCE_TIMELOCK_ADDRESS";
     const SAFE_ENV = "GOVERNANCE_SAFE_ADDRESS";
     let originalTimelock;
@@ -406,7 +447,7 @@ describe("Upgrade tooling & governance deploy path", function () {
       networkConfig: { type: "http", chainId: 11155111 },
     });
 
-    it("hands the main proxy to governance and retires the token bootstrap owner", async () => {
+    it("keeps local proxy ownership with the deployer and retires the token bootstrap owner", async () => {
       const [deployer, member1, member2] = await hre.ethers.getSigners();
       const Multisig = await hre.ethers.getContractFactory("TwoOfTwoMultisigMock");
       const multisig = await Multisig.deploy(
@@ -423,12 +464,13 @@ describe("Upgrade tooling & governance deploy path", function () {
 
       process.env[TIMELOCK_ENV] = tlAddr;
       process.env[SAFE_ENV] = multisigAddr;
-      const deployed = await deployIntegratedSystem(fakeLiveConnection(), {
+      const deployed = await deployIntegratedSystem({ethers: hre.ethers, artifacts: hre.artifacts, networkConfig:{type:"edr-simulated",chainId:31337}}, {
         writeDeployments: false,
         signer: deployer,
+        governanceOwner: tlAddr,
       });
 
-      expect(await deployed.deepFamily.owner()).to.equal(tlAddr);
+      expect(await deployed.deepFamily.owner()).to.equal(await deployer.getAddress());
       expect(await deployed.token.owner()).to.equal(hre.ethers.ZeroAddress);
     });
 
@@ -595,11 +637,12 @@ describe("Upgrade tooling & governance deploy path", function () {
   });
 
   describe("deployment reuse guards", function () {
-    it("refuses an implicit first deployment from an operational live-network path", async () => {
+    it("refuses a live-network reuse request before any approved production artifact set", async () => {
       const originalCwd = process.cwd();
       const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "deepfamily-empty-live-"));
 
       try {
+        await copyProtocolInputs(originalCwd, tmpDir);
         process.chdir(tmpDir);
         let err;
         try {
@@ -613,18 +656,19 @@ describe("Upgrade tooling & governance deploy path", function () {
         }
 
         expect(err, "expected an implicit live deployment to abort").to.be.an("error");
-        expect(err.message).to.match(/no deployment metadata.*operational task/i);
+        expect(err.message).to.match(/no approved production artifact set/i);
       } finally {
         process.chdir(originalCwd);
         await fs.rm(tmpDir, { recursive: true, force: true });
       }
     });
 
-    it("requires an explicitly allowed first live deployment to persist current artifacts", async () => {
+    it("refuses an explicitly allowed live deployment without production artifacts", async () => {
       const originalCwd = process.cwd();
       const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "deepfamily-unwritten-live-"));
 
       try {
+        await copyProtocolInputs(originalCwd, tmpDir);
         process.chdir(tmpDir);
         let err;
         try {
@@ -641,14 +685,14 @@ describe("Upgrade tooling & governance deploy path", function () {
         }
 
         expect(err, "expected an unpersisted live deployment to abort").to.be.an("error");
-        expect(err.message).to.match(/must persist.*artifact metadata/i);
+        expect(err.message).to.match(/no approved production artifact set/i);
       } finally {
         process.chdir(originalCwd);
         await fs.rm(tmpDir, { recursive: true, force: true });
       }
     });
 
-    it("refuses partial deployment metadata on a live network", async () => {
+    it("refuses live metadata reuse while production artifacts are unapproved", async () => {
       const originalCwd = process.cwd();
       const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "deepfamily-partial-live-"));
       const deploymentsDir = path.join(tmpDir, "deployments", "sepolia");
@@ -659,6 +703,7 @@ describe("Upgrade tooling & governance deploy path", function () {
       );
 
       try {
+        await copyProtocolInputs(originalCwd, tmpDir);
         process.chdir(tmpDir);
         let err;
         try {
@@ -672,7 +717,7 @@ describe("Upgrade tooling & governance deploy path", function () {
         }
 
         expect(err, "expected partial live metadata to abort").to.be.an("error");
-        expect(err.message).to.match(/metadata is partial/i);
+        expect(err.message).to.match(/no approved production artifact set/i);
       } finally {
         process.chdir(originalCwd);
         await fs.rm(tmpDir, { recursive: true, force: true });
@@ -689,6 +734,7 @@ describe("Upgrade tooling & governance deploy path", function () {
       };
 
       try {
+        await copyProtocolInputs(originalCwd, tmpDir);
         process.chdir(tmpDir);
         const deployed = await deployIntegratedSystem(connection, {
           writeDeployments: true,
@@ -718,6 +764,7 @@ describe("Upgrade tooling & governance deploy path", function () {
       };
 
       try {
+        await copyProtocolInputs(originalCwd, tmpDir);
         process.chdir(tmpDir);
         const deployed = await deployIntegratedSystem(connection, {
           writeDeployments: true,
@@ -781,6 +828,7 @@ describe("Upgrade tooling & governance deploy path", function () {
       }
 
       try {
+        await copyProtocolInputs(originalCwd, tmpDir);
         process.chdir(tmpDir);
         const deployed = await ensureIntegratedSystem({
           ethers: hre.ethers,

@@ -88,7 +88,7 @@ test("four-input VALUE constraints and canonical nullifiers", async (t) => {
   const output = fs.mkdtempSync(path.join(os.tmpdir(), "deepfamily-shielded-value-four-"));
   t.after(() => fs.rmSync(output, { recursive: true, force: true }));
   const calculators = {};
-  for (const circuit of ["shielded_private_transfer_4", "shielded_unshield_4"]) {
+  for (const circuit of ["shielded_unshield_4"]) {
     execFileSync(
       path.join(root, "bin/circom"),
       [
@@ -108,12 +108,11 @@ test("four-input VALUE constraints and canonical nullifiers", async (t) => {
       singleThread: true,
     });
   }
-  const transfer = calculators.shielded_private_transfer_4;
   const unshield = calculators.shielded_unshield_4;
   await t.test(
     "all four inputs support complete 32-sibling paths and enforce their bounds",
     async () => {
-      for (const isExit of [false, true]) {
+      for (const isExit of [true]) {
         const witness = fixture(4, isExit);
         for (let slot = 0; slot < 4; slot++) {
           const index = BigInt(slot * 71);
@@ -132,7 +131,7 @@ test("four-input VALUE constraints and canonical nullifiers", async (t) => {
           witness.inputSiblings[slot] = siblings.map(String);
           witness.inputRoots[slot] = String(root);
         }
-        const calculator = isExit ? unshield : transfer;
+        const calculator = unshield;
         await calculator.calculateWitness(witness, true);
         await assertConstraintViolation(() =>
           calculator.calculateWitness(
@@ -150,27 +149,12 @@ test("four-input VALUE constraints and canonical nullifiers", async (t) => {
     },
   );
   for (let count = 1; count <= 4; count++)
-    await t.test(`${count} contiguous inputs pass transfer and withdrawal`, async () => {
-      await transfer.calculateWitness(fixture(count), true);
+    await t.test(`${count} contiguous inputs pass withdrawal`, async () => {
       await unshield.calculateWitness(fixture(count, true), true);
     });
-  await t.test(
-    "all four inputs sum above uint128 while bounded outputs remain valid",
-    async () => {
-      const values = Array(4).fill(MAX / 4n);
-      values[0] += 4n;
-      const witness = fixture(4, false, values);
-      witness.outputAmounts = [String(MAX), "1"];
-      witness.outputCommitments = [String(note(MAX, 1001n, 201n)), String(note(1n, 1002n, 202n))];
-      await transfer.calculateWitness(witness, true);
-      await assertConstraintViolation(() =>
-        transfer.calculateWitness(fixture(4, false, Array(4).fill(MAX)), true),
-      );
-      await assertConstraintViolation(() =>
-        unshield.calculateWitness(fixture(4, true, Array(4).fill(MAX)), true),
-      );
-    },
-  );
+  await t.test("rejects change larger than uint128", async () => {
+    await assertConstraintViolation(() => unshield.calculateWitness(fixture(4, true, Array(4).fill(MAX)), true));
+  });
   for (const [label, change] of [
     ["owner mixing", (w) => (w.inputOwnerSecrets[1] = "5002")],
     ["zero real amount", (w) => (w.inputAmounts[1] = "0")],
@@ -182,11 +166,11 @@ test("four-input VALUE constraints and canonical nullifiers", async (t) => {
     ["duplicate nullifier", (w) => (w.inputNullifiers[3] = w.inputNullifiers[2])],
     ["real NF tampering", (w) => (w.inputNullifiers[0] = "1")],
     ["wrong chain", (w) => (w.chainId = "1")],
-    ["amount conservation", (w) => (w.outputAmounts[0] = "29")],
+    ["amount conservation", (w) => (w.changeAmount = "30")],
   ])
     await t.test(`rejects ${label}`, async () => {
       await assertConstraintViolation(() =>
-        transfer.calculateWitness(mutate(fixture(3), change), true),
+        unshield.calculateWitness(mutate(fixture(3, true), change), true),
       );
     });
   await t.test("changing withdrawal value or recipient cannot reuse a proof opening", async () => {

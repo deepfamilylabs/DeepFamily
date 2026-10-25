@@ -338,9 +338,9 @@ export async function encryptShieldedLetter(input) {
 }
 
 /**
- * Decrypt using either existing key mode's hpkeIkm, then authenticate the
+ * Decrypt using the wallet hpkeIkm, then authenticate the
  * attachment against the verified contract result before returning any body.
- * Code expiry/counters deliberately do not participate in historical recovery.
+ * Code expiry does not prevent historical recovery.
  */
 export async function decryptShieldedLetter(input) {
   const scope = normalizeShieldedLetterScope(input);

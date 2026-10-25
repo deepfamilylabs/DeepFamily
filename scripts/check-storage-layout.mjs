@@ -15,9 +15,9 @@ const PROXY_CONTRACTS = [
 // Positive: the canonical upgrade target must be a safe extension of the base.
 const POSITIVE_MOCK_CHECKS = [
   {
-    label: "DeepFamily -> DeepFamilyV2Mock",
+    label: "DeepFamily -> DeepFamilyUpgradeMock",
     from: "artifacts/contracts/DeepFamily.sol/DeepFamily.json",
-    to: "artifacts/contracts/test/DeepFamilyV2Mock.sol/DeepFamilyV2Mock.json",
+    to: "artifacts/contracts/test/DeepFamilyUpgradeMock.sol/DeepFamilyUpgradeMock.json",
   },
 ];
 

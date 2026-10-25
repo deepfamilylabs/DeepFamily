@@ -1550,23 +1550,15 @@
       "address": null,
       "personVerifierImmutable": null,
       "disclosureBindingVerifierImmutable": null,
-      "shieldVerifierImmutable": null,
-      "claimVerifierImmutable": null,
-      "privateTransferVerifierImmutable": null,
-      "unshieldVerifierImmutable": null,
       "artifactSha256": null,
-      "runtimeSha256": null,
-      "fundVerifierImmutable": null,
-      "claim32VerifierImmutable": null,
-      "privateTransfer4VerifierImmutable": null,
-      "unshield4VerifierImmutable": null
+      "runtimeSha256": null
     },
     "deepFamilyReader": {
       "address": null,
       "deepFamilyImmutable": null,
+      "archiveImmutable": null,
       "artifactSha256": null,
-      "runtimeSha256": null,
-      "archiveImmutable": null
+      "runtimeSha256": null
     },
     "deepFamilyArchive": {
       "address": null,
@@ -1579,38 +1571,44 @@
     "poseidonT4": null,
     "poseidonT6": null,
     "deepFamilyLineageIndex": null,
+    "eligibilitySource": {
+      "address": null,
+      "immutables": {
+        "LINEAGE_INDEX": null,
+        "DEEP_FAMILY": null,
+        "FACT_VERIFIER": null,
+        "TRUST_VERIFIER": null
+      },
+      "artifactSha256": null,
+      "runtimeSha256": null
+    },
+    "receiveRegistry": {
+      "address": null,
+      "immutables": {
+        "SOURCE": null,
+        "ISSUE_VERIFIER": null,
+        "CODE_VERIFIER": null,
+        "CAPABILITY_VERIFIER": null
+      },
+      "artifactSha256": null,
+      "runtimeSha256": null
+    },
+    "letterArchive": {
+      "address": null,
+      "immutables": {
+        "DEEP_FAMILY": null,
+        "RECEIVE_REGISTRY": null
+      },
+      "artifactSha256": null,
+      "runtimeSha256": null
+    },
     "shieldedVerifiers": {
       "shield": {
         "address": null,
         "artifactSha256": null,
         "runtimeSha256": null
       },
-      "claim": {
-        "address": null,
-        "artifactSha256": null,
-        "runtimeSha256": null
-      },
-      "privateTransfer": {
-        "address": null,
-        "artifactSha256": null,
-        "runtimeSha256": null
-      },
       "unshield": {
-        "address": null,
-        "artifactSha256": null,
-        "runtimeSha256": null
-      },
-      "fund": {
-        "address": null,
-        "artifactSha256": null,
-        "runtimeSha256": null
-      },
-      "claim32": {
-        "address": null,
-        "artifactSha256": null,
-        "runtimeSha256": null
-      },
-      "privateTransfer4": {
         "address": null,
         "artifactSha256": null,
         "runtimeSha256": null
@@ -1621,95 +1619,137 @@
         "runtimeSha256": null
       }
     },
+    "shieldedBoundaryVerifierAdapter": {
+      "address": null,
+      "shieldVerifierImmutable": null,
+      "unshieldVerifierImmutable": null,
+      "unshield4VerifierImmutable": null,
+      "artifactSha256": null,
+      "runtimeSha256": null
+    },
+    "generatedVerifiers": {
+      "sourceFact": {
+        "address": null,
+        "artifactSha256": null,
+        "runtimeSha256": null
+      },
+      "sourceTrust": {
+        "address": null,
+        "artifactSha256": null,
+        "runtimeSha256": null
+      },
+      "issue": {
+        "address": null,
+        "artifactSha256": null,
+        "runtimeSha256": null
+      },
+      "code": {
+        "address": null,
+        "artifactSha256": null,
+        "runtimeSha256": null
+      },
+      "capability": {
+        "address": null,
+        "artifactSha256": null,
+        "runtimeSha256": null
+      },
+      "fund": {
+        "address": null,
+        "artifactSha256": null,
+        "runtimeSha256": null
+      },
+      "claim": {
+        "address": null,
+        "artifactSha256": null,
+        "runtimeSha256": null
+      },
+      "transfer": {
+        "address": null,
+        "artifactSha256": null,
+        "runtimeSha256": null
+      }
+    },
+    "protocolVerifiers": {
+      "sourceFact": {
+        "address": null,
+        "verifierImmutable": null,
+        "artifactSha256": null,
+        "runtimeSha256": null
+      },
+      "sourceTrust": {
+        "address": null,
+        "verifierImmutable": null,
+        "artifactSha256": null,
+        "runtimeSha256": null
+      },
+      "issue": {
+        "address": null,
+        "verifierImmutable": null,
+        "artifactSha256": null,
+        "runtimeSha256": null
+      },
+      "code": {
+        "address": null,
+        "verifierImmutable": null,
+        "artifactSha256": null,
+        "runtimeSha256": null
+      },
+      "capability": {
+        "address": null,
+        "verifierImmutable": null,
+        "artifactSha256": null,
+        "runtimeSha256": null
+      },
+      "fund": {
+        "address": null,
+        "verifierImmutable": null,
+        "artifactSha256": null,
+        "runtimeSha256": null
+      },
+      "claim": {
+        "address": null,
+        "verifierImmutable": null,
+        "artifactSha256": null,
+        "runtimeSha256": null
+      },
+      "transfer": {
+        "address": null,
+        "verifierImmutable": null,
+        "artifactSha256": null,
+        "runtimeSha256": null
+      }
+    },
     "shieldedErc20Pool": {
       "address": null,
       "tokenImmutable": null,
-      "lineageIndexImmutable": null,
-      "artifactSha256": null,
-      "runtimeSha256": null,
+      "receiveRegistryImmutable": null,
       "verifierAdapterImmutable": null,
-      "authorizationStateImmutable": null,
-      "receiveVerifierImmutable": null
+      "fundVerifierImmutable": null,
+      "claimVerifierImmutable": null,
+      "transferVerifierImmutable": null,
+      "artifactSha256": null,
+      "runtimeSha256": null
     },
     "shieldedNativePool": {
       "address": null,
-      "lineageIndexImmutable": null,
+      "receiveRegistryImmutable": null,
       "verifierAdapterImmutable": null,
+      "fundVerifierImmutable": null,
+      "claimVerifierImmutable": null,
+      "transferVerifierImmutable": null,
       "artifactSha256": null,
-      "runtimeSha256": null,
-      "authorizationStateImmutable": null,
-      "receiveVerifierImmutable": null
+      "runtimeSha256": null
     },
     "shieldedPoolFactory": {
       "address": null,
       "deepTokenImmutable": null,
-      "lineageIndexImmutable": null,
+      "receiveRegistryImmutable": null,
       "verifierAdapterImmutable": null,
+      "fundVerifierImmutable": null,
+      "claimVerifierImmutable": null,
+      "transferVerifierImmutable": null,
       "nativePoolImmutable": null,
       "deepPool": null,
-      "artifactSha256": null,
-      "runtimeSha256": null,
-      "authorizationStateImmutable": null,
-      "receiveVerifierImmutable": null
-    },
-    "identityAuthorizationUpdateVerifier": {
-      "address": null,
-      "immutables": {},
-      "artifactSha256": null,
-      "runtimeSha256": null
-    },
-    "identityAuthorizationVerifierAdapter": {
-      "address": null,
-      "immutables": {
-        "VERIFIER": null
-      },
-      "artifactSha256": null,
-      "runtimeSha256": null
-    },
-    "identityAuthorizationState": {
-      "address": null,
-      "immutables": {
-        "VERIFIER": null
-      },
-      "artifactSha256": null,
-      "runtimeSha256": null
-    },
-    "anonymousReceivePresentationVerifier": {
-      "address": null,
-      "immutables": {},
-      "artifactSha256": null,
-      "runtimeSha256": null
-    },
-    "fundReceivePresentationVerifier": {
-      "address": null,
-      "immutables": {},
-      "artifactSha256": null,
-      "runtimeSha256": null
-    },
-    "attachedReceivePresentationVerifier": {
-      "address": null,
-      "immutables": {},
-      "artifactSha256": null,
-      "runtimeSha256": null
-    },
-    "receivePresentationVerifierRouter": {
-      "address": null,
-      "immutables": {
-        "ANONYMOUS_VERIFIER": null,
-        "FUND_VERIFIER": null
-      },
-      "artifactSha256": null,
-      "runtimeSha256": null
-    },
-    "privateLetterArchive": {
-      "address": null,
-      "immutables": {
-        "DEEP_FAMILY": null,
-        "AUTHORIZATION_STATE": null,
-        "LETTER_VERIFIER": null,
-        "ATTACHMENT_VERIFIER": null,
-        "POOL_FACTORY": null
-      },
       "artifactSha256": null,
       "runtimeSha256": null
     }

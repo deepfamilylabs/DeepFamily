@@ -1,197 +1,54 @@
 import "../hardhat-test-setup.mjs";
 import { expect } from "chai";
 import hre from "hardhat";
-import { deployUnifiedVerifierAdapter } from "./helpers/unifiedVerifierAdapter.mjs";
 
-const ACTIONS = ["shield", "fund", "claim", "privateTransfer", "unshield"];
-// Mirrors ProofConstants.sol and SHIELDED_POOL_PUBLIC_SIGNAL_COUNTS.
-const SIGNAL_COUNTS = [7, 29, 15, 11, 11];
 const PROOF = hre.ethers.AbiCoder.defaultAbiCoder().encode(
   ["uint256[2]", "uint256[2][2]", "uint256[2]"],
-  [
-    [1n, 2n],
-    [
-      [3n, 4n],
-      [5n, 6n],
-    ],
-    [7n, 8n],
-  ],
+  [[1n,2n],[[3n,4n],[5n,6n]],[7n,8n]],
 );
 
-describe("Unified Groth16 verifier adapter", function () {
-  async function setup() {
-    const person = await hre.ethers.deployContract("StubPersonCommitmentVerifier", [true]);
-    const disclosure = await hre.ethers.deployContract("StubDisclosureBindingVerifier", [false]);
-    const verifiers = { person, disclosure };
-    for (const [index, action] of ACTIONS.entries()) {
-      const verifier = await hre.ethers.deployContract("ShieldedGroth16VerifierMock");
-      await verifier.configure(true, BigInt(index + 1));
-      verifiers[action] = verifier;
-    }
-    return { adapter: await deployUnifiedVerifierAdapter(hre, verifiers), verifiers };
-  }
-
-  it("pins all seven purposes to their intended generated verifier", async function () {
-    const { adapter, verifiers } = await setup();
-    expect(await adapter.verifyProof(0, 1, PROOF, Array(5).fill(0n))).to.equal(true);
-    expect(await adapter.verifyProof(1, 1, PROOF, Array(4).fill(0n))).to.equal(false);
-
-    for (const [index, route] of ["person", "disclosure", ...ACTIONS].entries()) {
-      expect(await adapter.verifierForPurpose(index)).to.equal(await verifiers[route].getAddress());
-    }
-    expect(await adapter.personVerifier()).to.equal(await verifiers.person.getAddress());
-    expect(await adapter.disclosureBindingVerifier()).to.equal(
-      await verifiers.disclosure.getAddress(),
-    );
-    for (const [index, action] of ACTIONS.entries()) {
-      expect(await adapter[`${action}Verifier`]()).to.equal(await verifiers[action].getAddress());
-      const signals = Array(SIGNAL_COUNTS[index]).fill(0n);
-      signals[signals.length - 1] = BigInt(index + 1);
-      expect(await adapter.verifyProof(index + 2, 1, PROOF, signals)).to.equal(true);
-      // Every mock expects a distinct final signal, so forwarding to another route fails.
-      signals[signals.length - 1] += 1n;
-      expect(await adapter.verifyProof(index + 2, 1, PROOF, signals)).to.equal(false);
-    }
+describe("Fixed proof routes", function () {
+  it("keeps identity and disclosure separate from pool operations", async function () {
+    const person=await hre.ethers.deployContract("StubPersonCommitmentVerifier",[true]);
+    const disclosure=await hre.ethers.deployContract("StubDisclosureBindingVerifier",[false]);
+    const adapter=await hre.ethers.deployContract("Groth16VerifierAdapter",[await person.getAddress(),await disclosure.getAddress()]);
+    expect(await adapter.verifierForPurpose(0)).to.equal(await person.getAddress());
+    expect(await adapter.verifierForPurpose(1)).to.equal(await disclosure.getAddress());
+    expect(await adapter.verifyProof(0,1,PROOF,Array(5).fill(0n))).to.equal(true);
+    expect(await adapter.verifyProof(1,1,PROOF,Array(4).fill(0n))).to.equal(false);
+    for(const purpose of [2,3,4,5,6]) await expect(adapter.verifyProof(purpose,1,PROOF,Array(7).fill(0n))).to.be.revertedWithCustomError(adapter,"UnsupportedPurpose");
+    for(const [purpose,length] of [[0,4],[1,5]]) await expect(adapter.verifyProof(purpose,1,PROOF,Array(length).fill(0n))).to.be.revertedWithCustomError(adapter,"MalformedProofData");
+    await expect(adapter.verifyProof(0,255,PROOF,Array(5).fill(0n))).to.be.revertedWithCustomError(adapter,"UnsupportedProofEncoding");
+    await expect(adapter.verifyProof(0,1,"0x1234",Array(5).fill(0n))).to.be.revertedWithCustomError(adapter,"MalformedProofData");
+    const disabled=await hre.ethers.deployContract("Groth16VerifierAdapter",[hre.ethers.ZeroAddress,hre.ethers.ZeroAddress]);
+    await expect(disabled.verifyProof(0,1,PROOF,Array(5).fill(0n))).to.be.revertedWithCustomError(disabled,"VerifierNotConfigured").withArgs(0);
+    const [signer]=await hre.ethers.getSigners();
+    await expect(hre.ethers.deployContract("Groth16VerifierAdapter",[signer.address,hre.ethers.ZeroAddress])).to.be.revertedWithCustomError(disabled,"InvalidVerifier");
   });
 
-  it("rejects unsupported purposes, encodings and malformed public inputs", async function () {
-    const { adapter } = await setup();
-    await expect(adapter.verifierForPurpose(7)).to.be.revertedWithCustomError(
-      adapter,
-      "UnsupportedPurpose",
-    );
-    await expect(
-      adapter.verifyProof(8, 1, PROOF, Array(12).fill(0n)),
-    ).to.be.revertedWithCustomError(adapter, "UnsupportedPurpose");
-    await expect(
-      adapter.verifyProof(2, 255, PROOF, Array(7).fill(0n)),
-    ).to.be.revertedWithCustomError(adapter, "UnsupportedProofEncoding");
-    await expect(
-      adapter.verifyProof(2, 1, "0x1234", Array(7).fill(0n)),
-    ).to.be.revertedWithCustomError(adapter, "MalformedProofData");
-    for (const [purpose, wrongLength] of [
-      [0, 4],
-      [1, 5],
-      [2, 8],
-      [3, 12],
-      [4, 12],
-      [4, 27],
-      [5, 30],
-      [5, 12],
-      [6, 12],
-    ]) {
-      await expect(
-        adapter.verifyProof(purpose, 1, PROOF, Array(wrongLength).fill(0n)),
-      ).to.be.revertedWithCustomError(adapter, "MalformedProofData");
+  it("pins shield and one/four-input withdrawals by exact statement length", async function () {
+    const verifiers=[];
+    for(let index=0;index<3;index++) {
+      const verifier=await hre.ethers.deployContract("ShieldedGroth16VerifierMock");
+      await verifier.configure(true,BigInt(index+1));verifiers.push(verifier);
     }
-  });
-
-  it("routes one- and four-input VALUE proofs by public-signal length", async function () {
-    const verifiers = {};
-    for (const [index, action] of [
-      "privateTransfer",
-      "unshield",
-      "privateTransfer4",
-      "unshield4",
-    ].entries()) {
-      verifiers[action] = await hre.ethers.deployContract("ShieldedGroth16VerifierMock");
-      await verifiers[action].configure(true, BigInt(index + 1));
+    const adapter=await hre.ethers.deployContract("ShieldedBoundaryVerifierAdapter",await Promise.all(verifiers.map(v=>v.getAddress())));
+    expect(await adapter.verifierForPurpose(2)).to.equal(await verifiers[0].getAddress());
+    expect(await adapter.verifierForPurpose(6)).to.equal(await verifiers[1].getAddress());
+    expect(await adapter.unshield4Verifier()).to.equal(await verifiers[2].getAddress());
+    for(const [purpose,length,last] of [[2,7,1n],[6,11,2n],[6,20,3n]]) {
+      const signals=Array(length).fill(0n);signals[length-1]=last;
+      expect(await adapter.verifyProof(purpose,1,PROOF,signals)).to.equal(true);
+      signals[length-1]++;
+      expect(await adapter.verifyProof(purpose,1,PROOF,signals)).to.equal(false);
     }
-    const adapter = await deployUnifiedVerifierAdapter(hre, verifiers);
-    for (const [purpose, single, four, expected] of [
-      [5, "privateTransfer", "privateTransfer4", 1n],
-      [6, "unshield", "unshield4", 2n],
-    ]) {
-      expect(await adapter.verifierForPurpose(purpose)).to.equal(
-        await verifiers[single].getAddress(),
-      );
-      expect(await adapter[`${four}Verifier`]()).to.equal(await verifiers[four].getAddress());
-      const singleSignals = Array(11).fill(0n);
-      singleSignals[10] = expected;
-      expect(await adapter.verifyProof(purpose, 1, PROOF, singleSignals)).to.equal(true);
-      const fourSignals = Array(20).fill(0n);
-      fourSignals[19] = expected + 2n;
-      expect(await adapter.verifyProof(purpose, 1, PROOF, fourSignals)).to.equal(true);
-      // The chosen verifier must reject a signal accepted only by the other capacity.
-      singleSignals[10] = expected + 2n;
-      fourSignals[19] = expected;
-      expect(await adapter.verifyProof(purpose, 1, PROOF, singleSignals)).to.equal(false);
-      expect(await adapter.verifyProof(purpose, 1, PROOF, fourSignals)).to.equal(false);
+    for(const purpose of [0,1,3,4,5]) await expect(adapter.verifyProof(purpose,1,PROOF,Array(7).fill(0n))).to.be.revertedWithCustomError(adapter,"UnsupportedPurpose");
+    for(const [purpose,length] of [[2,11],[2,20],[6,7],[6,12]]) await expect(adapter.verifyProof(purpose,1,PROOF,Array(length).fill(0n))).to.be.revertedWithCustomError(adapter,"MalformedProofData");
+    await expect(adapter.verifyProof(2,255,PROOF,Array(7).fill(0n))).to.be.revertedWithCustomError(adapter,"UnsupportedProofEncoding");
+    await expect(adapter.verifyProof(2,1,"0x1234",Array(7).fill(0n))).to.be.revertedWithCustomError(adapter,"MalformedProofData");
+    for(let index=0;index<3;index++) {
+      const addresses=await Promise.all(verifiers.map(v=>v.getAddress()));addresses[index]=hre.ethers.ZeroAddress;
+      await expect(hre.ethers.deployContract("ShieldedBoundaryVerifierAdapter",addresses)).to.be.revertedWithCustomError(adapter,"InvalidVerifier");
     }
-    const singleOnly = await deployUnifiedVerifierAdapter(hre, {
-      privateTransfer: verifiers.privateTransfer,
-    });
-    await expect(singleOnly.verifyProof(5, 1, PROOF, Array(20).fill(0n)))
-      .to.be.revertedWithCustomError(singleOnly, "VerifierNotConfigured")
-      .withArgs(5);
-    const fourOnly = await deployUnifiedVerifierAdapter(hre, {
-      privateTransfer4: verifiers.privateTransfer4,
-    });
-    const signals = Array(20).fill(0n);
-    signals[19] = 3n;
-    expect(await fourOnly.verifyProof(5, 1, PROOF, signals)).to.equal(true);
-    await expect(fourOnly.verifyProof(5, 1, PROOF, Array(11).fill(0n)))
-      .to.be.revertedWithCustomError(fourOnly, "VerifierNotConfigured")
-      .withArgs(5);
-  });
-
-  it("uses the same Fund verifier for initial and continuation proofs", async function () {
-    const fund = await hre.ethers.deployContract("ShieldedGroth16VerifierMock");
-    await fund.configure(true, 10n);
-    const adapter = await deployUnifiedVerifierAdapter(hre, { fund });
-    expect(await adapter.verifierForPurpose(3)).to.equal(await fund.getAddress());
-    const signals = Array(29).fill(0n);
-    signals[28] = 10n;
-    for (const mode of [0n, 1n]) {
-      signals[2] = mode;
-      expect(await adapter.verifyProof(3, 1, PROOF, signals)).to.equal(true);
-    }
-    signals[28] = 11n;
-    expect(await adapter.verifyProof(3, 1, PROOF, signals)).to.equal(false);
-  });
-
-  it("accepts either claim key and falls back to the 64-level verifier", async function () {
-    const claim = await hre.ethers.deployContract("ShieldedGroth16VerifierMock");
-    const claim32 = await hre.ethers.deployContract("ShieldedGroth16VerifierMock");
-    await claim.configure(true, 64n);
-    await claim32.configure(true, 32n);
-    const adapter = await deployUnifiedVerifierAdapter(hre, { claim, claim32 });
-    expect(await adapter.claim32Verifier()).to.equal(await claim32.getAddress());
-    const signals = Array(15).fill(0n);
-    for (const last of [32n, 64n]) {
-      signals[14] = last;
-      expect(await adapter.verifyProof(4, 1, PROOF, signals)).to.equal(true);
-    }
-    signals[14] = 99n;
-    expect(await adapter.verifyProof(4, 1, PROOF, signals)).to.equal(false);
-    await expect(deployUnifiedVerifierAdapter(hre, { claim32 })).to.be.revertedWithCustomError(
-      adapter,
-      "InvalidVerifier",
-    );
-  });
-
-  it("allows isolated disabled routes but rejects their use and codeless verifier addresses", async function () {
-    const adapter = await deployUnifiedVerifierAdapter(hre);
-    expect(await adapter.verifierForPurpose(4)).to.equal(hre.ethers.ZeroAddress);
-    await expect(adapter.verifyProof(4, 1, PROOF, Array(15).fill(0n)))
-      .to.be.revertedWithCustomError(adapter, "VerifierNotConfigured")
-      .withArgs(4);
-    const [, eoa] = await hre.ethers.getSigners();
-    await expect(
-      hre.ethers.deployContract("Groth16VerifierAdapter", [
-        eoa.address,
-        hre.ethers.ZeroAddress,
-        Array(8).fill(hre.ethers.ZeroAddress),
-      ]),
-    ).to.be.revertedWithCustomError(adapter, "InvalidVerifier");
-    const invalidShieldedRoutes = Array(8).fill(hre.ethers.ZeroAddress);
-    invalidShieldedRoutes[4] = eoa.address;
-    await expect(
-      hre.ethers.deployContract("Groth16VerifierAdapter", [
-        hre.ethers.ZeroAddress,
-        hre.ethers.ZeroAddress,
-        invalidShieldedRoutes,
-      ]),
-    ).to.be.revertedWithCustomError(adapter, "InvalidVerifier");
   });
 });

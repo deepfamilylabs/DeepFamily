@@ -10,12 +10,11 @@ export * from "./gzip.js";
 export * from "./identity.js";
 export * from "./inheritance.js";
 export * from "./shielded-inheritance.js";
-export * from "./shielded-signals.js";
-export * from "./shielded-receive-credential.js";
-export * from "./shielded-budget-receive-code.js";
-export * from "./shielded-identity-authorization.js";
-export * from "./shielded-receive-presentation.js";
-export * from "./groth16-link.js";
+export * from "./receive-code.js";
+export * from "./budget.js";
+export * from "./eligibility.js";
+export * from "./wallet.js";
+export * from "./value.js";
 export * from "./shielded-hpke.js";
 export * from "./shielded-letters.js";
 export * from "./shielded-note-codec.js";
@@ -24,9 +23,6 @@ export * from "./unicode-normalization.js";
 export * from "./precis.js";
 export * from "./story.js";
 
-export * from "./shielded-independent-key.js";
-export * from "./shielded-independent-key-identity.js";
-export * from "./shielded-independent-key-recovery.js";
 export * from "./shielded-value-capacity.js";
 
 export * from "./proofDefinitions.js";

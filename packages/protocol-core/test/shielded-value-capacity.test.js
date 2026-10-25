@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { MAX_UINT128 } from "../constants.js";
 import {
-  computeShieldedDummyInputNullifier,
   computeShieldedOwnerCommitment,
 } from "../shielded-inheritance.js";
 import {
@@ -75,10 +74,7 @@ const optimalDirectSpend = (source, amount) => {
   return best;
 };
 test("capacity placeholders preserve slot one and separate every further slot", () => {
-  const first = computeShieldedDummyInputNullifier(
-    { ownerSecret: 17n, noteCommitment: 19n },
-    scope,
-  );
+  const first = computeShieldedDummyInputNullifierForSlot(17n, 19n, 1, scope);
   const all = Array.from({ length: 3 }, (_, i) =>
     computeShieldedDummyInputNullifierForSlot(17n, 19n, i + 1, scope),
   );

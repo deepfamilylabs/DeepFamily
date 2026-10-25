@@ -982,7 +982,7 @@ cancelled with `governance-cancel` while the old Timelock still owns `main`.
   append-only checker doesn't already provide.
 - `npm run storage:check` (`scripts/check-storage-layout.mjs`) diffs the current layout against the
   committed baselines in `storage-layouts/*.json`, and additionally runs a positive mock
-  (`DeepFamilyV2Mock` must pass) and a negative mock (`UnsafeUpgradeMock` must fail) so the checker
+  (`DeepFamilyUpgradeMock` must pass) and a negative mock (`UnsafeUpgradeMock` must fail) so the checker
   cannot silently break. It is part of `npm run contracts:check`.
 - The `upgrade-schedule` / `upgrade-execute` Hardhat tasks (`tasks/upgrade-schedule.mjs`,
   `tasks/upgrade-execute.mjs`) additionally validate the _specific_ candidate implementation against
@@ -1257,102 +1257,17 @@ with the latest roots, while retaining block-reorganization and spent-nullifier 
 The contract links the PoseidonT3–T6 libraries from `poseidon-solidity`. They are compiled without
 `viaIR` (see `hardhat.config.mjs`); with it, PoseidonT6 exceeds the contract size limit.
 
-## Shielded inheritance contracts
+## Receiving and asset pools
 
-The pool protocol, note payload, money HPKE envelope and receive credentials all use version `1`. Clients accept only the current formats. The contract requires version `1` in public identity-budget envelopes. The money-note AAD domain is `DeepFamily:ShieldedNoteHPKE:v1`; receive fingerprints use `DeepFamily:ReceiveCredential:anonymous:v1` or `DeepFamily:ReceiveCredential:fund:v1`. These are exact cryptographic hash inputs. See [private letters and receive authorization](private-letters.md) for credential, presentation and recovery details.
+`ReceiveRegistry` verifies generic code authorization and optional family budget capabilities. `EligibilitySource` authenticates actual current lineage facts, publisher authority and role revocations. `DeepFamily` binds that source and requires associated revocations atomically with relevant endorsement/trust changes. `LetterArchive` uses the same generic receiving authorization.
 
-Pool-specific hashes use `D = Poseidon3(1031, chainId, uint160(poolAddress))` and `S(purpose) = Poseidon3(1032, D, purpose)`. Purposes 1010, 1011, 1014–1017, 1019, 1021, 1026–1030 and 1033 use `S` for policy and note commitments, owner authorization, spend/period/enrollment/template-use nullifiers and allocation-key commitments. Donor memo recovery uses the same explicit chain/pool scope. Inputs, budget templates and claim markers cannot cross asset pools; identity, lineage and owner/view derivation remain independent of that scope. Circuit constraints are detailed in [Shielded inheritance circuits](zk-proofs.md#shielded-inheritance-circuits).
+`ShieldedPoolCore` directly implements the sole pool protocol. Native/ERC20 variants share its ledger and fixed `RECEIVE_REGISTRY`, `FUND_VERIFIER`, `CLAIM_VERIFIER` and `TRANSFER_VERIFIER` dependencies. `ShieldedPoolFactory` validates those immutables and creates matching ERC20 pools.
 
-Recipients do not register payment keys on chain. Version-1 anonymous `dfrecv` credentials expose R, owner, viewing key, mode, counter and expiry to their holders while hiding the identity commitment. Fund `dffund` credentials additionally authenticate and disclose that identity to the payer. The two Circom issuers have distinct fixed verification keys and 11/12 public signals. Mode 0 constrains the owner secret to the identity-derived secret; mode 1 permits the independent nonzero owner secret. The selected viewing key is authenticated, but its derivation and the independent root source are not proved. The holder checks the signature proof locally; the operation presentation privately verifies it again on chain. Credentials must come through an authenticated recipient channel.
+The public methods are `shield`, `unshield`, `transfer`, `depositBudget` and `claimBudget`. `ActionData` contains only input shard IDs, roots, nullifiers, two output commitments and two ciphertexts. There is no identity-counter dependency or alternate receiving router. `depositBudget` creates a code/policy record or adds an independent contribution while preserving its clock; both paths check current qualification. Claims authenticate current qualification and enforce a canonical subject/policy/period allowance across codes.
 
-Anonymous credentials do not provide an identity-matching oracle. Fixed R or viewing keys can correlate credentials, and anyone given Fund disclosure can associate that same R with its identity. Incrementing the counter does not erase associations already learned. Generating a code creates no transaction.
+Every spend rejects reused nullifiers; every append rejects duplicate commitments. Only completed two-output roots are eligible input roots. The money relations bind chain, pool, output ciphertext hashes and all relevant policy/code fields. ERC20 boundaries require exact sender/pool/recipient balance changes; native withdrawals and token calls use reentrancy guards.
 
-A receive code does not prove that the identity already exists in DeepFamily. Initial `fund` proves the recipient is a direct child with a current endorsement by a trusted source. Additional `fund` proves membership of an existing budget bound to that heir, preserves its enrollment and start time, and does not consume or count its balance. A spent or zero-value budget can still be a read-only template.
-
-The immutable, non-upgradeable `ShieldedPoolFactory` registers native currency and a DEEP ERC-20 pool at deployment. Anyone may create another canonical ERC-20 pool without DEEP protocol fees or staking. Each pool has separate note trees and liabilities. ERC-20 entry/exit verifies exact sender and recipient balance deltas and requires collateral of at least `totalShielded`; native deposits require exact value and native exits revert on failed calls. The factory and pools have no administrator, pause, treasury, surplus withdrawal or governance entrypoint. Registration and token import do not certify token behavior; unsupported behavior remains a risk limited to that token's pool.
-
-`ShieldedErc20Pool` and `ShieldedNativePool` each hold one asset using `ShieldedPoolCore` and a global sequence of note commitments in 32-level shards. Its five actions are `shield`, `fund`, `claim`, `privateTransfer` and `unshield`; each appends two fixed-size envelopes and commitments. Spends must use a root recorded after a complete action; the root emitted with an action's first output is never accepted, because in a new shard it equals that output's commitment. Public and private addressing share `shield → donor VALUE → fund → child BUDGET → claim → child VALUE`. Funding always spends donor VALUE; it does not directly transfer ordinary-wallet tokens. Only `shield` increases `totalShielded` and custody, and only `unshield` decreases them. Internal funding, claims and transfers conserve both. The lineage trees remain 64 levels deep.
-
-Private funding verifies the disclosed Fund credential in the client and atomically verifies its private receive presentation with the business proof on chain. Public addressing needs only the selected registered personHash and publishes the identity-budget recovery fields. Initial funding retains lineage and enrollment uniqueness checks; public funding reveals identities and terms.
-
-Rules are private parameters. Policy commitment P binds the parent identity/version, rate, positive uint32 periodDays, random policy salt and allocation-key commitment; enrollment commitment E binds P, the child, eligibility start and enrollment salt. `fundMode = 0` consumes donor VALUE plus a unique policy/heir enrollment tag and fixes `eligibleFrom = asOf + 7200`. `fundMode = 1` consumes new donor VALUE plus a randomized read-use tag, proves the historical budget template's membership, and preserves P/E and terms without consuming or counting the template balance. A spent or zero-value template remains usable.
-
-`budgetKind` is independent of `fundMode`: 0 is a private owner-bound budget, 1 is a public identity-bound budget. Legal `(budgetKind,keyMode)` pairs are `(1,0)`, `(0,0)` and `(0,1)`. Every private initial funding and refill requires a currently valid Fund credential. The proof binds its identity, owner, mode and viewing key to the actual new budget and historical template. A refill preserves binding kind, P/E, terms, key mode and complete original receiving keys; an expired or revoked code may be replaced by a matching current credential.
-
-The interface uses the following names. The recovered budget summary's `bindingKind` matches the funding action's `budgetKind`:
-
-| Interface label | `budgetKind` | `bindingKind` | `keyMode` |
-| --- | --- | --- | --- |
-| Public budget | 1 | 1 | 0 |
-| Private (identity credentials) | 0 | 0 | 0 |
-| Private (independent key) | 0 | 0 | 1 |
-
-Both private entries use the same owner-bound BUDGET format and HPKE encryption. Their difference is key derivation and authorization: mode 0 reconstructs its keys from the complete identity credentials, while mode 1 uses separate Spend/View branches derived from the independent key root and requires their owner secret in addition to the identity proof. Both still require identity credentials and lineage eligibility from one accepted checkpoint to claim.
-
-Private kind-2 payloads are 284 bytes, including keyMode and the Fund/Claim origin byte. Owner authorization is `Poseidon5(S(1033),owner,keyMode,viewKeyLo,viewKeyHi)`. Fund and Claim budget outputs use distinct scoped domains 202610210301 and 202610210302; this authenticates Fund provenance for attachments. Identity kind 5 retains its 218-byte terms/identity payload and implicit mode 0, padded to 512 bytes for public delivery. The Fund proof authenticates all ten public recovery fields. Public packets contain no private salts or allocation key.
-
-Donor change memos encrypt a budget copy and, for identity budgets, its private `ruleOpening`. Initial funding also backs up `allocationKey`, checked against its commitment on recovery. That key never enters a child budget or public packet. Historical memos remain recoverable after their VALUE is spent, but recovery accepts templates only at an authenticated Fund output boundary. Identity-budget memos use 400/432-byte payloads without/with allocation key; private memos use 428/460 bytes, including the original recipient viewing key. All fit the fixed 512-byte HPKE envelope. Identity memos omit the redundant policy commitment, reconstruct it from the encrypted opening and verify enrollment.
-
-`claim` consumes one budget note and proves checkpoint-bound lineage, identity-secret knowledge, the budget's owner-secret authorization, conservation and 1–3 distinct unpaid mature periods. Each claim uses only that note's available balance; separate notes are claimed in separate transactions. Private notes retain their rule-opening checks; public notes require no private salts and strictly derive their owner from the identity secret. Mode-1 notes additionally require their independent owner secret, with no identity fallback. A remainder retains the original binding and key mode; its encryption does not convert a public identity-bound note into an owner-bound note. Payout VALUE is fixed to that authorized owner and has no persistent keyMode. Both outputs are encrypted to the claimant. Period and enrollment nullifiers remain identity/P-based and exclude owner, mode and root source, so changing keys cannot reset an allowance. A funder who knows the complete identity secret and P can precompute real period nullifiers and associate claims with periods even without a mode-1 spending root.
-
-Each budget fixes a positive integer number of days per period at initial funding; additional funding preserves it. Period k (starting at zero) matures at `eligibleFrom + (k + 1) * periodDays * 86400`. One day is 86400 seconds; 30 and 365 days do not mean calendar months or years. The claim circuit bounds period indices to uint64 and periodDays to uint32, then compares maturity with 113 bits to prevent finite-field wraparound. Claims remain limited to 3 periods per proof; overdue periods do not expire. Changing periodDays creates another policy rather than changing an existing clock.
-
-Claim has one input slot, with no second-budget witness or placeholder input nullifier. `privateTransfer` and `unshield` default to a single-input circuit; the `_4` variants support one to four real inputs and are selected when two or more are needed. Real VALUE inputs must have positive uint128 amounts and share one owner, chain and pool; VALUE carries no permanent budget keyMode. Four-slot enabled inputs are contiguous, disabled openings are zero, and their public shard/root repeat the first. Placeholder nullifiers are distinct by slot; real spend nullifiers depend on the owner secret and note commitment. Input sums are bounded to 130 bits and each individual input and output to uint128; withdrawal has one change and a zero dummy. Initial `fund` and all `claim` calls require `lineageCheckpointId` identifying one accepted root pair and a fresh `asOf`. The checkpoint ID is lookup metadata authenticated by the proof-bound roots and timestamp; it does not add a circuit public signal. Other actions, including continuation funding, require a zero checkpoint ID. The two-hour proof lifetime and initial eligibility delay remain separate from the 15-minute checkpoint retirement window. Initial funding constrains endorsement `writtenAt ≤ asOf`; the claim circuit binds its range, while the frontend checks that comparison and the authentic index checkpoint indirectly enforces it through `writtenAt <= createdAt <= asOf`. Encrypted-output correctness is not proved by binding its ciphertext hash.
-
-The pool's eight generated business verifiers and DeepFamily share the seven-purpose Groth16VerifierAdapter. Its pool-verifier constructor array is `[shield, fund, claim, privateTransfer, unshield, claim32, privateTransfer4, unshield4]`. Transfer and unshield route directly to the single-input verifier for 11 public signals and the four-input verifier for 20; there is no extra verifier attempt. The Claim32 route requires the standard Claim verifier as its fallback. Both claim keys open the same fifteen public signals and consume one budget note for at most three periods. The adapter first tries Claim32, then standard Claim, using the same proof purpose and 256-byte payload. A standard Claim proof incurs the additional lightweight verifier attempt. Receive presentations use a separate immutable action router: action 3 selects the fixed Fund issuer, action 4 selects the anonymous issuer. Every canonical pool and the private-letter archive shares the same IdentityAuthorizationState.
-
-The authorization state now retains the current compressed SMT nodes and `authorizationCounter`
-per alias, with `getCounterProof(alias)` returning a member/non-member path at the selected block.
-A counter update reuses existing node IDs and updates only its path. New aliases allocate the
-necessary leaves and branches; previous hash versions are not appended as new nodes on every update.
-The contract links PoseidonT3 and PoseidonT4, pinned throughout deployment and runtime evidence.
-
-`incrementCounter(authorizationNullifier, aliasR, oldCounter, newCounter, proof)` accepts a
-counter authorization with six public signals, in order:
-`[authNullifier, chainId, consumer, aliasR, oldCounter, newCounter]`. The verifier proves knowledge
-of the original identity secret, derives the canonical alias, binds the actual chain and state
-contract, and constrains an exact uint64 increment. No tree roots or paths enter this proof.
-The contract checks the live alias counter, rejects reused authorization, and atomically computes
-the updated root from its stored nodes. `CounterIncremented` emits the actual prior and resulting
-roots. Different aliases can prepare updates concurrently; a conflicting update to the same alias
-still fails. Checkpoint creation/retirement and the 15-minute acceptance window remain in force.
-
-`prepareShieldedIdentityCounterAuthorization` is the only owner-proof preparation API. The old
-global-tree transition APIs have been removed, and the authorization circuit, development keys,
-verification key and Solidity verifier have been regenerated for the six-signal statement. The
-unpublished protocol retains no old authorization ABI. Dictionary reads and receive presentations
-still support complete paths through depth 64. Inserting distinct aliases with identical low
-64 bits is a separate capacity boundary and reverts without changing state.
-
-The global snapshot API exposes `getStateSnapshotHeader()` (format version 1, root node ID,
-node count, root and checkpoint ID) and `getNodePage(startId,limit)` (current node hash, key,
-counter, left ID and right ID). Node IDs start at 1, page limits are 1–256, and `nodeCount + 1`
-returns an empty page. These views reuse existing nodes and add no authorization write storage.
-The frontend defaults to downloading all current nodes at one block, validating the complete
-canonical graph and persisting it locally. Subsequent `CounterIncremented` updates are processed
-without alias filters; witness paths are read from local nodes and checked against the chain root. Users can explicitly
-select direct paths; these calls expose the queried alias to their RPC operator. Both modes read
-the same state and preserve counter/revocation rules. Switching read modes does not change write
-gas or reset counters. The project is unpublished, so this selection requires no live-state
-migration. Chain checkpoint/nullifier history still grows with updates; this change alone does
-not establish an unlimited write capacity or low transaction fees.
-
-
-| Action            | Purpose | Signals | Public inputs, in order                                                                                                                                                                   |
-| ----------------- | ------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `shield`          | 2       | 7       | chainId, pool, outputCommitments[2], ciphertextHashes[2], amount                                                                                                                          |
-| `fund`            | 3       | 29      | chainId, pool, fundMode, budgetKind, publicBudget[10], inputShardIds[2], inputRoots[2], inputNullifiers[2], outputCommitments[2], ciphertextHashes[2], endorsementRoot, trustedRoot, asOf, receiveBindings[2] |
-| `claim`           | 4       | 15      | chainId, pool, inputShardIds[1], inputRoots[1], inputNullifiers[1], periodNullifiers[3], outputCommitments[2], ciphertextHashes[2], endorsementRoot, trustedRoot, asOf                   |
-| `privateTransfer` | 5       | 11 / 20 | chainId, pool, inputShardIds[1/4], inputRoots[1/4], inputNullifiers[1/4], outputCommitments[2], ciphertextHashes[2], receiveBindings[2] |
-| `unshield`        | 6       | 11 / 20 | chainId, pool, inputShardIds[1/4], inputRoots[1/4], inputNullifiers[1/4], outputCommitments[2], ciphertextHashes[2], amount, recipient                                                                  |
-
-`publicBudget` follows the ten identity-payload fields, ending with periodDays; private funding supplies ten zeros. `ActionData.fundMode` and `budgetKind` apply only to fund and must be zero for other actions. The three input arrays have matching lengths: one slot for claim, two slots for shield/fund, and one or four for transfer/unshield. The VALUE array width selects its matching verifier. Initial fund repeats its first shard/root in both data slots; disabled transfer/unshield slots repeat slot zero and use distinct secret-bound placeholder nullifiers. Additional fund requires zero lineage roots and time. Contract and protocol-core signal layouts must match the generated circuits exactly.
-
-Secret-derived nullifiers and hidden input commitments prevent a direct public note reference on claim, transfer and exit. They do not guarantee absolute unlinkability: fee-wallet reuse, known budget terms, public activity, timing and small candidate sets can still correlate actions. Public facts remain disclosed. Recovery replays unfiltered pool events and validates envelopes or decrypts them locally, without identity-specific private-note queries.
-
-`ShieldedPoolFactory.poolCount` includes native and DEEP at construction and increments only when a new token pool is created; reusing a pool does not change it. Each pool's `nullifierCount` includes all emitted real, placeholder and period nullifiers. Recovery compares these public counts and note-tree state with unfiltered logs at one anchor block before treating a scan as complete.
-
-Localhost, testnet acceptance and guarded Mainnet release use the same integrated wiring: eight business verifiers, the shared adapter, owner-update verifier/adapter, authorization state, fixed anonymous/Fund/attachment presentation verifiers, their money router, canonical pools/factory, and PrivateLetterArchive. The shared manifests pin all sixteen Circom artifact sets, including fourteen shielded sets. One explicit `zk:setup` generates the final keys and ceremony evidence shared by development, CI and release; daily builds, downloads and checks reuse them. Current checked-in keys remain development-only and unattested until that setup and review. Production release retains its other reviewed-artifact and evidence requirements.
+The deployment catalog contains 13 relations. Local development builds and real-proof checks are available; public deployment remains blocked pending reviewed production ceremony evidence. Role revocation checks currently scan published openings and have a gas-scaling limit still to resolve before release.
 
 ## ZK Verifier Contracts
 
@@ -1370,30 +1285,11 @@ Localhost, testnet acceptance and guarded Mainnet release use the same integrate
 `suiteCommitment`)
 **Verification**: Groth16 proof with circuit `disclosure_binding.circom`
 
-### Shielded action verifiers
+### Asset and receiving verifiers
 
-The pool uses five action routes with eight verifier targets and 7 to 29 public signals, as listed above. They receive encoding-1, 256-byte ABC proof payloads through the same `Groth16VerifierAdapter` used for identity and disclosure. The single `zk:setup` command generates `contracts/Shielded*Verifier.sol` for all five pool routes. It also synchronizes the matching browser assets, including the receive-credential proving and verification keys, to `frontend/public/zk/shielded/` alongside the identity/disclosure workflow.
+`Groth16VerifierAdapter` handles identity/disclosure only. `ShieldedBoundaryVerifierAdapter` selects Shield (7 signals), Unshield (11) or four-input Unshield (20), with a 256-byte ABC payload.
 
-The person and disclosure verifiers are generated from their Circom circuits by snarkjs. DeepFamily selects them through the permanent `(purpose,circuitId)` route and an `IProofVerifierAdapter`. Encoding ID `1`
-requires a 256-byte ABI encoding of Groth16 `a/b/c`, and the adapter forwards to the typed verifier:
-
-```solidity
-// PersonCommitmentVerifier (5 public signals)
-function verifyProof(
-  uint256[2] calldata a,
-  uint256[2][2] calldata b,
-  uint256[2] calldata c,
-  uint256[5] calldata publicSignals
-) external view returns (bool);
-
-// DisclosureBindingVerifier (4 public signals)
-function verifyProof(
-  uint256[2] calldata a,
-  uint256[2][2] calldata b,
-  uint256[2] calldata c,
-  uint256[4] calldata publicSignals
-) external view returns (bool);
-```
+Eight generated verifiers under `contracts/generated/protocol/` are wrapped individually by `FixedGroth16Verifier`: source fact (10), source trust (8), issuance (5), code (10), capability (10), deposit (20), claim (23), transfer (12). The wrapper fixes the generated verifier and public arity at construction. Clients must use the same pinned keys and public-signal order.
 
 ## Contract Security Summary
 

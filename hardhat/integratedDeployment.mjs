@@ -3,11 +3,13 @@ import path from "node:path";
 import {
   INTEGRATED_DEPLOYMENT_RECORDS,
   SHIELDED_DEPLOYMENT_CIRCUITS,
-  SHIELDED_ACTIONS,
+  PROTOCOL_DEPLOYMENT_CIRCUITS,
   RECEIVE_DEPLOYMENT_CONTRACTS,
-  receiveDeploymentConstructorArgs, receiveDeploymentLibraries,
+  receiveDeploymentConstructorArgs,
+  receiveDeploymentLibraries,
   integratedDeploymentContract,
 } from "../scripts/lib/zkDeploymentCatalog.mjs";
+import { inspectCanonicalDevelopmentArtifacts } from "../scripts/check-protocol-artifacts.mjs";
 import { assertImplementationMatchesArtifact } from "../tasks/lib/timelockUpgrade.mjs";
 import {
   assertGovernanceMultisigWithProfile,
@@ -480,81 +482,118 @@ const assertExistingLineageWiring = async ({ deepFamily, lineageIndex }) => {
 export const assertIntegratedShieldedWiring = async (deployed) => {
   const {
     token,
+    deepFamily,
     lineageIndex,
     shieldedErc20Pool,
     shieldedNativePool,
     shieldedPoolFactory,
-    identityAuthorizationState,
-    identityAuthorizationVerifierAdapter,
-    identityAuthorizationUpdateVerifier,
-    anonymousReceivePresentationVerifier,
-    fundReceivePresentationVerifier,
-    attachedReceivePresentationVerifier,
-    receivePresentationVerifierRouter,
-    privateLetterArchive,
-    groth16VerifierAdapter: adapter,
+    shieldedBoundaryVerifierAdapter: boundary,
+    eligibilitySource: source,
+    receiveRegistry: registry,
+    letterArchive: letters,
   } = deployed;
-  const [tokenAddress, lineageAddress, adapterAddress, nativeAddress, deepPoolAddress] =
-    await Promise.all([
-      token.getAddress(),
-      lineageIndex.getAddress(),
-      adapter.getAddress(),
-      shieldedNativePool.getAddress(),
-      shieldedErc20Pool.getAddress(),
-    ]);
-  const stateAddress = await identityAuthorizationState.getAddress();
-  const receiveRouterAddress = await receivePresentationVerifierRouter.getAddress();
+  const [
+    tokenAddress,
+    familyAddress,
+    lineageAddress,
+    boundaryAddress,
+    registryAddress,
+    nativeAddress,
+    deepPoolAddress,
+  ] = await Promise.all([
+    token.getAddress(),
+    deepFamily.getAddress(),
+    lineageIndex.getAddress(),
+    boundary.getAddress(),
+    registry.getAddress(),
+    shieldedNativePool.getAddress(),
+    shieldedErc20Pool.getAddress(),
+  ]);
+  const check = (actual, expected, label) => {
+    if (!sameAddress(actual, expected))
+      throw new Error(`Integrated deployment ${label} binding mismatch`);
+  };
+  const poolBindings = {
+    VERIFIER: boundaryAddress,
+    RECEIVE_REGISTRY: registryAddress,
+    FUND_VERIFIER: await deployed.protocolVerifiers.fund.getAddress(),
+    CLAIM_VERIFIER: await deployed.protocolVerifiers.claim.getAddress(),
+    TRANSFER_VERIFIER: await deployed.protocolVerifiers.transfer.getAddress(),
+  };
   for (const [pool, kind, label] of [
-    [shieldedErc20Pool, 0n, "ERC20 pool"],
     [shieldedNativePool, 1n, "native pool"],
+    [shieldedErc20Pool, 0n, "ERC20 pool"],
   ]) {
-    for (const [value, expected, field] of [
-      [await pool.LINEAGE_INDEX(), lineageAddress, "lineage index"],
-      [await pool.VERIFIER(), adapterAddress, "verifier adapter"],
-      [await pool.AUTHORIZATION_STATE(), stateAddress, "identity authorization state"],
-      [await pool.RECEIVE_VERIFIER(), receiveRouterAddress, "receive verifier"],
-    ]) {
-      if (!sameAddress(value, expected))
-        throw new Error(`Integrated deployment ${label} ${field} binding mismatch`);
-    }
+    for (const [getter, address] of Object.entries(poolBindings))
+      check(await pool[getter](), address, `${label} ${getter}`);
     if (BigInt(await pool.assetKind()) !== kind || BigInt(await pool.protocolVersion()) !== 1n)
       throw new Error(`Integrated deployment ${label} kind/version mismatch`);
   }
-  for (const [value, expected, label] of [
+  for (const [getter, address] of Object.entries(poolBindings))
+    check(await shieldedPoolFactory[getter](), address, `factory ${getter}`);
+  for (const [actual, expected, label] of [
     [await shieldedErc20Pool.TOKEN(), tokenAddress, "pool token"],
-    [await shieldedPoolFactory.DEEP_TOKEN(), tokenAddress, "factory DEEP token"],
-    [await shieldedPoolFactory.LINEAGE_INDEX(), lineageAddress, "factory lineage"],
-    [await shieldedPoolFactory.VERIFIER(), adapterAddress, "factory verifier"],
+    [await shieldedPoolFactory.DEEP_TOKEN(), tokenAddress, "factory token"],
     [await shieldedPoolFactory.NATIVE_POOL(), nativeAddress, "factory native pool"],
-    [await shieldedPoolFactory.AUTHORIZATION_STATE(), stateAddress, "factory authorization state"],
-    [await shieldedPoolFactory.RECEIVE_VERIFIER(), receiveRouterAddress, "factory receive verifier"],
-    [await identityAuthorizationState.VERIFIER(), await identityAuthorizationVerifierAdapter.getAddress(), "counter verifier adapter"],
-    [await identityAuthorizationVerifierAdapter.VERIFIER(), await identityAuthorizationUpdateVerifier.getAddress(), "owner authorization verifier"],
-    [await receivePresentationVerifierRouter.ANONYMOUS_VERIFIER(), await anonymousReceivePresentationVerifier.getAddress(), "anonymous receive verifier"],
-    [await receivePresentationVerifierRouter.FUND_VERIFIER(), await fundReceivePresentationVerifier.getAddress(), "Fund receive verifier"],
-    [await privateLetterArchive.AUTHORIZATION_STATE(), stateAddress, "letter authorization state"],
-    [await privateLetterArchive.LETTER_VERIFIER(), await anonymousReceivePresentationVerifier.getAddress(), "letter verifier"],
-    [await privateLetterArchive.ATTACHMENT_VERIFIER(), await attachedReceivePresentationVerifier.getAddress(), "attachment verifier"],
-    [await privateLetterArchive.POOL_FACTORY(), await shieldedPoolFactory.getAddress(), "letter pool factory"],
-    [await privateLetterArchive.DEEP_FAMILY(), await deployed.deepFamily.getAddress(), "letter family"],
-    [await shieldedPoolFactory.poolFor(tokenAddress), deepPoolAddress, "factory DEEP pool"],
+    [await shieldedPoolFactory.poolFor(tokenAddress), deepPoolAddress, "factory token registry"],
     [
       await shieldedPoolFactory.poolFor("0x0000000000000000000000000000000000000000"),
       nativeAddress,
       "factory native registry",
     ],
-  ]) {
-    if (!sameAddress(value, expected))
-      throw new Error(`Integrated deployment ${label} binding mismatch`);
-  }
+    [await source.LINEAGE_INDEX(), lineageAddress, "qualification lineage"],
+    [await source.DEEP_FAMILY(), familyAddress, "qualification family"],
+    [
+      await deepFamily.eligibilitySource(),
+      await source.getAddress(),
+      "active qualification source",
+    ],
+    [await registry.SOURCE(), await source.getAddress(), "registry source"],
+    [await letters.RECEIVE_REGISTRY(), registryAddress, "letter registry"],
+    [await letters.DEEP_FAMILY(), familyAddress, "letter family"],
+    [
+      await source.FACT_VERIFIER(),
+      await deployed.protocolVerifiers.sourceFact.getAddress(),
+      "source fact verifier",
+    ],
+    [
+      await source.TRUST_VERIFIER(),
+      await deployed.protocolVerifiers.sourceTrust.getAddress(),
+      "source trust verifier",
+    ],
+    [
+      await registry.ISSUE_VERIFIER(),
+      await deployed.protocolVerifiers.issue.getAddress(),
+      "issue verifier",
+    ],
+    [
+      await registry.CODE_VERIFIER(),
+      await deployed.protocolVerifiers.code.getAddress(),
+      "code verifier",
+    ],
+    [
+      await registry.CAPABILITY_VERIFIER(),
+      await deployed.protocolVerifiers.capability.getAddress(),
+      "capability verifier",
+    ],
+  ])
+    check(actual, expected, label);
   for (const [action, spec] of Object.entries(SHIELDED_DEPLOYMENT_CIRCUITS)) {
-    const verifierAddress = await deployed.shieldedVerifiers[action].getAddress();
-    if (
-      !sameAddress(await adapter[spec.adapterVerifierGetter](), verifierAddress) ||
-      (SHIELDED_ACTIONS.includes(action) && !sameAddress(await adapter.verifierForPurpose(spec.proofPurpose), verifierAddress))
-    ) {
-      throw new Error(`Integrated deployment ${action} verifier binding mismatch`);
-    }
+    check(
+      await boundary[spec.adapterVerifierGetter](),
+      await deployed.shieldedVerifiers[action].getAddress(),
+      `${action} boundary verifier`,
+    );
+  }
+  for (const [action, spec] of Object.entries(PROTOCOL_DEPLOYMENT_CIRCUITS)) {
+    const verifier = deployed.protocolVerifiers[action];
+    check(
+      await verifier.VERIFIER(),
+      await deployed.generatedVerifiers[action].getAddress(),
+      `${action} generated verifier`,
+    );
+    if (BigInt(await verifier.PUBLIC_SIGNAL_COUNT()) !== BigInt(spec.publicSignals))
+      throw new Error(`Integrated deployment ${action} public ABI mismatch`);
   }
 };
 
@@ -682,6 +721,13 @@ export const deployIntegratedSystem = async (
     });
   }
 
+  if (!isLocalDev) {
+    throw new Error(
+      "The receive protocol has no approved production artifact set. Development proving keys may only be deployed to a local development network.",
+    );
+  }
+  inspectCanonicalDevelopmentArtifacts({ requireCompiledProtocol: true });
+
   const Token = await ethers.getContractFactory("DeepFamilyToken", deployer);
   const token = await deployContract("deepFamilyToken", Token);
 
@@ -715,7 +761,6 @@ export const deployIntegratedSystem = async (
   const personCommitmentVerifierAddress = await personCommitmentVerifier.getAddress();
   const nameDisclosureVerifierAddress = await nameDisclosureVerifier.getAddress();
 
-  // All verifier targets must exist before the single adapter fixes its seven routes.
   const shieldedVerifiers = {};
   for (const [action, spec] of Object.entries(SHIELDED_DEPLOYMENT_CIRCUITS)) {
     shieldedVerifiers[action] = await deployContract(
@@ -723,24 +768,32 @@ export const deployIntegratedSystem = async (
       await ethers.getContractFactory(spec.verifierContractName, deployer),
     );
   }
-  const Groth16VerifierAdapter = await ethers.getContractFactory(
-    "Groth16VerifierAdapter",
-    deployer,
-  );
   const groth16VerifierAdapter = await deployContract(
     "groth16VerifierAdapter",
-    Groth16VerifierAdapter,
-    [
-      personCommitmentVerifierAddress,
-      nameDisclosureVerifierAddress,
-      await Promise.all(
-        Object.keys(SHIELDED_DEPLOYMENT_CIRCUITS).map((action) =>
-          shieldedVerifiers[action].getAddress(),
-        ),
-      ),
-    ],
+    await ethers.getContractFactory("Groth16VerifierAdapter", deployer),
+    [personCommitmentVerifierAddress, nameDisclosureVerifierAddress],
   );
   const groth16VerifierAdapterAddress = await groth16VerifierAdapter.getAddress();
+  const shieldedBoundaryVerifierAdapter = await deployContract(
+    "shieldedBoundaryVerifierAdapter",
+    await ethers.getContractFactory("ShieldedBoundaryVerifierAdapter", deployer),
+    await Promise.all(
+      ["shield", "unshield", "unshield4"].map((name) => shieldedVerifiers[name].getAddress()),
+    ),
+  );
+  const generatedVerifiers = {},
+    protocolVerifiers = {};
+  for (const [action, spec] of Object.entries(PROTOCOL_DEPLOYMENT_CIRCUITS)) {
+    generatedVerifiers[action] = await deployContract(
+      spec.generatedLabel,
+      await ethers.getContractFactory(spec.contract, deployer),
+    );
+    protocolVerifiers[action] = await deployContract(
+      spec.adapterLabel,
+      await ethers.getContractFactory("FixedGroth16Verifier", deployer),
+      [await generatedVerifiers[action].getAddress(), spec.publicSignals],
+    );
+  }
 
   // Main contract behind a UUPS proxy. initialize() wires the token address.
   const DeepFamily = await ethers.getContractFactory("DeepFamily", {
@@ -885,40 +938,56 @@ export const deployIntegratedSystem = async (
   }
 
   const receive = {};
-  const receiveAddresses = { deepFamily: deepFamilyAddress, poseidonT3: lineageLibraries.PoseidonT3, poseidonT4: lineageLibraries.PoseidonT4 };
+  const receiveAddresses = {
+    deepFamily: deepFamilyAddress,
+    lineageIndex: lineageIndexAddress,
+    poseidonT3: lineageLibraries.PoseidonT3,
+    poseidonT4: lineageLibraries.PoseidonT4,
+  };
+  for (const [action, spec] of Object.entries(PROTOCOL_DEPLOYMENT_CIRCUITS)) {
+    receiveAddresses[spec.adapterLabel] = await protocolVerifiers[action].getAddress();
+  }
   for (const { contractName, property } of RECEIVE_DEPLOYMENT_CONTRACTS) {
-    if (property === "privateLetterArchive") continue;
-    receive[property] = await deployContract(property,
-      await ethers.getContractFactory(contractName, { signer: deployer, libraries: receiveDeploymentLibraries(property, receiveAddresses) }),
-      receiveDeploymentConstructorArgs(property, receiveAddresses));
+    receive[property] = await deployContract(
+      property,
+      await ethers.getContractFactory(contractName, {
+        signer: deployer,
+        libraries: receiveDeploymentLibraries(property, receiveAddresses),
+      }),
+      receiveDeploymentConstructorArgs(property, receiveAddresses),
+    );
     receiveAddresses[property] = await receive[property].getAddress();
   }
+  await executeTransaction(
+    "setEligibilitySource",
+    await deepFamily.setEligibilitySource.populateTransaction(receiveAddresses.eligibilitySource),
+  );
+  const poolArgs = [
+    await shieldedBoundaryVerifierAdapter.getAddress(),
+    receiveAddresses.receiveRegistry,
+    receiveAddresses.protocolFundVerifier,
+    receiveAddresses.protocolClaimVerifier,
+    receiveAddresses.protocolTransferVerifier,
+  ];
   const ShieldedNativePool = await ethers.getContractFactory("ShieldedNativePool", {
     signer: deployer,
     libraries: { PoseidonT3: lineageLibraries.PoseidonT3 },
   });
-  const shieldedNativePool = await deployContract("shieldedNativePool", ShieldedNativePool, [
-    lineageIndexAddress,
-    groth16VerifierAdapterAddress,
-    receiveAddresses.identityAuthorizationState,
-    receiveAddresses.receivePresentationVerifierRouter,
-  ]);
+  const shieldedNativePool = await deployContract(
+    "shieldedNativePool",
+    ShieldedNativePool,
+    poolArgs,
+  );
   const ShieldedPoolFactory = await ethers.getContractFactory("ShieldedPoolFactory", {
     signer: deployer,
     libraries: { PoseidonT3: lineageLibraries.PoseidonT3 },
   });
   const shieldedPoolFactory = await deployContract("shieldedPoolFactory", ShieldedPoolFactory, [
     tokenAddress,
-    lineageIndexAddress,
-    groth16VerifierAdapterAddress,
+    poolArgs[0],
     await shieldedNativePool.getAddress(),
-    receiveAddresses.identityAuthorizationState,
-    receiveAddresses.receivePresentationVerifierRouter,
+    ...poolArgs.slice(1),
   ]);
-  receiveAddresses.shieldedPoolFactory = await shieldedPoolFactory.getAddress();
-  receive.privateLetterArchive = await deployContract("privateLetterArchive",
-    await ethers.getContractFactory("PrivateLetterArchive", deployer),
-    receiveDeploymentConstructorArgs("privateLetterArchive", receiveAddresses));
   const shieldedErc20Pool = await ethers.getContractAt(
     "ShieldedErc20Pool",
     await shieldedPoolFactory.poolFor(tokenAddress),
@@ -927,6 +996,9 @@ export const deployIntegratedSystem = async (
   const shielded = {
     ...receive,
     shieldedVerifiers,
+    shieldedBoundaryVerifierAdapter,
+    generatedVerifiers,
+    protocolVerifiers,
     shieldedNativePool,
     shieldedPoolFactory,
     shieldedErc20Pool,
@@ -1078,8 +1150,12 @@ export const deployIntegratedSystem = async (
       { deepFamilyAddress },
       deploymentDirectory,
     );
-    for (const record of INTEGRATED_DEPLOYMENT_RECORDS.filter((item) =>
-      item.property.startsWith("shielded") || RECEIVE_DEPLOYMENT_CONTRACTS.some(({property}) => property === item.property),
+    for (const record of INTEGRATED_DEPLOYMENT_RECORDS.filter(
+      (item) =>
+        item.property.startsWith("shielded") ||
+        item.property.startsWith("protocol") ||
+        item.property.startsWith("generated") ||
+        RECEIVE_DEPLOYMENT_CONTRACTS.some(({ property }) => property === item.property),
     )) {
       const contract = integratedDeploymentContract(shielded, record.property);
       await writeDeployment(
@@ -1119,13 +1195,18 @@ export const ensureIntegratedSystem = async (
   { writeDeployments, artifacts: artifactReader, allowNewDeployment = false } = {},
 ) => {
   const connection = await resolveConnection(hreOrConnection);
-  if (connection.__deepfamilyIntegrated?.shieldedErc20Pool) {
+  if (connection.__deepfamilyIntegrated?.receiveRegistry) {
     return connection.__deepfamilyIntegrated;
   }
   const { ethers } = connection;
   const [signer] = await ethers.getSigners();
   const artifacts = artifactReader ?? hreOrConnection?.artifacts ?? null;
   const local = isLocalDevNetwork(connection);
+  if (!local)
+    throw new Error(
+      "The receive protocol has no approved production artifact set; development deployments cannot be reused on a live network.",
+    );
+  inspectCanonicalDevelopmentArtifacts({ requireCompiledProtocol: true });
   const shouldWrite =
     writeDeployments ??
     (local && !isEphemeralNetwork(connection) && Boolean(artifacts?.readArtifact));
@@ -1166,6 +1247,8 @@ export const ensureIntegratedSystem = async (
       const deployed = {
         deepFamilyImplementationAddress: implementation,
         shieldedVerifiers: {},
+        generatedVerifiers: {},
+        protocolVerifiers: {},
       };
       for (const record of records) {
         const contract = await ethers.getContractAt(
@@ -1195,18 +1278,26 @@ export const ensureIntegratedSystem = async (
               contractName: record.contractName,
               deployment: record.deployment,
               spec:
-                record.contractName === "IdentityAuthorizationState"
-                  ? { libraries: { PoseidonT3: libraries.PoseidonT3, PoseidonT4: libraries.PoseidonT4 } }
-                  : record.contractName === "DeepFamilyLineageIndex"
-                  ? { libraries }
-                  : ["ShieldedErc20Pool", "ShieldedNativePool", "ShieldedPoolFactory"].includes(
-                        record.contractName,
-                      )
-                    ? { libraries: { PoseidonT3: libraries.PoseidonT3 } }
-                    : {
-                        needsLibraries: false,
-                        librarySelfAddress: POSEIDON_LIBRARIES.includes(record.contractName),
+                record.contractName === "EligibilitySource"
+                  ? {
+                      libraries: {
+                        PoseidonT3: libraries.PoseidonT3,
+                        PoseidonT4: libraries.PoseidonT4,
                       },
+                    }
+                  : record.contractName === "DeepFamilyLineageIndex"
+                    ? { libraries }
+                    : [
+                          "ReceiveRegistry",
+                          "ShieldedErc20Pool",
+                          "ShieldedNativePool",
+                          "ShieldedPoolFactory",
+                        ].includes(record.contractName)
+                      ? { libraries: { PoseidonT3: libraries.PoseidonT3 } }
+                      : {
+                          needsLibraries: false,
+                          librarySelfAddress: POSEIDON_LIBRARIES.includes(record.contractName),
+                        },
             })),
         });
       }

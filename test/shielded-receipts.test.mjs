@@ -115,8 +115,8 @@ describe("shielded receipt observer", function () {
   it("uses the pool's actual fund and claim ABI selectors", async function () {
     const artifact = await hre.artifacts.readArtifact("ShieldedErc20Pool");
     const abi = new Interface(artifact.abi);
-    assert.equal(FUND_SELECTOR, abi.getFunction("fund").selector);
-    assert.equal(CLAIM_SELECTOR, abi.getFunction("claim").selector);
+    assert.equal(FUND_SELECTOR, abi.getFunction("depositBudget").selector);
+    assert.equal(CLAIM_SELECTOR, abi.getFunction("claimBudget").selector);
   });
 
   it("requires an explicit positive safe chain ID before RPC lookups", async function () {

@@ -7,36 +7,36 @@ import {
   buildShieldedHpkeAad,
   computeShieldedCiphertextHashField,
   decryptShieldedNote,
-  deriveShieldedHeirKeyMaterial,
   deriveShieldedViewPublicKey,
   encryptShieldedNote,
   splitShieldedViewPublicKey,
 } from "../index.js";
 
+const testKey = value => ({hpkeIkm: new Uint8Array(32).fill(Number(value))});
 const POOL = "0x0000000000000000000000000000000000000001";
 const OTHER_POOL = "0x0000000000000000000000000000000000000002";
 const context = { chainId: 1030n, poolAddress: POOL };
 
-test("existing identity secret deterministically derives an X25519 public key", async () => {
-  const { hpkeIkm } = deriveShieldedHeirKeyMaterial(13n);
+test("fixed recipient IKM deterministically derives the expected X25519 key", async () => {
+  const { hpkeIkm } = testKey(13n);
   const key = await deriveShieldedViewPublicKey(hpkeIkm);
   assert.equal(
     Buffer.from(key).toString("hex"),
-    "c89fca5e0978b147dbbabe45e4f1f5427018d7b63029d704b3c7cc4db2df226e",
+    "5804dea1d05a3f22886014cf45bb77d34bf5d17613b0b44222f9b087e45d644c",
   );
   const limbs = splitShieldedViewPublicKey(key);
   assert.deepEqual(limbs, {
-    viewKeyHi: 266675278854608699523136467037752259906n,
-    viewKeyLo: 149002525805011638159125817198076961390n,
+    viewKeyHi: 116997348331654895106151299621983057875n,
+    viewKeyLo: 100968460792833900495915938141066585164n,
   });
   assert.notDeepEqual(
     key,
-    await deriveShieldedViewPublicKey(deriveShieldedHeirKeyMaterial(14n).hpkeIkm),
+    await deriveShieldedViewPublicKey(testKey(14n).hpkeIkm),
   );
 });
 
 test("HPKE note round-trips with fixed length and randomized ciphertext", async () => {
-  const { hpkeIkm } = deriveShieldedHeirKeyMaterial(13n);
+  const { hpkeIkm } = testKey(13n);
   const recipientPublicKey = await deriveShieldedViewPublicKey(hpkeIkm);
   for (const payload of [
     new Uint8Array(),
@@ -58,14 +58,14 @@ test("HPKE note round-trips with fixed length and randomized ciphertext", async 
 });
 
 test("wrong identity, AAD, ciphertext mutation and truncation fail closed", async () => {
-  const { hpkeIkm } = deriveShieldedHeirKeyMaterial(13n);
+  const { hpkeIkm } = testKey(13n);
   const recipientPublicKey = await deriveShieldedViewPublicKey(hpkeIkm);
   const ciphertext = await encryptShieldedNote({
     recipientPublicKey,
     payload: new Uint8Array([1, 2, 3]),
     ...context,
   });
-  const wrongKey = deriveShieldedHeirKeyMaterial(14n).hpkeIkm;
+  const wrongKey = testKey(14n).hpkeIkm;
   const tampered = ciphertext.slice();
   tampered[tampered.length - 1] ^= 1;
   for (const invalid of [

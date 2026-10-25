@@ -6,7 +6,7 @@ import path from "node:path";
 import { ensureZkArtifacts } from "../scripts/ensure-zk-artifacts.mjs";
 import { SHIELDED_CIRCUITS } from "../scripts/lib/zkCircuitSelection.mjs";
 
-const circuitCount = 2 + Object.keys(SHIELDED_CIRCUITS).length;
+const circuitCount = 13;
 
 function writePinnedArtifacts(root, status) {
   const files = {
@@ -79,7 +79,7 @@ describe("integrated local ZK artifact preparation", function () {
       build: async () => calls.push("build"),
       check: async () => {
         calls.push("check");
-        if (!downloaded) throw new Error("missing public presentation keys");
+        if (!downloaded) throw new Error("missing public proof keys");
         return artifacts;
       },
       fetchAssets: async (options) => {
@@ -97,12 +97,12 @@ describe("integrated local ZK artifact preparation", function () {
     [
       "changed circuit",
       "development",
-      "zk-artifacts/shielded/shielded_anonymous_receive_presentation.r1cs",
+      "zk-artifacts/shielded/budget_deposit.r1cs",
     ],
     [
       "changed receive loader",
       "development",
-      "frontend/src/shared/zk/shieldedReceivePresentation.ts",
+      "frontend/src/shared/zk/receiveProtocol.ts",
     ],
     ["invalid final artifact", "production", "zk-artifacts/circuits/person_commitment.r1cs"],
   ]) {
@@ -133,7 +133,7 @@ describe("integrated local ZK artifact preparation", function () {
       expect(failure).to.be.instanceOf(Error);
       expect(failure.cause).to.equal(verificationError);
       expect(failure.message).to.contain(verificationError.message);
-      expect(failure.message).to.contain("npm run zk:setup");
+      expect(failure.message).to.contain("npm run zk:dev");
       expect(failure.message).to.contain("npm run zk:assets:fetch");
       expect(failure.message).to.contain("npm run zk:assets:publish");
       expect(calls).to.deep.equal(["build", "check", "fetch", "check"]);
@@ -166,7 +166,7 @@ describe("integrated local ZK artifact preparation", function () {
     expect(failure).to.be.instanceOf(Error);
     expect(failure.cause).to.equal(downloadError);
     expect(failure.message).to.contain(downloadError.message);
-    expect(failure.message).to.contain("npm run zk:setup");
+    expect(failure.message).to.contain("npm run zk:dev");
     expect(failure.message).to.contain("npm run zk:assets:publish");
     expect(calls).to.deep.equal(["build", "check", "fetch"]);
     expectPinnedArtifactsUnchanged(root, files);

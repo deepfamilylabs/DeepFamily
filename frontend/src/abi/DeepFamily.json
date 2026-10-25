@@ -256,6 +256,11 @@
     },
     {
       "inputs": [],
+      "name": "InvalidEligibilityMutation",
+      "type": "error"
+    },
+    {
+      "inputs": [],
       "name": "InvalidEnvelopePrefix",
       "type": "error"
     },
@@ -1283,6 +1288,19 @@
       "type": "function"
     },
     {
+      "inputs": [],
+      "name": "eligibilitySource",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
       "inputs": [
         {
           "internalType": "bytes32",
@@ -1375,6 +1393,35 @@
         }
       ],
       "name": "isApprovedForAll",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "personHash",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "uint256",
+          "name": "versionIndex",
+          "type": "uint256"
+        },
+        {
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        }
+      ],
+      "name": "isTrustedEndorserManager",
       "outputs": [
         {
           "internalType": "bool",
@@ -1912,6 +1959,24 @@
     {
       "inputs": [
         {
+          "internalType": "uint8[]",
+          "name": "roles",
+          "type": "uint8[]"
+        },
+        {
+          "internalType": "uint256[]",
+          "name": "secrets",
+          "type": "uint256[]"
+        }
+      ],
+      "name": "revokeEligibilityRoles",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
           "internalType": "bytes32",
           "name": "",
           "type": "bytes32"
@@ -2029,6 +2094,19 @@
         }
       ],
       "name": "setCircuitVerifier",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "source",
+          "type": "address"
+        }
+      ],
+      "name": "setEligibilitySource",
       "outputs": [],
       "stateMutability": "nonpayable",
       "type": "function"
@@ -2564,6 +2642,29 @@
         }
       ],
       "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint8[]",
+          "name": "roles",
+          "type": "uint8[]"
+        },
+        {
+          "internalType": "uint256[]",
+          "name": "secrets",
+          "type": "uint256[]"
+        },
+        {
+          "internalType": "bytes",
+          "name": "mutation",
+          "type": "bytes"
+        }
+      ],
+      "name": "withEligibilityRevocations",
+      "outputs": [],
+      "stateMutability": "nonpayable",
       "type": "function"
     },
     {

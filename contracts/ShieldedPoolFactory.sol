@@ -12,11 +12,12 @@ contract ShieldedPoolFactory is ReentrancyGuardTransient {
   error InvalidNativePool();
 
   address public immutable DEEP_TOKEN;
-  address public immutable LINEAGE_INDEX;
   address public immutable VERIFIER;
   address public immutable NATIVE_POOL;
-  address public immutable AUTHORIZATION_STATE;
-  address public immutable RECEIVE_VERIFIER;
+  address public immutable RECEIVE_REGISTRY;
+  address public immutable FUND_VERIFIER;
+  address public immutable CLAIM_VERIFIER;
+  address public immutable TRANSFER_VERIFIER;
   mapping(address asset => address pool) public poolFor;
   uint256 public poolCount;
 
@@ -24,18 +25,20 @@ contract ShieldedPoolFactory is ReentrancyGuardTransient {
 
   constructor(
     address deepToken,
-    address lineageIndex,
     address verifier,
     address nativePool,
-    address authorizationState,
-    address receiveVerifier
+    address registry,
+    address fundVerifier,
+    address claimVerifier,
+    address transferVerifier
   ) {
     if (
       deepToken.code.length == 0 ||
-      lineageIndex.code.length == 0 ||
       verifier.code.length == 0 ||
-      authorizationState.code.length == 0 ||
-      receiveVerifier.code.length == 0
+      registry.code.length == 0 ||
+      fundVerifier.code.length == 0 ||
+      claimVerifier.code.length == 0 ||
+      transferVerifier.code.length == 0
     ) {
       revert InvalidConstructorAddress();
     }
@@ -44,17 +47,19 @@ contract ShieldedPoolFactory is ReentrancyGuardTransient {
     if (
       nativeConfiguration.assetKind() != 1 ||
       nativeConfiguration.protocolVersion() != 1 ||
-      nativeConfiguration.LINEAGE_INDEX() != lineageIndex ||
       nativeConfiguration.VERIFIER() != verifier ||
-      nativeConfiguration.AUTHORIZATION_STATE() != authorizationState ||
-      nativeConfiguration.RECEIVE_VERIFIER() != receiveVerifier
+      nativeConfiguration.RECEIVE_REGISTRY() != registry ||
+      nativeConfiguration.FUND_VERIFIER() != fundVerifier ||
+      nativeConfiguration.CLAIM_VERIFIER() != claimVerifier ||
+      nativeConfiguration.TRANSFER_VERIFIER() != transferVerifier
     ) revert InvalidNativePool();
     DEEP_TOKEN = deepToken;
-    LINEAGE_INDEX = lineageIndex;
     VERIFIER = verifier;
     NATIVE_POOL = nativePool;
-    AUTHORIZATION_STATE = authorizationState;
-    RECEIVE_VERIFIER = receiveVerifier;
+    RECEIVE_REGISTRY = registry;
+    FUND_VERIFIER = fundVerifier;
+    CLAIM_VERIFIER = claimVerifier;
+    TRANSFER_VERIFIER = transferVerifier;
     poolFor[address(0)] = nativePool;
     poolCount = 1;
     emit PoolCreated(address(0), nativePool);
@@ -70,7 +75,8 @@ contract ShieldedPoolFactory is ReentrancyGuardTransient {
 
   function _createPool(address token) private returns (address pool) {
     pool = address(
-      new ShieldedErc20Pool(token, LINEAGE_INDEX, VERIFIER, AUTHORIZATION_STATE, RECEIVE_VERIFIER)
+      new ShieldedErc20Pool(token, VERIFIER, RECEIVE_REGISTRY, FUND_VERIFIER,
+        CLAIM_VERIFIER, TRANSFER_VERIFIER)
     );
     poolFor[token] = pool;
     ++poolCount;

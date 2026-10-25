@@ -81,9 +81,7 @@ test("single-input VALUE circuits preserve authority, membership and value", asy
   t.after(() => fs.rmSync(output, { recursive: true, force: true }));
   const calculators = {};
   for (const name of [
-    "shielded_private_transfer",
     "shielded_unshield",
-    "shielded_private_transfer_4",
     "shielded_unshield_4",
   ]) {
     execFileSync(
@@ -108,7 +106,7 @@ test("single-input VALUE circuits preserve authority, membership and value", asy
       { singleThread: true },
     );
   }
-  for (const exit of [false, true]) {
+  for (const exit of [true]) {
     const name = exit ? "shielded_unshield" : "shielded_private_transfer";
     const calculator = calculators[name];
     await t.test(`${name}: one real input and two outputs`, async () => {
@@ -159,18 +157,6 @@ test("single-input VALUE circuits preserve authority, membership and value", asy
       await assert.rejects(() => calculator.calculateWitness(fixture(exit, 4), true));
     });
   }
-  await t.test(
-    "single transfer rejects zero-value funding and accepts uint128 maximum",
-    async () => {
-      await assertConstraintViolation(() =>
-        calculators.shielded_private_transfer.calculateWitness(fixture(false, 1, 0n), true),
-      );
-      await calculators.shielded_private_transfer.calculateWitness(
-        fixture(false, 1, (1n << 128n) - 1n),
-        true,
-      );
-    },
-  );
   await t.test("single withdrawal rejects zero recipient and unbalanced withdrawal", async () => {
     for (const [field, value] of [
       ["recipient", "0"],

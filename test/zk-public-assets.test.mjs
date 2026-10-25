@@ -12,12 +12,16 @@ import { publishZkAssets } from "../scripts/publish-zk-assets.mjs";
 import { compressZkAssets } from "../scripts/compress-zk-assets.mjs";
 
 const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
-const BYTES = {
-  "frontend/public/zk/person_commitment.wasm": Buffer.from("core-wasm"),
-  "frontend/public/zk/person_commitment_final.zkey": Buffer.from("core-zkey"),
-  "frontend/public/zk/shielded/shielded_claim_64.wasm": Buffer.from("claim-wasm"),
-  "frontend/public/zk/shielded/shielded_claim_64_final.zkey": Buffer.from("claim-zkey"),
-};
+const CORE = ["person_commitment", "disclosure_binding"];
+const BOUNDARIES = ["shielded_shield", "shielded_unshield", "shielded_unshield_4"];
+const PROTOCOL = ["eligibility_source_fact", "eligibility_source_trust", "eligibility_issue", "receive_code", "budget_capability", "budget_deposit", "budget_claim", "value_transfer"];
+const BYTES = Object.fromEntries([
+  ...CORE.map(name => ["", name]), ...BOUNDARIES.map(name => ["shielded/", name]), ...PROTOCOL.map(name => ["protocol/", name]),
+].flatMap(([directory, name]) => [
+  [`frontend/public/zk/${directory}${name}.wasm`, Buffer.from(`${name}-wasm`)],
+  [`frontend/public/zk/${directory}${name}_final.zkey`, Buffer.from(`${name}-zkey`)],
+]));
+const ASSET_COUNT = 26;
 const digest = (file) => sha256(BYTES[`frontend/public/zk/${file}`]);
 const CREDENTIALS = {
   R2_ACCOUNT_ID: "account",
@@ -31,29 +35,18 @@ describe("ZK public proving assets", function () {
   beforeEach(function () {
     root = fs.mkdtempSync(path.join(os.tmpdir(), "deepfamily-zk-assets-"));
     fs.mkdirSync(path.join(root, "circuits"));
-    fs.writeFileSync(
-      path.join(root, "circuits/zk-artifacts-manifest.json"),
-      JSON.stringify({
-        circuits: {
-          person_commitment: {
-            wasmSha256: digest("person_commitment.wasm"),
-            zkeySha256: digest("person_commitment_final.zkey"),
-          },
-        },
-      }),
-    );
-    fs.writeFileSync(
-      path.join(root, "circuits/shielded-development-manifest.json"),
-      JSON.stringify({
-        circuits: {
-          claim: {
-            source: "shielded_claim_64",
-            wasmSha256: digest("shielded/shielded_claim_64.wasm"),
-            zkeySha256: digest("shielded/shielded_claim_64_final.zkey"),
-          },
-        },
-      }),
-    );
+    fs.writeFileSync(path.join(root, "circuits/zk-artifacts-manifest.json"), JSON.stringify({ circuits: Object.fromEntries(CORE.map(name => [name, {
+      wasmSha256: digest(`${name}.wasm`), zkeySha256: digest(`${name}_final.zkey`),
+    }])) }));
+    fs.writeFileSync(path.join(root, "circuits/shielded-development-manifest.json"), JSON.stringify({ circuits: Object.fromEntries(["shield", "unshield", "unshield4"].map((action, index) => [action, {
+      source: BOUNDARIES[index], wasmSha256: digest(`shielded/${BOUNDARIES[index]}.wasm`), zkeySha256: digest(`shielded/${BOUNDARIES[index]}_final.zkey`),
+    }])) }));
+    fs.writeFileSync(path.join(root, "circuits/receive-development-manifest.json"), JSON.stringify({ protocol: "deepfamily.receive", production:false,
+      circuits: Object.fromEntries(PROTOCOL.map(source => [source, { source,
+        compiled: { [`frontend/public/zk/protocol/${source}.wasm`]:digest(`protocol/${source}.wasm`) },
+        setup: { artifacts: { [`frontend/public/zk/protocol/${source}_final.zkey`]:digest(`protocol/${source}_final.zkey`) } },
+      }])),
+    }));
   });
   afterEach(function () {
     fs.rmSync(root, { recursive: true, force: true });
@@ -71,65 +64,24 @@ describe("ZK public proving assets", function () {
       return asset ? new Response(bytesFor(asset.file)) : new Response("missing", { status: 404 });
     };
 
-  it("lists the WASM and zkey of every manifest circuit by content-addressed key", function () {
-    expect(listZkPublicAssets(root)).to.deep.equal([
-      {
-        path: "/zk/person_commitment.wasm",
-        file: "frontend/public/zk/person_commitment.wasm",
-        key: `${digest("person_commitment.wasm")}/person_commitment.wasm.br`,
-        sha256: digest("person_commitment.wasm"),
-      },
-      {
-        path: "/zk/person_commitment_final.zkey",
-        file: "frontend/public/zk/person_commitment_final.zkey",
-        key: `${digest("person_commitment_final.zkey")}/person_commitment_final.zkey.br`,
-        sha256: digest("person_commitment_final.zkey"),
-      },
-      {
-        path: "/zk/shielded/shielded_claim_64.wasm",
-        file: "frontend/public/zk/shielded/shielded_claim_64.wasm",
-        key: `${digest("shielded/shielded_claim_64.wasm")}/shielded_claim_64.wasm.br`,
-        sha256: digest("shielded/shielded_claim_64.wasm"),
-      },
-      {
-        path: "/zk/shielded/shielded_claim_64_final.zkey",
-        file: "frontend/public/zk/shielded/shielded_claim_64_final.zkey",
-        key: `${digest("shielded/shielded_claim_64_final.zkey")}/shielded_claim_64_final.zkey.br`,
-        sha256: digest("shielded/shielded_claim_64_final.zkey"),
-      },
-    ]);
-  });
-
-  it("prefers the shielded production manifest once it exists", function () {
-    fs.writeFileSync(
-      path.join(root, "circuits/shielded-production-manifest.json"),
-      JSON.stringify({
-        circuits: {
-          claim: {
-            source: "shielded_claim_64",
-            wasmSha256: "a".repeat(64),
-            zkeySha256: "b".repeat(64),
-          },
-        },
-      }),
-    );
-    const shielded = listZkPublicAssets(root).filter((asset) => asset.path.includes("/shielded/"));
-    expect(shielded.map((asset) => asset.sha256)).to.deep.equal(["a".repeat(64), "b".repeat(64)]);
-  });
-
-  it("lists Circom receive presentations through the shared manifest without a separate runtime", function () {
-    const file = path.join(root, "circuits/shielded-development-manifest.json");
-    const manifest = JSON.parse(fs.readFileSync(file, "utf8"));
-    manifest.circuits.anonymousReceivePresentation = {
-      source: "shielded_anonymous_receive_presentation",
-      wasmSha256: "a".repeat(64),
-      zkeySha256: "b".repeat(64),
-    };
-    fs.writeFileSync(file, JSON.stringify(manifest));
+  it("lists exactly the current 13 public relation pairs by pinned digest", function () {
     const assets = listZkPublicAssets(root);
-    expect(assets.filter((asset) => asset.path.includes("receive_presentation"))).to.have.length(2);
-    expect(assets.every((asset) => /\.(wasm|zkey)$/u.test(asset.file))).to.equal(true);
-    expect(assets.some((asset) => asset.path.startsWith("/zk/receive/"))).to.equal(false);
+    expect(assets).to.have.length(ASSET_COUNT);
+    expect(new Set(assets.map(asset => asset.path)).size).to.equal(ASSET_COUNT);
+    for (const asset of assets) {
+      expect(asset.sha256).to.equal(sha256(BYTES[asset.file]));
+      expect(asset.key).to.equal(`${asset.sha256}/${path.basename(asset.file)}.br`);
+    }
+    expect(assets.filter(asset => asset.path.includes("/protocol/"))).to.have.length(16);
+    expect(fs.existsSync(path.join(root, "zk-artifacts"))).to.equal(false,
+      "a fresh checkout can enumerate and fetch artifacts using only committed manifests");
+  });
+  it("rejects an incomplete receiving relation graph", function () {
+    const file = path.join(root, "circuits/receive-development-manifest.json");
+    const manifest = JSON.parse(fs.readFileSync(file,"utf8"));
+    delete manifest.circuits.receive_code;
+    fs.writeFileSync(file, JSON.stringify(manifest));
+    expect(()=>listZkPublicAssets(root)).to.throw("All eight receiving proof statements are required");
   });
 
   it("downloads only missing or stale files and verifies their digests", async function () {
@@ -142,12 +94,8 @@ describe("ZK public proving assets", function () {
       fetchImpl: serve(requests),
       log: () => {},
     });
-    expect(result).to.deep.equal({ assetCount: 4, downloaded: 3 });
-    expect(requests).to.deep.equal([
-      `https://assets.example/${digest("person_commitment_final.zkey")}/person_commitment_final.zkey.br`,
-      `https://assets.example/${digest("shielded/shielded_claim_64.wasm")}/shielded_claim_64.wasm.br`,
-      `https://assets.example/${digest("shielded/shielded_claim_64_final.zkey")}/shielded_claim_64_final.zkey.br`,
-    ]);
+    expect(result).to.deep.equal({ assetCount: ASSET_COUNT, downloaded: ASSET_COUNT - 1 });
+    expect(requests).to.deep.equal(listZkPublicAssets(root).filter(asset => asset.file !== "frontend/public/zk/person_commitment.wasm").map(asset => `https://assets.example/${asset.key}`));
     for (const [file, bytes] of Object.entries(BYTES)) {
       expect(fs.readFileSync(path.join(root, file))).to.deep.equal(bytes);
     }
@@ -241,7 +189,7 @@ describe("ZK public proving assets", function () {
       },
       log: () => {},
     });
-    expect(result).to.deep.equal({ assetCount: 4, uploaded: 3 });
+    expect(result).to.deep.equal({ assetCount: ASSET_COUNT, uploaded: ASSET_COUNT - 1 });
     const puts = requests.filter((request) => request.method === "PUT");
     expect(puts.map((request) => request.url)).to.deep.equal(
       listZkPublicAssets(root)
@@ -259,18 +207,15 @@ describe("ZK public proving assets", function () {
         /^AWS4-HMAC-SHA256 Credential=key-id\/\d{8}\/auto\/s3\/aws4_request, SignedHeaders=cache-control;content-encoding;content-type;host;x-amz-content-sha256;x-amz-date, Signature=[0-9a-f]{64}$/,
       );
     }
-    expect(puts.map((put) => put.headers["content-type"])).to.deep.equal([
-      "application/octet-stream",
-      "application/wasm",
-      "application/octet-stream",
-    ]);
+    expect(puts.map(put => put.headers["content-type"])).to.deep.equal(
+      listZkPublicAssets(root).filter(asset => asset.key !== existingKey).map(asset => asset.file.endsWith(".wasm") ? "application/wasm" : "application/octet-stream"));
   });
 
   it("compresses, reuses valid sidecars and repairs corrupt or stale copies", async function () {
     for (const file of Object.keys(BYTES)) writeLocal(file);
     const first = await compressZkAssets({ root, log: () => {} });
-    expect(first.assetCount).to.equal(4);
-    expect(first.compressed).to.equal(4);
+    expect(first.assetCount).to.equal(ASSET_COUNT);
+    expect(first.compressed).to.equal(ASSET_COUNT);
     expect(first.rawBytes).to.equal(
       Object.values(BYTES).reduce((total, bytes) => total + bytes.length, 0),
     );
@@ -348,7 +293,7 @@ describe("ZK public proving assets", function () {
         baseUrl: `http://127.0.0.1:${server.address().port}`,
         log: () => {},
       });
-      expect(result).to.deep.equal({ assetCount: 4, downloaded: 4 });
+      expect(result).to.deep.equal({ assetCount: ASSET_COUNT, downloaded: ASSET_COUNT });
       expect(requests).to.deep.equal(assets.map((asset) => `/${asset.key}`));
       for (const [file, bytes] of Object.entries(BYTES)) {
         expect(fs.readFileSync(path.join(root, file))).to.deep.equal(bytes);
@@ -361,7 +306,7 @@ describe("ZK public proving assets", function () {
   it("refuses to publish local files that differ from the manifest", async function () {
     for (const file of Object.keys(BYTES)) writeLocal(file);
     writeLocal(
-      "frontend/public/zk/shielded/shielded_claim_64_final.zkey",
+      "frontend/public/zk/protocol/budget_deposit_final.zkey",
       Buffer.from("regenerated"),
     );
     let error;

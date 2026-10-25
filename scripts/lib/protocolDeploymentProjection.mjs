@@ -10,6 +10,7 @@ import {
   INTEGRATED_DEPLOYMENT_RECORDS,
   SHIELDED_DEPLOYMENT_CIRCUITS,
   RECEIVE_DEPLOYMENT_CONTRACTS,
+  PROTOCOL_DEPLOYMENT_CIRCUITS,
 } from "./zkDeploymentCatalog.mjs";
 import { MAINNET_TRANSACTION_LABELS } from "./mainnetReleaseSafety.mjs";
 
@@ -106,6 +107,9 @@ export const buildPlannedProtocolDeploymentEvidence = ({
     poseidonT4: deploymentBindings.poseidonT4,
     poseidonT6: deploymentBindings.poseidonT6,
     deepFamilyLineageIndex: deploymentBindings.deepFamilyLineageIndex,
+    shieldedBoundaryVerifierAdapter: withHashes(deploymentBindings.shieldedBoundaryVerifierAdapter, artifacts?.shieldedBoundaryVerifierAdapter),
+    generatedVerifiers: Object.freeze(Object.fromEntries(Object.keys(PROTOCOL_DEPLOYMENT_CIRCUITS).map(action => [action, withHashes(deploymentBindings.generatedVerifiers[action], artifacts?.generatedVerifiers?.[action])]))),
+    protocolVerifiers: Object.freeze(Object.fromEntries(Object.keys(PROTOCOL_DEPLOYMENT_CIRCUITS).map(action => [action, withHashes(deploymentBindings.protocolVerifiers[action], artifacts?.protocolVerifiers?.[action])]))),
     shieldedVerifiers: Object.freeze(
       Object.fromEntries(
         Object.keys(SHIELDED_DEPLOYMENT_CIRCUITS).map((action) => [
@@ -206,6 +210,11 @@ export const assertOnChainProtocolDeploymentRuntimes = async ({
       spec.verifierContractName,
       plannedAddresses?.[spec.verifierLabel],
       deploymentArtifacts?.shieldedVerifiers?.[action],
+    ]),
+    ["ShieldedBoundaryVerifierAdapter", plannedAddresses?.shieldedBoundaryVerifierAdapter, deploymentArtifacts?.shieldedBoundaryVerifierAdapter],
+    ...Object.values(PROTOCOL_DEPLOYMENT_CIRCUITS).flatMap(spec => [
+      [spec.contract, plannedAddresses?.[spec.generatedLabel], deploymentArtifacts?.generatedVerifiers?.[spec.action]],
+      [`${spec.action} fixed verifier`, plannedAddresses?.[spec.adapterLabel], deploymentArtifacts?.protocolVerifiers?.[spec.action]],
     ]),
     ...RECEIVE_DEPLOYMENT_CONTRACTS.map(({contractName, property}) => [contractName, plannedAddresses?.[property], deploymentArtifacts?.[property]]),
     [

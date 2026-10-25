@@ -9,7 +9,7 @@ pragma solidity ^0.8.20;
  *      - `proofEncodingId` values understood by the proof verifier adapters
  *      - Solidity mirrors of the public-signal shapes in
  *        `packages/protocol-core/publicSignalSpecs.js` (identity/disclosure) and
- *        `packages/protocol-core/shielded-signals.js` (pool actions).
+ *        `packages/protocol-core/{receive-code,budget,value}.js` (receive and pool actions).
  *
  *      Every adapter and every business contract that performs transport-layer length
  *      matching MUST reference these constants. Hard-coding signal lengths
@@ -37,29 +37,21 @@ library ProofConstants {
   uint8 internal constant PROOF_PURPOSE_DISCLOSURE_BINDING = 1;
   uint8 internal constant PROOF_PURPOSE_SHIELDED_ACTION_BASE = 2;
   uint8 internal constant PROOF_PURPOSE_SHIELDED_SHIELD = PROOF_PURPOSE_SHIELDED_ACTION_BASE;
-  uint8 internal constant PROOF_PURPOSE_SHIELDED_FUND = PROOF_PURPOSE_SHIELDED_ACTION_BASE + 1;
-  uint8 internal constant PROOF_PURPOSE_SHIELDED_CLAIM = PROOF_PURPOSE_SHIELDED_ACTION_BASE + 2;
-  uint8 internal constant PROOF_PURPOSE_SHIELDED_PRIVATE_TRANSFER =
-    PROOF_PURPOSE_SHIELDED_ACTION_BASE + 3;
   uint8 internal constant PROOF_PURPOSE_SHIELDED_UNSHIELD = PROOF_PURPOSE_SHIELDED_ACTION_BASE + 4;
 
   // ---------------------------------------------------------------------------
   // Public-signal length mirrors.
   //
   // JS signal builders/specs live in packages/protocol-core/publicSignalSpecs.js and
-  // packages/protocol-core/shielded-signals.js. Transport length checks use these
+  // packages/protocol-core/{receive-code,budget,value}.js. Transport length checks use these
   // constants; fixed-array declarations preserve each generated verifier's ABI.
   // ---------------------------------------------------------------------------
 
   uint256 internal constant PERSON_RELATION_PUBLIC_SIGNALS_LEN = 5;
   uint256 internal constant DISCLOSURE_BINDING_PUBLIC_SIGNALS_LEN = 4;
 
-  // Each pool action proves only the inputs it uses, in ShieldedPoolCore._publicSignals order.
+  // Each pool action proves only the inputs it uses, in ShieldedPoolCore._verifyBoundary order.
   uint256 internal constant SHIELDED_SHIELD_PUBLIC_SIGNALS_LEN = 7;
-  uint256 internal constant SHIELDED_FUND_PUBLIC_SIGNALS_LEN = 29;
-  uint256 internal constant SHIELDED_CLAIM_PUBLIC_SIGNALS_LEN = 15;
-  uint256 internal constant SHIELDED_PRIVATE_TRANSFER_PUBLIC_SIGNALS_LEN = 11;
   uint256 internal constant SHIELDED_UNSHIELD_PUBLIC_SIGNALS_LEN = 11;
-  uint256 internal constant SHIELDED_PRIVATE_TRANSFER_4_PUBLIC_SIGNALS_LEN = 20;
   uint256 internal constant SHIELDED_UNSHIELD_4_PUBLIC_SIGNALS_LEN = 20;
 }

@@ -14,7 +14,7 @@ env:
 
 jobs:
   circuit-constraints:
-    name: Shielded circuit constraints
+    name: Circuit constraints
     runs-on: ubuntu-latest
 
     steps:
@@ -33,7 +33,7 @@ jobs:
       - name: Install Circom compiler
         run: npm run zk:fetch
 
-      - name: Check shielded circuit constraints
+      - name: Check circuit constraints
         run: npm run test:circuits
 
   build-test:
@@ -81,7 +81,7 @@ jobs:
 
       # Builds its own copy (frontend/.csp-scan) with proving files on the preview origin, serves it
       # under the production headers, visits every route and runs all three workers on the golden
-      # vector and a controlled RPC fixture, including real receive presentation/link proofs.
+      # vector and a controlled RPC fixture, including the real receiving protocol proofs.
       # Fails on any CSP violation or broken worker flow. The runner image ships Google Chrome.
       - name: Frontend CSP scan
         run: npm run csp:scan --workspace deepfamily-frontend

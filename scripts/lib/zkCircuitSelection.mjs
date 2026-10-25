@@ -1,67 +1,38 @@
+import { PROTOCOL_CIRCUITS } from "./protocolCircuitCatalog.mjs";
+export { PROTOCOL_CIRCUITS };
+
 export const SHIELDED_CIRCUITS = Object.freeze({
-  anonymousReceiveCredential: "shielded_anonymous_receive_credential",
-  fundReceiveCredential: "shielded_fund_receive_credential",
-  identityAuthorizationUpdate: "shielded_identity_authorization_update",
   shield: "shielded_shield",
-  fund: "shielded_fund",
-  claim: "shielded_claim_64",
-  privateTransfer: "shielded_private_transfer",
   unshield: "shielded_unshield",
-  anonymousReceivePresentation: "shielded_anonymous_receive_presentation",
-  fundReceivePresentation: "shielded_fund_receive_presentation",
-  attachedReceivePresentation: "shielded_attached_receive_presentation",
-  claim32: "shielded_claim_32",
-  privateTransfer4: "shielded_private_transfer_4",
   unshield4: "shielded_unshield_4",
 });
-
-/** Both Groth16 relations use the same hidden credential prefix; only operation fields escape. */
-export const RECEIVE_PRESENTATION_CIRCUITS = Object.freeze({
-  anonymousReceivePresentation: Object.freeze({
-    kind: "anonymous",
-    issuer: "anonymousReceiveCredential",
-    hiddenInputs: 11,
-    publicInputs: 11,
-    contractName: "AnonymousReceivePresentationVerifier",
-  }),
-  fundReceivePresentation: Object.freeze({
-    kind: "fund",
-    issuer: "fundReceiveCredential",
-    hiddenInputs: 12,
-    publicInputs: 11,
-    contractName: "FundReceivePresentationVerifier",
-  }),
-  attachedReceivePresentation: Object.freeze({
-    kind: "attachment",
-    issuer: "anonymousReceiveCredential",
-    hiddenInputs: 11,
-    publicInputs: 14,
-    contractName: "AttachedReceivePresentationVerifier",
-  }),
-});
-
-/**
- * Receive-code proofs are verified only in the payer's browser. These circuits
- * go through the same build, setup and ceremony, but have no Solidity verifier.
- */
-export const SHIELDED_CLIENT_ONLY_CIRCUITS = Object.freeze([
-  "anonymousReceiveCredential",
-  "fundReceiveCredential",
-  ...Object.keys(RECEIVE_PRESENTATION_CIRCUITS),
-]);
-export const hasShieldedSolidityVerifier = (action) =>
-  !SHIELDED_CLIENT_ONLY_CIRCUITS.includes(action);
+export const hasShieldedSolidityVerifier = (action) => Object.hasOwn(SHIELDED_CIRCUITS, action);
 
 export const CORE_CIRCUITS = Object.freeze(["person", "disclosure"]);
 export const SHIELDED_CIRCUIT_NAMES = Object.freeze(
   Object.keys(SHIELDED_CIRCUITS).map((action) => `shielded:${action}`),
 );
+export const BOUNDARY_CIRCUIT_NAMES = Object.freeze([
+  "shielded:shield",
+  "shielded:unshield",
+  "shielded:unshield4",
+]);
+export const PROTOCOL_CIRCUIT_NAMES = Object.freeze(
+  Object.keys(PROTOCOL_CIRCUITS).map((name) => `protocol:${name}`),
+);
+export const CANONICAL_CIRCUIT_NAMES = Object.freeze([
+  ...CORE_CIRCUITS,
+  ...BOUNDARY_CIRCUIT_NAMES,
+  ...PROTOCOL_CIRCUIT_NAMES,
+]);
 const CIRCUIT_CHOICES = Object.freeze([
   "all",
   "core",
   ...CORE_CIRCUITS,
   "shielded",
+  "protocol",
   ...SHIELDED_CIRCUIT_NAMES,
+  ...PROTOCOL_CIRCUIT_NAMES,
 ]);
 
 export const parseCircuitArguments = (argv) => {
@@ -83,7 +54,7 @@ export const parseCircuitArguments = (argv) => {
     circuit = argv[0].slice("--circuit=".length);
   } else {
     throw new Error(
-      "Usage: --circuit <all|core|person|disclosure|shielded|shielded:action> " +
+      "Usage: --circuit <all|core|person|disclosure|shielded|shielded:action|protocol|protocol:action> " +
         "(the option may be omitted to select all)",
     );
   }
@@ -102,8 +73,9 @@ export const selectCircuitNames = (circuit) => {
       `Invalid circuit ${JSON.stringify(circuit)}; expected one of: ${CIRCUIT_CHOICES.join(", ")}`,
     );
   }
-  if (circuit === "all") return Object.freeze([...CORE_CIRCUITS, ...SHIELDED_CIRCUIT_NAMES]);
+  if (circuit === "all") return CANONICAL_CIRCUIT_NAMES;
   if (circuit === "core") return CORE_CIRCUITS;
-  if (circuit === "shielded") return SHIELDED_CIRCUIT_NAMES;
+  if (circuit === "shielded") return BOUNDARY_CIRCUIT_NAMES;
+  if (circuit === "protocol") return PROTOCOL_CIRCUIT_NAMES;
   return Object.freeze([circuit]);
 };

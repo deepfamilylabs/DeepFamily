@@ -9,11 +9,13 @@ interface IShieldedPoolConfiguration {
 
   function creationBlock() external view returns (uint256);
 
-  function LINEAGE_INDEX() external view returns (address);
-
-  function AUTHORIZATION_STATE() external view returns (address);
-
-  function RECEIVE_VERIFIER() external view returns (address);
-
   function VERIFIER() external view returns (address);
+
+  function RECEIVE_REGISTRY() external view returns (address);
+
+  function FUND_VERIFIER() external view returns (address);
+
+  function CLAIM_VERIFIER() external view returns (address);
+
+  function TRANSFER_VERIFIER() external view returns (address);
 }

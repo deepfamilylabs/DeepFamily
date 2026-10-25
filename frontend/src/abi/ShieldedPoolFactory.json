@@ -12,11 +12,6 @@
         },
         {
           "internalType": "address",
-          "name": "lineageIndex",
-          "type": "address"
-        },
-        {
-          "internalType": "address",
           "name": "verifier",
           "type": "address"
         },
@@ -27,12 +22,22 @@
         },
         {
           "internalType": "address",
-          "name": "authorizationState",
+          "name": "registry",
           "type": "address"
         },
         {
           "internalType": "address",
-          "name": "receiveVerifier",
+          "name": "fundVerifier",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "claimVerifier",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "transferVerifier",
           "type": "address"
         }
       ],
@@ -80,7 +85,7 @@
     },
     {
       "inputs": [],
-      "name": "AUTHORIZATION_STATE",
+      "name": "CLAIM_VERIFIER",
       "outputs": [
         {
           "internalType": "address",
@@ -106,7 +111,7 @@
     },
     {
       "inputs": [],
-      "name": "LINEAGE_INDEX",
+      "name": "FUND_VERIFIER",
       "outputs": [
         {
           "internalType": "address",
@@ -132,7 +137,20 @@
     },
     {
       "inputs": [],
-      "name": "RECEIVE_VERIFIER",
+      "name": "RECEIVE_REGISTRY",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "TRANSFER_VERIFIER",
       "outputs": [
         {
           "internalType": "address",

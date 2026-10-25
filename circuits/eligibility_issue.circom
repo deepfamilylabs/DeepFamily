@@ -1,0 +1,101 @@
+pragma circom 2.2.3;
+
+include "receive_common.circom";
+
+// Converts authenticated source facts into an credential. Q is the
+// only output; neither the subject, family nor recommender is public. The
+// contract pins the two current source roots before adding this exact Q.
+template EligibilityIssue() {
+    signal output credentialCommitment;
+    signal input chainId;
+    signal input authorizerScope;
+    signal input sourceRoot;
+    signal input trustedRoot;
+    signal input nameField;
+    signal input derivedSecretField;
+    signal input isBirthBC;
+    signal input birthYear;
+    signal input birthMonth;
+    signal input birthDay;
+    signal input gender;
+    signal input suiteId;
+    signal input parentIdentity;
+    signal input familySalt;
+    signal input issueNonce;
+    signal input parentVersion;
+    signal input endorser;
+    signal input xChild;
+    signal input xEndorse;
+    signal input xTrust;
+    signal input sourceFactSalt;
+    signal input sourceTrustSalt;
+    signal input credentialSalt;
+    signal input sourceDepth;
+    signal input sourceIndex;
+    signal input sourceSiblings[64];
+    signal input trustedDepth;
+    signal input trustedIndex;
+    signal input trustedSiblings[64];
+
+    component suite = AtomicSuiteCommitment();
+    suite.suiteId <== suiteId;
+    component identity = IdentityCommitmentCore();
+    identity.nameField <== nameField;
+    identity.derivedSecretField <== derivedSecretField;
+    identity.isBirthBC <== isBirthBC;
+    identity.birthYear <== birthYear;
+    identity.birthMonth <== birthMonth;
+    identity.birthDay <== birthDay;
+    identity.gender <== gender;
+    identity.suiteCommitment <== suite.suiteCommitment;
+    component fact = SourceFact();
+    fact.childIdentity <== identity.identityCommitment;
+    fact.parentIdentity <== parentIdentity;
+    fact.endorser <== endorser;
+    fact.xChild <== xChild;
+    fact.xEndorse <== xEndorse;
+    fact.parentVersion <== parentVersion;
+    fact.sourceFactSalt <== sourceFactSalt;
+    component sourcePath = ShieldedMerkleRoot(64);
+    sourcePath.leaf <== fact.leaf;
+    sourcePath.depth <== sourceDepth;
+    sourcePath.index <== sourceIndex;
+    sourcePath.siblings <== sourceSiblings;
+    sourceRoot === sourcePath.out;
+    component trust = SourceTrust();
+    trust.parentIdentity <== parentIdentity;
+    trust.endorser <== endorser;
+    trust.xTrust <== xTrust;
+    trust.parentVersion <== parentVersion;
+    trust.sourceTrustSalt <== sourceTrustSalt;
+    component trustedPath = ShieldedMerkleRoot(64);
+    trustedPath.leaf <== trust.leaf;
+    trustedPath.depth <== trustedDepth;
+    trustedPath.index <== trustedIndex;
+    trustedPath.siblings <== trustedSiblings;
+    trustedRoot === trustedPath.out;
+    component family = Poseidon(3);
+    family.inputs[0] <== 73201;
+    family.inputs[1] <== parentIdentity;
+    family.inputs[2] <== familySalt;
+    component credential = CredentialCommitment();
+    credential.chainId <== chainId;
+    credential.authorizerScope <== authorizerScope;
+    credential.derivedSecretField <== derivedSecretField;
+    credential.issueNonce <== issueNonce;
+    credential.familyRoot <== family.out;
+    credential.endorser <== endorser;
+    credential.parentVersion <== parentVersion;
+    credential.xChild <== xChild;
+    credential.xEndorse <== xEndorse;
+    credential.xTrust <== xTrust;
+    credential.credentialSalt <== credentialSalt;
+    credentialCommitment <== credential.credentialCommitment;
+    component nz[4];
+    nz[0] = NonZero(); nz[0].in <== parentIdentity;
+    nz[1] = NonZero(); nz[1].in <== familySalt;
+    nz[2] = NonZero(); nz[2].in <== sourceFactSalt;
+    nz[3] = NonZero(); nz[3].in <== sourceTrustSalt;
+}
+
+component main { public [chainId,authorizerScope,sourceRoot,trustedRoot] } = EligibilityIssue();

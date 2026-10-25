@@ -13,11 +13,12 @@ contract ShieldedErc20Pool is ShieldedPoolCore {
 
   constructor(
     address token,
-    address lineageIndex,
-    address verifier,
-    address authorizationState,
-    address receiveVerifier
-  ) ShieldedPoolCore(lineageIndex, verifier, authorizationState, receiveVerifier) {
+    address boundaryVerifier,
+    address registry,
+    address fundVerifier,
+    address claimVerifier,
+    address transferVerifier
+  ) ShieldedPoolCore(boundaryVerifier, registry, fundVerifier, claimVerifier, transferVerifier) {
     if (token.code.length == 0) revert InvalidConstructorAddress();
     TOKEN = IERC20(token);
   }
@@ -32,7 +33,7 @@ contract ShieldedErc20Pool is ShieldedPoolCore {
     bytes calldata proof
   ) external nonReentrant {
     _validateAmount(amount);
-    _execute(Action.Shield, data, proof, amount, address(0));
+    _verifyBoundary(Action.Shield, data, proof, amount, address(0));
     uint256 senderBefore = TOKEN.balanceOf(msg.sender);
     uint256 poolBefore = TOKEN.balanceOf(address(this));
     TOKEN.safeTransferFrom(msg.sender, address(this), amount);

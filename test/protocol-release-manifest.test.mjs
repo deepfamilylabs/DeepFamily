@@ -20,7 +20,7 @@ import {
   PROTOCOL_UNICODE_NORMALIZATION_DATA_PATH,
   shieldedDeploymentBindingsFromAddresses,
 } from "../scripts/lib/protocolReleaseManifest.mjs";
-import { SHIELDED_DEPLOYMENT_CIRCUITS, RECEIVE_DEPLOYMENT_CONTRACTS } from "../scripts/lib/zkDeploymentCatalog.mjs";
+import { SHIELDED_DEPLOYMENT_CIRCUITS, PROTOCOL_DEPLOYMENT_CIRCUITS, RECEIVE_DEPLOYMENT_CONTRACTS } from "../scripts/lib/zkDeploymentCatalog.mjs";
 
 const ROOT = path.resolve(import.meta.dirname, "..");
 const hash = (digit) => digit.repeat(64);
@@ -291,6 +291,10 @@ const createProductionFixture = () => {
         address(100 + index),
       ]),
     ),
+    shieldedBoundaryVerifierAdapter: address(304),
+    ...Object.fromEntries(Object.values(PROTOCOL_DEPLOYMENT_CIRCUITS).flatMap((spec, index) => [
+      [spec.generatedLabel, address(500 + index)], [spec.adapterLabel, address(600 + index)],
+    ])),
     shieldedErc20Pool: address(301),
     shieldedNativePool: address(302),
     shieldedPoolFactory: address(303),
@@ -307,6 +311,10 @@ const createProductionFixture = () => {
   });
   Object.assign(manifest.deployments, {
     ...shieldedBindings,
+    shieldedBoundaryVerifierAdapter: withHashes(shieldedBindings.shieldedBoundaryVerifierAdapter),
+    ...Object.fromEntries(["generatedVerifiers", "protocolVerifiers"].map(kind => [kind,
+      Object.fromEntries(Object.entries(shieldedBindings[kind]).map(([action, record]) => [action, withHashes(record)])),
+    ])),
     shieldedVerifiers: Object.fromEntries(
       Object.entries(shieldedBindings.shieldedVerifiers).map(([action, record]) => [
         action,
@@ -483,6 +491,12 @@ const createProductionFixture = () => {
     },
   };
   const deploymentArtifacts = {
+    shieldedBoundaryVerifierAdapter: { artifactSha256: HASHES.adapterArtifact, runtimeSha256: HASHES.adapterRuntime },
+    ...Object.fromEntries(["generatedVerifiers", "protocolVerifiers"].map(kind => [kind,
+      Object.fromEntries(Object.keys(PROTOCOL_DEPLOYMENT_CIRCUITS).map(action => [action,
+        { artifactSha256: HASHES.adapterArtifact, runtimeSha256: HASHES.adapterRuntime },
+      ])),
+    ])),
     shieldedVerifiers: Object.fromEntries(
       Object.keys(SHIELDED_DEPLOYMENT_CIRCUITS).map((action) => [
         action,
@@ -581,6 +595,9 @@ const acceptanceReportForManifest = (manifest) => ({
         "poseidonT6",
         "deepFamilyLineageIndex",
         "shieldedVerifiers",
+        "shieldedBoundaryVerifierAdapter",
+        "generatedVerifiers",
+        "protocolVerifiers",
         "shieldedErc20Pool",
         "shieldedNativePool",
         "shieldedPoolFactory",
@@ -1427,32 +1444,32 @@ describe("production protocol release manifest evidence", function () {
     [
       "an omitted shielded circuit",
       (deployments) => {
-        delete deployments.shieldedVerifiers.claim;
+        delete deployments.generatedVerifiers.sourceFact;
       },
-      /shielded verifier deployments must contain exactly/,
+      /generatedVerifiers must contain exactly/,
     ],
     [
       "an adapter using another circuit verifier",
       (deployments) => {
-        deployments.groth16VerifierAdapter.fundVerifierImmutable =
-          deployments.shieldedVerifiers.claim.address;
+        deployments.shieldedBoundaryVerifierAdapter.shieldVerifierImmutable =
+          deployments.shieldedVerifiers.unshield.address;
       },
-      /Groth16VerifierAdapter fund must bind its exact verifier/,
+      /shield boundary route must bind its verifier/,
     ],
     [
       "a pool using a different token",
       (deployments) => {
         deployments.shieldedErc20Pool.tokenImmutable = address(900);
       },
-      /declared token, lineage and common verifier adapter/,
+      /declared token, registry and boundary verifier/,
     ],
     [
       "a pool using another common adapter",
       (deployments) => {
         deployments.shieldedErc20Pool.verifierAdapterImmutable =
-          deployments.shieldedVerifiers.claim.address;
+          deployments.protocolVerifiers.claim.address;
       },
-      /common verifier adapter/,
+      /declared VALUE boundary verifier/,
     ],
   ]) {
     it(`rejects ${label}`, function () {
@@ -1463,11 +1480,29 @@ describe("production protocol release manifest evidence", function () {
   }
 
   it("rejects a shielded verifier artifact or adapter immutable-linked runtime hash drift", function () {
-    fixture.deploymentArtifacts.shieldedVerifiers.claim.artifactSha256 = hash("0");
-    assert.throws(() => fixture.inspect(), /ShieldedClaim64Verifier artifactSha256/);
-    fixture.deploymentArtifacts.shieldedVerifiers.claim.artifactSha256 = HASHES.adapterArtifact;
+    fixture.deploymentArtifacts.protocolVerifiers.claim.artifactSha256 = hash("0");
+    assert.throws(() => fixture.inspect(), /protocolClaimVerifier artifactSha256/);
+    fixture.deploymentArtifacts.protocolVerifiers.claim.artifactSha256 = HASHES.adapterArtifact;
     fixture.deploymentArtifacts.groth16VerifierAdapter.runtimeSha256 = hash("0");
     assert.throws(() => fixture.inspect(), /Groth16VerifierAdapter runtimeSha256/);
+  });
+
+  it("binds compiled hashes for the boundary adapter and every receiving verifier", function () {
+    const records = [
+      ["ShieldedBoundaryVerifierAdapter", fixture.deploymentArtifacts.shieldedBoundaryVerifierAdapter],
+      ...Object.entries(PROTOCOL_DEPLOYMENT_CIRCUITS).flatMap(([action, spec]) => [
+        [spec.contract, fixture.deploymentArtifacts.generatedVerifiers[action]],
+        [spec.adapterLabel, fixture.deploymentArtifacts.protocolVerifiers[action]],
+      ]),
+    ];
+    for (const [label, record] of records) {
+      for (const field of ["artifactSha256", "runtimeSha256"]) {
+        const original = record[field];
+        record[field] = hash("0");
+        assert.throws(() => fixture.inspect(), error => error.message.includes(`${label} ${field}`));
+        record[field] = original;
+      }
+    }
   });
 
   it("rejects an immutable-linked runtime hash drift", function () {

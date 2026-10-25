@@ -10,6 +10,7 @@ import { inspectCircomCompilerOverride } from "./lib/circomCompilerOverride.mjs"
 import { CIRCOM_ARTIFACT_FLAGS, localCircomBinaryPath } from "./lib/circomToolchain.mjs";
 import {
   SHIELDED_CIRCUITS,
+  PROTOCOL_CIRCUITS,
   parseCircuitArguments,
   selectCircuitNames,
 } from "./lib/zkCircuitSelection.mjs";
@@ -53,10 +54,17 @@ export const buildZkBuildCommands = ({
   return Object.freeze([
     ...selectCircuitNames(circuit).map((name) => {
       const shieldedAction = name.startsWith("shielded:") ? name.slice("shielded:".length) : null;
-      const source = shieldedAction
-        ? path.join("circuits", `${SHIELDED_CIRCUITS[shieldedAction]}.circom`)
-        : CIRCUIT_SOURCES[name];
-      const outputDirectory = shieldedAction ? SHIELDED_OUTPUT_DIRECTORY : CORE_OUTPUT_DIRECTORY;
+      const protocolAction = name.startsWith("protocol:") ? name.slice("protocol:".length) : null;
+      const source = protocolAction
+        ? path.join("circuits", `${PROTOCOL_CIRCUITS[protocolAction].source}.circom`)
+        : shieldedAction
+          ? path.join("circuits", `${SHIELDED_CIRCUITS[shieldedAction]}.circom`)
+          : CIRCUIT_SOURCES[name];
+      const outputDirectory = protocolAction
+        ? path.join("zk-artifacts", "protocol")
+        : shieldedAction
+          ? SHIELDED_OUTPUT_DIRECTORY
+          : CORE_OUTPUT_DIRECTORY;
       return Object.freeze({
         circuit: name,
         executable,
@@ -125,10 +133,10 @@ export const runZkBuild = async ({
 
 const printUsage = () => {
   console.log(`Usage:
-  node scripts/zk-build.mjs [--circuit <all|core|person|disclosure|shielded|shielded:action>]
+  node scripts/zk-build.mjs [--circuit <all|core|person|disclosure|shielded|shielded:action|protocol|protocol:action>]
 
 Compiles the selected Circom circuits with fixed R1CS, WASM, symbol, include-path and output
-settings. The default --circuit all includes the receive presentation circuits.
+settings. The default includes identity, asset boundaries and the eight receive protocol circuits.
 This command never generates or replaces proving keys.`);
 };
 

@@ -5,10 +5,8 @@ import {
   getDefaultRootVersionIndex,
   getDefaultRpcUrl,
   getDefaultReaderAddress,
-  getShieldedStateReadMode,
 } from "../../../shared/config/env";
 import { resolveEntryReaderForChain, resolveModuleAddresses } from "../services";
-import type { ShieldedStateReadMode } from "../../../shared/config/shieldedStateReadMode";
 
 type ConfigValues = {
   rpcUrl: string;
@@ -18,10 +16,9 @@ type ConfigValues = {
   rootHash: string;
   rootVersionIndex: number;
   chainId: number;
-  readonly stateReadMode: ShieldedStateReadMode;
 };
 
-type ConfigUpdates = Partial<Omit<ConfigValues, "stateReadMode">>;
+type ConfigUpdates = Partial<ConfigValues>;
 
 export type AppConfig = ConfigValues & {
   update: (partial: ConfigUpdates) => void;
@@ -60,7 +57,6 @@ function getEnvDefaults(): ConfigValues {
     rootHash,
     rootVersionIndex,
     chainId: inferChainId(),
-    stateReadMode: getShieldedStateReadMode(),
   };
 }
 
@@ -80,8 +76,6 @@ function normalizeStoredConfig(defaults: ConfigValues): ConfigValues {
 
   return {
     ...merged,
-    // The build's read strategy takes precedence over preferences from older builds.
-    stateReadMode: defaults.stateReadMode,
     // Worked out from the chain on every boot, so a redeployment that rewrites
     // the environment is picked up rather than lost behind a saved address.
     // Chain 0 means the RPC matched no known network, and then the unsuffixed
@@ -261,7 +255,7 @@ export function ConfigProvider({ children }: { children: React.ReactNode }) {
   const update = (partial: ConfigUpdates) => {
     if (partial.readerAddress != null) setModuleResolutionError(null);
     setState((prev) => {
-      const next = { ...prev, ...partial, stateReadMode: defaults.stateReadMode };
+      const next = { ...prev, ...partial };
       if (
         partial.readerAddress != null &&
         !sameAddress(partial.readerAddress, prev.readerAddress)

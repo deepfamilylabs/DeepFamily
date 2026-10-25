@@ -3,7 +3,7 @@ import {
   MAINNET_TRANSACTION_LABELS,
 } from "./mainnetReleaseSafety.mjs";
 import { MAINNET_DEPLOYMENT_NONCE_OFFSETS } from "./protocolDeploymentProjection.mjs";
-import { SHIELDED_DEPLOYMENT_CIRCUITS, RECEIVE_DEPLOYMENT_CONTRACTS, receiveDeploymentConstructorArgs, receiveDeploymentLibraries } from "./zkDeploymentCatalog.mjs";
+import { SHIELDED_DEPLOYMENT_CIRCUITS, PROTOCOL_DEPLOYMENT_CIRCUITS, RECEIVE_DEPLOYMENT_CONTRACTS, receiveDeploymentConstructorArgs, receiveDeploymentLibraries } from "./zkDeploymentCatalog.mjs";
 
 const PERSON_RELATION_CIRCUIT_ID = 1;
 const DISCLOSURE_BINDING_CIRCUIT_ID = 1;
@@ -117,6 +117,9 @@ export const buildMainnetReleaseIntents = async ({
     "PersonCommitmentVerifier",
     "DisclosureBindingVerifier",
     "Groth16VerifierAdapter",
+    "ShieldedBoundaryVerifierAdapter",
+    "FixedGroth16Verifier",
+    ...Object.values(PROTOCOL_DEPLOYMENT_CIRCUITS).map(spec => spec.contract),
     "DeepFamily",
     "UUPSProxy",
     "DeepFamilyArchive",
@@ -199,9 +202,14 @@ export const buildMainnetReleaseIntents = async ({
       [
         addresses.personCommitmentVerifier,
         addresses.disclosureBindingVerifier,
-        Object.values(SHIELDED_DEPLOYMENT_CIRCUITS).map((spec) => addresses[spec.verifierLabel]),
       ],
     ],
+    ["shieldedBoundaryVerifierAdapter", "ShieldedBoundaryVerifierAdapter",
+      [addresses.shieldedShieldVerifier, addresses.shieldedUnshieldVerifier, addresses.shieldedUnshield4Verifier]],
+    ...Object.values(PROTOCOL_DEPLOYMENT_CIRCUITS).flatMap(spec => [
+      [spec.generatedLabel, spec.contract, []],
+      [spec.adapterLabel, "FixedGroth16Verifier", [addresses[spec.generatedLabel], spec.publicSignals]],
+    ]),
     ["deepFamilyImplementation", "DeepFamily", [], deepFamilyBytecode],
     ["deepFamilyProxy", "UUPSProxy", [addresses.deepFamilyImplementation, proxyInitializeData]],
   ];
@@ -288,11 +296,12 @@ export const buildMainnetReleaseIntents = async ({
     addresses.deepFamilyProxy,
     deepFamilyInterface.encodeFunctionData("setLineageIndex", [addresses.deepFamilyLineageIndex]),
   );
-  const receiveAddresses = { ...addresses, deepFamily: addresses.deepFamilyProxy };
+  const receiveAddresses = { ...addresses, deepFamily: addresses.deepFamilyProxy, lineageIndex: addresses.deepFamilyLineageIndex };
   for (const {contractName, property} of RECEIVE_DEPLOYMENT_CONTRACTS) {
-    if (property === "privateLetterArchive") continue;
     await pushDeployment(property, contractName, receiveDeploymentConstructorArgs(property, receiveAddresses), linkBytecode({ ethers, artifact: artifact[contractName], libraries: receiveDeploymentLibraries(property, receiveAddresses) }));
   }
+  pushCall("setEligibilitySource", addresses.deepFamilyProxy,
+    deepFamilyInterface.encodeFunctionData("setEligibilitySource", [addresses.eligibilitySource]));
   const nativePoolBytecode = linkBytecode({
     ethers,
     artifact: artifact.ShieldedNativePool,
@@ -301,8 +310,8 @@ export const buildMainnetReleaseIntents = async ({
   await pushDeployment(
     "shieldedNativePool",
     "ShieldedNativePool",
-    [addresses.deepFamilyLineageIndex, addresses.groth16VerifierAdapter,
-      addresses.identityAuthorizationState, addresses.receivePresentationVerifierRouter],
+    [addresses.shieldedBoundaryVerifierAdapter, addresses.receiveRegistry,
+      addresses.protocolFundVerifier, addresses.protocolClaimVerifier, addresses.protocolTransferVerifier],
     nativePoolBytecode,
   );
   const factoryBytecode = linkBytecode({
@@ -315,15 +324,15 @@ export const buildMainnetReleaseIntents = async ({
     "ShieldedPoolFactory",
     [
       addresses.deepFamilyToken,
-      addresses.deepFamilyLineageIndex,
-      addresses.groth16VerifierAdapter,
+      addresses.shieldedBoundaryVerifierAdapter,
       addresses.shieldedNativePool,
-      addresses.identityAuthorizationState,
-      addresses.receivePresentationVerifierRouter,
+      addresses.receiveRegistry,
+      addresses.protocolFundVerifier,
+      addresses.protocolClaimVerifier,
+      addresses.protocolTransferVerifier,
     ],
     factoryBytecode,
   );
-  await pushDeployment("privateLetterArchive", "PrivateLetterArchive", receiveDeploymentConstructorArgs("privateLetterArchive", receiveAddresses));
   pushCall(
     "transferDeepFamilyOwnership",
     addresses.deepFamilyProxy,

@@ -253,7 +253,6 @@ export async function setupStubVerifiers(ethers, deepFamily) {
   const adapter = await Adapter.deploy(
     await personVerifier.getAddress(),
     await disclosureVerifier.getAddress(),
-    Array(8).fill(ethers.ZeroAddress),
   );
   await adapter.waitForDeployment();
   const adapterAddress = await adapter.getAddress();

@@ -1,3 +1,4 @@
+import { receivingVerificationEntries } from "./lib/receivingVerificationEntries.mjs";
 import { fileURLToPath } from "node:url";
 import fs from "node:fs/promises";
 import path from "node:path";
@@ -69,9 +70,9 @@ import {
   deriveMainnetPlannedAddresses,
 } from "./lib/protocolDeploymentProjection.mjs";
 import { validateTestnetReleaseEvidence } from "./lib/testnetReleaseEvidence.mjs";
-import { verifyAllProductionCeremonies } from "./zk-ceremony-verify.mjs";
+import { verifyProductionCeremony } from "./zk-ceremony-verify.mjs";
 import { assertReleaseCheckBoundary } from "./lib/releaseCheckBoundary.mjs";
-import { checkShieldedReleaseEvidence } from "./zk-shielded-release-check.mjs";
+import { checkProtocolReleaseEvidence } from "./check-protocol-release.mjs";
 import { assertShieldedDeploymentBindings } from "./lib/shieldedDeploymentEvidence.mjs";
 
 const TX_TIMEOUT_MS = 10 * 60 * 1000;
@@ -923,8 +924,8 @@ export const main = async (chainProfile) => {
     throw new Error("Mainnet release command mode does not match its approval input");
   }
 
-  const shieldedReleaseEvidence = await checkShieldedReleaseEvidence({ root: process.cwd() });
-  const zkCeremonyVerification = await verifyAllProductionCeremonies({
+  const shieldedReleaseEvidence = await checkProtocolReleaseEvidence({ root: process.cwd() });
+  const zkCeremonyVerification = await verifyProductionCeremony({
     root: process.cwd(),
     ptauPath: resolveProductionPtauPath(),
   });
@@ -1519,7 +1520,6 @@ export const main = async (chainProfile) => {
         [
           addresses.personCommitmentVerifier,
           addresses.disclosureBindingVerifier,
-          Object.values(SHIELDED_DEPLOYMENT_CIRCUITS).map((spec) => addresses[spec.verifierLabel]),
         ],
       ),
       await verificationEntry(hre.artifacts, "DeepFamily", addresses.deepFamilyImplementation, [], {
@@ -1553,65 +1553,7 @@ export const main = async (chainProfile) => {
           PoseidonT6: addresses.poseidonT6,
         },
       ),
-      ...(await Promise.all(
-        Object.values(SHIELDED_DEPLOYMENT_CIRCUITS).map((spec) =>
-          verificationEntry(
-            hre.artifacts,
-            spec.verifierContractName,
-            addresses[spec.verifierLabel],
-          ),
-        ),
-      )),
-      ...(await Promise.all(
-        RECEIVE_DEPLOYMENT_CONTRACTS.map(({ contractName, property }) =>
-          verificationEntry(
-            hre.artifacts,
-            contractName,
-            addresses[property],
-            receiveDeploymentConstructorArgs(property, addresses),
-            receiveDeploymentLibraries(property, addresses),
-          ),
-        ),
-      )),
-      await verificationEntry(
-        hre.artifacts,
-        "ShieldedErc20Pool",
-        addresses.shieldedErc20Pool,
-        [
-          addresses.token,
-          addresses.deepFamilyLineageIndex,
-          addresses.groth16VerifierAdapter,
-          addresses.identityAuthorizationState,
-          addresses.receivePresentationVerifierRouter,
-        ],
-        { PoseidonT3: addresses.poseidonT3 },
-      ),
-      await verificationEntry(
-        hre.artifacts,
-        "ShieldedNativePool",
-        addresses.shieldedNativePool,
-        [
-          addresses.deepFamilyLineageIndex,
-          addresses.groth16VerifierAdapter,
-          addresses.identityAuthorizationState,
-          addresses.receivePresentationVerifierRouter,
-        ],
-        { PoseidonT3: addresses.poseidonT3 },
-      ),
-      await verificationEntry(
-        hre.artifacts,
-        "ShieldedPoolFactory",
-        addresses.shieldedPoolFactory,
-        [
-          addresses.token,
-          addresses.deepFamilyLineageIndex,
-          addresses.groth16VerifierAdapter,
-          addresses.shieldedNativePool,
-          addresses.identityAuthorizationState,
-          addresses.receivePresentationVerifierRouter,
-        ],
-        { PoseidonT3: addresses.poseidonT3 },
-      ),
+      ...await receivingVerificationEntries(hre.artifacts,addresses,verificationEntry),
     ];
     await verifyContracts({ entries: verificationEntries, checkpoint, saveCheckpoint });
 

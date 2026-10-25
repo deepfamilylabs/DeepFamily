@@ -8,6 +8,7 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "poseidon-solidity/PoseidonT5.sol";
 import {IDeepFamilyArchive} from "./interfaces/IDeepFamilyArchive.sol";
 import {IDeepFamilyLineageIndex} from "./interfaces/IDeepFamilyLineageIndex.sol";
+import {IEligibilitySource} from "./interfaces/IEligibilitySource.sol";
 import {ERC165Checker} from "@openzeppelin/contracts/utils/introspection/ERC165Checker.sol";
 import {IProofVerifierAdapter} from "./interfaces/IProofVerifierAdapter.sol";
 import {AdultAgeGate} from "./libraries/AdultAgeGate.sol";
@@ -213,6 +214,8 @@ contract DeepFamily is
   mapping(bytes32 => mapping(uint256 => mapping(address => uint256))) private trustedEndorserIndex;
   mapping(bytes32 => bool) public rewardClaimedByPerson;
   address public lineageIndex;
+  // Source for current qualification and revocation checks.
+  address public eligibilitySource;
 
   // NOTE: No storage gap. This is the most-derived (leaf) upgradeable contract and every
   // inherited base uses ERC-7201 namespaced storage, so a new implementation adds state simply
@@ -590,18 +593,79 @@ contract DeepFamily is
     return IDeepFamilyLineageIndex(index);
   }
 
-  function _requireTrustedEndorserManager(bytes32 personHash, uint256 versionIndex) internal view {
-    uint256 tokenId = versionToTokenId[personHash][versionIndex];
-    if (tokenId == 0) {
-      if (personVersions[personHash][versionIndex - 1].addedBy != msg.sender) {
-        revert MustBeTrustedEndorserManager();
-      }
-      return;
+  /// @notice Activate the immutable eligibility bridge on this lineage index.
+  function setEligibilitySource(address source) external onlyProxy onlyOwner {
+    if (eligibilitySource != address(0) || source.code.length == 0) revert InvalidEligibilityMutation();
+    (bool ok, bytes memory result) = source.staticcall(abi.encodeWithSignature("LINEAGE_INDEX()"));
+    if (!ok || result.length != 32 || abi.decode(result, (address)) != address(_lineage())) {
+      revert InvalidEligibilityMutation();
     }
+    eligibilitySource = source;
+  }
 
-    if (_ownerOf(tokenId) != msg.sender) {
-      revert MustBeTrustedEndorserManager();
+  /// @notice Publish role revocations and perform the corresponding existing mutation atomically.
+  /// @dev Existing authorization checks run with the original caller through delegatecall.
+  ///      No arbitrary external call or nested batch is permitted.
+  function withEligibilityRevocations(
+    uint8[] calldata roles,
+    uint256[] calldata secrets,
+    bytes calldata mutation
+  ) external {
+    if (mutation.length < 4) revert InvalidEligibilityMutation();
+    bytes4 selector = bytes4(mutation[:4]);
+    if (
+      selector != this.endorseVersion.selector &&
+      selector != this.cancelEndorsement.selector &&
+      selector != this.removeTrustedEndorser.selector
+    ) revert InvalidEligibilityMutation();
+    _revokeEligibilityRoles(roles, secrets);
+    (bool ok, bytes memory result) = address(this).delegatecall(mutation);
+    if (!ok) {
+      assembly ("memory-safe") { revert(add(result, 32), mload(result)) }
     }
+  }
+
+  error InvalidEligibilityMutation();
+
+  /// @notice An existing eligibility controller can withdraw its role independently.
+  function revokeEligibilityRoles(uint8[] calldata roles, uint256[] calldata secrets) external {
+    _revokeEligibilityRoles(roles, secrets);
+  }
+
+  function _revokeEligibilityRoles(uint8[] calldata roles, uint256[] calldata secrets) private {
+    address source = eligibilitySource;
+    if (source == address(0)) revert InvalidEligibilityMutation();
+    IEligibilitySource(source).revokeRoles(msg.sender, roles, secrets);
+  }
+
+  function _beforeEndorsementChange(bytes32 personHash, address endorser) private view {
+    address source = eligibilitySource;
+    if (source != address(0)) {
+      IEligibilitySource(source).beforeEndorsementChange(
+        _lineage().identityCommitmentOf(personHash), endorser
+      );
+    }
+  }
+
+  /// @notice The same current authority used by add/removeTrustedEndorser, also for roles.
+  function isTrustedEndorserManager(
+    bytes32 personHash,
+    uint256 versionIndex,
+    address account
+  ) external view returns (bool) {
+    return _isTrustedEndorserManager(personHash, versionIndex, account);
+  }
+
+  function _isTrustedEndorserManager(bytes32 personHash, uint256 versionIndex, address account) private view returns (bool) {
+    if (versionIndex == 0 || versionIndex > personVersions[personHash].length) return false;
+    uint256 tokenId = versionToTokenId[personHash][versionIndex];
+    return tokenId == 0
+      ? personVersions[personHash][versionIndex - 1].addedBy == account
+      : _ownerOf(tokenId) == account;
+  }
+
+  function _requireTrustedEndorserManager(bytes32 personHash, uint256 versionIndex) internal view {
+    if (!_isTrustedEndorserManager(personHash, versionIndex, msg.sender)) revert MustBeTrustedEndorserManager();
   }
 
   function _addTrustedEndorserInternal(
@@ -632,6 +696,13 @@ contract DeepFamily is
     if (account == address(0)) revert InvalidTrustedEndorser();
     uint256 index = trustedEndorserIndex[personHash][versionIndex][account];
     if (index == 0) revert TrustedEndorserNotFound();
+
+    address source = eligibilitySource;
+    if (source != address(0)) {
+      IEligibilitySource(source).beforeTrustedChange(
+        _lineage().identityCommitmentOf(personHash), versionIndex, account
+      );
+    }
 
     uint256 arrayIdx = index - 1;
     uint256 lastIdx = trustedEndorsers[personHash][versionIndex].length - 1;
@@ -841,6 +912,7 @@ contract DeepFamily is
   ) external nonReentrant validPersonAndVersion(personHash, versionIndex) {
     uint256 prev = endorsedVersionIndex[personHash][msg.sender];
     if (prev == versionIndex) revert AlreadyEndorsed();
+    if (prev != 0) _beforeEndorsementChange(personHash, msg.sender);
 
     uint256 arrayIndex = versionIndex - 1;
     uint256 fee = IDeepFamilyToken(DEEP_FAMILY_TOKEN_CONTRACT).recentReward();
@@ -920,6 +992,7 @@ contract DeepFamily is
 
     uint256 versionIndex = endorsedVersionIndex[personHash][msg.sender];
     if (versionIndex == 0) revert NotEndorsed();
+    _beforeEndorsementChange(personHash, msg.sender);
 
     uint256 arrayIndex = versionIndex - 1;
     uint256 count = versionEndorsementCount[personHash][arrayIndex];

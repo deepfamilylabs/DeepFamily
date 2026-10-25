@@ -10,7 +10,6 @@ const mocks = vi.hoisted(() => ({
     readerAddress: "0x0000000000000000000000000000000000000101",
     rootHash: "0x" + "a".repeat(64),
     rootVersionIndex: 1,
-    stateReadMode: "rebuild" as "rebuild" | "chain",
   },
   resolveModuleAddresses: vi.fn(),
   resolveEntryReaderForChain: vi.fn(),
@@ -25,7 +24,6 @@ vi.mock("../../../shared/config/env", () => ({
   getDefaultReaderAddress: () => mocks.env.readerAddress,
   getDefaultRootHash: () => mocks.env.rootHash,
   getDefaultRootVersionIndex: () => mocks.env.rootVersionIndex,
-  getShieldedStateReadMode: () => mocks.env.stateReadMode,
 }));
 
 vi.mock("../services", () => ({
@@ -48,7 +46,6 @@ function readStoredConfig(): Record<string, unknown> {
 describe("ConfigContext module address resolution", () => {
   beforeEach(() => {
     localStorage.clear();
-    mocks.env.stateReadMode = "rebuild";
     mocks.resolveEntryReaderForChain.mockReset();
     mocks.resolveEntryReaderForChain.mockReturnValue(mocks.env.readerAddress);
     mocks.resolveModuleAddresses.mockReset();
@@ -154,76 +151,4 @@ describe("ConfigContext module address resolution", () => {
     expect(result.current.tokenAddress).toBe("");
   });
 
-  it("uses the default local rebuilding setting", () => {
-    const { result } = renderHook(() => useConfig(), { wrapper });
-    expect(result.current.stateReadMode).toBe("rebuild");
-    expect(result.current.defaults.stateReadMode).toBe("rebuild");
-  });
-
-  it("shares the deployment's chain setting without persisting a browser preference", async () => {
-    mocks.env.stateReadMode = "chain";
-    const first = renderHook(() => [useConfig(), useConfig()], { wrapper });
-    await waitFor(() => expect(first.result.current[0].contractAddress).toBe(mainAddress));
-    act(() => first.result.current[0].update({ rootVersionIndex: 2 }));
-    expect(first.result.current[1].stateReadMode).toBe("chain");
-    expect(first.result.current[0].defaults.stateReadMode).toBe("chain");
-    expect(readStoredConfig()).not.toHaveProperty("stateReadMode");
-    first.unmount();
-
-    const next = renderHook(() => useConfig(), { wrapper });
-    expect(next.result.current.stateReadMode).toBe("chain");
-  });
-
-  it.each([undefined, null, "chain", "onchain", "invalid", 1, {}, []])(
-    "ignores a saved read mode %j in favor of the deployment setting",
-    (stateReadMode) => {
-      localStorage.setItem("ft:config", JSON.stringify({ stateReadMode }));
-      const { result } = renderHook(() => useConfig(), { wrapper });
-      expect(result.current.stateReadMode).toBe("rebuild");
-    },
-  );
-
-  it("uses chain mode even when an older build saved rebuild", () => {
-    mocks.env.stateReadMode = "chain";
-    localStorage.setItem("ft:config", JSON.stringify({ stateReadMode: "rebuild" }));
-    const { result } = renderHook(() => useConfig(), { wrapper });
-    expect(result.current.stateReadMode).toBe("chain");
-  });
-
-  it("keeps the deployment setting if an untyped caller tries to update the mode", () => {
-    const { result } = renderHook(() => useConfig(), { wrapper });
-    act(() => result.current.update({
-      rootVersionIndex: 2,
-      stateReadMode: "chain",
-    } as Parameters<typeof result.current.update>[0]));
-    expect(result.current.stateReadMode).toBe("rebuild");
-    expect(result.current.rootVersionIndex).toBe(2);
-    expect(readStoredConfig()).not.toHaveProperty("stateReadMode");
-  });
-
-  it("keeps the deployment setting through damaged storage, unavailable storage, and resets", async () => {
-    mocks.env.stateReadMode = "chain";
-    localStorage.setItem("ft:config", "{broken");
-    const damaged = renderHook(() => useConfig(), { wrapper });
-    expect(damaged.result.current.stateReadMode).toBe("chain");
-    damaged.unmount();
-
-    const read = vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
-      throw new Error("Storage unavailable");
-    });
-    const unavailable = renderHook(() => useConfig(), { wrapper });
-    expect(unavailable.result.current.stateReadMode).toBe("chain");
-    unavailable.unmount();
-    read.mockRestore();
-
-    localStorage.setItem("ft:config", JSON.stringify({ stateReadMode: "chain" }));
-    const chosen = renderHook(() => useConfig(), { wrapper });
-    await waitFor(() => expect(chosen.result.current.contractAddress).toBe(mainAddress));
-    act(() => chosen.result.current.reset());
-    expect(chosen.result.current.stateReadMode).toBe("chain");
-    chosen.unmount();
-    localStorage.clear();
-    const cleared = renderHook(() => useConfig(), { wrapper });
-    expect(cleared.result.current.stateReadMode).toBe("chain");
-  });
 });

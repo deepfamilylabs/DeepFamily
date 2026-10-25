@@ -26,6 +26,7 @@ import { FUND_SELECTOR } from "../scripts/lib/shieldedReceipts.mjs";
 import {
   INTEGRATED_DEPLOYMENT_RECORDS,
   SHIELDED_DEPLOYMENT_CIRCUITS,
+  PROTOCOL_DEPLOYMENT_CIRCUITS,
   RECEIVE_DEPLOYMENT_CONTRACTS,
 } from "../scripts/lib/zkDeploymentCatalog.mjs";
 import { SHIELDED_CIRCUITS } from "../scripts/lib/zkCircuitSelection.mjs";
@@ -39,6 +40,8 @@ import {
 } from "../scripts/lib/zkArtifactTrust.mjs";
 import { createCanonicalTemporaryDirectory } from "./helpers/temporaryDirectory.mjs";
 
+const ACCEPTANCE_CIRCUITS = {...SHIELDED_DEPLOYMENT_CIRCUITS, ...Object.fromEntries(Object.entries(PROTOCOL_DEPLOYMENT_CIRCUITS).map(([action,spec])=>[action,{...spec,verifierLabel:spec.generatedLabel}]))};
+const ACCEPTANCE_SOURCES = Object.fromEntries(Object.entries(ACCEPTANCE_CIRCUITS).map(([action,spec])=>[action,spec.source]));
 const COMMIT = "12".repeat(20);
 const INPUT_DIGEST = `0x${"34".repeat(32)}`;
 const FINALIZED_BLOCK_HASH = `0x${"56".repeat(32)}`;
@@ -81,11 +84,9 @@ const SHIELDED_WASM_SHA256 = "45".repeat(32);
 const SHIELDED_ZKEY_SHA256 = "46".repeat(32);
 const SHIELDED_VERIFICATION_KEY_SHA256 = "47".repeat(32);
 const SHIELDED_PROOF_SHA256 = "48".repeat(32);
-const SHIELDED_ACTION_TRANSACTION_LABELS = Object.keys(SHIELDED_DEPLOYMENT_CIRCUITS)
-  .filter((action) => action !== "claim")
-  .map((action) => `shielded-action-${action}`);
+const SHIELDED_ACTION_TRANSACTION_LABELS = ["shield", "fund", "transfer", "unshield"].map(action=>`shielded-action-${action}`);
 const SHIELDED_TRANSACTION_RECEIPTS = Object.fromEntries(
-  [...SHIELDED_ACTION_TRANSACTION_LABELS, "shielded-action-fund-identity"].map((label, index) => [
+  SHIELDED_ACTION_TRANSACTION_LABELS.map((label, index) => [
     label,
     {
       hash: `0x${(index + 1).toString(16).padStart(64, "0")}`,
@@ -107,7 +108,7 @@ const REPORT_TRANSACTIONS = {
 const SHIELDED_ADDRESSES = Object.fromEntries(
   INTEGRATED_DEPLOYMENT_RECORDS.filter(
     (record) =>
-      record.transactionLabel.startsWith("shielded") ||
+      (record.transactionLabel.startsWith("shielded") || record.transactionLabel.startsWith("protocol")) ||
       RECEIVE_DEPLOYMENT_CONTRACTS.some(({ property }) => property === record.property) ||
       ["poseidonT3", "poseidonT4", "poseidonT6", "deepFamilyLineageIndex"].includes(record.transactionLabel),
   ).map((record, index) => [
@@ -128,30 +129,15 @@ const SHIELDED_BINDINGS = shieldedDeploymentBindings({
   ...SHIELDED_ADDRESSES,
 });
 const SHIELDED_DEPLOYMENT_ARTIFACTS = {
-  shieldedVerifiers: Object.fromEntries(
-    Object.keys(SHIELDED_DEPLOYMENT_CIRCUITS).map((action) => [
-      action,
-      { artifactSha256: SHIELDED_ARTIFACT_SHA256, runtimeSha256: SHIELDED_RUNTIME_SHA256 },
-    ]),
-  ),
-  ...Object.fromEntries(
-    [
-      "shieldedErc20Pool",
-      "shieldedNativePool",
-      "shieldedPoolFactory",
-      ...RECEIVE_DEPLOYMENT_CONTRACTS.map(({ property }) => property),
-    ].map((key) => [
-      key,
-      { artifactSha256: SHIELDED_ARTIFACT_SHA256, runtimeSha256: SHIELDED_RUNTIME_SHA256 },
-    ]),
-  ),
+  ...Object.fromEntries(["shieldedVerifiers", "generatedVerifiers", "protocolVerifiers"].map(kind=>[kind,Object.fromEntries(Object.keys(SHIELDED_BINDINGS[kind]).map(action=>[action,{artifactSha256:SHIELDED_ARTIFACT_SHA256,runtimeSha256:SHIELDED_RUNTIME_SHA256}]))])),
+  ...Object.fromEntries(["shieldedBoundaryVerifierAdapter","shieldedErc20Pool","shieldedNativePool","shieldedPoolFactory",...RECEIVE_DEPLOYMENT_CONTRACTS.map(spec=>spec.property)].map(key=>[key,{artifactSha256:SHIELDED_ARTIFACT_SHA256,runtimeSha256:SHIELDED_RUNTIME_SHA256}])),
 };
 const SHIELDED_DEPLOYMENT_EVIDENCE = shieldedDeploymentEvidence(
   SHIELDED_BINDINGS,
   SHIELDED_DEPLOYMENT_ARTIFACTS,
 );
 const SHIELDED_MANIFEST_CIRCUITS = Object.fromEntries(
-  Object.entries(SHIELDED_CIRCUITS).map(([action, source]) => [
+  Object.entries(ACCEPTANCE_SOURCES).map(([action, source]) => [
     action,
     {
       source,
@@ -266,6 +252,9 @@ const protocolManifestInspector = ({ root, requireProduction }) => {
         deepFamilyArchive: { artifactSha256: ARCHIVE_ARTIFACT_SHA256 },
         deepFamilyReader: { artifactSha256: READER_ARTIFACT_SHA256 },
         shieldedVerifiers: SHIELDED_DEPLOYMENT_EVIDENCE.shieldedVerifiers,
+        shieldedBoundaryVerifierAdapter: SHIELDED_DEPLOYMENT_EVIDENCE.shieldedBoundaryVerifierAdapter,
+        generatedVerifiers: SHIELDED_DEPLOYMENT_EVIDENCE.generatedVerifiers,
+        protocolVerifiers: SHIELDED_DEPLOYMENT_EVIDENCE.protocolVerifiers,
         shieldedErc20Pool: SHIELDED_DEPLOYMENT_EVIDENCE.shieldedErc20Pool,
         shieldedNativePool: SHIELDED_DEPLOYMENT_EVIDENCE.shieldedNativePool,
         shieldedPoolFactory: SHIELDED_DEPLOYMENT_EVIDENCE.shieldedPoolFactory,
@@ -289,12 +278,6 @@ const protocolDeploymentArtifactInspector = ({ deployments }) => {
     groth16VerifierAdapter: {
       personVerifierImmutable: PERSON_VERIFIER,
       disclosureBindingVerifierImmutable: DISCLOSURE_BINDING_VERIFIER,
-      ...Object.fromEntries(
-        Object.keys(SHIELDED_DEPLOYMENT_CIRCUITS).map((action) => [
-          `${action}VerifierImmutable`,
-          SHIELDED_ADDRESSES[SHIELDED_DEPLOYMENT_CIRCUITS[action].verifierLabel],
-        ]),
-      ),
     },
     deepFamilyArchive: { deepFamilyImmutable: DEEP_FAMILY },
     deepFamilyReader: {
@@ -326,71 +309,17 @@ const bindDeploymentEvidence = (report) => {
   return report;
 };
 
-const shieldedProofs = (chainId) =>
-  Object.fromEntries(
-    Object.entries(SHIELDED_DEPLOYMENT_CIRCUITS).map(([action, spec]) => {
-      const signals = Array(spec.publicSignals).fill("0");
-      signals[0] = String(chainId);
-      signals[1] = BigInt(SHIELDED_ADDRESSES.shieldedErc20Pool).toString();
-      // asOf closes the fund and claim inputs.
-      if (action === "fund") signals[signals.length - 1] = "1000";
-      if ((action === "claim" || action === "claim32")) signals[signals.length - 1] = String(8200 + 3 * 2_592_000);
-      return [
-        action,
-        {
-          source: spec.source,
-          verified: true,
-          verifierAddress: SHIELDED_ADDRESSES[spec.verifierLabel],
-          wasmSha256: SHIELDED_WASM_SHA256,
-          zkeySha256: SHIELDED_ZKEY_SHA256,
-          verificationKeySha256: SHIELDED_VERIFICATION_KEY_SHA256,
-          proofSha256: SHIELDED_PROOF_SHA256,
-          publicSignals: signals,
-          publicSignalsSha256: createHash("sha256").update(JSON.stringify(signals)).digest("hex"),
-          execution: ["claim", "claim32", "privateTransfer4", "unshield4"].includes(action) ? "verifier-call" : "transaction",
-          ...((action === "claim" || action === "claim32")
-            ? { claimCount: 3 }
-            : ["privateTransfer4", "unshield4"].includes(action) ? {}
-            : { transactionLabel: `shielded-action-${action}` }),
-        },
-      ];
-    }),
-  );
-
-const identityBudgetEvidence = (chainId) => {
-  const baseline = shieldedProofs(chainId);
-  const fundProof = structuredClone(baseline.fund);
-  const signals = fundProof.publicSignals;
-  signals[2] = "0";
-  signals[3] = "1";
-  signals[4] = "122";
-  signals[5] = "1";
-  signals[6] = "123";
-  signals[7] = "100";
-  signals[8] = "8200";
-  signals[9] = "124";
-  signals[10] = "125";
-  signals[11] = "1500";
-  signals[12] = "126";
-  signals[13] = "30";
-  signals[20] = "127";
-  signals[signals.length - 1] = "0";
-  fundProof.publicSignalsSha256 = createHash("sha256")
-    .update(JSON.stringify(signals))
-    .digest("hex");
-  fundProof.transactionLabel = "shielded-action-fund-identity";
-  return {
-    fundingLabel: "shielded-action-fund-identity",
-    budgetCommitment: "127",
-    heirPersonHash: keccak256(toBeHex(123n, 32)),
-    amountPerPeriod: "100",
-    periodDays: "30",
-    eligibleFrom: "8200",
-    remaining: "1500",
-    fundProof,
-    claimProof: structuredClone(baseline.claim),
-  };
-};
+const SCOPES = {sourceFact:[3,4,"eligibilitySource"],sourceTrust:[2,3,"eligibilitySource"],issue:[1,2,"receiveRegistry"],code:[3,4,"receiveRegistry"],capability:[5,6,"receiveRegistry"]};
+const shieldedProofs = chainId => Object.fromEntries(Object.entries(ACCEPTANCE_CIRCUITS).map(([action,spec])=>{
+  const signals=Array(spec.publicSignals).fill("0");
+  const [chainIndex,scopeIndex,scope]=SCOPES[action]??[0,1,"shieldedErc20Pool"];
+  signals[chainIndex]=String(chainId);signals[scopeIndex]=BigInt(SHIELDED_ADDRESSES[scope]).toString();
+  const executed=["shield","fund","transfer","unshield"].includes(action);
+  return [action,{ source:spec.source,verified:true,verifierAddress:SHIELDED_ADDRESSES[spec.verifierLabel],
+    wasmSha256:SHIELDED_WASM_SHA256,zkeySha256:SHIELDED_ZKEY_SHA256,verificationKeySha256:SHIELDED_VERIFICATION_KEY_SHA256,proofSha256:SHIELDED_PROOF_SHA256,
+    publicSignals:signals,publicSignalsSha256:createHash("sha256").update(JSON.stringify(signals)).digest("hex"),
+    execution:executed?"transaction":"verifier-call",...(executed?{transactionLabel:`shielded-action-${action}`}:{}) }];
+}));
 
 const validReportTemplate = () => ({
   schemaVersion: TESTNET_RELEASE_REPORT_SCHEMA_VERSION,
@@ -500,10 +429,10 @@ const validReportTemplate = () => ({
       blake2b512: ZK_PRODUCTION_PHASE1.blake2b512,
     },
     circuits: Object.keys(ZK_RELEASE_ARTIFACTS),
-    circuitCount: Object.keys(ZK_RELEASE_ARTIFACTS).length + Object.keys(SHIELDED_CIRCUITS).length,
+    circuitCount: 13,
     shielded: {
       status: "passed",
-      circuitCount: Object.keys(SHIELDED_CIRCUITS).length,
+      circuitCount: 11,
       manifestSha256: SHIELDED_MANIFEST_SHA256,
       ptau: {
         bytes: ZK_PRODUCTION_PHASE1.bytes,
@@ -522,24 +451,7 @@ const validReportTemplate = () => ({
     status: "passed",
     manifestSha256: SHIELDED_MANIFEST_SHA256,
     proofs: shieldedProofs(CHAIN_ID),
-    scenario: {
-      identityBudget: identityBudgetEvidence(CHAIN_ID),
-      fundLabel: "shielded-action-fund",
-      claimExecution: "verifier-call",
-      claimCount: 3,
-      receiveCode: {
-        verificationKeySha256: SHIELDED_VERIFICATION_KEY_SHA256,
-        proofSha256: SHIELDED_PROOF_SHA256,
-        verified: true,
-      },
-      recoveryEventCount: 2,
-      recoveredNotes: 1,
-      lineageDepth: 1,
-      noteDepth: 1,
-      eligibleFrom: "8200",
-      periodDays: "30",
-      claimAsOf: String(8200 + 3 * 2_592_000),
-    },
+    scenario: { offlinePayer:true,latestRoleChecks:true,appendRechecksEligibility:true,claimsRecheckEligibility:true,sameCodeAppends:true,crossCodeIndependent:true,notesRecovered:true,nativeAndToken:true },
     receipts: {
       rpcChecks: "passed",
       chainId: CHAIN_ID,
@@ -791,15 +703,12 @@ describe("schema v1 initial-mainnet-release rehearsal evidence", function () {
       protocolGeneration: PROTOCOL_GENERATION,
       goldenVectorSha256: GOLDEN_VECTOR_SHA256,
     });
-    expect(result.publicSummary.finality.revalidatedTransactionCount).to.equal(9);
+    expect(result.publicSummary.finality.revalidatedTransactionCount).to.equal(Object.keys(REPORT_TRANSACTIONS).length);
     expect(result.publicSummary.shielded).to.deep.include({
       manifestSha256: SHIELDED_MANIFEST_SHA256,
-      proofCount: 8,
-      claimCount: 3,
-      lineageDepth: 1,
-      noteDepth: 1,
+      proofCount: 11,
     });
-    expect(result.publicSummary.shielded.verifierCallActions).to.deep.equal(["claim", "claim32", "privateTransfer4", "unshield4"]);
+    expect(result.publicSummary.shielded.verifierCallActions).to.deep.equal(["unshield4", "sourceFact", "sourceTrust", "issue", "code", "capability", "claim"]);
     expect(result.publicSummary.shielded.transactionActions).to.have.length(4);
     expect(result.publicSummary.refund.transactionHash).to.equal(REFUND_TRANSACTION_HASH);
     expect(Object.isFrozen(result)).to.equal(true);
@@ -930,15 +839,9 @@ describe("schema v1 initial-mainnet-release rehearsal evidence", function () {
     report.network.chainId = String(sepoliaChainId);
     report.terminalGovernanceState.safe.chainId = String(sepoliaChainId);
     report.shielded.receipts.chainId = sepoliaChainId;
-    for (const proof of [
-      ...Object.values(report.shielded.proofs),
-      report.shielded.scenario.identityBudget.fundProof,
-      report.shielded.scenario.identityBudget.claimProof,
-    ]) {
-      proof.publicSignals[0] = String(sepoliaChainId);
-      proof.publicSignalsSha256 = createHash("sha256")
-        .update(JSON.stringify(proof.publicSignals))
-        .digest("hex");
+    for (const [action,proof] of Object.entries(report.shielded.proofs)) {
+      proof.publicSignals[SCOPES[action]?.[0]??0]=String(sepoliaChainId);
+      proof.publicSignalsSha256=createHash("sha256").update(JSON.stringify(proof.publicSignals)).digest("hex");
     }
     bindDeploymentEvidence(report);
     await writeReport(report);
@@ -1096,7 +999,7 @@ describe("schema v1 initial-mainnet-release rehearsal evidence", function () {
       ],
       ...[
         ["initial-deployment", "GovernedVerifierCandidate"],
-        ["upgrade-candidate", "DeepFamilyV2Mock"],
+        ["upgrade-candidate", "DeepFamilyUpgradeMock"],
         ["governance-replacements", "ReplacementGovernanceTimelock"],
       ].map(([phase, label], index) => [
         (report) =>
@@ -1125,7 +1028,7 @@ describe("schema v1 initial-mainnet-release rehearsal evidence", function () {
         "governance-safe-migration",
         "treasury-transfer",
         "deploy-Groth16VerifierAdapter",
-        "deploy-DeepFamilyV2Mock",
+        "deploy-DeepFamilyUpgradeMock",
         "deploy-ReplacementGovernanceTimelock",
       ].map((label) => [
         (report) => {
@@ -1526,166 +1429,35 @@ describe("schema v1 initial-mainnet-release rehearsal evidence", function () {
     }
   });
 
-  it("binds all configured public proof assets and the claim verifier call to the selected chain", async function () {
+  it("binds all eleven proof artifacts, statements and scopes to the selected chain", async function () {
     const cases = [
-      [
-        (report) => (report.shieldedArtifacts.manifestSha256 = "ff".repeat(32)),
-        /shieldedArtifacts\.manifestSha256/iu,
-      ],
-      [
-        (report) => delete report.shieldedArtifacts.circuits.privateTransfer,
-        /shieldedArtifacts\.circuits must contain exactly/iu,
-      ],
-      [
-        (report) => delete report.shieldedArtifacts.circuits.identityAuthorizationUpdate,
-        /shieldedArtifacts\.circuits must contain exactly/iu,
-      ],
-      [
-        (report) => {
-          report.zkCeremonyVerification.circuitCount = 8;
-        },
-        /zkCeremonyVerification\.circuitCount/iu,
-      ],
-      [
-        (report) => {
-          report.zkCeremonyVerification.shielded.circuitCount = 6;
-        },
-        /zkCeremonyVerification\.shielded\.circuitCount/iu,
-      ],
-      [
-        (report) =>
-          (report.shieldedArtifacts.circuits.privateTransfer.zkeySha256 = "ff".repeat(32)),
-        /shieldedArtifacts\.privateTransfer\.zkeySha256/iu,
-      ],
-      [
-        (report) => delete report.shielded.proofs.unshield,
-        /shielded\.proofs must contain exactly/iu,
-      ],
-      [
-        (report) => (report.shielded.proofs.fund.verified = false),
-        /shielded\.proofs\.fund\.verified/iu,
-      ],
-      [
-        (report) => (report.shielded.proofs.shield.verifierAddress = address(999)),
-        /shielded\.proofs\.shield\.verifierAddress/iu,
-      ],
-      [
-        (report) => (report.shielded.proofs.shield.publicSignals[1] = "11155111"),
-        /shielded\.proofs\.shield\.publicSignalsSha256/iu,
-      ],
-      [
-        (report) => (report.shielded.proofs.claim.execution = "transaction"),
-        /shielded\.proofs\.claim\.execution/iu,
-      ],
-      [
-        (report) => (report.shielded.proofs.claim.transactionLabel = "shielded-action-claim"),
-        /Future-maturity claim proof must not claim an executed pool transaction/iu,
-      ],
-      [
-        (report) => (report.zkCeremonyVerification.circuits = ["person_commitment"]),
-        /zkCeremonyVerification\.circuits must cover both core circuits/iu,
-      ],
-      [
-        (report) => (report.zkCeremonyVerification.shielded.ptau.sha256 = "ff".repeat(32)),
-        /zkCeremonyVerification\.shielded\.ptau\.sha256/iu,
-      ],
-      [(report) => (report.shielded.scenario.claimCount = 2), /shielded\.scenario\.claimCount/iu],
-      [
-        (report) => (report.shielded.scenario.identityBudget.claimProof.execution = "transaction"),
-        /shielded\.proofs\.claim\.execution/iu,
-      ],
-      [
-        (report) => (report.shielded.scenario.identityBudget.budgetCommitment = "128"),
-        /identityBudget budget commitment/iu,
-      ],
-      [
-        (report) => (report.shielded.scenario.identityBudget.heirPersonHash = address(999)),
-        /identityBudget heirPersonHash/iu,
-      ],
-      [
-        (report) => (report.shielded.scenario.identityBudget.amountPerPeriod = "101"),
-        /identityBudget\.amountPerPeriod/iu,
-      ],
-      [
-        (report) => (report.shielded.scenario.identityBudget.periodDays = "1"),
-        /identityBudget\.periodDays/iu,
-      ],
-      [(report) => (report.shielded.scenario.periodDays = "1"), /identityBudget\.periodDays/iu],
-      [
-        (report) => (report.shielded.scenario.identityBudget.remaining = "1100"),
-        /identityBudget\.remaining/iu,
-      ],
-      [
-        (report) => (report.shielded.scenario.identityBudget.eligibleFrom = "8201"),
-        /identityBudget\.eligibleFrom/iu,
-      ],
-      [
-        (report) => delete report.transactions["shielded-action-fund-identity"],
-        /shielded-action-fund-identity|finality/iu,
-      ],
-      [
-        (report) => (report.shielded.scenario.eligibleFrom = "8201"),
-        /identityBudget\.eligibleFrom/iu,
-      ],
+      [report=>report.shieldedArtifacts.manifestSha256="ff".repeat(32), /shieldedArtifacts.manifestSha256/u],
+      [report=>delete report.shieldedArtifacts.circuits.code, /shieldedArtifacts.circuits/u],
+      [report=>report.shieldedArtifacts.circuits.fund.zkeySha256="ff".repeat(32), /shieldedArtifacts.fund.zkeySha256/u],
+      [report=>report.zkCeremonyVerification.circuitCount=5, /zkCeremonyVerification.circuitCount/u],
+      [report=>report.zkCeremonyVerification.shielded.circuitCount=3, /zkCeremonyVerification.shielded.circuitCount/u],
+      [report=>delete report.shielded.proofs.claim, /shielded.proofs/u],
+      [report=>report.shielded.proofs.fund.verified=false, /shielded.proofs.fund.verified/u],
+      [report=>report.shielded.proofs.shield.verifierAddress=address(999), /shielded.proofs.shield.verifierAddress/u],
+      [report=>report.shielded.proofs.sourceFact.publicSignals[3]="11155111", /shielded.proofs.sourceFact.publicSignalsSha256/u],
+      [report=>report.shielded.proofs.claim.execution="transaction", /shielded.proofs.claim.execution/u],
+      [report=>report.shielded.scenario.appendRechecksEligibility=false, /shielded.scenario.appendRechecksEligibility/u],
+      [report=>report.shielded.scenario.offlinePayer=false, /shielded.scenario.offlinePayer/u],
     ];
-    for (const [mutate, pattern] of cases) {
-      const report = validReport();
-      mutate(report);
-      await writeReport(report);
-      await expectRejected(() => validate(), pattern);
-    }
+    for(const[mutate,pattern]of cases){const report=validReport();mutate(report);await writeReport(report);await expectRejected(()=>validate(),pattern);}
   });
-
-  it("rejects shielded receipt and immutable binding tampering", async function () {
+  it("rejects receiving receipt and canonical immutable binding tampering", async function () {
     const cases = [
-      [(report) => (report.shielded.receipts.chainId = 11155111), /shielded\.receipts\.chainId/iu],
-      [
-        (report) => (report.shielded.receipts.transactions.fund.txHash = `0x${"ef".repeat(32)}`),
-        /shielded fund transaction hash/iu,
-      ],
-      [
-        (report) => (report.shielded.receipts.transactions.fund.selector = "0x12345678"),
-        /shielded fund selector/iu,
-      ],
-      [
-        (report) => (report.shielded.receipts.transactions.fund.gasUsed = "300001"),
-        /shielded fund exceeds the committed production gas threshold/iu,
-      ],
-      [
-        (report) => (report.terminalGovernanceState.verifierAdapter.fundVerifier = address(999)),
-        /verifierAdapter\.fundVerifier/iu,
-      ],
-      [
-        (report) =>
-          (report.terminalGovernanceState.shieldedErc20Pool.tokenImmutable = address(999)),
-        /ShieldedErc20Pool must bind the declared token, lineage and common verifier adapter/iu,
-      ],
-      [
-        (report) =>
-          (report.terminalGovernanceState.shieldedErc20Pool.verifierAdapterImmutable =
-            address(999)),
-        /ShieldedErc20Pool must bind the declared token, lineage and common verifier adapter/iu,
-      ],
-      [
-        (report) => (report.shielded.scenario.receiveCode.verified = false),
-        /shielded\.scenario\.receiveCode\.verified/iu,
-      ],
-      [
-        (report) => delete report.shieldedArtifacts.circuits.fundReceiveCredential,
-        /shieldedArtifacts\.circuits must contain exactly/iu,
-      ],
-      [
-        (report) =>
-          (report.terminalGovernanceState.shieldedErc20Pool.runtimeSha256 = "ff".repeat(32)),
-        /ShieldedErc20Pool runtimeSha256/iu,
-      ],
+      [report=>report.shielded.receipts.chainId=11155111,/shielded.receipts.chainId/u],
+      [report=>report.shielded.receipts.transactions.fund.selector="0x12345678",/shielded fund selector/u],
+      [report=>report.shielded.receipts.transactions.fund.gasUsed="300001",/shielded fund exceeds/u],
+      [report=>report.terminalGovernanceState.shieldedErc20Pool.tokenImmutable=address(999),/ShieldedErc20Pool must bind/u],
+      [report=>report.terminalGovernanceState.shieldedErc20Pool.receiveRegistryImmutable=address(999),/shared receiving registry/u],
+      [report=>report.terminalGovernanceState.protocolVerifiers.fund.verifierImmutable=address(999),/adapter must bind/u],
+      [report=>report.terminalGovernanceState.shieldedBoundaryVerifierAdapter.shieldVerifierImmutable=address(999),/boundary route/u],
+      [report=>report.terminalGovernanceState.shieldedErc20Pool.runtimeSha256="ff".repeat(32),/ShieldedErc20Pool runtimeSha256/u],
     ];
-    for (const [mutate, pattern] of cases) {
-      const report = validReport();
-      mutate(report);
-      await writeReport(report);
-      await expectRejected(() => validate(), pattern);
-    }
+    for(const[mutate,pattern]of cases){const report=validReport();mutate(report);await writeReport(report);await expectRejected(()=>validate(),pattern);}
   });
 
   it("enforces a bounded report size before parsing", async function () {

@@ -108,7 +108,7 @@ describe("useRpcNetworkMenu", () => {
 
   it("keeps the local chain listed while it is the network in use", () => {
     // Picked earlier on a build that knows no reader for it: the menu still
-    // names it, unconfigured, rather than as an anonymous custom RPC.
+    // names it, unconfigured, rather than as an unnamed custom RPC.
     mocks.config.rpcUrl = "http://local-node";
     mocks.config.chainId = 31337;
     const { result } = renderHook(() => useRpcNetworkMenu());

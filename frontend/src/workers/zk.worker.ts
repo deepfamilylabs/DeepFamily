@@ -1,12 +1,6 @@
-import type { ShieldedStateReadMode } from "../shared/config/shieldedStateReadMode";
 import type { Groth16Proof } from "../shared/zk/zk";
 import { serializeWorkerError } from "../shared/workers/workerErrors";
-import {
-  createShieldedReceiveCodeFromCredentials,
-  verifyShieldedReceiveCode,
-  type ShieldedReceiveCodeCheck,
-} from "../shared/zk/shieldedReceiveCode";
-import type { IdentityFields } from "@deepfamily/protocol-core";
+
 import type {
   DisclosureBindingProofParameters,
   PersonRelationProofParameters,
@@ -40,14 +34,7 @@ type ZkWorkerMethods = {
     params: { proof: Groth16Proof; publicSignals: string[] };
     result: { ok: boolean };
   };
-  createShieldedReceiveCodeFromCredentials: {
-    params: { identity: IdentityFields; rawPassphrase: string; disclosure?: "anonymous" | "fund"; context: { rpcUrl: string; chainId: string; factoryAddress: string; stateReadMode?: ShieldedStateReadMode }; expiresAt: string };
-    result: { code: string; personHash: string };
-  };
-  verifyShieldedReceiveCode: {
-    params: { code: string };
-    result: ShieldedReceiveCodeCheck;
-  };
+
 };
 
 type ZkWorkerRequest = { id: number; method: keyof ZkWorkerMethods; params: any };
@@ -80,9 +67,7 @@ const handlers: {
     assertDescriptorPurpose("DisclosureBinding");
     return { ok: await verifyDisclosureBindingProof(proof, publicSignals) };
   },
-  createShieldedReceiveCodeFromCredentials: async (credentials) =>
-    await createShieldedReceiveCodeFromCredentials(credentials),
-  verifyShieldedReceiveCode: async ({ code }) => await verifyShieldedReceiveCode(code),
+
 };
 
 self.addEventListener("message", async (event: MessageEvent<ZkWorkerRequest>) => {

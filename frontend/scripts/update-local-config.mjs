@@ -9,6 +9,8 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { ethers } from "ethers";
 import seedHelpers from "../../lib/seedHelpers.js";
+import { validateReceiveDeployment } from "./lib/receiveDeployment.mjs";
+import { exportProtocolFrontendArtifacts } from "../../scripts/export-protocol-frontend.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -111,8 +113,10 @@ async function updateLocalConfig() {
     const readerPath = path.join(DEPLOYMENTS_DIR, "DeepFamilyReader.json");
     const factoryPath = path.join(DEPLOYMENTS_DIR, "ShieldedPoolFactory.json");
     const nativePoolPath = path.join(DEPLOYMENTS_DIR, "ShieldedNativePool.json");
-    const lettersPath = path.join(DEPLOYMENTS_DIR, "PrivateLetterArchive.json");
+    const lettersPath = path.join(DEPLOYMENTS_DIR, "LetterArchive.json");
     const poolPath = path.join(DEPLOYMENTS_DIR, "ShieldedErc20Pool.json");
+    const registryPath = path.join(DEPLOYMENTS_DIR, "ReceiveRegistry.json");
+    const sourcePath = path.join(DEPLOYMENTS_DIR, "EligibilitySource.json");
     if (!fs.existsSync(deepFamilyPath)) {
       console.log("DeepFamily contract not deployed. Run `npm run dev:deploy` first.");
       process.exit(1);
@@ -121,7 +125,7 @@ async function updateLocalConfig() {
       console.log("DeepFamily reader module not deployed. Run `npm run dev:deploy` first.");
       process.exit(1);
     }
-    if (![poolPath, nativePoolPath, factoryPath, lettersPath].every((file) => fs.existsSync(file))) {
+    if (![poolPath, nativePoolPath, factoryPath, lettersPath, registryPath, sourcePath].every((file) => fs.existsSync(file))) {
       console.log("Shielded pool not deployed. Run `npm run dev:deploy` first.");
       process.exit(1);
     }
@@ -133,6 +137,8 @@ async function updateLocalConfig() {
     const lettersDeployment = JSON.parse(fs.readFileSync(lettersPath, "utf8"));
     const lettersAddress = ethers.getAddress(lettersDeployment.address);
     const factoryDeployment = JSON.parse(fs.readFileSync(factoryPath, "utf8"));
+    const registryDeployment = JSON.parse(fs.readFileSync(registryPath, "utf8"));
+    const sourceDeployment = JSON.parse(fs.readFileSync(sourcePath, "utf8"));
     const contractAddress = deepFamilyDeployment.address;
     const readerAddress = readerDeployment.address;
     const poolAddress = ethers.getAddress(poolDeployment.address);
@@ -175,74 +181,10 @@ async function updateLocalConfig() {
     const nativePool = new ethers.Contract(nativePoolAddress, nativeDeployment.abi, provider);
     const letters = new ethers.Contract(lettersAddress, lettersDeployment.abi, provider);
     const factory = new ethers.Contract(factoryAddress, factoryDeployment.abi, provider);
-    const [
-      familyToken,
-      familyLineage,
-      poolToken,
-      poolLineage,
-      factoryToken,
-      factoryLineage,
-      factoryNative,
-      registeredDeep,
-      registeredNative,
-      poolVersion,
-      nativeVersion,
-      poolKind,
-      nativeKind,
-      familyVerifier,
-      poolVerifier,
-      nativeVerifier,
-      factoryVerifier,
-      nativeLineage,
-    ] = await Promise.all([
-      deepFamily.DEEP_FAMILY_TOKEN_CONTRACT(),
-      deepFamily.lineageIndex(),
-      pool.TOKEN(),
-      pool.LINEAGE_INDEX(),
-      factory.DEEP_TOKEN(),
-      factory.LINEAGE_INDEX(),
-      factory.NATIVE_POOL(),
-      factory.poolFor(await deepFamily.DEEP_FAMILY_TOKEN_CONTRACT()),
-      factory.poolFor(ethers.ZeroAddress),
-      pool.protocolVersion(),
-      nativePool.protocolVersion(),
-      pool.assetKind(),
-      nativePool.assetKind(),
-      deepFamily.verifierRegistry(0, 1),
-      pool.VERIFIER(),
-      nativePool.VERIFIER(),
-      factory.VERIFIER(),
-      nativePool.LINEAGE_INDEX(),
-    ]);
-    if (
-      ethers.getAddress(familyToken) !== ethers.getAddress(poolToken) ||
-      ethers.getAddress(familyLineage) !== ethers.getAddress(poolLineage) ||
-      ethers.getAddress(factoryToken) !== ethers.getAddress(familyToken) ||
-      ethers.getAddress(factoryLineage) !== ethers.getAddress(familyLineage) ||
-      ethers.getAddress(nativeLineage) !== ethers.getAddress(familyLineage) ||
-      [poolVerifier, nativeVerifier, factoryVerifier].some(
-        (address) => ethers.getAddress(address) !== ethers.getAddress(familyVerifier),
-      ) ||
-      ethers.getAddress(factoryNative) !== nativePoolAddress ||
-      ethers.getAddress(registeredNative) !== nativePoolAddress ||
-      ethers.getAddress(registeredDeep) !== poolAddress ||
-      BigInt(poolVersion) !== 1n ||
-      BigInt(nativeVersion) !== 1n ||
-      BigInt(poolKind) !== 0n ||
-      BigInt(nativeKind) !== 1n
-    ) {
-      throw new Error("Local shielded pool is not bound to this DeepFamily");
-    }
-
-    const [lettersCode, lettersFactory, lettersFamily, lettersState, poolState, nativeState, factoryState] = await Promise.all([
-      provider.getCode(lettersAddress), letters.POOL_FACTORY(), letters.DEEP_FAMILY(), letters.AUTHORIZATION_STATE(),
-      pool.AUTHORIZATION_STATE(), nativePool.AUTHORIZATION_STATE(), factory.AUTHORIZATION_STATE(),
-    ]);
-    if (lettersCode === "0x" || ethers.getAddress(lettersFactory) !== factoryAddress ||
-      ethers.getAddress(lettersFamily) !== ethers.getAddress(contractAddress) ||
-      [poolState, nativeState, factoryState].some(address => ethers.getAddress(address) !== ethers.getAddress(lettersState))) {
-      throw new Error("Local private letter archive is not bound to the canonical pools and authorization state");
-    }
+    const registry = new ethers.Contract(registryDeployment.address, registryDeployment.abi, provider);
+    const source = new ethers.Contract(sourceDeployment.address, sourceDeployment.abi, provider);
+    const { registryAddress } = await validateReceiveDeployment({ deepFamily, pool, nativePool, factory, letters, registry, source });
+    exportProtocolFrontendArtifacts({ root: PROJECT_ROOT, chainId: LOCAL_CHAIN_ID, registryAddress });
 
     try {
       const tokenCounter = await deepFamily.tokenCounter();
@@ -307,10 +249,10 @@ async function updateLocalConfig() {
       VITE_SHIELDED_POOL_FACTORY_FROM_BLOCK: factoryDeployment.deploymentBlock,
       [`VITE_SHIELDED_POOL_FACTORY_FROM_BLOCK_${LOCAL_CHAIN_ID}`]:
         factoryDeployment.deploymentBlock,
-      VITE_PRIVATE_LETTER_ARCHIVE_ADDRESS: lettersAddress,
-      [`VITE_PRIVATE_LETTER_ARCHIVE_ADDRESS_${LOCAL_CHAIN_ID}`]: lettersAddress,
-      VITE_PRIVATE_LETTER_ARCHIVE_FROM_BLOCK: lettersDeployment.deploymentBlock,
-      [`VITE_PRIVATE_LETTER_ARCHIVE_FROM_BLOCK_${LOCAL_CHAIN_ID}`]: lettersDeployment.deploymentBlock,
+      VITE_LETTER_ARCHIVE_ADDRESS: lettersAddress,
+      [`VITE_LETTER_ARCHIVE_ADDRESS_${LOCAL_CHAIN_ID}`]: lettersAddress,
+      VITE_LETTER_ARCHIVE_FROM_BLOCK: lettersDeployment.deploymentBlock,
+      [`VITE_LETTER_ARCHIVE_FROM_BLOCK_${LOCAL_CHAIN_ID}`]: lettersDeployment.deploymentBlock,
       VITE_ROOT_PERSON_HASH: defaultRoot.hash,
       VITE_ROOT_VERSION_INDEX: defaultRoot.versionIndex,
     };

@@ -13,9 +13,9 @@
     "build": "hardhat --config hardhat.config.mjs --build-profile production compile",
     "pages:build": "npm ci --workspace deepfamily-frontend --include-workspace-root=false --no-audit --no-fund && npm run build --workspace deepfamily-frontend",
     "pretest": "npm run test:protocol",
-    "test": "cross-env REQUIRE_REAL_RECEIVE_PROOFS=1 hardhat --config hardhat.config.mjs test mocha",
+    "test": "cross-env REQUIRE_PROTOCOL_REAL_PROOFS=1 hardhat --config hardhat.config.mjs test mocha",
     "test:protocol": "node scripts/generate-unicode-normalization-data.mjs --check && node scripts/generate-precis-data.mjs --check && npm test --workspace @deepfamily/protocol-core",
-    "test:circuits": "node --test circuits/test/shielded_*.test.mjs",
+    "test:circuits": "node --test circuits/test/*.test.mjs",
     "deploy:net": "hardhat --config hardhat.config.mjs --build-profile production run scripts/deploy-integrated.mjs --network $npm_config_net",
     "deploy:timelock": "hardhat --config hardhat.config.mjs --build-profile production run scripts/deploy-timelock.mjs --network $npm_config_net",
     "acceptance": "node scripts/evm-command.mjs acceptance",
@@ -61,7 +61,13 @@
     "zk:assets:publish": "node scripts/publish-zk-assets.mjs",
     "zk:build": "node scripts/zk-build.mjs",
     "zk:setup": "node scripts/zk-setup.mjs",
-    "zk:check": "node scripts/zk-check.mjs"
+    "zk:check": "node scripts/zk-check.mjs",
+    "zk:dev": "node scripts/protocol-zk-development.mjs --all",
+    "zk:dev:check": "node scripts/protocol-zk-development.mjs --check",
+    "test:proof": "cross-env REQUIRE_PROTOCOL_REAL_PROOFS=1 node --test test/protocol-real-proof.test.mjs",
+    "test:evm": "cross-env REQUIRE_PROTOCOL_REAL_PROOFS=1 hardhat --config hardhat.config.mjs test mocha test/protocol-real-evm.test.mjs",
+    "test:contracts": "hardhat --config hardhat.config.mjs test mocha test/receive-registry.test.mjs test/eligibility-source.test.mjs test/eligibility-lineage.test.mjs test/pool-core.test.mjs test/protocol-deployment.test.mjs",
+    "zk:frontend": "node scripts/export-protocol-frontend.mjs"
   },
   "keywords": [
     "blockchain",

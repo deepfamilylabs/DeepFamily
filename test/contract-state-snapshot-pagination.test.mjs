@@ -2,9 +2,7 @@ import "../hardhat-test-setup.mjs";
 import assert from "node:assert/strict";
 import { expect } from "chai";
 import hre from "hardhat";
-import { poseidon2, poseidon3 } from "poseidon-lite";
 import {
-  buildShieldedIdentityAuthorizationState,
   computeLineageEndorsementLeaf,
   computeLineageParentsDigest,
   computeLineageTrustedLeaf,
@@ -13,36 +11,6 @@ import { deployIntegratedFixture } from "./fixtures/integrated.mjs";
 import { addPerson, makeTestPerson, setupStubVerifiers } from "./helpers/testHelper.mjs";
 
 const MAX = hre.ethers.MaxUint256;
-
-async function authFixture() {
-  const verifier = await hre.ethers.deployContract("IdentityCounterVerifierMock");
-  const t3 = await hre.ethers.deployContract("PoseidonT3");
-  const t4 = await hre.ethers.deployContract("PoseidonT4");
-  const State = await hre.ethers.getContractFactory("IdentityAuthorizationState", {
-    libraries: { PoseidonT3: await t3.getAddress(), PoseidonT4: await t4.getAddress() },
-  });
-  const state = await State.deploy(await verifier.getAddress());
-  const chainId = (await hre.ethers.provider.getNetwork()).chainId;
-  let nonce = 10_000n;
-  const increment = async (alias, counter = 0n) => {
-    const inputs = [
-      ++nonce,
-      chainId,
-      BigInt(await state.getAddress()),
-      alias,
-      counter,
-      counter + 1n,
-    ];
-    return state.incrementCounter(
-      inputs[0],
-      alias,
-      counter,
-      counter + 1n,
-      hre.ethers.AbiCoder.defaultAbiCoder().encode(["uint256[6]"], [inputs]),
-    );
-  };
-  return { state, increment };
-}
 
 async function collectPages(read, count, pageSize = 2n, start = 0n) {
   const rows = [];
@@ -54,97 +22,6 @@ async function collectPages(read, count, pageSize = 2n, start = 0n) {
 
 describe("Global current-state snapshot pagination", function () {
   this.timeout(120_000);
-
-  it("exports every authorization node with bounded pages, stable IDs and fixed-block consistency", async function () {
-    const { state, increment } = await hre.networkHelpers.loadFixture(authFixture);
-    const empty = await state.getStateSnapshotHeader();
-    assert.deepEqual([...empty], [1n, 0n, 0n, 0n, 1n]);
-    assert.deepEqual([...(await state.getNodePage(1, 256))], []);
-    for (const [start, limit] of [
-      [0n, 1n],
-      [2n, 1n],
-      [1n, 0n],
-      [1n, 257n],
-      [MAX, 1n],
-    ])
-      await expect(state.getNodePage(start, limit)).to.be.revertedWithCustomError(
-        state,
-        "InvalidSnapshotPage",
-      );
-
-    const expected = new Map();
-    // Real inserts exercise a full maximum-size response, without synthetic storage writes.
-    for (let alias = 1n; alias <= 129n; ++alias) {
-      await increment(alias);
-      expected.set(alias, 1n);
-    }
-    const header = await state.getStateSnapshotHeader();
-    assert.equal(header.formatVersion, 1n);
-    assert.equal(header.nodeCount, 257n);
-    assert.equal((await state.getNodePage(1, 256)).length, 256);
-    assert.equal((await state.getNodePage(257, 256)).length, 1);
-    assert.deepEqual([...(await state.getNodePage(258, 1))], []);
-    await expect(state.getNodePage(259, 1)).to.be.revertedWithCustomError(
-      state,
-      "InvalidSnapshotPage",
-    );
-    const nodes = await collectPages(
-      (start, limit) => state.getNodePage(start, limit),
-      257n,
-      13n,
-      1n,
-    );
-    const seen = new Set();
-    const entries = new Map();
-    const hash = (id, depth = 0) => {
-      if (id === 0n) return 0n;
-      assert.ok(id > 0n && id <= header.nodeCount);
-      assert.ok(!seen.has(id), "node IDs must not be cyclic or reused by different parents");
-      seen.add(id);
-      const node = nodes[Number(id - 1n)];
-      let computed;
-      if (node.counter !== 0n) {
-        assert.equal(node.left, 0n);
-        assert.equal(node.right, 0n);
-        assert.ok(!entries.has(node.key));
-        entries.set(node.key, node.counter);
-        computed = poseidon3([node.key, node.counter, 1n]);
-      } else {
-        assert.ok(depth < 64);
-        assert.equal(node.key, 0n);
-        assert.ok(node.left !== 0n || node.right !== 0n);
-        computed = poseidon2([hash(node.left, depth + 1), hash(node.right, depth + 1)]);
-      }
-      assert.equal(node.hash, computed);
-      return computed;
-    };
-    assert.equal(hash(header.rootNodeId), header.root);
-    assert.equal(BigInt(seen.size), header.nodeCount);
-    assert.deepEqual([...entries].sort(), [...expected].sort());
-    assert.equal(buildShieldedIdentityAuthorizationState(entries).root, header.root);
-    assert.deepEqual(
-      [...(await state.getStateSnapshotHeader())],
-      [...header],
-      "views cannot mutate state",
-    );
-
-    const fixedBlock = await hre.ethers.provider.getBlockNumber();
-    const before = [...(await state.getNodePage(1, 256))].map((row) => [...row]);
-    await increment(1n, 1n);
-    const current = await state.getStateSnapshotHeader();
-    assert.equal(current.nodeCount, header.nodeCount);
-    assert.equal(current.rootNodeId, header.rootNodeId);
-    assert.notEqual(current.root, header.root);
-    assert.equal(current.checkpointId, header.checkpointId + 1n);
-    assert.deepEqual(
-      [...(await state.getStateSnapshotHeader({ blockTag: fixedBlock }))],
-      [...header],
-    );
-    assert.deepEqual(
-      [...(await state.getNodePage(1, 256, { blockTag: fixedBlock }))].map((row) => [...row]),
-      before,
-    );
-  });
 
   it("exports lineage slot openings through replacement, cancellation, renewal and trust changes", async function () {
     const { deepFamily, lineageIndex, token } =

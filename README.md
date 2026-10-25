@@ -148,61 +148,20 @@ check. Gas reports remain optional maintenance checks; see [ZK proofs](docs/zk-p
 
 ### ZK Artifact Workflow
 
-The same `zk:*` workflow covers 16 Circom circuits (two identity/disclosure and fourteen shielded,
-including three receive presentations). Receive credentials, letters and recovery use these
-shared build, setup and verification commands:
+The protocol uses 13 Circom relations: two identity/disclosure, three money boundaries and eight receiving/qualification/budget relations. `dfreceive` is the sole receiving-code format. A payer can use the code for letters, transfers and future budget contributions while the recipient remains offline. See [receiving codes and letters](docs/private-letters.md).
 
-Run `npm run test:circuits` for shielded constraint tests. They compile the current sources into
-temporary directories and require only npm dependencies and the pinned Circom compiler
-(`npm run zk:fetch`), without proving keys, Powers of Tau, or downloaded browser artifacts.
-`npm run check` includes these tests, and CI runs them in an independent job.
+| Command | Purpose |
+| --- | --- |
+| `npm run zk:fetch` | Install the pinned Circom toolchain |
+| `npm run zk:build` | Compile the 13 canonical relations |
+| `npm run zk:dev` | Explicitly generate local development receiving keys |
+| `npm run zk:dev:check` | Check source, toolchain and artifact hashes |
+| `npm run zk:frontend -- <chainId> <registry>` | Export trusted frontend receiving artifacts |
+| `npm run test:circuits` | Check current circuit constraints without proving keys |
+| `npm run test:proof` | Verify eight real receiving proofs and public-signal binding |
+| `npm run test:evm` | Exercise the complete real-proof money and eligibility flow |
 
-| Command                        | Purpose                                                            |
-| ------------------------------ | ------------------------------------------------------------------ |
-| `npm run zk:fetch`             | Install host-native and canonical audit-reference Circom compilers |
-| `npm run zk:assets:fetch`      | Download and decode the manifest-pinned browser WASM/zkey files from R2 |
-| `npm run zk:assets:publish`    | Compress and upload new browser WASM/zkey files to R2              |
-| `npm run zk:build`             | Compile all 16 Circom circuits                                     |
-| `npm run zk:setup`             | Generate the final keys, verifiers and evidence for all 16 circuits |
-| `npm run zk:check`             | Rebuild and check artifacts, proofs and available ceremony evidence |
-
-Each Groth16 circuit has its own proving and verification keys. The single setup command handles
-the complete catalog and derives the shared receive-link parameters and three fixed Solidity
-verifiers from the matching keys. It records the single-operator ceremony and artifact evidence.
-Local development, CI and release use this same final artifact set. Generated browser files go
-under `frontend/public/zk/` and Solidity verifiers under `contracts/`.
-
-Receive presentations use LinkG16 to link two ordinary Circom proofs over the same hidden
-credential fields, without recursive pairing checks inside a circuit or a Go/WASM prover.
-The payer loads one presentation's WASM/zkey, with uncompressed sizes of about 13.56 MiB for anonymous receipts,
-13.69 MiB for Fund, or 20.97 MiB for attachments, plus a shared 26 KiB link-key file.
-The submitted proof is 1,184 bytes (anonymous/attachment) or 1,216 bytes (Fund), excluding
-public signals and ciphertext. First use needs no recipient registration or transaction;
-credential creation and payment still read the latest authorization counter. See
-[private letters](docs/private-letters.md) for the exact flow and sizes.
-
-Current checked-in keys remain development-only and unattested until the final setup is explicitly
-run and its outputs reviewed. Local functionality and real-proof acceptance can reuse the current
-pinned files; the setup command creates their final replacement for every environment.
-
-The browser `.wasm` and `.zkey` files are not committed; their `.vkey.json` files and the
-small shared `shielded/receive-link-keys.json` are committed. The
-circuit manifests pin each uncompressed file's SHA-256, and Brotli copies are hosted on R2 at
-`<VITE_ZK_ASSET_BASE_URL>/<sha256>/<file name>.br`. Objects carry `Content-Encoding: br`
-and the original file's content type, so native browser and Node fetch decode them before the
-unchanged manifest digest is checked. The repository names no host: set the variable
-in `frontend/.env.local`, in the GitHub repository variables for CI, and in Cloudflare Pages.
-`npm run zk:assets:fetch` installs the decoded files in a fresh checkout (`dev:all` and CI do this automatically).
-The publish command generates adjacent, ignored `.br` files using Brotli quality 5 and reports
-their sizes before uploading. Run it once when adopting Brotli,
-and after any setup that changes a key:
-`npm run zk:assets:publish` (with `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` and
-`R2_BUCKET` in `.env`), before deploying a build that uses the new URLs. Compression reduces
-download size; decoded proving-key size, prover memory, circuit constraints and proof bytes
-remain unchanged. Local development serves the original files. Daily build, fetch and check commands reuse
-the pinned keys. `dev:all` stops if a circuit change makes them stale or a required pinned file
-cannot be obtained; key generation requires an explicit `npm run zk:setup` from a clean, reviewed
-commit.
+Local development keys are not approved production keys. Production setup and release remain blocked until all 13 relations have reviewed ceremony evidence. Browser WASM/zkey files are generated/downloaded artifacts; proof keys cannot be selected by a scanned receiving code. The project has one protocol and no compatibility entry points for previous receiving designs.
 
 `zk:fetch` installs two distinct compiler roles. The native compiler is written to `bin/circom`
 (`bin/circom.exe` on Windows) and is used by local and diagnostic builds. Release gates snapshot it

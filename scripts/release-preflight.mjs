@@ -1,404 +1,70 @@
 #!/usr/bin/env node
-
-import { execFileSync } from "node:child_process";
-import fs from "node:fs/promises";
 import path from "node:path";
+import fs from "node:fs/promises";
 import { fileURLToPath } from "node:url";
-
-import {
-  assertLocalCircomInstallation,
-  buildPinnedCircomFromSource,
-  resolveTrustedSourceBuildTool,
-} from "./fetch-circom.mjs";
-import {
-  buildCircomOverrideEnvironment,
-  withoutCircomOverrideEnvironment,
-} from "./lib/circomCompilerOverride.mjs";
-import {
-  CIRCOM_VERSION,
-  localCircomBinaryPath,
-  resolveLocalCircomTarget,
-} from "./lib/circomToolchain.mjs";
-import {
-  assertReleaseRuntimeCompatibility,
-  normalizePortableCommand,
-  sanitizeReleaseEnvironment,
-} from "./lib/portableCommand.mjs";
-import { createPrivateTemporaryDirectory } from "./lib/privateTemporaryDirectory.mjs";
-import { resolveProductionPtauPath } from "./lib/productionPtau.mjs";
+import { execFileSync } from "node:child_process";
+import { inspectProtocolProductionArtifacts } from "./lib/protocolProductionArtifacts.mjs";
 import { inspectProtocolReleaseManifest } from "./lib/protocolReleaseManifest.mjs";
-import { ZK_PRODUCTION_PHASE1, inspectZkReleaseArtifacts } from "./lib/zkArtifactTrust.mjs";
-import {
-  buildProductionCompilerEvidence,
-  preparePrivateProductionCompiler,
-} from "./lib/zkProductionSetup.mjs";
-import { verifyProductionCeremony } from "./zk-ceremony-verify.mjs";
-import { verifyLinkedReceiveArtifacts } from "./lib/linkedReceiveArtifacts.mjs";
-import { verifyShieldedProductionCeremony } from "./lib/shieldedProductionSetup.mjs";
-import { runZkCheck } from "./zk-check.mjs";
-import { checkShieldedReleaseEvidence } from "./zk-shielded-release-check.mjs";
+import { inspectZkReleaseArtifacts } from "./lib/zkArtifactTrust.mjs";
+import { assertLocalCircomInstallation, buildPinnedCircomFromSource, resolveTrustedSourceBuildTool } from "./fetch-circom.mjs";
+import { assertReleaseRuntimeCompatibility, normalizePortableCommand, sanitizeReleaseEnvironment } from "./lib/portableCommand.mjs";
+import { buildCircomOverrideEnvironment, withoutCircomOverrideEnvironment } from "./lib/circomCompilerOverride.mjs";
+import { resolveLocalCircomTarget } from "./lib/circomToolchain.mjs";
+import { createPrivateTemporaryDirectory } from "./lib/privateTemporaryDirectory.mjs";
+import { buildProductionCompilerEvidence, preparePrivateProductionCompiler } from "./lib/productionCompiler.mjs";
 
 export const RELEASE_PREFLIGHT_COMMANDS = Object.freeze([
   Object.freeze(["npm", ["run", "clean"]]),
-  // Contracts must build before the frontend synchronizes ABI artifacts.
   Object.freeze(["npm", ["run", "contracts:check"]]),
   Object.freeze(["npm", ["run", "frontend:check"]]),
   Object.freeze(["npm", ["run", "zk:check"]]),
-  Object.freeze([process.execPath, ["scripts/zk-shielded-release-check.mjs"]]),
-  // The release toolchain itself (Hardhat, Safe SDK, ethers and snarkjs) is in devDependencies.
   Object.freeze(["npm", ["run", "security:audit"]]),
 ]);
-
-export const defaultRunner = ({
-  executable,
-  args,
-  cwd,
-  capture = false,
-  platform = process.platform,
-  env = process.env,
-}) => {
-  const command = normalizePortableCommand({ executable, args, platform, env });
-  return execFileSync(command.executable, command.args, {
-    cwd,
-    env,
-    encoding: capture ? "utf8" : undefined,
-    stdio: capture ? ["ignore", "pipe", "pipe"] : "inherit",
-  });
+export const defaultRunner = ({ executable, args, cwd, env = process.env, capture = false, platform = process.platform }) => {
+  const command=normalizePortableCommand({executable,args,platform,env});
+  return execFileSync(command.executable,command.args,{cwd,env,encoding:capture?"utf8":undefined,stdio:capture?["ignore","pipe","pipe"]:"inherit"});
 };
-
-const assertCleanGitState = ({ root, runner, stage, env, gitExecutable }) => {
-  const commit = String(
-    runner({
-      executable: gitExecutable,
-      args: ["rev-parse", "HEAD"],
-      cwd: root,
-      capture: true,
-      env,
-    }),
-  ).trim();
-  const status = String(
-    runner({
-      executable: gitExecutable,
-      args: ["status", "--porcelain=v1", "--untracked-files=all"],
-      cwd: root,
-      capture: true,
-      env,
-    }),
-  ).trim();
-  if (!/^[0-9a-f]{40}$/.test(commit)) {
-    throw new Error(`Release preflight ${stage} Git commit is unavailable`);
-  }
-  if (status !== "") {
-    throw new Error(`Release preflight requires a clean Git working tree (${stage})`);
-  }
+function cleanGitState({root,runner,env,gitExecutable}) {
+  const run=args=>String(runner({executable:gitExecutable,args,cwd:root,env,capture:true})).trim();
+  const commit=run(["rev-parse","HEAD"]), status=run(["status","--porcelain=v1","--untracked-files=all"]);
+  if(!/^[0-9a-f]{40}$/u.test(commit)) throw new Error("Release preflight Git commit is unavailable");
+  if(status!=="") throw new Error("Release preflight requires a clean Git working tree");
   return commit;
-};
-
-const runReleaseValidation = async (
-  {
-    root = process.cwd(),
-    platform = process.platform,
-    arch = process.arch,
-    libc,
-    report,
-    env = process.env,
-    runner = defaultRunner,
-    commands = RELEASE_PREFLIGHT_COMMANDS,
-    compilerInspector = assertLocalCircomInstallation,
-    compilerSourceBuilder = buildPinnedCircomFromSource,
-    gitToolResolver = resolveTrustedSourceBuildTool,
-    privateDirectoryFactory = createPrivateTemporaryDirectory,
-    ptauPath,
-    mpcMetadataReader,
-    expectedProductionPhase1 = ZK_PRODUCTION_PHASE1,
-    protocolManifestInspector = inspectProtocolReleaseManifest,
-    zkChecker = runZkCheck,
-    shieldedReleaseInspector = checkShieldedReleaseEvidence,
-    receiveArtifactInspector = verifyLinkedReceiveArtifacts,
-    receiveCeremonyVerifier = async (options) => {
-      const verified = await verifyShieldedProductionCeremony(options);
-      return verified.receive;
-    },
-  } = {},
-  { verifyCeremonies },
-) => {
-  if (typeof runner !== "function") throw new Error("runner must be a function");
-  if (!Array.isArray(commands)) throw new Error("commands must be an array");
-  if (typeof compilerInspector !== "function") {
-    throw new Error("compilerInspector must be a function");
-  }
-  if (typeof compilerSourceBuilder !== "function") {
-    throw new Error("compilerSourceBuilder must be a function");
-  }
-  if (typeof gitToolResolver !== "function") {
-    throw new Error("gitToolResolver must be a function");
-  }
-  if (typeof privateDirectoryFactory !== "function") {
-    throw new Error("privateDirectoryFactory must be a function");
-  }
-  if (typeof protocolManifestInspector !== "function") {
-    throw new Error("protocolManifestInspector must be a function");
-  }
-  if (typeof receiveArtifactInspector !== "function") {
-    throw new Error("receiveArtifactInspector must be a function");
-  }
-  if (typeof zkChecker !== "function") throw new Error("zkChecker must be a function");
-  if (typeof shieldedReleaseInspector !== "function") {
-    throw new Error("shieldedReleaseInspector must be a function");
-  }
-  assertReleaseRuntimeCompatibility({ platform, arch, env, operation: "Release preflight" });
-  if (verifyCeremonies && typeof receiveCeremonyVerifier !== "function") {
-    throw new Error("Receive production setup and independent verification are not provided");
-  }
-
-  const localTarget = resolveLocalCircomTarget({ platform, arch, libc, report });
-  const baseEnvironment = withoutCircomOverrideEnvironment(sanitizeReleaseEnvironment(env));
-  const gitExecutable = await gitToolResolver({ name: "git" });
-  if (typeof gitExecutable !== "string" || !path.isAbsolute(gitExecutable)) {
-    throw new Error("Release preflight Git resolver must return an absolute path");
-  }
-  const releaseCommit = assertCleanGitState({
-    root,
-    runner,
-    stage: "before checks",
-    env: baseEnvironment,
-    gitExecutable,
-  });
-  const initialProtocolEvidence = protocolManifestInspector({
-    root,
-    requireProduction: true,
-  });
-  if (!/^[0-9a-f]{64}$/.test(initialProtocolEvidence?.manifestSha256 ?? "")) {
-    throw new Error("Release preflight protocol manifest SHA-256 is invalid");
-  }
-  // Check this independently before commands can rebuild artifacts or local compilers.
-  const initialReceiveEvidence = await receiveArtifactInspector({
-    root,
-    requireProduction: true,
-    env: baseEnvironment,
-    platform,
-  });
-  if (
-    initialReceiveEvidence?.status !== "production" ||
-    initialReceiveEvidence?.verification !== "passed" ||
-    initialReceiveEvidence?.circuitCount !== 3 ||
-    !/^[0-9a-f]{64}$/u.test(initialReceiveEvidence?.manifestSha256 ?? "")
-  ) {
-    throw new Error("Release preflight requires production receive presentation evidence");
-  }
-  // Refuse an unreviewed artifact set before inspecting or building any local compiler.
-  const initialZkEvidence = inspectZkReleaseArtifacts({
-    root,
-    requireProduction: true,
-    requireBuiltR1cs: false,
-    expectedProductionPhase1,
-  });
-  let compilerStageRoot;
-  try {
-    let localCompiler;
-    if (localTarget.strategy === "pinned-source") {
-      compilerStageRoot = await privateDirectoryFactory({
-        prefix: "deepfamily-zk-preflight-compiler-",
-      });
-      localCompiler = await preparePrivateProductionCompiler({
-        target: localTarget,
-        stageRoot: compilerStageRoot,
-        sourceBuilder: compilerSourceBuilder,
-        sourceEnvironment: baseEnvironment,
-      });
-    } else {
-      localCompiler = await compilerInspector({ root, platform, arch, libc, report });
-      const expectedCompilerPath = path.join(
-        path.resolve(root),
-        localCircomBinaryPath({ platform }),
-      );
-      if (localCompiler?.path !== expectedCompilerPath) {
-        throw new Error(
-          "Release preflight local Circom inspection returned unexpected target evidence",
-        );
-      }
-    }
-    if (
-      localCompiler?.target !== localTarget.id ||
-      localCompiler?.strategy !== localTarget.strategy
-    ) {
-      throw new Error(
-        "Release preflight local Circom inspection returned unexpected target evidence",
-      );
-    }
-    const expectedLibcEvidence = localTarget.libcEvidence ?? null;
-    const actualLibcEvidence = localCompiler.libcEvidence ?? null;
-    if (
-      (expectedLibcEvidence === null) !== (actualLibcEvidence === null) ||
-      (expectedLibcEvidence !== null &&
-        ["family", "version", "source"].some(
-          (field) => actualLibcEvidence?.[field] !== expectedLibcEvidence[field],
-        ))
-    ) {
-      throw new Error(
-        "Release preflight local Circom inspection returned unexpected libc evidence",
-      );
-    }
-    if (localCompiler.version !== CIRCOM_VERSION) {
-      throw new Error("Release preflight local Circom inspection returned an unexpected version");
-    }
-    if (!/^[0-9a-f]{64}$/.test(localCompiler.sha256)) {
-      throw new Error(
-        "Release preflight local Circom inspection returned an invalid SHA-256 digest",
-      );
-    }
-    if (localTarget.strategy === "official-binary" && localCompiler.sha256 !== localTarget.sha256) {
-      throw new Error(
-        "Release preflight local Circom inspection does not match the pinned target SHA-256",
-      );
-    }
-    buildProductionCompilerEvidence({ compiler: localCompiler, platform, arch });
-    const commandEnvironment =
-      localTarget.strategy === "pinned-source"
-        ? buildCircomOverrideEnvironment({ env: baseEnvironment, compiler: localCompiler })
-        : baseEnvironment;
-
-    for (const [executable, args] of commands) {
-      if (executable === "npm" && args[0] === "run" && args[1] === "zk:check") {
-        await zkChecker({
-          root,
-          verifyCeremonies: false,
-          runner: (command) =>
-            runner({
-              ...command,
-              capture: false,
-              env: commandEnvironment,
-            }),
-        });
-        continue;
-      }
-      if (executable === process.execPath && args[0] === "scripts/zk-shielded-release-check.mjs") {
-        await shieldedReleaseInspector({ root, env: baseEnvironment, ptauPath });
-        continue;
-      }
-      runner({
-        executable,
-        args,
-        cwd: root,
-        capture: false,
-        env: baseEnvironment,
-      });
-    }
-    let coreCeremonyVerification;
-    if (verifyCeremonies) {
-      coreCeremonyVerification = await verifyProductionCeremony({
-        root,
-        ptauPath: ptauPath ?? resolveProductionPtauPath({ root, env: baseEnvironment, platform }),
-        env: baseEnvironment,
-        runner,
-        mpcMetadataReader,
-        expectedProductionPhase1,
-      });
-      const receiveVerification = await receiveCeremonyVerifier({ root, env: baseEnvironment });
-      if (
-        receiveVerification?.verification !== "passed" ||
-        receiveVerification?.manifestSha256 !== initialReceiveEvidence.manifestSha256
-      )
-        throw new Error(
-          "Release preflight requires independent receive ceremony verification for its exact production manifest",
-        );
-    }
-
-    const finishedCommit = assertCleanGitState({
-      root,
-      runner,
-      stage: "after checks",
-      env: baseEnvironment,
-      gitExecutable,
-    });
-    if (finishedCommit !== releaseCommit) {
-      throw new Error("Release commit changed while preflight was running");
-    }
-    const finalZkEvidence = inspectZkReleaseArtifacts({
-      root,
-      requireProduction: true,
-      requireBuiltR1cs: true,
-      expectedProductionPhase1,
-    });
-    if (finalZkEvidence.manifestSha256 !== initialZkEvidence.manifestSha256) {
-      throw new Error("ZK artifact manifest changed while release preflight was running");
-    }
-    if (
-      verifyCeremonies &&
-      (coreCeremonyVerification.manifestSha256 !== finalZkEvidence.manifestSha256 ||
-        coreCeremonyVerification.transcriptSha256 !== finalZkEvidence.transcriptSha256)
-    ) {
-      throw new Error("Verified core ceremony does not match the final release artifacts");
-    }
-    const finalProtocolEvidence = protocolManifestInspector({
-      root,
-      requireProduction: true,
-    });
-    if (finalProtocolEvidence.manifestSha256 !== initialProtocolEvidence.manifestSha256) {
-      throw new Error("Protocol release manifest changed while release preflight was running");
-    }
-    const finalReceiveEvidence = await receiveArtifactInspector({
-      root,
-      requireProduction: true,
-      expectedManifestSha256: initialReceiveEvidence.manifestSha256,
-      env: baseEnvironment,
-      platform,
-    });
-    if (
-      finalReceiveEvidence?.status !== "production" ||
-      finalReceiveEvidence?.verification !== "passed" ||
-      finalReceiveEvidence?.circuitCount !== 3 ||
-      finalReceiveEvidence?.manifestSha256 !== initialReceiveEvidence.manifestSha256
-    ) {
-      throw new Error("Receive presentation manifest changed while release preflight was running");
-    }
-
-    return Object.freeze({
-      status: verifyCeremonies ? "passed" : "checks-passed",
-      releaseCommit,
-      zkCeremonyId: finalZkEvidence.ceremonyId,
-      zkTrustModel: finalZkEvidence.trustModel,
-      zkContributorCount: finalZkEvidence.contributorCount,
-      zkMinimumContributors: finalZkEvidence.minimumContributors,
-      zkManifestSha256: finalZkEvidence.manifestSha256,
-      zkTranscriptSha256: finalZkEvidence.transcriptSha256,
-      protocolManifestSha256: finalProtocolEvidence.manifestSha256,
-      receiveManifestSha256: finalReceiveEvidence.manifestSha256,
-      ptauSha256: finalZkEvidence.phase1Sha256,
-      checks: commands.map(([executable, args]) => `${executable} ${args.join(" ")}`),
-    });
-  } finally {
-    if (compilerStageRoot !== undefined) {
-      await fs.rm(compilerStageRoot, { recursive: true, force: true });
-    }
-  }
-};
-
-export const runReleaseChecks = (options) =>
-  runReleaseValidation(options, { verifyCeremonies: false });
-
-export const runReleasePreflight = (options) =>
-  runReleaseValidation(options, { verifyCeremonies: true });
-
-export const main = async () => {
-  const result = await runReleasePreflight();
-  console.log("Production release preflight passed:");
-  console.log(`  release commit: ${result.releaseCommit}`);
-  console.log(`  ZK ceremony:    ${result.zkCeremonyId}`);
-  console.log(
-    `  ZK trust:       ${result.zkTrustModel}, ` +
-      `${result.zkContributorCount}/${result.zkMinimumContributors} contributor(s)`,
-  );
-  console.log(`  ZK manifest:    ${result.zkManifestSha256}`);
-  console.log(`  Protocol:       ${result.protocolManifestSha256}`);
-};
-
-const isMain =
-  process.argv[1] !== undefined && fileURLToPath(import.meta.url) === path.resolve(process.argv[1]);
-
-if (isMain) {
-  main().catch((error) => {
-    console.error(`[release-preflight] ${error.message}`);
-    process.exitCode = 1;
-  });
 }
+/** Public release validation authenticates keys before running any release command. */
+export async function runReleaseChecks({root=process.cwd(),env=process.env,platform=process.platform,arch=process.arch,libc,report,runner=defaultRunner}={}) {
+  if(typeof runner!=="function") throw new Error("runner must be a function");
+  // No development manifest can substitute for the reviewed complete relation graph.
+  const production=inspectProtocolProductionArtifacts({root});
+  assertReleaseRuntimeCompatibility({platform,arch,env,operation:"Release preflight"});
+  const baseEnvironment=withoutCircomOverrideEnvironment(sanitizeReleaseEnvironment(env));
+  const gitExecutable=await resolveTrustedSourceBuildTool({name:"git"});
+  const releaseCommit=cleanGitState({root,runner,env:baseEnvironment,gitExecutable});
+  const protocol=inspectProtocolReleaseManifest({root,requireProduction:true});
+  const identity=inspectZkReleaseArtifacts({root,requireProduction:true,requireBuiltR1cs:false});
+  const target=resolveLocalCircomTarget({platform,arch,libc,report});
+  let stage;
+  try {
+    let compiler;
+    if(target.strategy==="pinned-source") {
+      stage=await createPrivateTemporaryDirectory({prefix:"deepfamily-preflight-compiler-"});
+      compiler=await preparePrivateProductionCompiler({target,stageRoot:stage,sourceBuilder:buildPinnedCircomFromSource,sourceEnvironment:baseEnvironment});
+    } else compiler=await assertLocalCircomInstallation({root,platform,arch,libc,report});
+    buildProductionCompilerEvidence({compiler,platform,arch});
+    const commandEnvironment=target.strategy==="pinned-source"?buildCircomOverrideEnvironment({env:baseEnvironment,compiler}):baseEnvironment;
+    for(const[executable,args]of RELEASE_PREFLIGHT_COMMANDS)
+      await runner({executable,args,cwd:root,env:commandEnvironment,capture:false,platform});
+    const finalProduction=inspectProtocolProductionArtifacts({root});
+    const finalProtocol=inspectProtocolReleaseManifest({root,requireProduction:true});
+    const finalIdentity=inspectZkReleaseArtifacts({root,requireProduction:true,requireBuiltR1cs:true});
+    if(JSON.stringify(finalProduction)!==JSON.stringify(production)||finalProtocol.manifestSha256!==protocol.manifestSha256||finalIdentity.manifestSha256!==identity.manifestSha256)
+      throw new Error("Proof or protocol manifests changed while release preflight was running");
+    if(cleanGitState({root,runner,env:baseEnvironment,gitExecutable})!==releaseCommit)
+      throw new Error("Release commit changed while preflight was running");
+    return Object.freeze({status:"checks-passed",releaseCommit,circuitCount:13,protocolManifestSha256:protocol.manifestSha256});
+  } finally { if(stage!==undefined) await fs.rm(stage,{recursive:true,force:true}); }
+}
+export async function runReleasePreflight(options = {}) { return runReleaseChecks(options); }
+export async function main() { return runReleasePreflight(); }
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url))
+  main().catch(error => { console.error(`[release-preflight] ${error.message}`); process.exitCode = 1; });

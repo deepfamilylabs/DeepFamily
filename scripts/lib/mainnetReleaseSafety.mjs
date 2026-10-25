@@ -8,6 +8,7 @@ import {
   INTEGRATED_DEPLOYMENT_RECORDS,
   SHIELDED_DEPLOYMENT_CIRCUITS,
   RECEIVE_DEPLOYMENT_CONTRACTS,
+  PROTOCOL_DEPLOYMENT_CIRCUITS,
 } from "./zkDeploymentCatalog.mjs";
 
 export const ESPACE_MAINNET_NETWORK = ESPACE_CHAIN_PROFILE.mainnet.networkName;
@@ -25,6 +26,8 @@ export const MAINNET_TRANSACTION_LABELS = Object.freeze([
   "disclosureBindingVerifier",
   ...Object.values(SHIELDED_DEPLOYMENT_CIRCUITS).map((spec) => spec.verifierLabel),
   "groth16VerifierAdapter",
+  "shieldedBoundaryVerifierAdapter",
+  ...Object.values(PROTOCOL_DEPLOYMENT_CIRCUITS).flatMap(spec => [spec.generatedLabel, spec.adapterLabel]),
   "deepFamilyImplementation",
   "deepFamilyProxy",
   "tokenInitialize",
@@ -38,10 +41,10 @@ export const MAINNET_TRANSACTION_LABELS = Object.freeze([
   "poseidonT6",
   "deepFamilyLineageIndex",
   "setLineageIndex",
-  ...RECEIVE_DEPLOYMENT_CONTRACTS.filter(({ property }) => property !== "privateLetterArchive").map(({ property }) => property),
+  ...RECEIVE_DEPLOYMENT_CONTRACTS.map(({ property }) => property),
+  "setEligibilitySource",
   "shieldedNativePool",
   "shieldedPoolFactory",
-  "privateLetterArchive",
   "transferDeepFamilyOwnership",
 ]);
 

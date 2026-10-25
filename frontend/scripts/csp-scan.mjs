@@ -3,8 +3,8 @@ import { spawn } from 'node:child_process'
 import fs from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import path from 'node:path'
-import { splitShieldedLetterCiphertextHash, verifyLinkedGroth16Proof } from '@deepfamily/protocol-core'
-import { createCspScanRpcFixture } from './lib/cspScanRpcFixture.mjs'
+import { fileURLToPath } from 'node:url'
+import { exportProtocolFrontendArtifacts } from '../../scripts/export-protocol-frontend.mjs'
 
 const mode = process.env.CSP_SCAN_MODE === 'dev' ? 'dev' : 'preview'
 const port = Number(process.env.CSP_SCAN_PORT || (mode === 'dev' ? 5173 : 4173))
@@ -14,6 +14,7 @@ const baseUrl = process.env.CSP_SCAN_BASE_URL || `http://${host}:${port}`
 // The scan builds and serves its own copy, configured for scanning, and never touches dist/.
 const workDir = path.join(process.cwd(), '.csp-scan')
 const outDir = path.join(workDir, 'dist')
+const workerManifestFile = path.join(workDir, 'worker-proof-manifest.json')
 const reportFile = process.env.DEEP_CSP_REPORT_FILE || path.join(workDir, `report.${mode}.jsonl`)
 const viteBin = path.join(path.dirname(createRequire(import.meta.url).resolve('vite/package.json')), 'bin', 'vite.js')
 
@@ -97,240 +98,48 @@ const spawnFrontendServer = async () => {
   return runVite(['preview', '--outDir', outDir, '--host', host, '--port', String(port), '--strictPort'], env)
 }
 
-// First paint never starts the crypto, ZK or asset worker, yet they hold the code the policy is most
-// likely to break: WebAssembly, blob: threads and fetched proving files. Drive the built bundles
-// with the committed golden vector: derive its identity material and unlock its envelope, then
-// create and verify shielded receive codes in both proving workers, using real Groth16 proofs,
-// then prove a letter presentation and its LinkG16 transport in the production asset worker.
-// The asset flow also checks that its unlocked session only returns the public DTO. Codes refuse
-// an empty passphrase, which is what the vector uses, so that step takes a fixed one instead.
-const RECEIVE_CODE_PASSPHRASE = 'csp-scan receive code'
-
+// Exercise the built wallet worker under the site's real CSP, including Groth16
+// WASM/blob workers and encrypted wallet backup recovery. The worker does not need
+// an RPC server to create and verify a generic receive code.
 const runWorkerFlows = async (page) => {
-  // Route only this controlled JSON-RPC endpoint. Worker fetches still run under the
-  // production same-origin CSP; the scan never needs a public chain or extra CSP origin.
-  const rpcFixture = createCspScanRpcFixture()
-  const rpcUrl = new URL('/__csp-scan/rpc', baseUrl).toString()
-  const fulfillRpc = async (route) => {
-    const response = rpcFixture.handle(route.request().postDataJSON())
-    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(response) })
-  }
-  await page.context().route(rpcUrl, fulfillRpc)
   const assets = await fs.readdir(path.join(outDir, 'assets'))
-  const workerUrl = (name) => {
-    const file = assets.find(f => f.startsWith(`${name}.worker-`) && f.endsWith('.js'))
-    if (!file) throw new Error(`no ${name} worker in ${outDir}/assets`)
-    return `/assets/${file}`
-  }
-  const vector = JSON.parse(
-    await fs.readFile(new URL('../../protocol-vectors/onchain-biography-v1.json', import.meta.url), 'utf8')
-  )
-  const { fullName, gender, birthYear, birthMonth, birthDay, isBirthBC } =
-    JSON.parse(vector.metadata.canonicalJsonUtf8).person
-  const c = vector.context
-  const input = {
-    cryptoUrl: workerUrl('crypto'),
-    zkUrl: workerUrl('zk'),
-    assetUrl: workerUrl('shieldedAsset'),
-    identity: { fullName, gender, birthYear, birthMonth, birthDay, isBirthBC },
-    rawPassphrase: vector.identity.rawPassphrase,
-    receivePassphrase: RECEIVE_CODE_PASSPHRASE,
-    receiveContext: { ...rpcFixture.context, rpcUrl },
-    expiresAt: rpcFixture.expiresAt,
-    identitySuiteId: vector.identity.identitySuiteId,
-    envelopeHex: vector.envelope.envelopeHex,
-    context: {
-      chainId: String(c.chainId),
-      deepFamilyProxy: c.deepFamilyProxy,
-      personHash: c.personHash,
-      fatherHash: c.fatherHash,
-      fatherVersionIndex: String(c.fatherVersionIndex),
-      motherHash: c.motherHash,
-      motherVersionIndex: String(c.motherVersionIndex),
-      versionCommitment: String(c.versionCommitment),
-    },
-  }
-
-  // An app page hosts the workers, so they start under the Trusted Types policy the app installs.
+  const workerFile = assets.find(file => file.startsWith('receive.worker-') && file.endsWith('.js'))
+  if (!workerFile) throw new Error('The receive worker is missing from the frontend build')
+  const manifest = JSON.parse(await fs.readFile(workerManifestFile, 'utf8'))
+  const context = { rpcUrl: new URL('/__csp-scan/unused-rpc', baseUrl).toString(),
+    deployment: { chainId: manifest.chainId, registryAddress: manifest.registryAddress, poolAddress: '0x0000000000000000000000000000000000000001' }, manifest }
   await page.goto(new URL('/terms', baseUrl).toString(), { waitUntil: 'load' })
-  await page.waitForTimeout(1000)
-  let timer
-  const timeout = new Promise((_, reject) => {
-    timer = setTimeout(() => reject(new Error('worker flows timed out')), 240_000)
-  })
-  const flows = page.evaluate(async (input) => {
+  const result = await page.evaluate(async ({ url, context }) => {
+    const worker = new Worker(url, { type: 'module' })
     let sequence = 0
-    const call = (worker, method, params) => new Promise((resolve, reject) => {
+    const call = (method, input) => new Promise((resolve, reject) => {
       const id = ++sequence
       worker.onmessage = ({ data }) => {
-        // Public-state synchronization can emit progress before the method result.
         if (data?.id !== id) return
         data.ok ? resolve(data.result) : reject(new Error(`${method}: ${data?.error?.message || 'failed'}`))
       }
-      worker.onerror = (event) => reject(new Error(`${method}: ${event.message || 'worker failed to load'}`))
-      worker.postMessage({ id, method, params })
+      worker.onerror = () => reject(new Error(`${method}: worker could not load`))
+      worker.postMessage({ id, method, input, context })
     })
-    const context = { ...input.context }
-    for (const key of ['chainId', 'fatherVersionIndex', 'motherVersionIndex', 'versionCommitment']) {
-      context[key] = BigInt(context[key])
+    const assertFields = (value, fields) => {
+      if (!value || typeof value !== 'object' || Object.keys(value).some(key => !fields.includes(key))) throw new Error('Wallet worker exposed an unexpected field')
     }
-    const { identity, rawPassphrase, receivePassphrase, identitySuiteId } = input
-    const workers = []
-    const startWorker = (url) => {
-      const worker = new Worker(url, { type: 'module' })
-      workers.push(worker)
-      return worker
-    }
-    const assertPublicFields = (value, fields, label) => {
-      if (!value || typeof value !== 'object' || Array.isArray(value) ||
-        Object.keys(value).some(key => !fields.includes(key)) ||
-        fields.some(key => !Object.hasOwn(value, key))) {
-        // Never serialize an unexpected DTO: it might contain the very secret under test.
-        throw new Error(`${label} is not the expected public DTO`)
-      }
-    }
-    const lower = (value) => String(value).toLowerCase()
     try {
-      const crypto = startWorker(input.cryptoUrl)
-      const zk = startWorker(input.zkUrl)
-      const asset = startWorker(input.assetUrl)
-      const material = await call(crypto, 'deriveIdentityMaterialV1', { identity, rawPassphrase, identitySuiteId })
-      const unlocked = await call(crypto, 'decryptPersonVersionEnvelopeV1', {
-        envelopeHex: input.envelopeHex,
-        rawPassphrase,
-        context,
-      })
-      const receiver = await call(crypto, 'deriveIdentityMaterialV1', {
-        identity,
-        rawPassphrase: receivePassphrase,
-        identitySuiteId,
-      })
-      const created = await call(zk, 'createShieldedReceiveCodeFromCredentials', {
-        identity,
-        rawPassphrase: receivePassphrase,
-        context: input.receiveContext,
-        expiresAt: input.expiresAt,
-        disclosure: 'anonymous',
-      })
-      const check = await call(zk, 'verifyShieldedReceiveCode', { code: created.code })
-      const assetState = await call(asset, 'unlockIdentity', {
-        identity,
-        rawPassphrase: receivePassphrase,
-      })
-      assertPublicFields(assetState, ['credentials', 'identity', 'independentKey'], 'asset session')
-      assertPublicFields(assetState.credentials, ['handle'], 'independent-key credentials')
-      assertPublicFields(assetState.identity, [
-        'handle', 'identitySuiteId', 'identityCommitment', 'personHash', 'identity',
-      ], 'asset identity')
-      assertPublicFields(assetState.identity.identity, ['fullName'], 'asset identity display')
-      if (assetState.independentKey !== null || typeof assetState.credentials.handle !== 'string' || typeof assetState.identity.handle !== 'string' ||
-        typeof assetState.identity.identityCommitment !== 'string' ||
-        typeof assetState.identity.personHash !== 'string' ||
-        typeof assetState.identity.identitySuiteId !== 'number' ||
-        typeof assetState.identity.identity.fullName !== 'string') {
-        throw new Error('asset session returned invalid public field types or created an independent key root')
-      }
-      const assetCreated = await call(asset, 'receiveCode', {
-        slot: 'identity', context: input.receiveContext, expiresAt: input.expiresAt, disclosure: 'anonymous',
-      })
-      assertPublicFields(assetCreated, ['code'], 'asset receive code')
-      if (typeof assetCreated.code !== 'string') {
-        throw new Error('asset receive code returned invalid public field types')
-      }
-      const assetCheck = await call(zk, 'verifyShieldedReceiveCode', { code: assetCreated.code })
-      const publicCheckFields = [
-        'ok', 'disclosure', 'authorizationAlias', 'authorizationCounter', 'expiresAt',
-        'ownerCommitment', 'viewingKey', 'keyMode', 'identitySuiteId',
-        'independentKeySuiteId', 'independentKeyDerivationVersion', 'fingerprint',
-      ]
-      assertPublicFields(check, publicCheckFields, 'anonymous receive verification')
-      assertPublicFields(assetCheck, publicCheckFields, 'anonymous asset receive verification')
-      const letter = await call(asset, 'prepareLetter', {
-        context: input.receiveContext, code: created.code, body: 'CSP scan test letter',
-      })
-      assertPublicFields(letter, ['delivery', 'ciphertext', 'proof'], 'proven letter')
-      assertPublicFields(letter.delivery, [
-        'messageId', 'checkpointId', 'asOf', 'expiresAt', 'recipientBinding',
-      ], 'letter delivery')
-      return {
-        personHash: lower(material.personHash),
-        unlockValidated: unlocked.metadataUnlockValidated,
-        versionCommitment: String(unlocked.versionCommitment),
-        receiverPersonHash: lower(receiver.personHash),
-        receiverIdentityCommitment: String(receiver.identityCommitment),
-        createdPersonHash: lower(created.personHash),
-        receiveCodeVerified: check.ok,
-        assetPersonHash: lower(assetState.identity.personHash),
-        assetIdentityCommitment: assetState.identity.identityCommitment,
-        assetIdentitySuiteId: assetState.identity.identitySuiteId,
-        assetReceiveCodeVerified: assetCheck.ok,
-        assetKeyMode: assetCheck.keyMode,
-        assetReceivingFieldsMatch: publicCheckFields.every(field => assetCheck[field] === check[field]),
-        anonymousDisclosureValidated: check.disclosure === 'anonymous' && check.expiresAt === input.expiresAt &&
-          check.authorizationCounter === '0',
-        assetPublicDtoValidated: true,
-        letter,
-      }
-    } finally {
-      for (const worker of workers) worker.terminate()
-    }
-  }, input)
-  const result = await Promise.race([flows, timeout]).finally(async () => {
-    clearTimeout(timer)
-    await page.context().unroute(rpcUrl, fulfillRpc)
-  })
-  if (rpcFixture.errors.length) throw new Error('worker flows used unsupported fixture RPC calls')
-
-  const checks = [
-    ['the vector identity derives to its person hash', result.personHash === String(vector.identity.personHash).toLowerCase()],
-    ['the vector envelope unlocks', result.unlockValidated === true],
-    ['the unlocked version commitment matches', result.versionCommitment === String(vector.metadata.versionCommitment)],
-    ['the receive code verifies', result.receiveCodeVerified === true],
-    [
-      'both workers derive the same receiving identity',
-      result.createdPersonHash === result.receiverPersonHash,
-    ],
-    ['the asset worker returns only public session/code DTOs', result.assetPublicDtoValidated === true],
-    ['the asset receive code verifies in the ZK worker', result.assetReceiveCodeVerified === true],
-    [
-      'the asset session and verified code match the original identity and mode',
-      result.assetPersonHash === result.receiverPersonHash &&
-      result.assetIdentityCommitment === result.receiverIdentityCommitment &&
-      result.assetIdentitySuiteId === Number(input.identitySuiteId) && result.assetKeyMode === 0,
-    ],
-    ['anonymous verification exposes only the expected public fields', result.anonymousDisclosureValidated === true],
-    ['both proving workers bind the same receiving keys and credential fields', result.assetReceivingFieldsMatch === true],
-  ]
-  const broken = checks.find(([, ok]) => !ok)
-  if (broken) throw new Error(`worker flows: ${broken[0]} failed`)
-
-  const { delivery, ciphertext, proof } = result.letter
-  if (delivery.checkpointId !== rpcFixture.checkpointId || delivery.asOf !== rpcFixture.asOf ||
-    delivery.expiresAt !== rpcFixture.expiresAt || !/^0x[0-9a-f]+$/iu.test(proof) ||
-    (proof.length - 2) / 2 !== 1184) {
-    throw new Error('worker flows: letter delivery does not match the controlled authorization state')
-  }
-  const { cipherLo, cipherHi } = splitShieldedLetterCiphertextHash(ciphertext)
-  const publicInputs = [
-    BigInt(input.receiveContext.chainId), BigInt(input.receiveContext.lettersAddress), 1n,
-    BigInt(delivery.messageId), cipherLo, cipherHi, BigInt(delivery.checkpointId),
-    BigInt(rpcFixture.stateRoot), BigInt(delivery.asOf), BigInt(delivery.expiresAt), BigInt(delivery.recipientBinding),
-  ]
-  const linkKeys = JSON.parse(await fs.readFile(new URL('../public/zk/shielded/receive-link-keys.json', import.meta.url), 'utf8')).anonymous
-  const issuerKey = JSON.parse(await fs.readFile(new URL('../public/zk/shielded/shielded_anonymous_receive_credential.vkey.json', import.meta.url), 'utf8'))
-  const verifies = (publicInputs) => verifyLinkedGroth16Proof({
-    proof, publicInputs,
-    issuer: { verificationKey: issuerKey, deltaG1: linkKeys.issuerDeltaG1 },
-    presentation: { verificationKey: linkKeys.verificationKey, deltaG1: linkKeys.deltaG1 },
-  })
-  if (!await verifies(publicInputs)) throw new Error('worker flows: production receive presentation/link proof failed independent verification')
-  const replay = [...publicInputs]
-  replay[2] = 4n
-  const changedCiphertext = [...publicInputs]
-  changedCiphertext[4] ^= 1n
-  if (await verifies(replay) || await verifies(changedCiphertext)) {
-    throw new Error('worker flows: linked proof accepted a changed operation or ciphertext')
-  }
+      const rawPassphrase = 'csp-scan wallet backup password'
+      const created = await call('walletCreate', { rawPassphrase })
+      assertFields(created, ['state', 'backup'])
+      const received = await call('walletCreateCode', { rawPassphrase, expiresAt: String(Math.floor(Date.now() / 1000) + 86400) })
+      assertFields(received, ['state', 'backup', 'code'])
+      const checked = await call('verifyCode', { code: received.code })
+      assertFields(checked, ['chainId', 'authorizerScope', 'nonce', 'codeAlias', 'commonBinding', 'revocationTag', 'ownerCommitment', 'viewingKey', 'expiresAt', 'version', 'proof', 'publicSignals', 'capabilities'])
+      await call('walletLock', {})
+      const restored = await call('walletRestore', { rawPassphrase, backup: received.backup })
+      return { validCode: received.code.startsWith('dfreceive1') && checked.capabilities.length === 0,
+        restored: restored.state.unlocked && restored.state.codeCount === received.state.codeCount,
+        backup: received.backup instanceof Uint8Array && received.backup.length > 64 }
+    } finally { worker.terminate() }
+  }, { url: `/assets/${workerFile}`, context })
+  if (!result.validCode || !result.restored || !result.backup) throw new Error('Wallet worker CSP flow failed')
 }
 
 const readReports = async () => {
@@ -409,6 +218,17 @@ const main = async () => {
   const pageViolations = []
   let workerFailure = null
   await fs.mkdir(workDir, { recursive: true })
+  if (mode === 'preview' && process.env.CSP_SCAN_WORKERS !== '0') {
+    // This scope exercises a local worker without a deployed registry. Keep its
+    // test pins in the scan directory; never replace the application's config.
+    const { manifest } = exportProtocolFrontendArtifacts({
+      root: fileURLToPath(new URL('../..', import.meta.url)),
+      chainId: 31337n,
+      registryAddress: '0x0000000000000000000000000000000000001234',
+      writeConfig: false,
+    })
+    await fs.writeFile(workerManifestFile, `${JSON.stringify(manifest, null, 2)}\n`)
+  }
   const server = await spawnFrontendServer()
   const serverExit = new Promise((_, reject) => {
     server.on('exit', (code) => reject(new Error(`frontend server exited (${code})`)))
@@ -604,7 +424,7 @@ const main = async () => {
         try {
           await runWorkerFlows(page)
           const seconds = ((Date.now() - started) / 1000).toFixed(1)
-          console.log(`[csp-scan] workers: identity derived, envelope unlocked, ZK + asset receive codes proved and verified, real receive presentation/link independently verified with replay rejection, asset DTO public-only, all workers terminated (${seconds}s)`)
+          console.log(`[csp-scan] workers: receive code proved and verified in the wallet worker, encrypted backup restored, public results checked, worker terminated (${seconds}s)`)
         } catch (err) {
           workerFailure = err
         }

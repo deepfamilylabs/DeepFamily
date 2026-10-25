@@ -207,8 +207,8 @@ describe("Timelock deployment configuration", function () {
           ...options,
           governanceOwner: await accepted.getAddress(),
         }),
-      ).to.be.rejectedWith("deployment preflight accepted; no broadcast");
-      expect(broadcasts).to.equal(1);
+      ).to.be.rejectedWith(/no approved production artifact set/i);
+      expect(broadcasts).to.equal(0);
     }
     expect(await deployerSigner.getNonce()).to.equal(nonceBefore);
   });
