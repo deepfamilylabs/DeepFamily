@@ -241,7 +241,31 @@ The tree can hide person versions that aren't vouched for by a root-defined allo
 
 `InheritancePage` renders `InheritanceWorkspace`, using `ReceiveService`, `receiveChain` and the stateful `receive.worker`. There is one receiving-code format (`dfreceive`) and one wallet workflow. The page supports wallet creation, encrypted backup/restore, code generation, asset shielding, budget deposits and contributions, claims, transfers, withdrawals and letters.
 
-Wallet secrets and qualification openings stay in `inheritanceWalletSession`. Worker responses use a public result allowlist. Code branch zero is reserved for wallet change; externally shared codes use newly allocated indices. The wallet updates its encrypted backup before exposing each new external code. Restore validates the chain and registry and recovers notes locally from public ledger events. A family wallet can derive its canonical subject secret inside the Worker from the existing identity form. Same-subject encrypted backups can merge registered, current qualifications without replacing money keys or code indices; code generation selects at most two current qualifications. Claims select a current credential when an earlier one has been revoked.
+Wallet secrets and qualification openings stay in `inheritanceWalletSession` and `qualificationWallet`. Worker responses use a public result allowlist, including nested qualification summaries. Code branch zero is reserved for wallet change; externally shared codes use newly allocated indices. The wallet updates its encrypted backup before exposing each new external code. Restore validates the chain and registry and recovers notes locally from public ledger events. A family wallet derives its canonical subject secret inside the Worker from the existing identity form; code generation selects at most two current qualifications. Claims select a current credential when an earlier one has been revoked.
+
+`QualificationManager` replaces the previous qualification-backup merge form. A recipient creates a
+public request bound to its actual identity, chain, registry, Source and independently derived
+handoff key. The endorser and parent manager independently prove current lineage and publish their
+SourceFact/SourceTrust approvals. Each controller keeps its openings in an encrypted wallet backup
+and exports a recipient-bound HPKE package; import authenticates the opening against the current
+Source leaf and role records. The recipient registers Q using its canonical identity secret inside
+the Worker. The trust controller retains one family salt per parent/version across reissues, so a
+replacement current qualification can claim existing budgets for that family. Requests expose public
+identity information to their controllers and are not receiving codes for payers.
+
+Source and Q preparation saves a recoverable private draft before publication. `walletBackupStore`
+commits only the encrypted backup bytes to IndexedDB before the page permits a chain transaction,
+then exports the same bytes for the user. If persistence fails, publication stops. Full-wallet
+restore remains available; the most recent local recovery copy also requires its password. A
+confirmed operation interrupted before local confirmation can be restored using its exact canonical
+Source/Q leaf, optionally checking a supplied receipt hash. It does not re-publish the same leaf.
+
+The management panel lists a controller wallet's issued approvals and supports role revocation or
+atomic `withEligibilityRevocations` cancellation of an endorsement/trusted recommendation. Chain
+reads authenticate real lineage metadata and compact paths at one canonical block. Every write
+checks the actual signer/controller and invokes the page's cancellation guard immediately before
+signing. Operation sequence numbers stop a canceled older transaction from changing a newer UI
+operation's state.
 
 `shared/zk/receiveProtocol.ts` accepts the trusted `proof-artifacts.local.json` build configuration. It verifies artifact digests and exact public signals for all eight receiving relations and the three asset boundaries. Scanned codes cannot choose the verifier or artifact source. `RECEIVE_REGISTRY` on the configured factory/pool binds chain calls to that same scope.
 

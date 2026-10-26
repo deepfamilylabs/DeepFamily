@@ -11,7 +11,7 @@ import {
 import { getBigInt } from "ethers";
 // @ts-ignore snarkjs does not publish complete browser typings.
 import * as snarkjs from "snarkjs";
-import { ReceiveChain, encodeProtocolProof } from "../clients/receiveChain";
+import { ReceiveChain } from "../clients/receiveChain";
 import { fetchPinnedZkAsset } from "./zkAssets";
 
 export const PROTOCOL_CIRCUITS = Object.freeze({
@@ -56,13 +56,6 @@ const publicSignalsOf = (circuit: Circuit, values: readonly ProtocolInteger[]) =
 function assertSignals(circuit: Circuit, actual: readonly ProtocolInteger[], expected: readonly ProtocolInteger[]) {
   const parsed = publicSignalsOf(circuit, actual), wanted = publicSignalsOf(circuit, expected);
   if (parsed.some((value, i) => value !== wanted[i])) throw new Error(` ${circuit} proof returned a different statement`);
-}
-function publicProtocolProof(proof: ProtocolProof): ProtocolProof {
-  encodeProtocolProof(proof);
-  return { pi_a: proof.pi_a.slice(0, 3).map(value => getBigInt(value)),
-    pi_b: proof.pi_b.slice(0, 3).map(row => row.slice(0, 2).map(value => getBigInt(value))),
-    pi_c: proof.pi_c.slice(0, 3).map(value => getBigInt(value)),
-    ...(proof.protocol ? { protocol: proof.protocol } : {}), ...(proof.curve ? { curve: proof.curve } : {}) };
 }
 
 /** Hash-check every artifact, including local files and verification keys, before invoking snarkjs. */
@@ -192,12 +185,6 @@ export class ReceiveService {
     const result = await this.proofs.prove("issue", prepared.witness);
     assertSignals("issue", result.publicSignals, prepared.publicSignals);
     return { proof: result.proof, publicSignals: result.publicSignals };
-  }
-  async proveQualification(input: { circuit: "sourceFact" | "sourceTrust" | "issue";
-    witness: Record<string, bigint | bigint[]>; expectedPublicSignals: readonly ProtocolInteger[] }) {
-    const result = await this.proofs.prove(input.circuit, input.witness);
-    assertSignals(input.circuit, result.publicSignals, input.expectedPublicSignals);
-    return { proof: publicProtocolProof(result.proof), publicSignals: result.publicSignals.map(value => getBigInt(value)) };
   }
   async verifyCode(code: string, asOf?: ProtocolInteger): Promise<ReceiveCode> {
     return verifyReceiveCode({ code, chainId: this.chain.deployment.chainId,

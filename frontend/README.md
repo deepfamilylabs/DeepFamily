@@ -31,8 +31,18 @@ remote builds. Builds using the host omit local WASM/zkey files from `dist`.
 The inheritance page has one wallet and one `dfreceive` code format. The receiving Worker owns
 money secrets, code indices and qualification/controller openings. Users create or restore an
 authenticated encrypted wallet backup, then share codes with independently derived owner/viewing
-keys. A family wallet derives its canonical subject secret inside the Worker; qualifications from
-a matching encrypted backup can be merged without replacing existing money keys.
+keys. A family wallet derives its canonical subject secret inside the Worker. Its Family
+qualifications panel creates public requests, imports recipient-bound encrypted controller
+approvals and registers authenticated qualifications. Controllers publish SourceFact/SourceTrust
+approvals, retain their revocation openings in encrypted backups and can revoke them or atomically
+withdraw the underlying relationship. Reissuing from the same controller family preserves the
+anonymous family commitment so a current qualification can claim an existing budget.
+
+Before publication, the page awaits a committed encrypted recovery copy in IndexedDB and exports
+an updated backup. No identity secret, source opening or family salt is stored there in plaintext.
+The latest local copy still requires its backup password. Confirmed Source/Q operations can be
+recovered from their exact canonical public leaves after a page closes, with or without a transaction
+hash. Whole-wallet restore replaces the removed qualification-backup merge entry point.
 
 `shield` creates VALUE in the selected native/ERC20 pool. `depositBudget` spends the payer's VALUE
 using a recipient code, a matching family capability and the public budget rule. The first deposit
@@ -47,19 +57,17 @@ paths: `rebuild` (default) replays public events locally and validates the resul
 Both use anchored block reads and validate roots. Missing, blank or unknown values select
 `rebuild`; there is no runtime switch or automatic fallback. Funds-note recovery and paths
 continue to use local ledger replay in both modes. This setting does not change the contract's
-bounded latest-tail role checks.
+direct latest-role checks.
 
-Budget preparation also reads authenticated public revocation logs at an anchored block. The
-Worker proves continuous intervals of up to 32 entries using only the original code and public
-openings. Before a deposit or claim, the transaction client submits required `prepareRoleScan`
-transactions and waits for them before sending the funds transaction. The contract checks at
-most eight newer entries per role against the latest state; a larger tail reports
-`RevocationStateNotPrepared`, while a matching revocation rejects the qualification immediately.
-Read-only qualification checks can authenticate the public log locally without requiring a
-preparation transaction. Network failures and incomplete/corrupt logs remain errors. Preparation
-can require multiple proofs and transactions: the initial total for a new nonce/tag remains
-proportional to revocation history, and later calls reuse verified progress. No 15-minute grace
-period is introduced.
+Budget deposits, appends and claims check three current Source role indices directly. There are no
+revocation scans, preparation proofs or preparation transactions. Codes using the same role
+qualification can be linked through the shared indices; owner and viewing keys remain independently
+derived. A later revocation rejects an already-prepared business proof at execution.
+
+With `npm run dev:all` running, `npm run test:qualifications` (from the repository root) exercises
+three isolated browser wallets, actual identity/Source/Q proofs and the complete qualification,
+offline-budget, revocation and reissue flow. This runner accepts localhost development chains only;
+its synthetic private inputs and encrypted backups remain beneath `tmp/`.
 
 For architecture, domain layout, ABI sync, workers, ZK artifacts, and troubleshooting, see [docs/frontend.md](../docs/frontend.md). For frontend security guidance, see [docs/frontend-security.md](../docs/frontend-security.md).
 

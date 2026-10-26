@@ -67,6 +67,7 @@
     "zk:dev:check": "node scripts/check-zk-artifacts.mjs",
     "test:proof": "cross-env REQUIRE_PROTOCOL_REAL_PROOFS=1 node --test test/protocol-real-proof.test.mjs",
     "test:evm": "cross-env REQUIRE_PROTOCOL_REAL_PROOFS=1 hardhat --config hardhat.config.mjs test mocha test/protocol-real-evm.test.mjs",
+    "test:qualifications": "node frontend/scripts/qualification-acceptance.mjs",
     "test:contracts": "hardhat --config hardhat.config.mjs test mocha test/receive-registry.test.mjs test/eligibility-source.test.mjs test/eligibility-lineage.test.mjs test/pool-core.test.mjs test/protocol-deployment.test.mjs",
     "zk:frontend": "node scripts/export-protocol-frontend.mjs"
   },

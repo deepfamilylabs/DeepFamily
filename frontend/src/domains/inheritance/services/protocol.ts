@@ -39,12 +39,6 @@ export class ReceiveProtocol {
   prepareLetter(input: ReceiveWorkerCalls["prepareLetter"]["input"]) {
     return this.worker.call("prepareLetter", input, this.context);
   }
-  proveIssue(input: ReceiveWorkerCalls["proveIssue"]["input"]) {
-    return this.worker.call("proveIssue", input, this.context);
-  }
-  proveSource(input: ReceiveWorkerCalls["proveQualification"]["input"]) {
-    return this.worker.call("proveQualification", input, this.context);
-  }
   readBudgetRecord(key: bigint) { return this.reader.readBudgetRecord(key); }
   readSourcePaths(factLeafIndex: string | bigint, trustedLeafIndex: string | bigint) {
     return this.reader.readSourcePaths(factLeafIndex, trustedLeafIndex);

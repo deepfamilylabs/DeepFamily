@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({ call: vi.fn(), close: vi.fn(), clearSecrets: v
   sendDeposit: vi.fn(), firstValidation: vi.fn(), nextSubmission: vi.fn(), submitFunds: vi.fn() }));
 vi.mock("react-i18next", () => ({ useTranslation: () => ({ t: (key: string, values?: { index?: number }) => values?.index === undefined ? key : `${key} ${values.index}` }) }));
 vi.mock("../../../shared/workers/receiveWorkerClient", () => ({ ReceiveWorkerClient: class { call = mocks.call; close = mocks.close; } }));
+vi.mock("../../../shared/clients/walletBackupStore", () => ({ saveEncryptedWalletBackup: vi.fn(async () => {}), readLatestEncryptedWalletBackup: vi.fn(async () => null) }));
 vi.mock("../../../shared/clients/receiveChain", () => ({ ReceiveChain: class {
   constructor(_deployment: unknown, _signer: unknown, private readonly options: { beforeTransaction(): void }) {}
   sendDeposit(prepared: unknown, shardId: unknown) { return mocks.sendDeposit(this.options, prepared, shardId); }
@@ -68,17 +69,12 @@ describe("receiving wallet identity and qualification controls", () => {
     expect(mocks.clearSecrets).toHaveBeenCalled();
     expect(mocks.call.mock.calls[0][1]).not.toHaveProperty("codeRootSecret");
   });
-  it("imports an encrypted qualification backup and lets the next code omit every qualification", async () => {
+  it("lets the next code omit every qualification and removes the old qualification backup merge", async () => {
     open(); await createWallet();
-    fireEvent.change(screen.getByLabelText("walletProtocol.qualificationBackup"), { target: { files: [{ arrayBuffer: async () => new Uint8Array([4, 5]).buffer }] } });
-    fireEvent.change(screen.getByLabelText("walletProtocol.qualificationPassword"), { target: { value: "source backup password" } });
-    enterPassword();
-    await waitFor(() => expect((screen.getByRole("button", { name: "walletProtocol.importQualificationsAndBackup" }) as HTMLButtonElement).disabled).toBe(false));
-    fireEvent.click(screen.getByRole("button", { name: "walletProtocol.importQualificationsAndBackup" }));
-    await screen.findByText("walletProtocol.qualificationsImported");
+    expect(screen.queryByLabelText("walletProtocol.qualificationBackup")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "walletProtocol.refresh" }));
+    await screen.findByLabelText("walletProtocol.qualification 2");
     expect(screen.getByText("walletProtocol.qualificationPrivacy")).toBeTruthy();
-    expect(mocks.call).toHaveBeenCalledWith("walletImportQualifications", { backup: new Uint8Array([4, 5]),
-      sourcePassphrase: "source backup password", rawPassphrase: "encrypted backup password" }, context);
     expect((screen.getByLabelText(/walletProtocol.qualification 1/u) as HTMLInputElement).disabled).toBe(true);
     fireEvent.click(screen.getByLabelText("walletProtocol.qualification 2"));
     fireEvent.click(screen.getByLabelText("walletProtocol.qualification 3"));
@@ -123,5 +119,23 @@ describe("receiving wallet identity and qualification controls", () => {
     expect(mocks.sendDeposit).not.toHaveBeenCalled();
     expect(mocks.firstValidation).not.toHaveBeenCalled();
     expect(mocks.submitFunds).not.toHaveBeenCalled();
+  });
+  it("keeps a new operation busy when an earlier canceled transaction finishes", async () => {
+    const oldReceipt = deferred<{ status: number }>(), nextWallet = deferred<unknown>();
+    mocks.sendDeposit.mockResolvedValue({ wait: () => oldReceipt.promise });
+    openConnected(); await createWallet();
+    fireEvent.click(screen.getByRole("button", { name: "walletProtocol.budget" }));
+    fireEvent.click(screen.getByRole("button", { name: "walletProtocol.submit" }));
+    await waitFor(() => expect(mocks.sendDeposit).toHaveBeenCalledTimes(1));
+    fireEvent.click(screen.getByRole("button", { name: "walletProtocol.cancel" }));
+    const original = mocks.call.getMockImplementation()!;
+    mocks.call.mockImplementation((method: string, ...args: unknown[]) => method === "walletCreate" ? nextWallet.promise : original(method, ...args));
+    enterPassword(); fireEvent.click(screen.getByRole("button", { name: "walletProtocol.create" }));
+    await waitFor(() => expect((screen.getByRole("button", { name: "walletProtocol.create" }) as HTMLButtonElement).disabled).toBe(true));
+    await act(async () => { oldReceipt.resolve({ status: 1 }); await oldReceipt.promise; });
+    expect((screen.getByRole("button", { name: "walletProtocol.create" }) as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.queryByText("walletProtocol.confirmed")).toBeNull();
+    await act(async () => { nextWallet.resolve({ state, backup: new Uint8Array([1, 2, 3]) }); await nextWallet.promise; });
+    await screen.findByText("walletProtocol.unlocked · walletProtocol.qualifications");
   });
 });

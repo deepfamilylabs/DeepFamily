@@ -10,6 +10,8 @@ import { decodeBudgetNotePayload, verifyBudgetNotePayload } from "./budget.js";
 import { decryptShieldedNote } from "./shielded-hpke.js";
 import { verifyShieldedNotePayload } from "./shielded-note-codec.js";
 import { computeShieldedSpendNullifier, normalizeShieldedScope } from "./shielded-inheritance.js";
+import { computeIdentityFromDerivedSecret } from "./identity.js";
+import { normalizeWalletQualifications, decodeQualificationRequest } from "./qualification.js";
 
 const FIELD = SNARK_SCALAR_FIELD - 1n;
 const MAGIC = Uint8Array.of(0x44, 0x46, 0x57, 0x42, 1);
@@ -57,7 +59,26 @@ export function normalizeWalletState(input) {
   fail(Array.isArray(input.revocationRoles) && input.revocationRoles.length<=256,"Invalid controller role set");
   const revocationRoles=input.revocationRoles.map(item=>({role:Number(bigintFrom(item.role,"role",2n)),secret:nonzero(item.secret,"roleSecret")}));
   fail(new Set(revocationRoles.map(item=>`${item.role}:${item.secret}`)).size===revocationRoles.length,"Duplicate controller role");
-  return {version:1,chainId,authorizerScope,masterKey,codeRootSecret,nextCodeIndex,credentials,revocationRoles};
+  const identity = input.identity == null ? null : (() => {
+    const material = computeIdentityFromDerivedSecret({ identity: input.identity.fields,
+      identitySuiteId: input.identity.identitySuiteId, derivedSecretField: codeRootSecret });
+    return { fields: material.identity, identitySuiteId: material.identitySuiteId };
+  })();
+  const qualification = normalizeWalletQualifications(input.qualification);
+  for (const item of qualification.sources) {
+    const request = decodeQualificationRequest(item.request);
+    fail(request.chainId === String(chainId) && BigInt(request.registryAddress) === authorizerScope,
+      "Qualification source does not belong to this wallet registry");
+  }
+  for (const item of qualification.requests) {
+    const request = decodeQualificationRequest(item.request);
+    fail(identity !== null && request.chainId === String(chainId)
+      && BigInt(request.registryAddress) === authorizerScope
+      && BigInt(request.childIdentity) === computeIdentityFromDerivedSecret({ identity: identity.fields,
+        identitySuiteId: identity.identitySuiteId, derivedSecretField: codeRootSecret }).identityCommitment,
+    "Qualification request does not belong to this wallet identity");
+  }
+  return {version:1,chainId,authorizerScope,masterKey,codeRootSecret,nextCodeIndex,credentials,revocationRoles,identity,qualification};
 }
 
 export async function createWalletState(input) {
@@ -70,7 +91,7 @@ export async function createWalletState(input) {
     const key=await deriveReceiveKeyMaterial({...input,masterKey,codeIndex:0n});
     return normalizeWalletState({version:1,chainId:key.chainId,authorizerScope:key.authorizerScope,
       masterKey,codeRootSecret:key.codeRootSecret,nextCodeIndex:input.nextCodeIndex??0n,
-      credentials:input.credentials??[],revocationRoles:input.revocationRoles??[]});
+      credentials:input.credentials??[],revocationRoles:input.revocationRoles??[],identity:input.identity??null,qualification:input.qualification});
   } finally { wipeBytes(masterKey); }
 }
 
@@ -89,7 +110,8 @@ function serialized(wallet) {
   return JSON.stringify({version:1,chainId:String(wallet.chainId),authorizerScope:String(wallet.authorizerScope),
     masterKey:bytesToHex(wallet.masterKey),codeRootSecret:String(wallet.codeRootSecret),nextCodeIndex:String(wallet.nextCodeIndex),
     credentials:wallet.credentials.map(item=>Object.fromEntries(Object.entries(item).map(([k,v])=>[k,String(v)]))),
-    revocationRoles:wallet.revocationRoles.map(item=>({role:item.role,secret:String(item.secret)}))});
+    revocationRoles:wallet.revocationRoles.map(item=>({role:item.role,secret:String(item.secret)})),
+    identity:wallet.identity,qualification:wallet.qualification});
 }
 
 /** Reuses the project's Argon2id/AES-256-GCM envelope with a wallet-only AAD domain. */

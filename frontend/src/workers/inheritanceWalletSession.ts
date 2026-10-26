@@ -1,6 +1,6 @@
 import {
   createWalletState, allocateWalletCode, encryptWalletBackup, decryptWalletBackup,
-  recoverWalletNotes, normalizeWalletState, deriveReceiveKeyMaterial, computePeriodNullifier,
+  recoverWalletNotes, deriveReceiveKeyMaterial, computePeriodNullifier,
   prepareShield, prepareUnshield, generateShieldedRandomField, decryptShieldedLetter,
   readArchiveBlob, computePolicyCommitment,
   deriveIdentityMaterial, wipeBytes, computeRoleStatusIndex, RECEIVE_MAX_CAPABILITIES,
@@ -14,6 +14,7 @@ import type { ReceiveWorkerContext } from "../shared/workers/receiveWorkerClient
 import { loadShieldedPoolSnapshot, type PublicShieldedNote, type ShieldedPoolSnapshot } from "../domains/inheritance/services/shieldedPoolChain";
 import { getEventScanConfig, getLetterArchiveDeploymentBlock } from "../shared/config/env";
 import { poseidon2 } from "poseidon-lite";
+import { QUALIFICATION_WALLET_METHODS, runQualificationWallet } from "./qualificationWallet";
 
 type Wallet = Awaited<ReturnType<typeof createWalletState>>;
 type Recovered = Awaited<ReturnType<typeof recoverWalletNotes>>[number];
@@ -45,7 +46,9 @@ export class WalletSession {
   private notes = new Map<string, Recovered>();
   private snapshot: ShieldedPoolSnapshot<never> | null = null;
   private snapshotPool = "";
+  private qualificationEpoch = 0;
   lock(): WalletStateView {
+    ++this.qualificationEpoch;
     this.wallet?.masterKey.fill(0); this.wallet = null; this.scope = ""; this.notes.clear(); this.snapshot = null;
     this.backupChanged = false;
     return this.view();
@@ -191,7 +194,8 @@ export class WalletSession {
         if (parameters.identity) material = await deriveIdentityMaterial({ identity: parameters.identity.fields,
           rawPassphrase: parameters.identity.rawPassphrase, identitySuiteId: parameters.identity.identitySuiteId ?? 1 });
         const wallet = await createWalletState({ chainId: env.chain.deployment.chainId, authorizerScope: BigInt(env.chain.deployment.registryAddress),
-          codeRootSecret: material?.derivedSecretField ?? parameters.codeRootSecret, nextCodeIndex: 1n });
+          codeRootSecret: material?.derivedSecretField ?? parameters.codeRootSecret, nextCodeIndex: 1n,
+          identity: material ? { fields: material.identity, identitySuiteId: material.identitySuiteId } : null });
         const backup = await encryptWalletBackup({ wallet, rawPassphrase: parameters.rawPassphrase });
         this.install(wallet, env); return { state: this.view(), backup };
       } finally { wipeBytes(material?.identitySalt); wipeBytes(material?.derivedSecretBytes); }
@@ -204,32 +208,24 @@ export class WalletSession {
       return { state: this.view() };
     }
     const wallet = this.current(env);
-    if (method === "walletReadQualifications") return { qualifications: await this.qualificationOptions(wallet, env) };
-    if (method === "walletImportQualifications") {
-      const parameters = input as WalletCalls["walletImportQualifications"]["input"];
-      const imported = await decryptWalletBackup({ backup: parameters.backup, rawPassphrase: parameters.sourcePassphrase,
-        chainId: wallet.chainId, authorizerScope: wallet.authorizerScope });
-      try {
-        if (imported.codeRootSecret !== wallet.codeRootSecret) throw new Error("Qualification backup belongs to another wallet identity; create the matching family wallet first");
-        if (!imported.credentials.length && !imported.revocationRoles.length) throw new Error("This backup contains no qualification or controller openings");
-        const currentCredentials: Wallet["credentials"] = [];
-        for (const credential of imported.credentials) {
-          const authenticated = await this.authenticatedCredential(credential, env);
-          if (await this.currentQualification(authenticated, env)) currentCredentials.push(credential);
-        }
-        if (!currentCredentials.length && !imported.revocationRoles.length) throw new Error("This backup contains no current qualification or controller openings");
-        const credentials = [...new Map([...wallet.credentials, ...currentCredentials]
-          .map(item => [String(item.credentialCommitment), item])).values()];
-        const revocationRoles = [...new Map([...wallet.revocationRoles, ...imported.revocationRoles]
-          .map(item => [`${item.role}:${item.secret}`, item])).values()];
-        const merged = normalizeWalletState({ ...wallet, credentials, revocationRoles });
-        try {
-          const backup = await encryptWalletBackup({ wallet: merged, rawPassphrase: parameters.rawPassphrase });
-          this.wallet = merged; this.backupChanged = false; wipeBytes(wallet.masterKey);
-          return { state: this.view(), backup };
-        } catch (error) { wipeBytes(merged.masterKey); throw error; }
-      } finally { wipeBytes(imported.masterKey); }
+    if (QUALIFICATION_WALLET_METHODS.includes(method)) {
+      const epoch = this.qualificationEpoch;
+      const result = await runQualificationWallet(method as Parameters<typeof runQualificationWallet>[0], input as Parameters<typeof runQualificationWallet>[1], {
+        wallet, chain: env.chain, service: env.service, proofs: env.proofs,
+        save: async (next, rawPassphrase) => {
+          try {
+            if (this.qualificationEpoch !== epoch || this.wallet !== wallet) throw new Error("Qualification operation cancelled");
+            const backup = await encryptWalletBackup({ wallet: next, rawPassphrase });
+            if (this.qualificationEpoch !== epoch || this.wallet !== wallet) throw new Error("Qualification operation cancelled");
+            this.wallet = next; this.backupChanged = false; wipeBytes(wallet.masterKey);
+            return { state: this.view(), backup };
+          } catch (error) { wipeBytes(next.masterKey); throw error; }
+        },
+      });
+      if (this.qualificationEpoch !== epoch) throw new Error("Qualification operation cancelled");
+      return result;
     }
+    if (method === "walletReadQualifications") return { qualifications: await this.qualificationOptions(wallet, env) };
     if (method === "walletBackup") {
       const backup = await encryptWalletBackup({ wallet, rawPassphrase: (input as WalletCalls["walletBackup"]["input"]).rawPassphrase });
       this.backupChanged = false; return { state: this.view(), backup };

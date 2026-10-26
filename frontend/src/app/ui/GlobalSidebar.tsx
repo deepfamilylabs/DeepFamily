@@ -521,7 +521,7 @@ export default function GlobalSidebar() {
         pb-[env(safe-area-inset-bottom)]
 
         /* Mobile: full-screen drawer */
-        w-full ${isMobileOpen ? "translate-x-0" : "-translate-x-full"}
+        w-full ${isMobileOpen ? "visible translate-x-0" : "invisible -translate-x-full md:visible"}
 
         /* Desktop: full-height rail beside the header; open widths overlay the content */
         md:translate-x-0 md:border-r md:border-slate-200 md:dark:border-gray-800

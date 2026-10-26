@@ -9,8 +9,6 @@ export interface ReceiveWorkerContext {
   manifest: PinnedManifest;
 }
 export interface ReceiveWorkerCalls extends WalletCalls {
-  proveIssue: { input: Parameters<ReceiveService["proveIssue"]>[0]; result: Awaited<ReturnType<ReceiveService["proveIssue"]>> };
-  proveQualification: { input: Parameters<ReceiveService["proveQualification"]>[0]; result: Awaited<ReturnType<ReceiveService["proveQualification"]>> };
   createCode: { input: Parameters<ReceiveService["createCode"]>[0]; result: Awaited<ReturnType<ReceiveService["createCode"]>> };
   verifyCode: { input: { code: string; asOf?: string | bigint }; result: Awaited<ReturnType<ReceiveService["verifyCode"]>> };
   prepareDeposit: { input: Parameters<ReceiveService["prepareDeposit"]>[0]; result: DepositSubmission };
@@ -39,7 +37,8 @@ export class ReceiveWorkerClient {
       if (event.data.ok === true) entry.resolve(event.data.result);
       else {
         const error = new Error(event.data.error?.message ?? "Receive operation failed");
-        if (event.data.error?.code === "QUALIFICATION_REVOKED") Object.assign(error, { code: "QUALIFICATION_REVOKED" });
+        if (typeof event.data.error?.code === "string" && /^(?:QUALIFICATION_[A-Z_]+|INVALID_QUALIFICATION)$/u.test(event.data.error.code))
+          Object.assign(error, { code: event.data.error.code });
         entry.reject(error);
       }
     });

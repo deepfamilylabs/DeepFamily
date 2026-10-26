@@ -166,6 +166,7 @@ The protocol uses 13 Circom relations: two identity/disclosure, three money boun
 | `npm run zk:frontend -- <chainId> <registry>` | Export trusted frontend receiving artifacts |
 | `npm run test:circuits` | Check current circuit constraints without proving keys |
 | `npm run test:proof` | Verify eight real receiving proofs and public-signal binding |
+| `npm run test:qualifications` | Run localhost browser acceptance with three isolated wallets and actual qualification/funding proofs |
 | `npm run test:evm` | Exercise the complete real-proof money and eligibility flow |
 
 Local development keys are not approved production keys. Production setup and release remain blocked until all 13 relations have reviewed ceremony evidence. Browser WASM/zkey files are generated/downloaded artifacts; proof keys cannot be selected by a scanned receiving code. The project has one protocol and no compatibility entry points for previous receiving designs.

@@ -1,4 +1,21 @@
 import type { BoundarySubmission } from "../workers/walletWorkerTypes";
+import { QualificationChain, QUALIFICATION_SOURCE_ABI } from "./qualificationChain";
+import type {
+  QualificationRoleQuery,
+  RoleRevocationSubmission,
+  SourceFactRequest,
+  SourceTrustRequest,
+} from "./qualificationChain";
+export type {
+  QualificationBindings,
+  SourceFactContext,
+  SourceTrustContext,
+  QualificationRoleStatus,
+  QualificationRoleQuery,
+  QualificationRole,
+  RoleRevocationSubmission,
+  QualificationMutation,
+} from "./qualificationChain";
 import { getPublicStateReadMode, type PublicStateReadMode } from "../config/env";
 import {
   assertReceiveTreeAnchor,
@@ -50,21 +67,13 @@ export const RECEIVE_REGISTRY_ABI = [
   "function revokeCode(uint256 secret) returns (uint256)",
   "function issuanceRoot() view returns (uint256)",
   "function credentialCount() view returns (uint256)",
+  "function getCredentialPage(uint256 start,uint256 limit) view returns(uint256[])",
   "event CredentialIssued(uint256 indexed leafIndex,uint256 credential,uint256 root)",
   "function SOURCE() view returns (address)",
   "function registerCredential(uint256 credential,uint256 sourceRoot,uint256 trustedRoot,bytes proof) returns (uint256 leafIndex,uint256 root)",
   "function getCredentialProof(uint256 leafIndex) view returns (uint256 leaf,uint256 root,uint256 index,uint256 depth,uint256[] siblings)",
 ] as const;
-export const ELIGIBILITY_SOURCE_ABI = [
-  "function isRoleRevoked(uint8 role,uint256 roleIndex) view returns (bool)",
-  "function sourceRoot() view returns (uint256)",
-  "function trustedRoot() view returns (uint256)",
-  "function sourceSize(uint8 treeId) view returns (uint256)",
-  "function getSourceProof(uint8 treeId,uint256 leafIndex) view returns (uint256 leaf,uint256 root,uint256 index,uint256 depth,uint256[] siblings)",
-  "event SourceLeafPublished(uint8 indexed treeId,uint256 indexed leafIndex,uint256 leaf,uint256 root)",
-  "function publishFact(uint256 childIdentity,uint256 parentIdentity,address endorser,uint256 parentVersion,uint256 factLeaf,uint256 childRoleCommitment,uint256 endorsementRoleCommitment,bytes proof) returns (uint256 leafIndex,uint256 root)",
-  "function publishTrust(uint256 parentIdentity,address endorser,uint256 parentVersion,uint256 trustLeaf,uint256 trustRoleCommitment,bytes proof) returns (uint256 leafIndex,uint256 root)",
-] as const;
+export const ELIGIBILITY_SOURCE_ABI = QUALIFICATION_SOURCE_ABI;
 export const POOL_ABI = [
   "function protocolVersion() view returns (uint256)",
   "function RECEIVE_REGISTRY() view returns (address)",
@@ -216,6 +225,7 @@ export class ReceiveChain {
   private readonly registry: Contract;
   private readonly pool: Contract;
   private readonly letters?: Contract;
+  private readonly qualification: QualificationChain;
   readonly stateReadMode: PublicStateReadMode;
   constructor(
     deployment: ReceiveDeployment,
@@ -244,6 +254,15 @@ export class ReceiveChain {
     this.letters = this.deployment.lettersAddress
       ? new Contract(this.deployment.lettersAddress, LETTER_ABI, runner)
       : undefined;
+    this.qualification = new QualificationChain({
+      registry: this.registry,
+      runner,
+      chainId: this.deployment.chainId,
+      stateReadMode: this.stateReadMode,
+      assertDeployment: (blockTag) => this.assertDeployment(blockTag),
+      beforeTransaction: options.beforeTransaction,
+      encodeProof: encodeProtocolProof,
+    });
   }
   private async assertDeployment(blockTag?: number) {
     const provider = this.runner.provider;
@@ -302,6 +321,7 @@ export class ReceiveChain {
     proof: ProtocolProof;
     publicSignals: readonly ProtocolInteger[];
   }): Promise<ContractTransactionResponse> {
+    const signer = await this.qualification.readSigner();
     const roots = await this.readSourceRoots();
     const signals = input.publicSignals.map((value) => getBigInt(value));
     if (
@@ -312,6 +332,7 @@ export class ReceiveChain {
       signals[4] !== roots.trustedRoot
     )
       throw new Error("Receive issuance statement does not match current source roots");
+    await this.qualification.assertIssuanceSigner(signer);
     return this.registry.registerCredential(
       signals[0],
       signals[3],
@@ -323,45 +344,54 @@ export class ReceiveChain {
     proof: ProtocolProof;
     publicSignals: readonly ProtocolInteger[];
   }): Promise<ContractTransactionResponse> {
-    const roots = await this.readSourceRoots();
-    const signals = input.publicSignals.map((value) => getBigInt(value));
-    if (
-      signals.length !== 10 ||
-      signals[3] !== this.deployment.chainId ||
-      signals[4] !== BigInt(roots.sourceAddress)
-    )
-      throw new Error("Receive source fact scope mismatch");
-    return new Contract(roots.sourceAddress, ELIGIBILITY_SOURCE_ABI, this.runner).publishFact(
-      signals[5],
-      signals[6],
-      getAddress(toBeHex(signals[7], 20)),
-      signals[8],
-      signals[0],
-      signals[1],
-      signals[2],
-      encodeProtocolProof(input.proof),
-    );
+    return this.qualification.sendFact(input);
   }
   async sendSourceTrust(input: {
     proof: ProtocolProof;
     publicSignals: readonly ProtocolInteger[];
   }): Promise<ContractTransactionResponse> {
-    const roots = await this.readSourceRoots();
-    const signals = input.publicSignals.map((value) => getBigInt(value));
-    if (
-      signals.length !== 8 ||
-      signals[2] !== this.deployment.chainId ||
-      signals[3] !== BigInt(roots.sourceAddress)
-    )
-      throw new Error("Receive source trust scope mismatch");
-    return new Contract(roots.sourceAddress, ELIGIBILITY_SOURCE_ABI, this.runner).publishTrust(
-      signals[4],
-      getAddress(toBeHex(signals[5], 20)),
-      signals[6],
-      signals[0],
-      signals[1],
-      encodeProtocolProof(input.proof),
-    );
+    return this.qualification.sendTrust(input);
+  }
+  readQualificationBindings() {
+    return this.qualification.readBindings();
+  }
+  readQualificationParent(personHash: string) {
+    return this.qualification.readParent(personHash);
+  }
+  readQualificationController(
+    input: SourceTrustRequest & { kind: "fact" | "trust"; actor: string },
+  ) {
+    return this.qualification.readController(input);
+  }
+  findSourceLeafIndex(treeId: 0 | 1, leaf: ProtocolInteger) {
+    return this.qualification.findLeaf(leaf, treeId);
+  }
+  findCredentialIndex(credential: ProtocolInteger) {
+    return this.qualification.findLeaf(credential);
+  }
+  readSourceFactContext(input: SourceFactRequest) {
+    return this.qualification.readFactContext(input);
+  }
+  readSourceTrustContext(input: SourceTrustRequest) {
+    return this.qualification.readTrustContext(input);
+  }
+  readRoleStatuses(input: { roles: QualificationRoleQuery[] }) {
+    return this.qualification.readRoleStatuses(input);
+  }
+  sendRoleRevocation(input: RoleRevocationSubmission) {
+    return this.qualification.sendRevocation(input);
+  }
+  confirmSourcePublication(
+    transactionHash: string,
+    expected: { treeId: 0 | 1; leaf: ProtocolInteger },
+  ) {
+    return this.qualification.confirmSourcePublication(transactionHash, expected);
+  }
+  confirmCredentialRegistration(
+    transactionHash: string,
+    expected: { credential: ProtocolInteger },
+  ) {
+    return this.qualification.confirmCredentialRegistration(transactionHash, expected);
   }
   async readBudgetRecord(budgetKey: bigint) {
     await this.assertDeployment();

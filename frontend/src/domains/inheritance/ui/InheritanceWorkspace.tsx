@@ -9,8 +9,10 @@ import { FIELD_INPUT, FIELD_TEXTAREA, FieldBlock, PanelButton } from "./inherita
 import { CopyIconButton } from "../../../shared/ui";
 import { PersonHashCalculator, type PersonHashCalculatorHandle } from "../../person";
 import { normalizeFriendlyError } from "../../../shared/lib/errors";
+import { QualificationManager, type QualificationOperation } from "./QualificationManager";
+import { readLatestEncryptedWalletBackup, saveEncryptedWalletBackup } from "../../../shared/clients/walletBackupStore";
 
-type Task = "receive" | "shield" | "transfer" | "budget" | "unshield" | "letter";
+type Task = "receive" | "qualifications" | "shield" | "transfer" | "budget" | "unshield" | "letter";
 const LOCKED: WalletStateView = { unlocked: false, codeCount: "0", credentialCount: 0, backupChanged: false };
 function downloadBackup(bytes: Uint8Array, chainId: string) {
   const url = URL.createObjectURL(new Blob([new Uint8Array(bytes)], { type: "application/octet-stream" }));
@@ -26,6 +28,7 @@ export function InheritanceWorkspace({ context, signer, account, symbol, decimal
   if (!client.current) client.current = new ReceiveWorkerClient();
   const current = useRef({ context, signer, account }); current.current = { context, signer, account };
   const submissionEpoch = useRef(0);
+  const operationSequence = useRef(0);
   const [state, setState] = useState<WalletStateView>(LOCKED);
   const [notes, setNotes] = useState<WalletNoteView[]>([]), [letters, setLetters] = useState<WalletLetterView[]>([]);
   const [task, setTask] = useState<Task>("receive"), [busy, setBusy] = useState(false);
@@ -33,7 +36,6 @@ export function InheritanceWorkspace({ context, signer, account, symbol, decimal
   const [password, setPassword] = useState(""), [backupFile, setBackupFile] = useState<Uint8Array | null>(null);
   const identityForm = useRef<PersonHashCalculatorHandle>(null);
   const [walletKind, setWalletKind] = useState<"ordinary" | "family">("ordinary");
-  const [qualificationFile, setQualificationFile] = useState<Uint8Array | null>(null), [qualificationPassword, setQualificationPassword] = useState("");
   const [qualifications, setQualifications] = useState<WalletQualificationView[]>([]), [selectedQualifications, setSelectedQualifications] = useState<number[]>([]);
   const [code, setCode] = useState(""), [recipientCode, setRecipientCode] = useState("");
   const [expiryDays, setExpiryDays] = useState("365"), [amount, setAmount] = useState("");
@@ -47,15 +49,23 @@ export function InheritanceWorkspace({ context, signer, account, symbol, decimal
     if (parsed <= 0n) throw new Error(tr("invalidAmount")); return String(parsed);
   };
   const worker = () => { if (!client.current) throw new Error(tr("locked")); return client.current; };
-  useEffect(() => () => { ++submissionEpoch.current; client.current?.close(); client.current = null; }, []);
+  const saveBackup = async (result: { backup: Uint8Array; state: WalletStateView }) => {
+    const epoch = submissionEpoch.current, activeWorker = client.current;
+    await saveEncryptedWalletBackup({ chainId: String(context.deployment.chainId), registryAddress: context.deployment.registryAddress }, result.backup);
+    if (epoch !== submissionEpoch.current || client.current !== activeWorker) throw new Error(tr("walletChanged"));
+    downloadBackup(result.backup, String(context.deployment.chainId)); setState(result.state);
+  };
+  useEffect(() => () => { ++submissionEpoch.current; ++operationSequence.current; client.current?.close(); client.current = null; }, []);
   useEffect(() => { setNotes([]); setLetters([]); setNoteHandle(""); setRule(""); setStatus(""); setError(""); }, [context.deployment.poolAddress]);
   const run = async (operation: () => Promise<void>) => {
+    const sequence = ++operationSequence.current;
     setBusy(true); setError(""); setStatus("");
     try { await operation(); } catch (failure) {
+      if (operationSequence.current !== sequence) return;
       const friendly = normalizeFriendlyError(failure, t);
       setError(friendly.type === "UNKNOWN_ERROR" ? (failure instanceof Error ? failure.message : tr("failed")) : friendly.message);
     }
-    finally { setBusy(false); }
+    finally { if (operationSequence.current === sequence) setBusy(false); }
   };
   const recover = async () => {
     const result = await worker().call("walletRecover", {}, current.current.context);
@@ -75,7 +85,7 @@ export function InheritanceWorkspace({ context, signer, account, symbol, decimal
     const identity = walletKind === "family" ? { fields: form!.getRawIdentityFields(), rawPassphrase: form!.getSecretInputs().passphrase } : undefined;
     form?.clearSecretInputs();
     const result = await worker().call("walletCreate", { rawPassphrase, ...(identity ? { identity } : {}) }, context);
-    downloadBackup(result.backup, String(context.deployment.chainId)); setState(result.state); setStatus(tr("created"));
+    await saveBackup(result); setStatus(tr("created"));
     setQualifications([]); setSelectedQualifications([]);
   });
   const restore = () => run(async () => {
@@ -88,24 +98,29 @@ export function InheritanceWorkspace({ context, signer, account, symbol, decimal
     if (password.length < 12) throw new Error(tr("passwordLength"));
     const rawPassphrase = password; setPassword("");
     const result = await worker().call("walletBackup", { rawPassphrase }, context);
-    downloadBackup(result.backup, String(context.deployment.chainId)); setState(result.state); setStatus(tr("backedUp"));
+    await saveBackup(result); setStatus(tr("backedUp"));
   });
   const generateCode = () => run(async () => {
     if (password.length < 12) throw new Error(tr("passwordLength"));
     const days = Number(expiryDays); if (!Number.isSafeInteger(days) || days < 1 || days > 3650) throw new Error(tr("invalidExpiry"));
     const rawPassphrase = password; setPassword("");
     const result = await worker().call("walletCreateCode", { expiresAt: String(BigInt(Math.floor(Date.now() / 1000)) + BigInt(days) * 86400n), rawPassphrase, credentialIndices: selectedQualifications }, context);
-    downloadBackup(result.backup, String(context.deployment.chainId)); setCode(result.code); setState(result.state); setStatus(tr("codeReady"));
+    await saveBackup(result); setCode(result.code); setStatus(tr("codeReady"));
   });
-  const importQualifications = () => run(async () => {
-    if (!qualificationFile) throw new Error(tr("chooseQualifications"));
-    if (password.length < 12) throw new Error(tr("passwordLength"));
-    const rawPassphrase = password, sourcePassphrase = qualificationPassword; setPassword(""); setQualificationPassword("");
-    const result = await worker().call("walletImportQualifications", { backup: qualificationFile, sourcePassphrase, rawPassphrase }, context);
-    downloadBackup(result.backup, String(context.deployment.chainId)); setQualificationFile(null); setState(result.state);
-    await refreshQualifications(); setStatus(tr("qualificationsImported"));
-  });
-  const lock = () => { ++submissionEpoch.current; worker().close(); client.current = new ReceiveWorkerClient(); setState(LOCKED); setNotes([]); setLetters([]); setPassword(""); setCode(""); setQualifications([]); setSelectedQualifications([]); setQualificationPassword(""); setQualificationFile(null); setStatus(tr("locked")); };
+  const lock = () => { ++submissionEpoch.current; ++operationSequence.current; worker().close(); client.current = new ReceiveWorkerClient(); setState(LOCKED); setNotes([]); setLetters([]); setPassword(""); setCode(""); setQualifications([]); setSelectedQualifications([]); setStatus(tr("locked")); };
+  const qualificationOperation = (): QualificationOperation => {
+    const expected = current.current, epoch = submissionEpoch.current, activeWorker = worker();
+    const assertCurrent = () => {
+      const actual = current.current;
+      if (epoch !== submissionEpoch.current || client.current !== activeWorker || actual.signer !== expected.signer
+        || actual.account !== expected.account || actual.context.rpcUrl !== expected.context.rpcUrl
+        || actual.context.deployment.registryAddress !== expected.context.deployment.registryAddress
+        || actual.context.deployment.poolAddress !== expected.context.deployment.poolAddress)
+        throw new Error(tr("walletChanged"));
+    };
+    return { worker: activeWorker, context: expected.context, account: expected.account, assertCurrent,
+      chain: expected.signer ? new ReceiveChain(expected.context.deployment, expected.signer, { beforeTransaction: assertCurrent }) : null };
+  };
   const submit = (override?: { claim: WalletNoteView }) => run(async () => {
     const expected = current.current;
     const expectedEpoch = submissionEpoch.current;
@@ -138,6 +153,7 @@ export function InheritanceWorkspace({ context, signer, account, symbol, decimal
       assertCurrent(); transaction = await chain.sendLetter(message);
     } else return;
     const receipt = await transaction.wait();
+    assertCurrent();
     if (!receipt || receipt.status !== 1) throw new Error(tr("failed"));
     setStatus(tr("confirmed")); if (state.unlocked) await recover();
   });
@@ -152,6 +168,11 @@ export function InheritanceWorkspace({ context, signer, account, symbol, decimal
       {!state.unlocked ? <>
         <p className="text-sm text-ink-muted">{tr("backupDescription")}</p>
         <FieldBlock label={tr("backupFile")}><input aria-label={tr("backupFile")} type="file" accept=".dfwallet,application/octet-stream" disabled={working} onChange={event => { const file = event.target.files?.[0]; if (file) void file.arrayBuffer().then(bytes => setBackupFile(new Uint8Array(bytes))); }} /></FieldBlock>
+        <PanelButton size="compact" disabled={working} onClick={() => void run(async () => {
+          const recovered = await readLatestEncryptedWalletBackup({ chainId: String(context.deployment.chainId), registryAddress: context.deployment.registryAddress });
+          if (!recovered) throw new Error(tr("noLocalBackup"));
+          setBackupFile(recovered); setStatus(tr("localBackupLoaded"));
+        })}>{tr("localBackup")}</PanelButton>
         {!backupFile ? <>
           <FieldBlock label={tr("walletKind")}><select aria-label={tr("walletKind")} className={FIELD_INPUT} value={walletKind} onChange={event => setWalletKind(event.target.value as "ordinary" | "family")} disabled={working}><option value="ordinary">{tr("ordinaryWallet")}</option><option value="family">{tr("familyWallet")}</option></select></FieldBlock>
           <p className="text-sm text-ink-muted">{tr(walletKind === "family" ? "familyWalletDescription" : "ordinaryWalletDescription")}</p>
@@ -162,10 +183,12 @@ export function InheritanceWorkspace({ context, signer, account, symbol, decimal
       <div className="flex flex-wrap gap-2">{!state.unlocked ? <><PanelButton variant="primary" busy={busy} disabled={working || Boolean(backupFile)} onClick={() => void create()}>{tr("create")}</PanelButton><PanelButton disabled={working || !backupFile} onClick={() => void restore()}>{tr("restore")}</PanelButton></> : <><PanelButton onClick={() => void backup()} disabled={working}>{tr("backup")}</PanelButton><PanelButton disabled={working} onClick={() => void run(recover)}>{tr("refresh")}</PanelButton></>}</div>
       {state.backupChanged ? <p role="status" className="text-sm text-warning">{tr("backupChanged")}</p> : null}
     </section>
-    <nav aria-label={tr("tasks")} className="flex flex-wrap gap-2">{(["receive", "shield", "transfer", "budget", "unshield", "letter"] as const).map(item => <button key={item} type="button" disabled={working} onClick={() => { setTask(item); setError(""); setStatus(""); }} aria-pressed={task === item} className={`rounded-xl px-4 py-2 text-sm font-medium border ${task === item ? "border-primary bg-primary/10 text-ink" : "border-hairline text-ink-muted"}`}>{tr(item)}</button>)}</nav>
+    <nav aria-label={tr("tasks")} className="flex flex-wrap gap-2">{(["receive", "qualifications", "shield", "transfer", "budget", "unshield", "letter"] as const).map(item => <button key={item} type="button" disabled={working} onClick={() => { setTask(item); setError(""); setStatus(""); }} aria-pressed={task === item} className={`rounded-xl px-4 py-2 text-sm font-medium border ${task === item ? "border-primary bg-primary/10 text-ink" : "border-hairline text-ink-muted"}`}>{item === "qualifications" ? t("qualificationManager.title") : tr(item)}</button>)}</nav>
     <section className="rounded-[20px] border border-hairline bg-surface p-5 space-y-4">
-      <h2 className="font-semibold text-ink">{tr(task)}</h2>
-      {task === "receive" ? <>
+      <h2 className="font-semibold text-ink">{task === "qualifications" ? t("qualificationManager.title") : tr(task)}</h2>
+      {task === "qualifications" ? (state.unlocked ? <QualificationManager busy={working} openOperation={qualificationOperation} run={run}
+        save={saveBackup} changed={refreshQualifications} />
+        : <p className="text-sm text-ink-muted">{t("qualificationManager.unlockFirst")}</p>) : task === "receive" ? <>
         <p className="text-sm text-ink-muted">{tr("receiveDescription")}</p>
         <FieldBlock label={tr("expiryDays")}><input className={FIELD_INPUT} type="number" min="1" max="3650" value={expiryDays} onChange={event => setExpiryDays(event.target.value)} disabled={working} /></FieldBlock>
         {qualifications.length ? <fieldset className="space-y-2"><legend className="text-sm font-medium">{tr("codeQualifications")}</legend><p className="text-xs text-ink-muted">{tr("codeQualificationsDescription")}</p><p className="text-xs text-ink-muted">{tr("qualificationPrivacy")}</p>{qualifications.map(item => <label key={item.index} className="flex items-center gap-2 text-sm"><input type="checkbox" checked={selectedQualifications.includes(item.index)} disabled={working || !item.current || (!selectedQualifications.includes(item.index) && selectedQualifications.length >= 2)} onChange={event => setSelectedQualifications(previous => event.target.checked ? [...previous, item.index] : previous.filter(index => index !== item.index))} />{t("walletProtocol.qualification", { index: item.index + 1 })}{!item.current ? ` · ${tr("qualificationWithdrawn")}` : ""}</label>)}</fieldset> : null}
@@ -181,7 +204,6 @@ export function InheritanceWorkspace({ context, signer, account, symbol, decimal
         {signer ? <PanelButton variant="primary" busy={busy} disabled={working || (task !== "letter" && !state.unlocked)} onClick={() => void submit()}>{tr("submit")}</PanelButton> : <WalletConnectButton alwaysShowLabel />}
       </>}
     </section>
-    {state.unlocked ? <section className="rounded-[20px] border border-hairline bg-surface p-5 space-y-4"><h2 className="font-semibold text-ink">{tr("importQualifications")}</h2><p className="text-sm text-ink-muted">{tr("importQualificationsDescription")}</p><FieldBlock label={tr("qualificationBackup")}><input aria-label={tr("qualificationBackup")} type="file" accept=".dfwallet,application/octet-stream" disabled={working} onChange={event => { const file = event.target.files?.[0]; if (file) void file.arrayBuffer().then(bytes => setQualificationFile(new Uint8Array(bytes))); }} /></FieldBlock><FieldBlock label={tr("qualificationPassword")}><input aria-label={tr("qualificationPassword")} className={FIELD_INPUT} type="password" autoComplete="off" value={qualificationPassword} onChange={event => setQualificationPassword(event.target.value)} disabled={working} /></FieldBlock><PanelButton disabled={working || !qualificationFile} onClick={() => void importQualifications()}>{tr("importQualificationsAndBackup")}</PanelButton></section> : null}
     {state.unlocked ? <section className="rounded-[20px] border border-hairline bg-surface p-5 space-y-4"><h2 className="font-semibold text-ink">{tr("balance")}</h2><p className="text-xl tabular-nums">{units(String(values.reduce((sum, item) => sum + BigInt(item.amount), 0n)))} {symbol}</p><h3 className="font-medium">{tr("budgets")}</h3>{budgets.length ? budgets.map((note, i) => <div key={note.handle} className="flex flex-wrap items-center justify-between gap-3 border-t border-hairline pt-3"><div><p>{`${tr("budget")} ${i + 1} · ${units(note.amount)} ${symbol}`}</p><p className="text-xs text-ink-muted">{t("walletProtocol.schedule", { amount: units(note.rate ?? "0"), symbol, days: note.periodDays })}</p></div><PanelButton size="compact" disabled={working || !signer || note.claimPeriod === undefined} onClick={() => void submit({ claim: note })}>{tr("claim")}</PanelButton></div>) : <p className="text-sm text-ink-muted">{tr("noBudgets")}</p>}</section> : null}
     {state.unlocked && state.credentialCount > 0 ? <section className="rounded-[20px] border border-hairline bg-surface p-5 space-y-4"><h2 className="font-semibold">{tr("createRule")}</h2><p className="text-sm text-ink-muted">{tr("ruleDescription")}</p><FieldBlock label={tr("familyQualification")}><select className={FIELD_INPUT} value={familyChoice} onChange={event => setFamilyChoice(event.target.value)}>{Array.from({ length: state.credentialCount }, (_, i) => <option key={i} value={i}>{t("walletProtocol.qualification", { index: i + 1 })}</option>)}</select></FieldBlock><FieldBlock label={`${tr("amountPerPeriod")} (${symbol})`}><input className={FIELD_INPUT} value={ruleRate} onChange={event => setRuleRate(event.target.value)} /></FieldBlock><FieldBlock label={tr("periodDays")}><input className={FIELD_INPUT} type="number" min="1" value={ruleDays} onChange={event => setRuleDays(event.target.value)} /></FieldBlock><PanelButton disabled={working} onClick={() => void createRule()}>{tr("createRule")}</PanelButton>{rule ? <><textarea className={FIELD_TEXTAREA} value={rule} readOnly rows={3} aria-label={tr("rule")} /><CopyIconButton label={tr("copyRule")} onClick={() => void navigator.clipboard.writeText(rule)} /></> : null}</section> : null}
     {letters.length ? <section className="rounded-[20px] border border-hairline bg-surface p-5 space-y-4"><h2 className="font-semibold">{tr("inbox")}</h2>{letters.map(letter => <article key={`${letter.sender}:${letter.messageId}`} className="whitespace-pre-wrap break-words border-t border-hairline pt-3 text-sm">{letter.body}</article>)}</section> : null}

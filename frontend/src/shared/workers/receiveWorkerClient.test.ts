@@ -46,10 +46,27 @@ describe("receiving proof worker boundary", () => {
     const worker = FakeWorker.instances[0];
     worker.reply({ id: worker.clones[0].id, ok: false, error });
     await expect(pending).rejects.toMatchObject({ code: "QUALIFICATION_REVOKED" });
-    for (const failure of [new Error(secret), new ProtocolError("INVALID_PROOF", secret),
-      Object.assign(new Error(secret), { code: "NETWORK_ERROR", witness: secret })]) {
+    for (const failure of [new Error(secret), new ProtocolError("INVALID_PROOF", secret)]) {
       expect(publicWorkerError(failure)).toEqual({ message: "Receive proof operation failed" });
     }
+    expect(publicWorkerError(Object.assign(new Error(secret), { code: "NETWORK_ERROR", witness: secret })))
+      .toEqual({ code: "QUALIFICATION_NETWORK_ERROR", message: "Chain state is unavailable. Reconnect and refresh before continuing." });
+  });
+  it("filters nested qualification management and lifecycle results while allowing explicitly public revocation secrets", () => {
+    const secret = "private-qualification-material";
+    const result = publicWorkerResult("walletReadQualificationManagement", { canRequest: true,
+      requests: [{ id: "public-id", request: "public-request", familySalt: secret, issue: { credentialSalt: secret } }],
+      sources: [{ id: "source-id", kind: "fact", request: "public-request", xChild: secret, secret }], wallet: { masterKey: secret } });
+    expect(JSON.stringify(result)).not.toContain(secret);
+    expect(result).toEqual({ canRequest: true, requests: [{ id: "public-id", request: "public-request" }],
+      sources: [{ id: "source-id", kind: "fact", request: "public-request" }] });
+    expect(publicWorkerResult("walletPrepareQualificationIssue", { requestId: "request-id", proof: { pi_a: [1n, 2n], witness: secret },
+      state: { unlocked: true, codeCount: "1", credentialCount: 0, backupChanged: false, masterKey: secret }, credentialOpening: secret }))
+      .toEqual({ requestId: "request-id", proof: { pi_a: [1n, 2n] },
+        state: { unlocked: true, codeCount: "1", credentialCount: 0, backupChanged: false } });
+    expect(publicWorkerResult("walletPrepareRoleRevocation", { roles: [0, 1], secrets: [11n, 13n],
+      mutation: { kind: "cancelEndorsement", childIdentity: 17n, familySalt: secret }, witness: secret }))
+      .toEqual({ roles: [0, 1], secrets: [11n, 13n], mutation: { kind: "cancelEndorsement", childIdentity: 17n } });
   });
   it("removes private witnesses and note openings even if a future SDK result grows extra fields", () => {
     const secret = "private-must-not-cross";

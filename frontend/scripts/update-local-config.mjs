@@ -239,6 +239,9 @@ async function updateLocalConfig() {
 
     const updates = {
       VITE_RPC_URL: "http://127.0.0.1:8545",
+      // Locally generated development keys are served with their exported pins.
+      // A remote asset host may still contain keys from a different deployment.
+      VITE_ZK_ASSET_BASE_URL: "",
       // Person/tree modules use this reader; asset pools are resolved through the factory.
       VITE_READER_ADDRESS: readerAddress,
       // Keyed by chain, so switching networks in the app can find its way back
