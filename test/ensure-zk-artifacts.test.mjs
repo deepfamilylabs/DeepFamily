@@ -4,9 +4,9 @@ import os from "node:os";
 import path from "node:path";
 
 import { ensureZkArtifacts } from "../scripts/ensure-zk-artifacts.mjs";
-import { SHIELDED_CIRCUITS } from "../scripts/lib/zkCircuitSelection.mjs";
+import { CANONICAL_CIRCUIT_NAMES } from "../scripts/lib/zkCircuitSelection.mjs";
 
-const circuitCount = 14;
+const circuitCount = CANONICAL_CIRCUIT_NAMES.length;
 
 function writePinnedArtifacts(root, status) {
   const files = {
@@ -94,16 +94,8 @@ describe("integrated local ZK artifact preparation", function () {
   });
 
   for (const [label, status, changedFile] of [
-    [
-      "changed circuit",
-      "development",
-      "zk-artifacts/shielded/budget_deposit.r1cs",
-    ],
-    [
-      "changed receive loader",
-      "development",
-      "frontend/src/shared/zk/receiveProtocol.ts",
-    ],
+    ["changed circuit", "development", "zk-artifacts/shielded/budget_deposit.r1cs"],
+    ["changed receive loader", "development", "frontend/src/shared/zk/receiveProtocol.ts"],
     ["invalid final artifact", "production", "zk-artifacts/circuits/person_commitment.r1cs"],
   ]) {
     it(`requires explicit setup when the ${label} fails verification`, async function () {

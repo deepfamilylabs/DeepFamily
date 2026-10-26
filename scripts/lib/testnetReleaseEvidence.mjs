@@ -5,10 +5,7 @@ import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { keccak256, toBeHex } from "ethers";
 
-import {
-  SECONDS_PER_DAY,
-  MAX_UINT32,
-} from "@deepfamily/protocol-core";
+import { SECONDS_PER_DAY, MAX_UINT32 } from "@deepfamily/protocol-core";
 import { MAINNET_MIN_DELAY_FLOOR_SECONDS } from "./mainnetReleaseSafety.mjs";
 import {
   MINIMUM_MULTI_PARTY_CONTRIBUTORS,
@@ -691,9 +688,9 @@ const requireTerminalGovernanceEvidence = ({
       "poseidonT6",
       "deepFamilyLineageIndex",
       "shieldedVerifiers",
-    "shieldedBoundaryVerifierAdapter",
-    "generatedVerifiers",
-    "protocolVerifiers",
+      "shieldedBoundaryVerifierAdapter",
+      "generatedVerifiers",
+      "protocolVerifiers",
       "shieldedErc20Pool",
       "shieldedNativePool",
       "shieldedPoolFactory",
@@ -1257,64 +1254,155 @@ const requireProductionZkEvidence = (report) => {
 };
 
 const requireShieldedAcceptanceEvidence = (report, repositoryRoot, expectedChainId, inspector) => {
-  if (typeof inspector !== "function") throw new Error("shieldedArtifactInspector must be a function");
+  if (typeof inspector !== "function")
+    throw new Error("shieldedArtifactInspector must be a function");
   const inspected = inspector({ root: repositoryRoot });
-  const specs = { ...SHIELDED_DEPLOYMENT_CIRCUITS,
-    ...Object.fromEntries(Object.entries(PROTOCOL_DEPLOYMENT_CIRCUITS).map(([action,spec])=>[action,{...spec,verifierLabel:spec.generatedLabel}])),
+  const specs = {
+    ...SHIELDED_DEPLOYMENT_CIRCUITS,
+    ...Object.fromEntries(
+      Object.entries(PROTOCOL_DEPLOYMENT_CIRCUITS).map(([action, spec]) => [
+        action,
+        { ...spec, verifierLabel: spec.generatedLabel },
+      ]),
+    ),
   };
   const actions = Object.keys(specs);
-  const criteria = requireRecord(inspected.manifest.releaseCriteria, "shielded production releaseCriteria");
+  const criteria = requireRecord(
+    inspected.manifest.releaseCriteria,
+    "shielded production releaseCriteria",
+  );
   requireSafeInteger(criteria.fundMaxGas, "fundMaxGas", 1);
-  const artifacts = requireRecord(report.shieldedArtifacts,"shieldedArtifacts");
-  requireExact(artifacts.status,"passed","shieldedArtifacts.status");
-  requireExact(artifacts.productionReady,true,"shieldedArtifacts.productionReady");
-  requireExact(artifacts.manifestSha256,inspected.manifestSha256,"shieldedArtifacts.manifestSha256");
-  const circuits = requireExactRecordKeys(artifacts.circuits,"shieldedArtifacts.circuits",actions);
-  for (const [action,circuit] of Object.entries(circuits)) {
-    requireExact(circuit.source,specs[action].source,`shieldedArtifacts.${action}.source`);
-    for (const field of ["sourceSha256","wasmSha256","zkeySha256","verificationKeySha256"])
-      requireExact(requireSha256(circuit[field],`shieldedArtifacts.${action}.${field}`),inspected.manifest.circuits[action][field],`shieldedArtifacts.${action}.${field}`);
+  const artifacts = requireRecord(report.shieldedArtifacts, "shieldedArtifacts");
+  requireExact(artifacts.status, "passed", "shieldedArtifacts.status");
+  requireExact(artifacts.productionReady, true, "shieldedArtifacts.productionReady");
+  requireExact(
+    artifacts.manifestSha256,
+    inspected.manifestSha256,
+    "shieldedArtifacts.manifestSha256",
+  );
+  const circuits = requireExactRecordKeys(
+    artifacts.circuits,
+    "shieldedArtifacts.circuits",
+    actions,
+  );
+  for (const [action, circuit] of Object.entries(circuits)) {
+    requireExact(circuit.source, specs[action].source, `shieldedArtifacts.${action}.source`);
+    for (const field of ["sourceSha256", "wasmSha256", "zkeySha256", "verificationKeySha256"])
+      requireExact(
+        requireSha256(circuit[field], `shieldedArtifacts.${action}.${field}`),
+        inspected.manifest.circuits[action][field],
+        `shieldedArtifacts.${action}.${field}`,
+      );
   }
-  const ceremony = requireRecord(report.zkCeremonyVerification,"zkCeremonyVerification");
-  requireExact(ceremony.circuitCount,14,"zkCeremonyVerification.circuitCount");
-  if (JSON.stringify([...ceremony.circuits].sort()) !== JSON.stringify(Object.keys(ZK_RELEASE_ARTIFACTS).sort()))
+  const ceremony = requireRecord(report.zkCeremonyVerification, "zkCeremonyVerification");
+  requireExact(
+    ceremony.circuitCount,
+    Object.keys(ZK_RELEASE_ARTIFACTS).length + actions.length,
+    "zkCeremonyVerification.circuitCount",
+  );
+  if (
+    JSON.stringify([...ceremony.circuits].sort()) !==
+    JSON.stringify(Object.keys(ZK_RELEASE_ARTIFACTS).sort())
+  )
     throw new Error("zkCeremonyVerification.circuits must cover both core circuits");
-  const receiving = requireRecord(ceremony.shielded,"zkCeremonyVerification.shielded");
-  requireExact(receiving.status,"passed","zkCeremonyVerification.shielded.status");
-  requireExact(receiving.circuitCount,12,"zkCeremonyVerification.shielded.circuitCount");
-  requireExact(receiving.manifestSha256,inspected.manifestSha256,"zkCeremonyVerification.shielded.manifestSha256");
-  for (const field of ["bytes","sha256","blake2b512"])
-    requireExact(receiving.ptau[field],ceremony.ptau[field],`zkCeremonyVerification.shielded.ptau.${field}`);
-  const evidence = requireRecord(report.shielded,"shielded");
-  requireExact(evidence.status,"passed","shielded.status");
-  requireExact(evidence.manifestSha256,inspected.manifestSha256,"shielded.manifestSha256");
-  const proofs = requireExactRecordKeys(evidence.proofs,"shielded.proofs",actions);
-  const transactions = requireRecord(report.transactions,"transactions");
-  const contractInputs = {sourceFact:[3,4,"eligibilitySource"],sourceTrust:[2,3,"eligibilitySource"],issue:[1,2,"receiveRegistry"],code:[3,4,"receiveRegistry"],capability:[5,6,"receiveRegistry"]};
-  for (const [action,proof] of Object.entries(proofs)) {
-    const spec = specs[action], item = inspected.manifest.circuits[action], label=`shielded.proofs.${action}`;
-    requireExact(proof.source,spec.source,`${label}.source`);
-    requireExact(proof.verified,true,`${label}.verified`);
-    requireSameAddress(proof.verifierAddress,report.addresses[spec.verifierLabel],`${label}.verifierAddress`);
-    for (const field of ["wasmSha256","zkeySha256","verificationKeySha256"])
-      requireExact(requireSha256(proof[field],`${label}.${field}`),item[field],`${label}.${field}`);
-    requireSha256(proof.proofSha256,`${label}.proofSha256`);
-    const signals=proof.publicSignals;
-    if (!Array.isArray(signals)||signals.length!==spec.publicSignals||signals.some(x=>typeof x!=="string"||!/^(?:0|[1-9][0-9]*)$/u.test(x)))
+  const receiving = requireRecord(ceremony.shielded, "zkCeremonyVerification.shielded");
+  requireExact(receiving.status, "passed", "zkCeremonyVerification.shielded.status");
+  requireExact(
+    receiving.circuitCount,
+    actions.length,
+    "zkCeremonyVerification.shielded.circuitCount",
+  );
+  requireExact(
+    receiving.manifestSha256,
+    inspected.manifestSha256,
+    "zkCeremonyVerification.shielded.manifestSha256",
+  );
+  for (const field of ["bytes", "sha256", "blake2b512"])
+    requireExact(
+      receiving.ptau[field],
+      ceremony.ptau[field],
+      `zkCeremonyVerification.shielded.ptau.${field}`,
+    );
+  const evidence = requireRecord(report.shielded, "shielded");
+  requireExact(evidence.status, "passed", "shielded.status");
+  requireExact(evidence.manifestSha256, inspected.manifestSha256, "shielded.manifestSha256");
+  const proofs = requireExactRecordKeys(evidence.proofs, "shielded.proofs", actions);
+  const transactions = requireRecord(report.transactions, "transactions");
+  const contractInputs = {
+    sourceFact: [3, 4, "eligibilitySource"],
+    sourceTrust: [2, 3, "eligibilitySource"],
+    issue: [1, 2, "receiveRegistry"],
+    code: [3, 4, "receiveRegistry"],
+    capability: [5, 6, "receiveRegistry"],
+  };
+  for (const [action, proof] of Object.entries(proofs)) {
+    const spec = specs[action],
+      item = inspected.manifest.circuits[action],
+      label = `shielded.proofs.${action}`;
+    requireExact(proof.source, spec.source, `${label}.source`);
+    requireExact(proof.verified, true, `${label}.verified`);
+    requireSameAddress(
+      proof.verifierAddress,
+      report.addresses[spec.verifierLabel],
+      `${label}.verifierAddress`,
+    );
+    for (const field of ["wasmSha256", "zkeySha256", "verificationKeySha256"])
+      requireExact(
+        requireSha256(proof[field], `${label}.${field}`),
+        item[field],
+        `${label}.${field}`,
+      );
+    requireSha256(proof.proofSha256, `${label}.proofSha256`);
+    const signals = proof.publicSignals;
+    if (
+      !Array.isArray(signals) ||
+      signals.length !== spec.publicSignals ||
+      signals.some((x) => typeof x !== "string" || !/^(?:0|[1-9][0-9]*)$/u.test(x))
+    )
       throw new Error(`${label}.publicSignals must contain canonical decimal signals`);
-    requireExact(proof.publicSignalsSha256,createHash("sha256").update(JSON.stringify(signals)).digest("hex"),`${label}.publicSignalsSha256`);
-    const [chainIndex,scopeIndex,scope]=contractInputs[action]??[0,1,"shieldedErc20Pool"];
-    requireExact(signals[chainIndex],String(expectedChainId),`${label} chain ID`);
-    requireSameAddress(`0x${BigInt(signals[scopeIndex]).toString(16).padStart(40,"0")}`,report.addresses[scope],`${label} contract`);
-    const executed=["shield","fund","transfer","unshield"].includes(action);
-    requireExact(proof.execution,executed?"transaction":"verifier-call",`${label}.execution`);
+    requireExact(
+      proof.publicSignalsSha256,
+      createHash("sha256").update(JSON.stringify(signals)).digest("hex"),
+      `${label}.publicSignalsSha256`,
+    );
+    const [chainIndex, scopeIndex, scope] = contractInputs[action] ?? [0, 1, "shieldedErc20Pool"];
+    requireExact(signals[chainIndex], String(expectedChainId), `${label} chain ID`);
+    requireSameAddress(
+      `0x${BigInt(signals[scopeIndex]).toString(16).padStart(40, "0")}`,
+      report.addresses[scope],
+      `${label} contract`,
+    );
+    const executed = ["shield", "fund", "transfer", "unshield"].includes(action);
+    requireExact(proof.execution, executed ? "transaction" : "verifier-call", `${label}.execution`);
     if (executed) {
-      requireExact(proof.transactionLabel,`shielded-action-${action}`,`${label}.transactionLabel`);
-      requireExact(requireRecord(transactions[proof.transactionLabel],`transactions.${proof.transactionLabel}`).status,1,`transactions.${proof.transactionLabel}.status`);
-    } else if (Object.hasOwn(proof,"transactionLabel")) throw new Error(`${label} verifier-call must not claim a pool transaction`);
+      requireExact(
+        proof.transactionLabel,
+        `shielded-action-${action}`,
+        `${label}.transactionLabel`,
+      );
+      requireExact(
+        requireRecord(
+          transactions[proof.transactionLabel],
+          `transactions.${proof.transactionLabel}`,
+        ).status,
+        1,
+        `transactions.${proof.transactionLabel}.status`,
+      );
+    } else if (Object.hasOwn(proof, "transactionLabel"))
+      throw new Error(`${label} verifier-call must not claim a pool transaction`);
   }
-  const scenario=requireExactRecordKeys(evidence.scenario,"shielded.scenario",["offlinePayer","latestRoleChecks","appendRechecksEligibility","claimsRecheckEligibility","sameCodeAppends","crossCodeIndependent","notesRecovered","nativeAndToken"]);
-  for(const [field,value]of Object.entries(scenario)) requireExact(value,true,`shielded.scenario.${field}`);
+  const scenario = requireExactRecordKeys(evidence.scenario, "shielded.scenario", [
+    "offlinePayer",
+    "latestRoleChecks",
+    "appendRechecksEligibility",
+    "claimsRecheckEligibility",
+    "sameCodeAppends",
+    "crossCodeIndependent",
+    "notesRecovered",
+    "nativeAndToken",
+  ]);
+  for (const [field, value] of Object.entries(scenario))
+    requireExact(value, true, `shielded.scenario.${field}`);
   const receipts = requireRecord(evidence.receipts, "shielded.receipts");
   requireExact(receipts.rpcChecks, "passed", "shielded.receipts.rpcChecks");
   requireExact(receipts.chainId, expectedChainId, "shielded.receipts.chainId");
@@ -1355,9 +1443,11 @@ const requireShieldedAcceptanceEvidence = (report, repositoryRoot, expectedChain
     throw new Error("shielded fund gas exceeds transaction or block limit");
   if (recorded.gasUsed !== undefined)
     requireExact(String(observation.gasUsed), String(recorded.gasUsed), "shielded fund gasUsed");
-  return { manifestSha256: inspected.manifestSha256, proofCount: actions.length,
-    transactionActions: actions.filter(action=>proofs[action].execution==="transaction"),
-    verifierCallActions: actions.filter(action=>proofs[action].execution==="verifier-call"),
+  return {
+    manifestSha256: inspected.manifestSha256,
+    proofCount: actions.length,
+    transactionActions: actions.filter((action) => proofs[action].execution === "transaction"),
+    verifierCallActions: actions.filter((action) => proofs[action].execution === "verifier-call"),
   };
 };
 

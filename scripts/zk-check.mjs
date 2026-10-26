@@ -65,10 +65,7 @@ const defaultRunner = ({ executable, args, cwd }) =>
 
 export const parseArguments = parseCircuitArguments;
 
-export const buildZkCheckCommands = ({
-  root = process.cwd(),
-  circuit = "all",
-} = {}) => {
+export const buildZkCheckCommands = ({ root = process.cwd(), circuit = "all" } = {}) => {
   const resolvedRoot = path.resolve(root);
   const selected = selectCircuitNames(circuit);
   const core = selected.filter((name) => Object.hasOwn(CHECKS, name));
@@ -135,7 +132,7 @@ const printUsage = () => {
   console.log(`Usage:
   node scripts/zk-check.mjs [--circuit <all|core|person|disclosure|shielded|shielded:action|protocol|protocol:action>]
 
-The default check rebuilds the 14 canonical relations, checks identity proofs/constraints,
+The default check rebuilds the canonical relations, checks identity proofs/constraints,
 validates local artifact hashes and checks all eight protocol Groth16 statements.
 Development artifact verification is not production ceremony approval.
 Every step reuses the current keys; no check generates replacement keys.

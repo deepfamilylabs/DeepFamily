@@ -304,17 +304,17 @@ VITE_ROOT_VERSION_INDEX=...
 
 **Commonly used optional vars**
 
-| Variable                                                                             | Purpose                                                                    |
-| ------------------------------------------------------------------------------------ | -------------------------------------------------------------------------- |
-| `VITE_ROOT_PERSON_HASH_<LANG>`, `VITE_ROOT_VERSION_INDEX_<LANG>`                     | Per-language root overrides (e.g. `_EN`, `_ZH`)                            |
-| `VITE_DF_HARD_NODE_LIMIT`                                                            | Cap tree node count for public/low-budget RPCs                             |
-| `VITE_DF_*_TTL_MS`, `VITE_DF_QUERY_PAGE_LIMIT`                                       | Query cache tuning                                                         |
-| `VITE_USE_INDEXEDDB_CACHE`                                                           | Persist tree caches in IndexedDB                                           |
-| `VITE_SHOW_DEBUG`                                                                    | Enable debug UI (tree debug panel, etc.)                                   |
-| `VITE_SHOW_TRUSTED_SOURCE_FILTER_TOGGLE`                                             | Show trusted-source filter toggle (on by default; `0` forces filtering on) |
-| `VITE_SHIELDED_POOL_FACTORY_ADDRESS`, `VITE_SHIELDED_POOL_FACTORY_ADDRESS_<chainId>` | Canonical multi-asset pool factory for `/inheritance`                      |
-| `VITE_SHIELDED_STATE_READ_MODE` | Build-time Q/Source path reads: `rebuild` (default) or targeted `chain`; funds notes always replay locally |
-| `VITE_ZK_ASSET_BASE_URL` | Build-time WASM/zkey host using pinned hash paths; verification-key JSON remains local |
+| Variable                                                                             | Purpose                                                                                                    |
+| ------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------- |
+| `VITE_ROOT_PERSON_HASH_<LANG>`, `VITE_ROOT_VERSION_INDEX_<LANG>`                     | Per-language root overrides (e.g. `_EN`, `_ZH`)                                                            |
+| `VITE_DF_HARD_NODE_LIMIT`                                                            | Cap tree node count for public/low-budget RPCs                                                             |
+| `VITE_DF_*_TTL_MS`, `VITE_DF_QUERY_PAGE_LIMIT`                                       | Query cache tuning                                                                                         |
+| `VITE_USE_INDEXEDDB_CACHE`                                                           | Persist tree caches in IndexedDB                                                                           |
+| `VITE_SHOW_DEBUG`                                                                    | Enable debug UI (tree debug panel, etc.)                                                                   |
+| `VITE_SHOW_TRUSTED_SOURCE_FILTER_TOGGLE`                                             | Show trusted-source filter toggle (on by default; `0` forces filtering on)                                 |
+| `VITE_SHIELDED_POOL_FACTORY_ADDRESS`, `VITE_SHIELDED_POOL_FACTORY_ADDRESS_<chainId>` | Canonical multi-asset pool factory for `/inheritance`                                                      |
+| `VITE_SHIELDED_STATE_READ_MODE`                                                      | Build-time Q/Source path reads: `rebuild` (default) or targeted `chain`; funds notes always replay locally |
+| `VITE_ZK_ASSET_BASE_URL`                                                             | Build-time WASM/zkey host using pinned hash paths; verification-key JSON remains local                     |
 
 ### Local auto-config
 
@@ -378,7 +378,7 @@ Translations live under `frontend/src/locales/`.
 
 ## ZK Artifacts
 
-The application uses 14 canonical Circom relations. Receiving artifacts are exported into `frontend/public/zk/protocol`; the build trusts the digest-bound `frontend/src/proof-artifacts.local.json` configuration. Local export is `npm run zk:frontend -- <chainId> <registry>`. Browser proof generation uses WASM, zkey and verification-key JSON, never a code-supplied key or R1CS download.
+The application uses 13 canonical Circom relations. Receiving artifacts are exported into `frontend/public/zk/protocol`; the build trusts the digest-bound `frontend/src/proof-artifacts.local.json` configuration. Local export is `npm run zk:frontend -- <chainId> <registry>`. Browser proof generation uses WASM, zkey and verification-key JSON, never a code-supplied key or R1CS download.
 
 Identity/disclosure assets retain their manifest-pinned `/zk/` loading flow. Boundary relations use Shield, Unshield and four-input Unshield; other funds operations use the fixed receiving relations. There are no presentation-link keys or alternative receive-code issuers. Development artifacts are local-only; production proof-ceremony evidence is still required before public release.
 
@@ -553,7 +553,7 @@ See [frontend-security.md](frontend-security.md) for the threat model, CSP guida
 | Symptom                         | First thing to check                                                                        |
 | ------------------------------- | ------------------------------------------------------------------------------------------- |
 | "Network Error" / read failures | `VITE_RPC_URL`, `VITE_READER_ADDRESS` (DeepFamilyReader), and that the node is reachable    |
-| ABI mismatch / missing methods  | Run `npm run sync:abi --workspace deepfamily-frontend` (or restart `frontend:dev`)            |
+| ABI mismatch / missing methods  | Run `npm run sync:abi --workspace deepfamily-frontend` (or restart `frontend:dev`)          |
 | Proof generation fails          | Confirm `/zk/*` artifacts exist and match the deployed verifier version                     |
 | Worker crashes on import        | A React/DOM import leaked into `shared/crypto` or `shared/zk` — inspect the import graph    |
 | Stale tree/query data           | Clear IndexedDB (`VITE_USE_INDEXEDDB_CACHE=1`) or toggle it off for a run                   |

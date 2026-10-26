@@ -6,7 +6,7 @@
   "trustModel": "Local development setup only; these keys are not approved for production",
   "compiler": {
     "path": "bin/circom",
-    "sha256": "85342c7ff332d948df7c0c50ecf201e6129349aef550ce873f3c811b79fe53a3",
+    "sha256": "f2dce46f181b115b89b00ab737d239cf5425d5e47e4a0957e8c0da463606ac2c",
     "version": "circom compiler 2.2.3",
     "flags": [
       "--r1cs",
@@ -51,11 +51,11 @@
         "ptauPath": "circuits/ptau/ppot_0080_17.ptau",
         "ptauSha256": "f807e065fde53f72f4bf4d57140fab85b26daa6cc95bdfec7cce93622b3a367c",
         "ptauPower": 17,
-        "contributionHash": "73bdb99bf6597bc87461a5a50d50c5bc31d2a037bd50ea47ecef76a129b38c9718f271434202297c0d8aacb9bc601b244b4f45f37c821d085d06f1a4038a0224",
+        "contributionHash": "4968927ef8971c89bb86a1104877543c8dd3ae0f076f70dfe1cb0bf0b730f67a0755e4105dcdab819ceed43279593b7a0472c0169125f2455b33851a0216f222",
         "artifacts": {
-          "frontend/public/zk/protocol/eligibility_source_fact_final.zkey": "86dde016e30b269ad3c4f2c0ccf733067a0775a7a74a8befca793d16a1d1ab72",
-          "frontend/public/zk/protocol/eligibility_source_fact.vkey.json": "ca00864e2cfed72fb00e7946aaa3570a6fea9d7ab3daa11f9761895a2986b074",
-          "contracts/generated/protocol/EligibilitySourceFactVerifier.sol": "ac3f0720b7395064bf4ce8e1092bfefe83f18b3b8f3859891aff44a4fa492292"
+          "frontend/public/zk/protocol/eligibility_source_fact_final.zkey": "262fb8dd11c23de0e10f9da2a2f777d0ff38a4028ab7eae354d2dd1f0e6d5ba9",
+          "frontend/public/zk/protocol/eligibility_source_fact.vkey.json": "bcc5895169cd80e282e3ee67922f8aec9e29697792d09afd02e3aeaa7efc6cc6",
+          "contracts/generated/protocol/EligibilitySourceFactVerifier.sol": "4918809894b14d6a59bc4a7baa2e025aeddfaf642bbeea2b4344dbec6c3f02c9"
         }
       }
     },
@@ -91,11 +91,11 @@
         "ptauPath": "circuits/ptau/ppot_0080_17.ptau",
         "ptauSha256": "f807e065fde53f72f4bf4d57140fab85b26daa6cc95bdfec7cce93622b3a367c",
         "ptauPower": 17,
-        "contributionHash": "dc2886954f518c390e5d2aab1448a2481e22c5c02ffbe91ae30e5caf38a177d6ea77643c475e323114d416b3d64c7a37f6cc7892d4e7f57eea2e9a5b85cf873b",
+        "contributionHash": "a3afe3cf80245954706dc4ed9446e5f970bdc611f41191f53a8462682f76f8b41ff8d84ed1ef68dd4568ffde3a0dfe4a95d17b95fdfffe6c5599bb65503e039f",
         "artifacts": {
-          "frontend/public/zk/protocol/eligibility_source_trust_final.zkey": "fb06c966083edc303efd4b0728ed2834ff484e1fa0c441bd2be62d2b83b21e4f",
-          "frontend/public/zk/protocol/eligibility_source_trust.vkey.json": "83df337f6764eed7aed9a5cebc820aefe67749a1a722ab996f4f8e015e4b6530",
-          "contracts/generated/protocol/EligibilitySourceTrustVerifier.sol": "b9d261637b7835d2532475594f13a948fcf030a2dc0d5d1ff1ea545ddd0eeab9"
+          "frontend/public/zk/protocol/eligibility_source_trust_final.zkey": "dc48e9ff2cd09de5a57a8eb7fb4593065ff61821f6f8c5343f0a7be78e44fb23",
+          "frontend/public/zk/protocol/eligibility_source_trust.vkey.json": "d3418095826534689d251bb4e4153662eb32f39334b5af364448cc24e098ff96",
+          "contracts/generated/protocol/EligibilitySourceTrustVerifier.sol": "e54669819a7e82d9135104a4d618ec6d3147c852676b103179929995a3452882"
         }
       }
     },
@@ -131,11 +131,11 @@
         "ptauPath": "circuits/ptau/ppot_0080_17.ptau",
         "ptauSha256": "f807e065fde53f72f4bf4d57140fab85b26daa6cc95bdfec7cce93622b3a367c",
         "ptauPower": 17,
-        "contributionHash": "64fc03dc3061cd2a30a4c9e36dde8057fb9d6ccec48da575ae78ec1e1f73ae6b91982dfa74de2cd1850fc4a1446ea4ead2c189b35cf21a5ff0f4e0322699ca36",
+        "contributionHash": "731ea9592bcb89656fa7e7992f9f99ad48e605a2dc029266eadef74b83be063e43640da42869ca689b00c82793d3f4216d9518e9b168153c8767c365ba9d3390",
         "artifacts": {
-          "frontend/public/zk/protocol/eligibility_issue_final.zkey": "25e0e0191b71b24eaad87b31a9c3a2551c91d71653c707313e7c3fd014fb6d0a",
-          "frontend/public/zk/protocol/eligibility_issue.vkey.json": "211a6fe3e4b5df2324064333775a0bc208cf208539f14953e3812da658f0e147",
-          "contracts/generated/protocol/EligibilityIssueVerifier.sol": "d9feb2345c7e296e0512b88a7a97c7055504f194614800790c3670e786f5e264"
+          "frontend/public/zk/protocol/eligibility_issue_final.zkey": "c4ded5bec322c7b790828d11ee20695f83813b038b25c8032a3ef877af72f5da",
+          "frontend/public/zk/protocol/eligibility_issue.vkey.json": "ae479b5459c79fa01add94ce9fc4d41e5b184c66f9df7b2e2cfaee0d97b31858",
+          "contracts/generated/protocol/EligibilityIssueVerifier.sol": "99b7f1cc410a82b18529abf6ec4fa16c29622e51915a90d3f9f99809b7a2ae79"
         }
       }
     },
@@ -171,11 +171,11 @@
         "ptauPath": "circuits/ptau/ppot_0080_17.ptau",
         "ptauSha256": "f807e065fde53f72f4bf4d57140fab85b26daa6cc95bdfec7cce93622b3a367c",
         "ptauPower": 17,
-        "contributionHash": "4ebcaa7f2eb9793949b14d6693c721fed7c324ead7112c3c6b6d61d28a466426405352d264c70113d05f458f844582b7fe1699dab157579ea43848e02627406f",
+        "contributionHash": "6bc2afcf167aefca4b767a570c1ce549e734f40601f56e098dd34881f00ba473a63d40e04a46a06f604fe23ed44cf64dc4ec7d1ae85b0ad8325e721d41e45c87",
         "artifacts": {
-          "frontend/public/zk/protocol/receive_code_final.zkey": "ef52f61e704de8e63497be4bb4b513f8d1c851fc9fcea2d150df6aa4e6a8040c",
-          "frontend/public/zk/protocol/receive_code.vkey.json": "5571ba38d4fc3944d0cc966f8600302e22fb47456b985f260729c7ee887175f4",
-          "contracts/generated/protocol/ReceiveCodeVerifier.sol": "430f3515ce23ac3d24c02ee9c0efa824bbbd47ee99548d9f262522338eb50daa"
+          "frontend/public/zk/protocol/receive_code_final.zkey": "0357ebc6508f9f62d3be02b9299e4491a8a17d9e984ede91c38fadd4ec67f94c",
+          "frontend/public/zk/protocol/receive_code.vkey.json": "21968e9dee6f0f4757a47d03682d9b565e2775c33bceeb40b61d4280bb76c0d7",
+          "contracts/generated/protocol/ReceiveCodeVerifier.sol": "5c958c8ecd916465bc4046691786a5cf22d560daa0501abd06fe99ec4ec30dea"
         }
       }
     },
@@ -211,11 +211,11 @@
         "ptauPath": "circuits/ptau/ppot_0080_17.ptau",
         "ptauSha256": "f807e065fde53f72f4bf4d57140fab85b26daa6cc95bdfec7cce93622b3a367c",
         "ptauPower": 17,
-        "contributionHash": "d720e2bf6cf2df768c8f7608d7ba7ff593066b4fe0cf356143501dbf3c1fd561281c3ef058f3741d7b78b70e78f1435779313ac2b3bb2d300a0e596df81d7ad6",
+        "contributionHash": "865b456c4d6140675db0fc4b4952e6e606f27e4fc9ad89dc4885510fbcabc12d6f079daab637d02ba161f9dafbb31d8c8b72c7b54563b4b19dcc42cc2fd01681",
         "artifacts": {
-          "frontend/public/zk/protocol/budget_capability_final.zkey": "435f36cea4405ace319662075fdef09d49fe2d83a2af0e9d7f4e7f32bb6f5703",
-          "frontend/public/zk/protocol/budget_capability.vkey.json": "1dc35003aa82c44e14f9dc1485c80ebd9d075f4cd00781dc35db1f0e80a99700",
-          "contracts/generated/protocol/BudgetCapabilityVerifier.sol": "f0974cc2e0920248f272d779d27c879ddc640d5e77c256b098f4cea0d88488ae"
+          "frontend/public/zk/protocol/budget_capability_final.zkey": "c018cd3789a87cb45a8d7f210f15d5b73860dbb65f9a906607d052b00c9aca11",
+          "frontend/public/zk/protocol/budget_capability.vkey.json": "eeb7e58c2f64978e747ee5d7ddd722071e00c99fb50ba61e5e6380c5cf25c446",
+          "contracts/generated/protocol/BudgetCapabilityVerifier.sol": "8e417ffe587cedbff40546758ce70c9cc1d64dac40580878c165d9ef7fed09f6"
         }
       }
     },
@@ -254,11 +254,11 @@
         "ptauPath": "circuits/ptau/ppot_0080_17.ptau",
         "ptauSha256": "f807e065fde53f72f4bf4d57140fab85b26daa6cc95bdfec7cce93622b3a367c",
         "ptauPower": 17,
-        "contributionHash": "4e12f12b2f3bfec08c7f4bee6ef0eae1a687f8461e4d6e3945a5f6db8a08b5538255da4bd7781d668279463bf7ebaa6e6d46251ac1a166252fb3a01d71b33962",
+        "contributionHash": "3520c28c04916cf5bc6a9f6c95726a476f1c14b8ff6022b0e8f57f498349ca4b391c6c66061b2d10125fa40db9985c4e971ca5647c6827b6b29944db258e162e",
         "artifacts": {
-          "frontend/public/zk/protocol/budget_deposit_final.zkey": "a2b20a9d4e4a4cba4360ef165fa1fd1d39f5e859fd08ba2e724f20504e38abda",
-          "frontend/public/zk/protocol/budget_deposit.vkey.json": "5d04adc325a19a8c7e00a08daa2071fa111fcd0c72aed825fdefbd6368d33c49",
-          "contracts/generated/protocol/BudgetDepositVerifier.sol": "e59ef7cd414dff2e7b96d8cff8bec84a49fc141357113b1f68f96e5deacb683c"
+          "frontend/public/zk/protocol/budget_deposit_final.zkey": "a4b03f303969ec638275e0306d876860b0b1e79c672879eb96a6348c4ac21b44",
+          "frontend/public/zk/protocol/budget_deposit.vkey.json": "147f49318777c38df55131cd66f53055bf62cd6d7a809009286419ea71c064cd",
+          "contracts/generated/protocol/BudgetDepositVerifier.sol": "6fd93fc6b3b8e7f387c0f84c8732c4dca126d19980bd616ceda4fa46b19382c1"
         }
       }
     },
@@ -297,11 +297,11 @@
         "ptauPath": "circuits/ptau/ppot_0080_17.ptau",
         "ptauSha256": "f807e065fde53f72f4bf4d57140fab85b26daa6cc95bdfec7cce93622b3a367c",
         "ptauPower": 17,
-        "contributionHash": "f317911038e2c41f0c00c4909f15167f66ee3282cbbf2e9ecf3cc9478994c48191862024a7135e4302459da535d612485e8e2f898285750a5563620afd65366e",
+        "contributionHash": "24b237555997c1cb416538069e12a782c583d2b54ac5a67dc598c4e8fdffbf79a9733e8c530298b54e1f9080361e05533df3d14515fbabef1a3fd980b6e57434",
         "artifacts": {
-          "frontend/public/zk/protocol/budget_claim_final.zkey": "5106743b8a4af8626edba2e331a4a9340dd3b61cc4c61fbe9adec96f73505f44",
-          "frontend/public/zk/protocol/budget_claim.vkey.json": "32f4e6dacb34d67d296bf8da535103eb1150b547a5039e9a5e9fb79c8eadd00d",
-          "contracts/generated/protocol/BudgetClaimVerifier.sol": "99863deebf840fa312b36f2c7cbe05598116e0c0b72dcb3730c8cbb42e358a57"
+          "frontend/public/zk/protocol/budget_claim_final.zkey": "90279b141879a6aa24cce3387bfc9e3986d344347f9653a46739f2ff6864ec94",
+          "frontend/public/zk/protocol/budget_claim.vkey.json": "fd55e75bfa9fd868bcb07dda706c5b5631ee7460d113d13636cc98cc410c4404",
+          "contracts/generated/protocol/BudgetClaimVerifier.sol": "715902e1fdd0495fb97d91f9a147789657b26b73023cbcf39d797f4feb05f108"
         }
       }
     },
@@ -337,11 +337,11 @@
         "ptauPath": "circuits/ptau/ppot_0080_17.ptau",
         "ptauSha256": "f807e065fde53f72f4bf4d57140fab85b26daa6cc95bdfec7cce93622b3a367c",
         "ptauPower": 17,
-        "contributionHash": "e7ff29ddcad97e2b11a0c0d90f0b28539ded70ab14c3df879cff47ea83f0ede8c4a00e9475511a6d27274357cf08e443c434e0b4809a5446cd48fe31b68f5a66",
+        "contributionHash": "14d2b0cddfea48abfde2def85bebf5e9b757f6087b4776cd4324d9fcd053822d0fac5c103c19d7cb350a6a308093c5e6260a56e6cbdcc0ecadb7b5925aaf8345",
         "artifacts": {
-          "frontend/public/zk/protocol/value_transfer_final.zkey": "e00b9bc99519130c2a33d11741742306e915e7626b879684cfe219e3312956d3",
-          "frontend/public/zk/protocol/value_transfer.vkey.json": "db1e35f77a198f636ef1f352aa9b5dcac723b62885e55d1599d16e3955c1e800",
-          "contracts/generated/protocol/ValueTransferVerifier.sol": "3e8f64ac90740df378f44884e8a6b41152ee9817b843777e0b7c442b0011c4cb"
+          "frontend/public/zk/protocol/value_transfer_final.zkey": "f03a89e00d6816532de34fe4724eced6cfdecbf579e24a6b09db6eb203d4683b",
+          "frontend/public/zk/protocol/value_transfer.vkey.json": "cfd1ef473cd75b6d6126548136a36dbcedfbeaa2a235eca5bd26802dfea8c862",
+          "contracts/generated/protocol/ValueTransferVerifier.sol": "fdd7081cbfcbf029f61911029b023bad2db7cf6bb8d0b70f6ffbbb1e19336a10"
         }
       }
     }

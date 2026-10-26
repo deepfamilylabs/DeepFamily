@@ -136,7 +136,7 @@ const printUsage = () => {
   node scripts/zk-build.mjs [--circuit <all|core|person|disclosure|shielded|shielded:action|protocol|protocol:action>]
 
 Compiles the selected Circom circuits with fixed R1CS, WASM, symbol, include-path and output
-settings. The default includes identity, asset boundaries and the nine receive protocol circuits.
+settings. The default includes identity, asset boundaries and the fixed receive protocol circuits.
 This command never generates or replaces proving keys.`);
 };
 

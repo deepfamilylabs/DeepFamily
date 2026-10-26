@@ -3,7 +3,11 @@ import { expect } from "chai";
 import { ethers } from "ethers";
 
 import { ESPACE_CHAIN_PROFILE, ETHEREUM_CHAIN_PROFILE } from "../scripts/lib/chainProfiles.mjs";
-import { SHIELDED_DEPLOYMENT_CIRCUITS, PROTOCOL_DEPLOYMENT_CIRCUITS, RECEIVE_DEPLOYMENT_CONTRACTS } from "../scripts/lib/zkDeploymentCatalog.mjs";
+import {
+  SHIELDED_DEPLOYMENT_CIRCUITS,
+  PROTOCOL_DEPLOYMENT_CIRCUITS,
+  RECEIVE_DEPLOYMENT_CONTRACTS,
+} from "../scripts/lib/zkDeploymentCatalog.mjs";
 import {
   MAINNET_DEPLOYMENT_NONCE_OFFSETS,
   assertOnChainProtocolDeploymentRuntimes,
@@ -51,10 +55,31 @@ const fakeDeploymentArtifactInspector = ({ deployments }) => {
     });
   };
   return Object.freeze({
-    ...Object.fromEntries(RECEIVE_DEPLOYMENT_CONTRACTS.map(({contractName, property}) => [property, artifact(contractName, deployments[property])])),
-    shieldedBoundaryVerifierAdapter: artifact("ShieldedBoundaryVerifierAdapter", deployments.shieldedBoundaryVerifierAdapter),
-    generatedVerifiers: Object.fromEntries(Object.keys(PROTOCOL_DEPLOYMENT_CIRCUITS).map(action => [action, artifact(PROTOCOL_DEPLOYMENT_CIRCUITS[action].contract, deployments.generatedVerifiers[action])])),
-    protocolVerifiers: Object.fromEntries(Object.keys(PROTOCOL_DEPLOYMENT_CIRCUITS).map(action => [action, artifact(`FixedVerifier:${action}`, deployments.protocolVerifiers[action])])),
+    ...Object.fromEntries(
+      RECEIVE_DEPLOYMENT_CONTRACTS.map(({ contractName, property }) => [
+        property,
+        artifact(contractName, deployments[property]),
+      ]),
+    ),
+    shieldedBoundaryVerifierAdapter: artifact(
+      "ShieldedBoundaryVerifierAdapter",
+      deployments.shieldedBoundaryVerifierAdapter,
+    ),
+    generatedVerifiers: Object.fromEntries(
+      Object.keys(PROTOCOL_DEPLOYMENT_CIRCUITS).map((action) => [
+        action,
+        artifact(
+          PROTOCOL_DEPLOYMENT_CIRCUITS[action].contract,
+          deployments.generatedVerifiers[action],
+        ),
+      ]),
+    ),
+    protocolVerifiers: Object.fromEntries(
+      Object.keys(PROTOCOL_DEPLOYMENT_CIRCUITS).map((action) => [
+        action,
+        artifact(`FixedVerifier:${action}`, deployments.protocolVerifiers[action]),
+      ]),
+    ),
     shieldedVerifiers: Object.fromEntries(
       Object.entries(deployments.shieldedVerifiers).map(([action, record]) => [
         action,
@@ -133,7 +158,7 @@ describe("planned production protocol deployment projection", function () {
     ).to.throw("non-negative safe integer");
   });
 
-  it("includes three asset-boundary keys and nine fixed receiving proof routes", function () {
+  it("includes the catalogued asset-boundary keys and fixed receiving proof routes", function () {
     const fixture = fixtureFor(ESPACE_CHAIN_PROFILE);
     const contracts = fixture.planned.projection.contracts;
     expect(Object.keys(contracts.shieldedVerifiers)).to.deep.equal(
@@ -165,23 +190,38 @@ describe("planned production protocol deployment projection", function () {
       plannedAddresses,
       manifest: baseManifest(),
     });
-    expect(Object.keys(inspected.artifacts.shieldedVerifiers)).to.have.length(3);
-    expect(Object.keys(inspected.artifacts.generatedVerifiers)).to.have.length(9);
-    expect(Object.keys(inspected.artifacts.protocolVerifiers)).to.have.length(9);
+    expect(Object.keys(inspected.artifacts.shieldedVerifiers)).to.deep.equal(
+      Object.keys(SHIELDED_DEPLOYMENT_CIRCUITS),
+    );
+    expect(Object.keys(inspected.artifacts.generatedVerifiers)).to.deep.equal(
+      Object.keys(PROTOCOL_DEPLOYMENT_CIRCUITS),
+    );
+    expect(Object.keys(inspected.artifacts.protocolVerifiers)).to.deep.equal(
+      Object.keys(PROTOCOL_DEPLOYMENT_CIRCUITS),
+    );
     expect(inspected.artifacts.shieldedErc20Pool.runtimeBytecode).to.include(
       plannedAddresses.poseidonT3.slice(2).toLowerCase(),
     );
     expect(inspected.deployments.poseidonT4).to.equal(plannedAddresses.poseidonT4);
-    for (const name of ["poseidonT3", "poseidonT4"])
-      expect(inspected.artifacts.eligibilitySource.runtimeBytecode).to.include(plannedAddresses[name].slice(2).toLowerCase());
-    expect(PROTOCOL_DEPLOYMENT_ARTIFACTS.eligibilitySource.libraryFields).to.deep.equal(["PoseidonT3"]);
+    expect(inspected.artifacts.eligibilitySource.runtimeBytecode).to.include(
+      plannedAddresses.poseidonT3.slice(2).toLowerCase(),
+    );
+    expect(PROTOCOL_DEPLOYMENT_ARTIFACTS.eligibilitySource.libraryFields).to.deep.equal([
+      "PoseidonT3",
+    ]);
     const wrongSourceLibrary = inspectProtocolDeploymentArtifact({
       artifactName: "eligibilitySource",
-      immutableValues: { LINEAGE_INDEX: plannedAddresses.deepFamilyLineageIndex, DEEP_FAMILY: plannedAddresses.deepFamily,
-        FACT_VERIFIER: plannedAddresses.protocolSourceFactVerifier, TRUST_VERIFIER: plannedAddresses.protocolSourceTrustVerifier },
+      immutableValues: {
+        LINEAGE_INDEX: plannedAddresses.deepFamilyLineageIndex,
+        DEEP_FAMILY: plannedAddresses.deepFamily,
+        FACT_VERIFIER: plannedAddresses.protocolSourceFactVerifier,
+        TRUST_VERIFIER: plannedAddresses.protocolSourceTrustVerifier,
+      },
       libraries: { PoseidonT3: plannedAddresses.poseidonT6 },
     });
-    expect(wrongSourceLibrary.runtimeSha256).not.to.equal(inspected.artifacts.eligibilitySource.runtimeSha256);
+    expect(wrongSourceLibrary.runtimeSha256).not.to.equal(
+      inspected.artifacts.eligibilitySource.runtimeSha256,
+    );
     expect(PROTOCOL_DEPLOYMENT_ARTIFACTS.shieldedErc20Pool.libraryFields).to.deep.equal([
       "PoseidonT3",
     ]);
@@ -254,7 +294,8 @@ describe("planned production protocol deployment projection", function () {
             DEPLOYER),
         ...Object.keys(SHIELDED_DEPLOYMENT_CIRCUITS).map(
           (action) => (manifest) =>
-            (manifest.deployments.shieldedBoundaryVerifierAdapter[`${action}VerifierImmutable`] = DEPLOYER),
+            (manifest.deployments.shieldedBoundaryVerifierAdapter[`${action}VerifierImmutable`] =
+              DEPLOYER),
         ),
         (manifest) => (manifest.deployments.shieldedErc20Pool.verifierAdapterImmutable = DEPLOYER),
         (manifest) => (manifest.deployments.deepFamilyArchive.address = DEPLOYER),
@@ -287,10 +328,19 @@ describe("planned production protocol deployment projection", function () {
   it("checks immutable-linked deployed runtime bytes without masking", async function () {
     const fixture = fixtureFor(ESPACE_CHAIN_PROFILE);
     const codeByAddress = new Map([
-      [fixture.plannedAddresses.shieldedBoundaryVerifierAdapter.toLowerCase(), fixture.planned.artifacts.shieldedBoundaryVerifierAdapter.runtimeBytecode],
-      ...Object.values(PROTOCOL_DEPLOYMENT_CIRCUITS).flatMap(spec => [
-        [fixture.plannedAddresses[spec.generatedLabel].toLowerCase(), fixture.planned.artifacts.generatedVerifiers[spec.action].runtimeBytecode],
-        [fixture.plannedAddresses[spec.adapterLabel].toLowerCase(), fixture.planned.artifacts.protocolVerifiers[spec.action].runtimeBytecode],
+      [
+        fixture.plannedAddresses.shieldedBoundaryVerifierAdapter.toLowerCase(),
+        fixture.planned.artifacts.shieldedBoundaryVerifierAdapter.runtimeBytecode,
+      ],
+      ...Object.values(PROTOCOL_DEPLOYMENT_CIRCUITS).flatMap((spec) => [
+        [
+          fixture.plannedAddresses[spec.generatedLabel].toLowerCase(),
+          fixture.planned.artifacts.generatedVerifiers[spec.action].runtimeBytecode,
+        ],
+        [
+          fixture.plannedAddresses[spec.adapterLabel].toLowerCase(),
+          fixture.planned.artifacts.protocolVerifiers[spec.action].runtimeBytecode,
+        ],
       ]),
       ...RECEIVE_DEPLOYMENT_CONTRACTS.map(({ property }) => [
         fixture.plannedAddresses[property].toLowerCase(),
