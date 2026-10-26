@@ -18,6 +18,7 @@ import {
   encryptShieldedLetter,
   encryptShieldedNote,
   generateShieldedRandomField,
+  prepareRevocationScan,
   verifyShieldedNotePayload,
 } from "@deepfamily/protocol-core";
 import {
@@ -75,7 +76,7 @@ function offlinePayer(input) {
 
 describe("Receive protocol actual Groth16 / EVM / HPKE acceptance", function () {
   this.timeout(1_800_000);
-  after(async () => { await globalThis.curve_bn128?.terminate?.(); });
+  after(async () => { await globalThis.curve_bn128?.terminate?.(); delete globalThis.curve_bn128; });
 
   realTest("uses one code offline for future budgets, append, ordinary transfers and letters, then claims with canonical allowance", async function () {
     inspectProtocolArtifacts(); // Required runs fail if keys are missing, stale or incompatible.
@@ -156,6 +157,33 @@ describe("Receive protocol actual Groth16 / EVM / HPKE acceptance", function () 
     const issueProof = await proveProtocol({ circuit: "issue", witness: issuance.witness, expectedPublicSignals: issuance.publicSignals });
     await registry.registerCredential(issuance.credentialCommitment, issuance.witness.sourceRoot,
       issuance.witness.trustedRoot, issueProof.solidityProof);
+
+    // Build more than the live-tail allowance through actual source proofs and real
+    // DeepFamily controller entrypoints. These different role secrets do not revoke Q.
+    const numeric = witness => Object.fromEntries(Object.entries(witness).map(([name, value]) =>
+      [name, Array.isArray(value) ? value.map(BigInt) : BigInt(value)]));
+    for (let index = 0n; index < 9n; ++index) {
+      const secrets = [700001n + 10n * index, 700002n + 10n * index, 700003n + 10n * index];
+      const extraFact = sourceFactFixture({ ...numeric(sourceFact.witness),
+        xChild: secrets[0], xEndorse: secrets[1], sourceFactSalt: 800001n + index });
+      extraFact.witness.endorsementRoot = sourceFact.witness.endorsementRoot;
+      extraFact.publicSignals[9] = sourceFact.publicSignals[9];
+      const factProof = await proveProtocol({ circuit: "sourceFact", witness: extraFact.witness,
+        expectedPublicSignals: extraFact.publicSignals });
+      await source.connect(endorser).publishFact(childIdentity, parentIdentity, endorser.address, 1,
+        extraFact.publicSignals[0], extraFact.publicSignals[1], extraFact.publicSignals[2], factProof.solidityProof);
+      const extraTrust = sourceTrustFixture({ ...numeric(sourceTrust.witness),
+        xTrust: secrets[2], sourceTrustSalt: 900001n + index });
+      extraTrust.witness.trustedRoot = sourceTrust.witness.trustedRoot;
+      extraTrust.publicSignals[7] = sourceTrust.publicSignals[7];
+      const trustProof = await proveProtocol({ circuit: "sourceTrust", witness: extraTrust.witness,
+        expectedPublicSignals: extraTrust.publicSignals });
+      await source.publishTrust(parentIdentity, endorser.address, 1, extraTrust.publicSignals[0],
+        extraTrust.publicSignals[1], trustProof.solidityProof);
+      await deepFamily.connect(endorser).revokeEligibilityRoles([0, 1], secrets.slice(0, 2));
+      await deepFamily.revokeEligibilityRoles([2], secrets.slice(2));
+    }
+    for (const role of [0, 1, 2]) assert.equal(await source.revokedRoleCount(role), 9n);
 
     const masterKey = hre.ethers.getBytes(hre.ethers.zeroPadValue("0x0123456789abcdef", 32));
     const makeCode = async (codeIndex) => {
@@ -257,6 +285,26 @@ describe("Receive protocol actual Groth16 / EVM / HPKE acceptance", function () 
       { ...policy, familyCommitment: familyCommitment + 1n }), /Command failed/u);
     const firstDeposit = await prepared(native, first, nativeDonor.donor, 0n);
     const originalSize = (await native.noteShard(0)).size;
+    await expect(submitDeposit(native, first, firstDeposit))
+      .to.be.revertedWithCustomError(source, "RevocationStateNotPrepared").withArgs(0, 0, 9);
+    assert.equal((await native.noteShard(0)).size, originalSize);
+    assert.equal(await native.nullifierSpent(firstDeposit.publicInput.inputNullifier), false);
+    assert.equal((await native.budgetRecords(firstDeposit.budgetKey)).exists, false);
+    // The offline payer needs only the code's public nonce/tags and published log
+    // openings; it never receives the qualification/identity secrets to prepare status.
+    for (const recipient of [first, second]) for (const role of [0, 1, 2]) {
+      const tag = recipient.capability[["childTag", "endorsementTag", "trustedTag"][role]];
+      const end = await source.revokedRoleCount(role);
+      const scan = prepareRevocationScan({ chainId, sourceAddress: await source.getAddress(), role,
+        nonce: recipient.tuple.nonce, tag, start: 0n,
+        startHash: await source.revocationCheckpoint(role, 0), endHash: await source.revocationCheckpoint(role, end),
+        secrets: Array.from(await source.getRevokedRolePage(role, 0, end)) });
+      const scanProof = await proveProtocol({ circuit: "revocationScan", witness: scan.witness,
+        expectedPublicSignals: scan.publicSignals });
+      await source.connect(payer).prepareRoleScan(role, recipient.tuple.nonce, tag, 0, end, scanProof.solidityProof);
+      assert.equal(await source.roleScanProgress(role, recipient.tuple.nonce, tag), 9n);
+      assert.equal(await source.isRoleRevoked(role, recipient.tuple.nonce, tag), false);
+    }
     const altered = structuredClone(firstDeposit);
     altered.outputCiphertexts[0] = hre.ethers.hexlify(new Uint8Array(512).fill(1));
     await expect(submitDeposit(native, first, altered)).to.be.revertedWithCustomError(native, "InvalidZKProof");

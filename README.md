@@ -57,10 +57,11 @@ DeepFamily creates the decentralized family tree infrastructure, using zero-know
 
 ### Family Inheritance
 
-- A public `shield` deposit places the selected ERC-20 or native asset in its canonical pool. A unified `fund` action initializes a private rule while funding an eligible direct child, or adds another budget under an existing enrollment. Rules are recovered from encrypted donor memos; they have no standalone asset note.
-- Funding offers **Public budget**, **Private (identity credentials)**, and **Private (independent key)**. Each spends donor VALUE and creates child BUDGET notes. Public budget needs only the child's registered person hash and publishes the recipient and budget terms. Private modes need a verified receive code of the matching type. Private (independent key) binds a separate funds owner; identity credentials alone cannot derive that independent key root.
-- A child proves current lineage eligibility and claims 1–3 matured periods from one budget note into a private VALUE note. Each budget fixes its period duration in days at initial funding. Claims preserve the remaining budget terms; private transfers and a public exit are separate transactions. Insufficient budgets do not consume a period.
-- Independent keys default to a random 32-byte root, with wallet-signature derivation as an explicit alternative. The same root is backed up as 24 English recovery words or a Shielded Key. **Unlock independent key** accepts words or a Shielded Key. For signature-derived keys, the original signing wallet produces a recovery candidate that must be confirmed against matching pool history. Both creation methods require saving words or a Key and re-importing that backup after clearing the in-memory independent key. Identity credentials recreate their derived funds without a separate key backup; independent-key budget claims also require the original identity credentials and current eligibility. See [independent keys and recovery](docs/shielded-independent-key-spec.md) for the exact rules.
+- A public `shield` deposit places the selected ERC-20 or native asset in its canonical pool. `depositBudget` spends the payer's VALUE and creates an encrypted BUDGET contribution. The first deposit creates a code/policy record; later deposits add independent contributions and preserve its original eligibility clock. Both paths check current qualification.
+- One `dfreceive` code authorizes letters and ordinary transfers, with optional family capabilities for child budgets. A payer can use the original code and a future public family rule while the recipient stays offline. Ordinary receipt and letters remain available after a family qualification is revoked.
+- `claimBudget` proves a current qualification, spends a matured contribution and creates VALUE plus the remaining BUDGET output. The subject/policy/period allowance is shared across codes. Transfers and public `unshield` exits are separate transactions.
+- Qualification revocation takes effect immediately. Public-log scan proofs prepare at most 32 entries per interval; each final role check examines at most eight new entries. A larger unchecked tail requires preparation instead of an unbounded scan. First-time preparation for a new code still grows with the history size; this is not a constant-total-cost protocol.
+- Wallet secrets and qualification/controller openings remain inside the receiving Worker. Authenticated encrypted backups preserve money keys, code indices and openings; each new external code requires an updated backup. A family wallet derives its canonical subject secret from identity inputs inside the Worker. Recovery replays public ledger events and decrypts locally. See [receiving codes and letters](docs/private-letters.md).
 - Gas-paying wallets, public deposits, and public exit addresses and amounts remain visible. Privacy depends on avoiding address funding and timing links; the pool does not offer absolute anonymity. Each asset has its own balances, budgets and anonymity set.
 
 ## Technology Stack
@@ -83,7 +84,10 @@ DeepFamily creates the decentralized family tree infrastructure, using zero-know
 | **PersonCommitmentVerifier.sol**  | ZK verifier for person identity and parent commitment proofs                                                        |
 | **DisclosureBindingVerifier.sol** | ZK verifier for NFT mint disclosure-binding proofs                                                                  |
 | **DeepFamilyLineageIndex.sol**    | Immutable Poseidon Merkle mirror of endorsements and recommended sources, written by the DeepFamily proxy           |
-| **ShieldedPoolCore.sol**          | Common multi-asset pool protocol with private/public budgets, claims, transfers, and exits                          |
+| **EligibilitySource.sol**        | Authenticated lineage facts, trusted sources and current role revocations                                          |
+| **ReceiveRegistry.sol**          | Qualification issuance, generic receiving authorization and family budget capabilities                             |
+| **LetterArchive.sol**            | Encrypted letters authorized by the same receiving code                                                            |
+| **ShieldedPoolCore.sol**          | Common multi-asset ledger with budget contributions, claims, transfers and exits                                   |
 | **ShieldedErc20Pool.sol**         | One immutable ERC-20 pool with exact sender/recipient transfer checks                                               |
 | **ShieldedNativePool.sol**        | Direct native-currency pool with exact deposit value and reverting payouts                                          |
 | **ShieldedPoolFactory.sol**       | Permissionless canonical pool creation for gas only, with no administrator                                          |
@@ -143,25 +147,38 @@ npm run frontend:check # Run frontend lint + typecheck + tests
 npm run check          # Run circuit constraints, frontend checks and contract lint/build/test
 ```
 
-Real proof tests require the manifest-pinned artifacts; missing or mismatched files fail the
-check. Gas reports remain optional maintenance checks; see [ZK proofs](docs/zk-proofs.md#optional-gas-reports).
+The development artifacts have been regenerated and pass `zk:dev:check` for all 14 relations.
+Real-proof and EVM checks are separate; they require the matching manifest-pinned files and
+reject missing or mismatched artifacts. See [ZK proofs](docs/zk-proofs.md#development-and-release).
 
 ### ZK Artifact Workflow
 
-The protocol uses 13 Circom relations: two identity/disclosure, three money boundaries and eight receiving/qualification/budget relations. `dfreceive` is the sole receiving-code format. A payer can use the code for letters, transfers and future budget contributions while the recipient remains offline. See [receiving codes and letters](docs/private-letters.md).
+The protocol uses 14 Circom relations: two identity/disclosure, three money boundaries and nine receiving/qualification/budget relations. `dfreceive` is the sole receiving-code format. A payer can use the code for letters, transfers and future budget contributions while the recipient remains offline. See [receiving codes and letters](docs/private-letters.md).
 
 | Command | Purpose |
 | --- | --- |
 | `npm run zk:fetch` | Install the pinned Circom toolchain |
-| `npm run zk:build` | Compile the 13 canonical relations |
-| `npm run zk:dev` | Explicitly generate local development receiving keys |
-| `npm run zk:dev:check` | Check source, toolchain and artifact hashes |
+| `npm run zk:build` | Compile the 14 canonical relations |
+| `npm run zk:assets:fetch` | Download and verify the manifest-pinned proving files |
+| `npm run zk:dev` | Compile all 14 relations, regenerate 12 receiving/boundary development key sets and reuse identity/disclosure keys |
+| `npm run zk:dev:check` | Verify the complete 14-relation artifact bundle without replacing keys |
+| `npm run zk:check` | Rebuild all 14 relations and check pinned artifacts and real proofs |
 | `npm run zk:frontend -- <chainId> <registry>` | Export trusted frontend receiving artifacts |
 | `npm run test:circuits` | Check current circuit constraints without proving keys |
-| `npm run test:proof` | Verify eight real receiving proofs and public-signal binding |
+| `npm run test:proof` | Verify nine real receiving proofs and public-signal binding |
 | `npm run test:evm` | Exercise the complete real-proof money and eligibility flow |
 
-Local development keys are not approved production keys. Production setup and release remain blocked until all 13 relations have reviewed ceremony evidence. Browser WASM/zkey files are generated/downloaded artifacts; proof keys cannot be selected by a scanned receiving code. The project has one protocol and no compatibility entry points for previous receiving designs.
+Local development keys are not approved production keys. Production setup and release remain blocked until all 14 relations have reviewed ceremony evidence. Browser WASM/zkey files are generated/downloaded artifacts; proof keys cannot be selected by a scanned receiving code. The project has one protocol and no compatibility entry points for previous receiving designs.
+
+`zk:setup` currently refuses production setup because that reviewed ceremony is unavailable;
+it does not generate final keys or promote development artifacts. `zk:dev` is explicit local
+development rotation: it compiles all 14 relations, verifies and reuses existing matching
+identity/disclosure keys, and generates new keys for the nine receiving and three boundary
+relations. It updates their development manifests, vkeys and Solidity verifiers; redeploy local
+contracts and run `zk:frontend` to synchronize pins and boundary aliases after rotation.
+`zk:dev:check` checks all 14 sets without regeneration. Use `--circuit protocol:code` or `--circuit shielded:unshield4` to rotate a selected
+current relation, or `--ptau <path>` to choose the local Phase 1 file; focused runs still require
+all 14 artifact sets to pass the final check.
 
 `zk:fetch` installs two distinct compiler roles. The native compiler is written to `bin/circom`
 (`bin/circom.exe` on Windows) and is used by local and diagnostic builds. Release gates snapshot it
@@ -188,56 +205,25 @@ Every selected compiler must report the repository-pinned Circom version and pas
 target-specific binary or source-provenance checks. All circuit compilation uses explicit
 `--O2 --sanity_check 2`, pinning both the optimization and sanity-check levels instead of relying
 on compiler defaults.
-For official targets, `zk:setup` snapshots the hash-verified compiler. For the macOS
-arm64 source target it ignores the reusable development compiler and performs a fresh locked build
-of the pinned source commit under the user's protected build directory. The source builder rejects
-external ancestor Cargo configuration, discards inherited Git, Cargo, Rust, Node, dynamic-loader,
-npm, and native-build overrides, resolves Git/Cargo/Rustc to protected absolute executables, and
-uses a controlled PATH plus private home, Cargo, XDG, and temporary directories. It also disables
-ambient Git system/global configuration and hooks. The setup copies the compiler and pTau
-into its private OS temporary stage. For the first setup, it records the reviewed clean-commit
-sources and compiles every circuit to establish fresh R1CS/WASM hashes. It rechecks the sources,
-compiled outputs and pTau immediately before each Groth16 setup and before installation.
-Review the generated artifact bundle before committing it. Rotation compares sources and compiled
-outputs with the existing final manifest; `release:preflight` independently rebuilds and compares
-them with the reviewed final artifact hashes. Both commands support Linux x64 with glibc, macOS
-arm64, and Windows x64.
+`zk:build` compiles the two identity/disclosure relations into `zk-artifacts/circuits`, the
+three asset boundaries into `zk-artifacts/shielded`, and the nine receiving relations into
+`zk-artifacts/protocol`. Compilation does not replace proving keys.
 
-Release-only staging is permission-checked: POSIX roots must be owned by the current user with mode
-`0700`; Windows roots have inheritance and existing access rules removed, are owned by the current
-user SID, and are re-read to verify that only that SID has full control. The setup hashes the
-logical snarkjs production dependency graph—package content, identity, version, and logical
-dependency path, independent of checkout location or hoisting—rather than only the CLI file. It
-then copies the verified runtime into private staging, makes package files read-only on POSIX, and
-executes snarkjs from that snapshot. The contribution helper and its local dependency are copied
-from the exact release-commit Git blobs, then re-hashed both before Phase 2 entropy is generated and
-again immediately before the child process receives it.
+The receiving development manifest is `circuits/receive-development-manifest.json`.
+`zk:frontend` exports its verified browser files and the three boundary artifact sets into
+`frontend/public/zk/protocol`, with trusted chain/registry pins in
+`frontend/src/proof-artifacts.local.json`. Identity/disclosure files remain under
+`frontend/public/zk/`. Remote builds fetch WASM/zkey from the configured
+`VITE_ZK_ASSET_BASE_URL` using `<sha256>/<file name>.br`; verification-key JSON stays local.
+The browser checks the decoded files against the pinned hashes.
 
-The current ZK artifact manifest is schema v3 and commits that snarkjs runtime-graph digest.
-`zk:setup` and `release:preflight` both require schema v3.
-If a reviewed dependency update changes the runtime graph after production artifacts already
-exist, the setup command keeps refusing overwrite by default. Its explicit rotation mode requires
-the reviewed old-manifest and new-runtime digests, validates the complete old production bundle,
-and regenerates every Phase 2 artifact set from scratch; see the
-[production ZK setup runbook](docs/zk-ceremony.md#rotate-after-a-reviewed-snarkjs-runtime-change).
+`zk:check` rebuilds all 14 relations and verifies the current artifacts and real receiving proofs;
+it never generates replacement keys.
 
-Run `npm run zk:ptau:fetch` once to download and verify the pinned power-17 Phase 1 file (151 MB,
-Git-ignored). After freezing the reviewed circuit and dependency commit, run `npm run zk:setup`
-on a controlled machine outside CI. It verifies the pinned Phase 1 pTau, compiles all 16 circuits,
-generates their final keys and receive-link parameters, exports the Solidity verifiers, copies
-the frontend assets, and records the manifests and ceremony transcripts. Review and commit the
-complete generated bundle, then publish its proving files for development, CI and release to reuse.
-The first setup validates the existing manifest and toolchain pins without requiring the earlier
-development proving files or matching their old source/R1CS/WASM hashes.
-
-The setup uses the pinned public Phase 1 pTau locally installed at
-`circuits/ptau/ppot_0080_17.ptau`, or the file selected by `ZK_PTAU_PATH`. Setup and verification
-commands check its byte length and both pinned hashes first and do not download it.
-
-Artifact copying is strict: the refresh workflow fails if a required generated WASM, zkey, or
-verification key is missing. It never silently generates a missing artifact during the copy step.
-See [ZK proofs](docs/zk-proofs.md) and the
-[ZK setup runbook](docs/zk-ceremony.md) for key generation and release verification.
+`npm run zk:ptau:fetch` downloads the pinned power-17 Phase 1 file for explicit local development
+setup. A reviewed production ceremony for the current 14-relation graph is still required;
+`zk:setup` and `release:preflight` remain closed. Previous ceremony/runbook procedures do not
+provide production approval for this graph.
 
 ## Deployment Guide
 
@@ -276,13 +262,11 @@ evidence, or authorization digest. Do not invoke a lower-level script with an ar
 
 ### Recommended eSpace Mainnet release
 
-Production release is blocked until the development Groth16 keys have been replaced with
-`npm run zk:setup`, the generated artifacts have been reviewed and committed together,
-`npm run release:preflight` passes from that clean commit, and the exact release commit produces an
-eSpace Testnet `release-rehearsal` report with `releaseReady=true`. The default setup reuses the
-pinned public power-17 pTau and records one local Phase 2 contributor under the explicit
-`single-operator` trust model; an independent multi-party ceremony is an optional enhancement, not
-a three-person requirement. See the [production ZK setup runbook](docs/zk-ceremony.md).
+Production release is blocked: the current 14-relation graph has no reviewed production
+ceremony, and `zk:setup` refuses to create or approve production keys. The release flow below
+remains gated on reviewed production artifacts, a passing `release:preflight` from their clean
+commit, and an exact eSpace Testnet `release-rehearsal` report with `releaseReady=true`. A prior
+ceremony for a different circuit graph does not satisfy these requirements.
 A successful, self-validated rehearsal automatically publishes the exact schema-v1 evidence to the
 Git-ignored, eSpace-specific path `tmp/release-evidence/espace-release-rehearsal.json`. Diagnostic,
 failed, and recovery runs never overwrite that file. The eSpace Mainnet release commands read it
@@ -632,7 +616,7 @@ governance task rejects upgrade and ownership-transfer functions. See
 - [Conflux eSpace Mainnet release](docs/espace-mainnet-release.md) - Guarded Safe and release runbook
 - [Ethereum Mainnet release](docs/ethereum-mainnet-release.md) - Guarded Safe and release runbook
 - [Zero-Knowledge Proofs](docs/zk-proofs.md) - ZK proof system and circuit documentation
-- [Shielded Independent Keys and Recovery](docs/shielded-independent-key-spec.md) - Independent key root derivation, recovery words, Shielded Keys, and backup verification
+- [Receiving Codes and Letters](docs/private-letters.md) - Shared receiving authorization, budget contributions and encrypted wallet recovery
 - [Frontend Integration](docs/frontend.md) - React component and UI development guide
 - [Frontend Security](docs/frontend-security.md) - Passphrase, Archive unlock, and plaintext cache boundaries
 

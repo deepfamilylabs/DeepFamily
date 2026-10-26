@@ -1276,12 +1276,12 @@ const requireShieldedAcceptanceEvidence = (report, repositoryRoot, expectedChain
       requireExact(requireSha256(circuit[field],`shieldedArtifacts.${action}.${field}`),inspected.manifest.circuits[action][field],`shieldedArtifacts.${action}.${field}`);
   }
   const ceremony = requireRecord(report.zkCeremonyVerification,"zkCeremonyVerification");
-  requireExact(ceremony.circuitCount,13,"zkCeremonyVerification.circuitCount");
+  requireExact(ceremony.circuitCount,14,"zkCeremonyVerification.circuitCount");
   if (JSON.stringify([...ceremony.circuits].sort()) !== JSON.stringify(Object.keys(ZK_RELEASE_ARTIFACTS).sort()))
     throw new Error("zkCeremonyVerification.circuits must cover both core circuits");
   const receiving = requireRecord(ceremony.shielded,"zkCeremonyVerification.shielded");
   requireExact(receiving.status,"passed","zkCeremonyVerification.shielded.status");
-  requireExact(receiving.circuitCount,11,"zkCeremonyVerification.shielded.circuitCount");
+  requireExact(receiving.circuitCount,12,"zkCeremonyVerification.shielded.circuitCount");
   requireExact(receiving.manifestSha256,inspected.manifestSha256,"zkCeremonyVerification.shielded.manifestSha256");
   for (const field of ["bytes","sha256","blake2b512"])
     requireExact(receiving.ptau[field],ceremony.ptau[field],`zkCeremonyVerification.shielded.ptau.${field}`);
@@ -1290,7 +1290,7 @@ const requireShieldedAcceptanceEvidence = (report, repositoryRoot, expectedChain
   requireExact(evidence.manifestSha256,inspected.manifestSha256,"shielded.manifestSha256");
   const proofs = requireExactRecordKeys(evidence.proofs,"shielded.proofs",actions);
   const transactions = requireRecord(report.transactions,"transactions");
-  const contractInputs = {sourceFact:[3,4,"eligibilitySource"],sourceTrust:[2,3,"eligibilitySource"],issue:[1,2,"receiveRegistry"],code:[3,4,"receiveRegistry"],capability:[5,6,"receiveRegistry"]};
+  const contractInputs = {sourceFact:[3,4,"eligibilitySource"],sourceTrust:[2,3,"eligibilitySource"],revocationScan:[0,1,"eligibilitySource"],issue:[1,2,"receiveRegistry"],code:[3,4,"receiveRegistry"],capability:[5,6,"receiveRegistry"]};
   for (const [action,proof] of Object.entries(proofs)) {
     const spec = specs[action], item = inspected.manifest.circuits[action], label=`shielded.proofs.${action}`;
     requireExact(proof.source,spec.source,`${label}.source`);

@@ -5,6 +5,8 @@ import { createRequire } from 'node:module'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { exportProtocolFrontendArtifacts } from '../../scripts/export-protocol-frontend.mjs'
+import { computeRevocationGenesis, computeRevocationDigest, prepareRevocationScan } from '../../packages/protocol-core/revocation.js'
+import { poseidon3 } from 'poseidon-lite'
 
 const mode = process.env.CSP_SCAN_MODE === 'dev' ? 'dev' : 'preview'
 const port = Number(process.env.CSP_SCAN_PORT || (mode === 'dev' ? 5173 : 4173))
@@ -100,7 +102,7 @@ const spawnFrontendServer = async () => {
 
 // Exercise the built wallet worker under the site's real CSP, including Groth16
 // WASM/blob workers and encrypted wallet backup recovery. The worker does not need
-// an RPC server to create and verify a generic receive code.
+// an RPC server to create a generic code or prove a public revocation-log range.
 const runWorkerFlows = async (page) => {
   const assets = await fs.readdir(path.join(outDir, 'assets'))
   const workerFile = assets.find(file => file.startsWith('receive.worker-') && file.endsWith('.js'))
@@ -108,8 +110,17 @@ const runWorkerFlows = async (page) => {
   const manifest = JSON.parse(await fs.readFile(workerManifestFile, 'utf8'))
   const context = { rpcUrl: new URL('/__csp-scan/unused-rpc', baseUrl).toString(),
     deployment: { chainId: manifest.chainId, registryAddress: manifest.registryAddress, poolAddress: '0x0000000000000000000000000000000000000001' }, manifest }
+  const scanScope = { chainId: BigInt(manifest.chainId), sourceAddress: 2n, role: 0n }
+  const nonce = 9001n
+  const secrets = Array.from({ length: 32 }, (_, index) => 40000n + BigInt(index))
+  const startHash = computeRevocationGenesis(scanScope)
+  let endHash = startHash
+  for (const secret of secrets) endHash = computeRevocationDigest({ role: scanScope.role, previousHash: endHash, secret })
+  const scan = JSON.parse(JSON.stringify(prepareRevocationScan({ ...scanScope, nonce,
+    tag: poseidon3([73301n, 999991n, nonce]), start: 0n, startHash, endHash, secrets }),
+  (_key, value) => typeof value === 'bigint' ? String(value) : value))
   await page.goto(new URL('/terms', baseUrl).toString(), { waitUntil: 'load' })
-  const result = await page.evaluate(async ({ url, context }) => {
+  const result = await page.evaluate(async ({ url, context, scan }) => {
     const worker = new Worker(url, { type: 'module' })
     let sequence = 0
     const call = (method, input) => new Promise((resolve, reject) => {
@@ -134,12 +145,20 @@ const runWorkerFlows = async (page) => {
       assertFields(checked, ['chainId', 'authorizerScope', 'nonce', 'codeAlias', 'commonBinding', 'revocationTag', 'ownerCommitment', 'viewingKey', 'expiresAt', 'version', 'proof', 'publicSignals', 'capabilities'])
       await call('walletLock', {})
       const restored = await call('walletRestore', { rawPassphrase, backup: received.backup })
+      const scanStarted = performance.now()
+      const scanned = await call('proveQualification', { circuit: 'revocationScan', witness: scan.witness,
+        expectedPublicSignals: scan.publicSignals })
+      const revocationScanMs = Math.round(performance.now() - scanStarted)
+      assertFields(scanned, ['proof', 'publicSignals'])
+      assertFields(scanned.proof, ['pi_a', 'pi_b', 'pi_c', 'protocol', 'curve'])
+      if (JSON.stringify(scanned.publicSignals.map(String)) !== JSON.stringify(scan.publicSignals)) throw new Error('Revocation scan public statement changed')
       return { validCode: received.code.startsWith('dfreceive1') && checked.capabilities.length === 0,
         restored: restored.state.unlocked && restored.state.codeCount === received.state.codeCount,
-        backup: received.backup instanceof Uint8Array && received.backup.length > 64 }
+        backup: received.backup instanceof Uint8Array && received.backup.length > 64, revocationScanMs }
     } finally { worker.terminate() }
-  }, { url: `/assets/${workerFile}`, context })
+  }, { url: `/assets/${workerFile}`, context, scan })
   if (!result.validCode || !result.restored || !result.backup) throw new Error('Wallet worker CSP flow failed')
+  console.log(`[csp-scan] revocationScan32: proved and verified in browser worker (${result.revocationScanMs}ms)`)
 }
 
 const readReports = async () => {

@@ -135,8 +135,8 @@ const printUsage = () => {
   console.log(`Usage:
   node scripts/zk-check.mjs [--circuit <all|core|person|disclosure|shielded|shielded:action|protocol|protocol:action>]
 
-The default check rebuilds the 13 canonical relations, checks identity proofs/constraints,
-validates local artifact hashes and checks all eight protocol Groth16 statements.
+The default check rebuilds the 14 canonical relations, checks identity proofs/constraints,
+validates local artifact hashes and checks all nine protocol Groth16 statements.
 Development artifact verification is not production ceremony approval.
 Every step reuses the current keys; no check generates replacement keys.
 Use --circuit to select checks without rebuilding. Receiving and boundary checks authenticate

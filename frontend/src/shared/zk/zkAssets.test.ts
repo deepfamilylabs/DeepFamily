@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { fetchZkAsset } from "./zkAssets";
+import { fetchPinnedZkAsset, fetchZkAsset } from "./zkAssets";
 
 const BYTES = new TextEncoder().encode("claim-zkey");
 const UNSERVED_DIGEST = "a".repeat(64);
@@ -90,6 +90,41 @@ describe("ZK proving asset loading", () => {
     ).rejects.toThrow(
       `Failed to load https://zk.example/${UNSERVED_DIGEST}/person_commitment.wasm.br: 404`,
     );
+  });
+});
+
+describe("trusted receive proving asset pins", () => {
+  it("routes boundary aliases by their trusted digest and filename", async () => {
+    const digest = await sha256Hex(BYTES);
+    const fetchMock = stubFetch(BYTES);
+    await expect(fetchPinnedZkAsset({
+      url: "/zk/protocol/shielded_unshield_4_final.zkey", sha256: digest.toUpperCase(),
+    }, {
+      baseUrl: "https://zk.example/assets///",
+      digests: { "/zk/shielded/shielded_unshield_4_final.zkey": digest },
+    })).resolves.toEqual(BYTES);
+    expect(fetchMock).toHaveBeenCalledWith(
+      `https://zk.example/assets/${digest}/shielded_unshield_4_final.zkey.br`,
+    );
+  });
+
+  it("checks explicit pins for same-origin development copies", async () => {
+    const pin = { url: "/zk/protocol/receive_code.wasm", sha256: await sha256Hex(BYTES) };
+    const fetchMock = stubFetch(BYTES);
+    await expect(fetchPinnedZkAsset(pin, { baseUrl: "", digests: {} })).resolves.toEqual(BYTES);
+    expect(fetchMock).toHaveBeenCalledWith(pin.url, { cache: "no-cache" });
+    stubFetch(new TextEncoder().encode("replaced local file"));
+    await expect(fetchPinnedZkAsset(pin, { baseUrl: "", digests: {} })).rejects.toThrow("digest mismatch");
+  });
+
+  it("rejects corrupt remote bytes and missing trusted digests before proving", async () => {
+    const pin = { url: "/zk/protocol/receive_code.wasm", sha256: await sha256Hex(BYTES) };
+    const host = { baseUrl: "https://zk.example", digests: {} };
+    stubFetch(new TextEncoder().encode("replaced remote file"));
+    await expect(fetchPinnedZkAsset(pin, host)).rejects.toThrow("digest mismatch");
+    const fetchMock = stubFetch(BYTES);
+    await expect(fetchPinnedZkAsset({ ...pin, sha256: "" }, host)).rejects.toThrow("Missing pinned");
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });
 

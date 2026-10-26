@@ -133,7 +133,7 @@ describe("planned production protocol deployment projection", function () {
     ).to.throw("non-negative safe integer");
   });
 
-  it("includes three asset-boundary keys and eight fixed receiving proof routes", function () {
+  it("includes three asset-boundary keys and nine fixed receiving proof routes", function () {
     const fixture = fixtureFor(ESPACE_CHAIN_PROFILE);
     const contracts = fixture.planned.projection.contracts;
     expect(Object.keys(contracts.shieldedVerifiers)).to.deep.equal(
@@ -166,8 +166,8 @@ describe("planned production protocol deployment projection", function () {
       manifest: baseManifest(),
     });
     expect(Object.keys(inspected.artifacts.shieldedVerifiers)).to.have.length(3);
-    expect(Object.keys(inspected.artifacts.generatedVerifiers)).to.have.length(8);
-    expect(Object.keys(inspected.artifacts.protocolVerifiers)).to.have.length(8);
+    expect(Object.keys(inspected.artifacts.generatedVerifiers)).to.have.length(9);
+    expect(Object.keys(inspected.artifacts.protocolVerifiers)).to.have.length(9);
     expect(inspected.artifacts.shieldedErc20Pool.runtimeBytecode).to.include(
       plannedAddresses.poseidonT3.slice(2).toLowerCase(),
     );
@@ -178,7 +178,7 @@ describe("planned production protocol deployment projection", function () {
     const wrongSourceLibrary = inspectProtocolDeploymentArtifact({
       artifactName: "eligibilitySource",
       immutableValues: { LINEAGE_INDEX: plannedAddresses.deepFamilyLineageIndex, DEEP_FAMILY: plannedAddresses.deepFamily,
-        FACT_VERIFIER: plannedAddresses.protocolSourceFactVerifier, TRUST_VERIFIER: plannedAddresses.protocolSourceTrustVerifier },
+        FACT_VERIFIER: plannedAddresses.protocolSourceFactVerifier, TRUST_VERIFIER: plannedAddresses.protocolSourceTrustVerifier, SCAN_VERIFIER: plannedAddresses.protocolRevocationScanVerifier },
       libraries: { PoseidonT3: plannedAddresses.poseidonT3, PoseidonT4: plannedAddresses.poseidonT6 },
     });
     expect(wrongSourceLibrary.runtimeSha256).not.to.equal(inspected.artifacts.eligibilitySource.runtimeSha256);

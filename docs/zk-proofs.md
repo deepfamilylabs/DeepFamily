@@ -19,7 +19,12 @@ commitment; `personHash` carries no route-recency marker.
 The current development manifest assigns circuit ID `1` independently to both purposes. The same
 numeric ID may be used under different purposes because the full key is `(purpose,circuitId)`.
 
-The shielded inheritance pool uses a separate set of action circuits. Version-1 receive credentials authenticate identity authorization counters and expiry through private presentation proofs. Fund and private transfers verify the presentation and business proof atomically; private letters use the same authorization state. These proofs do not use the DeepFamily `ProofEnvelope` route. See [private letters and receive authorization](private-letters.md) for the full flow and shared artifact workflow.
+Asset pools and receiving use fixed action verifiers outside the DeepFamily `ProofEnvelope`
+route. `ReceiveRegistry` authenticates generic code authorization and optional family budget
+capabilities; `depositBudget` combines those proofs with the payer's money proof and current role
+status. Transfers and letters use the same generic code without a family capability. There are
+no identity authorization counters or linked presentation proofs. See [receiving codes and
+letters](private-letters.md) for the flow and artifact workflow.
 
 ## Identity and Commitment Architecture
 
@@ -300,7 +305,7 @@ intentionally public NFT data.
 
 ## Receiving and budget circuits
 
-There are 13 canonical relations: PersonRelation, DisclosureBinding, Shield, Unshield, four-input Unshield, source fact, source trust, qualification issuance, receive code, budget capability, budget deposit, budget claim and transfer.
+There are 14 canonical relations: PersonRelation, DisclosureBinding, Shield, Unshield, four-input Unshield, source fact, source trust, revocation scan, qualification issuance, receive code, budget capability, budget deposit, budget claim and transfer.
 
 The source relations authenticate actual lineage roots and hidden revocation-role openings. Issuance authenticates the same underlying subject as the identity circuit. The code relation independently binds its owner/viewing key, expiry, nonce and revocation tag. A capability proves that this code belongs to a qualified subject and hidden family rule without revealing the qualification opening.
 
@@ -308,8 +313,11 @@ Deposit and transfer witnesses contain the payer's spending material plus public
 
 | Relation | Circuit | Public signals |
 | --- | --- | ---: |
+| PersonRelation | `person_commitment` | 5 |
+| DisclosureBinding | `disclosure_binding` | 4 |
 | Source fact | `eligibility_source_fact` | 10 |
 | Source trust | `eligibility_source_trust` | 8 |
+| Revocation scan | `eligibility_revocation_scan` | 9 |
 | Issuance | `eligibility_issue` | 5 |
 | Code | `receive_code` | 10 |
 | Capability | `budget_capability` | 10 |
@@ -320,22 +328,70 @@ Deposit and transfer witnesses contain the payer's spending material plus public
 | Unshield | `shielded_unshield` | 11 |
 | Four-input Unshield | `shielded_unshield_4` | 20 |
 
+SourceFact and SourceTrust authenticate actual current lineage paths and publish salted source
+leaves. Issue proves membership in both source trees and registers a qualification Q. Capability
+proves Q membership, the same subject as the code, and code-specific family/role tags. Deposit
+proves the payer's funds and the future rule against that capability; Claim proves current Q,
+the budget-note spend, maturity and allowance. Shield/Unshield are the public asset boundaries,
+and ValueTransfer uses the generic code without requiring Q.
+
+Historical Q roots certify issuance; they do not grant a grace period after role revocation.
+Every `depositBudget` call, including an additional contribution, and every `claimBudget` call
+checks the latest published role revocations. `eligibility_revocation_scan` proves that a
+continuous interval of at most 32 published openings contains no match for the selected public
+role/nonce/tag. Its nine public signals bind the chain, Source, role, nonce, tag, interval start
+and end, and both authenticated prefix digests. Private witness slots contain the public log
+openings with canonical zero padding; no recipient secret or qualification opening is needed.
+
+The Source verifies that the interval begins at its exact cached progress, authenticates both
+endpoints and advances progress only after the fixed verifier accepts. Final funds acceptance
+checks at most eight unchecked entries per role against the live log. A larger tail reports
+`RevocationStateNotPrepared` and must be prepared before retrying. A target revocation appended
+after proof generation remains effective immediately; historical issuance roots never authorize
+ignoring that tail.
+
 ## Proof transport
 
 Each Groth16 ABC proof uses 256 bytes. Identity/disclosure have a dedicated adapter; asset boundaries have their own adapter. Receiving relations each use a fixed generated verification key and arity through `FixedGroth16Verifier`. No linked presentation proofs, identity counters or alternative receive issuers are accepted.
 
 Frontend proof keys come from trusted build configuration, never from a scanned code. The prover verifies exact expected public signals and the proof locally before submission. Contracts independently verify their public signals and current qualification status.
 
+Receiving and boundary pins are exported into `frontend/src/proof-artifacts.local.json`, with
+local browser files under `/zk/protocol/`. A remote build resolves WASM/zkey to
+`<VITE_ZK_ASSET_BASE_URL>/<sha256>/<file name>.br` and checks the decoded file hash; vkeys keep
+their local pinned URLs. A supplied code cannot override the host, hashes or verification key.
+
 ## Development and release
 
-`npm run zk:build` compiles the canonical 13 relations. `npm run zk:dev` explicitly creates local development keys for the eight receiving relations; `npm run zk:dev:check` checks source graphs, compiler/runtime and artifact hashes. `npm run zk:frontend -- <chainId> <registry>` exports a chain/registry-bound frontend bundle.
+`npm run zk:build` compiles the canonical 14 relations without replacing keys. Explicit
+`npm run zk:dev` compiles the full graph, verifies and reuses matching identity/disclosure keys,
+and regenerates development keys for the nine receiving and three boundary relations. It updates
+their development manifests, vkeys and Solidity verifiers; local contracts and frontend pins must
+be synchronized with that bundle. `npm run zk:dev:check` checks all 14 artifact sets without
+regeneration. After local deployment, `npm run zk:frontend -- <chainId> <registry>` synchronizes
+boundary aliases and exports a chain/registry-bound frontend bundle.
+`zk:dev -- --circuit protocol:code` or `--circuit shielded:unshield4` selects a current relation, and `--ptau <path>` selects the local Phase 1 file. Focused generation
+still ends with a check of the complete 14-relation bundle.
 
-`npm run test:circuits` checks current constraints. `npm run test:proof` generates all eight receiving proofs and rejects changes to every public coordinate. `npm run test:evm` combines real proofs with actual lineage state, native/ERC20 money, offline-payer proof generation, HPKE recovery, deposits, contributions, claims, withdrawals, letters and revocation.
+`npm run test:circuits` checks current constraints. `npm run test:proof` generates all nine receiving proofs and rejects changes to every public coordinate. `npm run test:evm` combines real proofs with actual lineage state, native/ERC20 money, offline-payer proof generation, HPKE recovery, deposits, contributions, claims, withdrawals, letters and revocation.
 
-Current keys are development-only. A reviewed production ceremony covering all 13 relations is not yet available, so production deployment/setup/release gates refuse these keys. No development command implicitly promotes them.
+The development bundle has been regenerated and passes `zk:dev:check` for all 14 relations.
+This verifies artifact integrity; `zk:check`, `test:proof` and `test:evm` separately validate real
+proofs and EVM execution. Development key rotation requires coordinated manifest, verifier,
+local deployment and frontend updates.
+
+Current keys are development-only. A reviewed production ceremony covering all 14 relations is
+not yet available. `zk:setup` currently fails closed rather than generating production keys;
+`release:preflight` and public deployment/release gates are also closed. `zk:dev` is an explicit
+local development setup, and no development command implicitly promotes its artifacts.
 
 ## Privacy and operational limits
 
 Fresh codes contain independently derived owner/viewing keys and no public subject identifier or derivation index. A public family rule can reveal a matching family commitment. Publishing revocation openings may associate historical codes; this is allowed by the requirements. Different codes may create separate initial budget records, while claims preserve the subject-wide period allowance.
 
-The protocol does not hide public chain metadata, timing or amounts at shield/unshield boundaries. Revocation lookup currently scans published role openings; scaling and deployment limits still need resolution before release. These limits are separate from the demonstrated ability of a stranger to prove future budget eligibility from the original code without recipient interaction.
+The protocol does not hide public chain metadata, timing or amounts at shield/unshield
+boundaries. Revocation proofs bound each interval and the final live-tail check; initial proof
+work and preparation transactions for a new nonce/tag still grow with the complete history.
+Caches retain per-code progress, so browser time, aggregate gas and storage remain capacity
+constraints. This is not a claim of constant total cost or unlimited scale. Public release still
+requires those capacity measurements, a reviewed ceremony and the remaining production gates.

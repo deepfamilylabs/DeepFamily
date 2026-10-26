@@ -51,7 +51,7 @@ export const RECEIVE_DEPLOYMENT_CONTRACTS = Object.freeze(
 export const receiveDeploymentConstructorArgs = (property, a) => {
   switch (property) {
     case "eligibilitySource":
-      return [a.lineageIndex, a.protocolSourceFactVerifier, a.protocolSourceTrustVerifier];
+      return [a.lineageIndex, a.protocolSourceFactVerifier, a.protocolSourceTrustVerifier, a.protocolRevocationScanVerifier];
     case "receiveRegistry":
       return [
         a.eligibilitySource,
@@ -77,6 +77,7 @@ export const RECEIVE_DEPLOYMENT_IMMUTABLES = Object.freeze({
     DEEP_FAMILY: "deepFamily",
     FACT_VERIFIER: "protocolSourceFactVerifier",
     TRUST_VERIFIER: "protocolSourceTrustVerifier",
+    SCAN_VERIFIER: "protocolRevocationScanVerifier",
   },
   receiveRegistry: {
     SOURCE: "eligibilitySource",

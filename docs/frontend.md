@@ -24,7 +24,7 @@ frontend/src/
 ├── pages/       # Route-level composition; imports from domains + shared only
 ├── domains/     # Feature code grouped by bounded context
 │   ├── config/        # Network/contract config context and UI
-│   ├── inheritance/   # Multi-asset pools: private/public funding, claims, transfers, exits
+│   ├── inheritance/   # Multi-asset wallets, receiving codes, budgets, claims, transfers, exits
 │   ├── wallet/        # Wallet + network selection
 │   ├── person/        # Person model, queries, UI coordination
 │   ├── tree/          # Family-tree context/queries/selectors/services and view UI
@@ -42,7 +42,7 @@ frontend/src/
 │   ├── lib/           # Small framework-agnostic utilities
 │   ├── ui/             # Reusable presentational primitives (no domain coupling)
 │   └── workers/       # Worker client wrappers (main-thread side)
-├── workers/     # Crypto/ZK entries and the stateful shielded asset session Worker
+├── workers/     # Crypto/ZK entries and the stateful receiving wallet Worker
 ├── abi/         # Synced contract ABI (do not edit by hand)
 ├── i18n/        # i18next initialization
 ├── locales/     # Translation resources
@@ -60,19 +60,18 @@ Use the directory tree for ownership boundaries, and these files as first-read e
 - Domain gateways: `frontend/src/domains/tree/api/treeReadGateway.ts`, `frontend/src/shared/clients/personReadGateway.ts`, `frontend/src/domains/transactions/api/txGateway.ts`, `frontend/src/domains/transactions/api/invalidationCoordinator.ts`
 - Tree runtime: `frontend/src/domains/tree/context/TreeViewContext.tsx`, `frontend/src/domains/tree/context/useTreeGraphState.ts`, `frontend/src/domains/tree/services/treeTraversalOrchestrator.ts`
 - Worker/ZK/metadata boundaries: `frontend/src/workers/crypto.worker.ts`,
-  `frontend/src/workers/zk.worker.ts`, `frontend/src/workers/shieldedAsset.worker.ts`,
-  `frontend/src/workers/shieldedAssetSession.ts`, `frontend/src/shared/workers/`,
+  `frontend/src/workers/zk.worker.ts`, `frontend/src/workers/receive.worker.ts`,
+  `frontend/src/workers/inheritanceWalletSession.ts`, `frontend/src/shared/workers/`,
   `frontend/src/shared/metadata/metadataArchiveService.ts`,
   `frontend/src/shared/metadata/metadataUnlockCoordinator.ts`,
   `packages/protocol-core/identity.js`, `frontend/src/shared/crypto/identityHash.ts`, and
   `frontend/src/shared/zk/proofDescriptors.ts`
 - Family inheritance: `frontend/src/pages/InheritancePage.tsx`,
-  `frontend/src/domains/inheritance/services/inheritanceChain.ts` (tree replay and legitimacy
-  lookup), `frontend/src/domains/inheritance/services/shieldedFundingPreparation.ts` (unified
-  funding), `frontend/src/domains/inheritance/services/shieldedClaimPreparation.ts` (unified
-  claims), `frontend/src/domains/inheritance/services/shieldedAssetRegistry.ts` (pool discovery),
-  `frontend/src/domains/inheritance/services/shieldedWalletRecovery.ts` (historical recovery),
-  and `packages/protocol-core/shielded-inheritance.js` (commitments and claim math)
+  `frontend/src/domains/inheritance/ui/InheritanceWorkspace.tsx` (wallet and transaction UI),
+  `frontend/src/shared/clients/receiveChain.ts` (canonical receiving contracts and state reads),
+  `frontend/src/shared/zk/receiveProtocol.ts` (trusted prover and receiving service),
+  `frontend/src/domains/inheritance/services/shieldedAssetRegistry.ts` (pool discovery), and
+  `packages/protocol-core/{receive-code,eligibility,budget,wallet,value}.js` (protocol definitions)
 - Boundary tests: `frontend/src/shared/config/env.test.ts`, `frontend/src/pages/TreePage.test.tsx`, `frontend/src/domains/tree/api/treeReadGateway.test.ts`, `frontend/src/domains/transactions/api/txGateway.test.ts`, `frontend/src/pages/InheritancePage.test.tsx`
 
 Update this section when adding or moving stable entry points, route groups, domain gateways, app providers, shared config/client/cache layers, worker boundaries, or boundary-level tests. Do not list ordinary leaf components, local renderers, or one-off helpers here; keep them discoverable through their owning directory.
@@ -244,9 +243,38 @@ The tree can hide person versions that aren't vouched for by a root-defined allo
 
 Wallet secrets and qualification openings stay in `inheritanceWalletSession`. Worker responses use a public result allowlist. Code branch zero is reserved for wallet change; externally shared codes use newly allocated indices. The wallet updates its encrypted backup before exposing each new external code. Restore validates the chain and registry and recovers notes locally from public ledger events. A family wallet can derive its canonical subject secret inside the Worker from the existing identity form. Same-subject encrypted backups can merge registered, current qualifications without replacing money keys or code indices; code generation selects at most two current qualifications. Claims select a current credential when an earlier one has been revoked.
 
-`shared/zk/receiveProtocol.ts` accepts the trusted `proof-artifacts.local.json` build configuration. It verifies artifact digests and exact public signals for all eight receiving relations and the three asset boundaries. Scanned codes cannot choose the verifier or artifact source. `RECEIVE_REGISTRY` on the configured factory/pool binds chain calls to that same scope.
+`shared/zk/receiveProtocol.ts` accepts the trusted `proof-artifacts.local.json` build configuration. It verifies artifact digests and exact public signals for all nine receiving relations and the three asset boundaries. Scanned codes cannot choose the verifier or artifact source. `RECEIVE_REGISTRY` on the configured factory/pool binds chain calls to that same scope.
 
 The configured letter archive uses `VITE_LETTER_ARCHIVE_*`. A single code authorizes both ordinary letters and money transfers; child-budget operations additionally require a current capability. `depositBudget` creates or adds a contribution automatically and rechecks current qualification in both cases. See [receiving codes and letters](private-letters.md).
+
+Qualification Q and Source membership paths follow the build-time
+`VITE_SHIELDED_STATE_READ_MODE`. The default `rebuild` mode replays public issuance/source events
+locally, validates event order and tree roots, and derives the selected path without sending its
+index in a targeted path query. `chain` reads the selected contract path, disclosing its index to
+the RPC, and validates the returned leaf/path against the anchored root. Both modes bind related
+reads to one block and check its anchor. Missing, blank or unknown values select `rebuild`;
+there is no page switch, persisted preference or silent fallback between modes.
+
+Funds-note recovery and paths still use local ledger replay in both modes. The setting controls
+client membership-path reads; it does not replace the on-chain latest-role check. Historical Q
+roots certify issuance, while current role status is checked again for budget deposits,
+contributions and claims.
+
+`receiveRevocations` reads public log pages, counts, checkpoints and verified progress at one
+block, authenticates the complete returned interval, then rechecks its block anchor. The Worker
+uses `eligibility_revocation_scan` to prove continuous ranges of up to 32 entries; the witness
+requires published openings and the code's public nonce/tag, never holder secrets. The transaction
+client submits necessary `prepareRoleScan` transactions and waits for their receipts before the
+funds transaction. Final acceptance checks the current tail of at most eight entries per role. Each worker round reads and proves at most 32 entries per role (three proofs total). The client waits for confirmed preparation progress before requesting the next round; interrupted operations resume from that progress instead of rebuilding every proof in one timed job.
+A longer unchecked tail returns `RevocationStateNotPrepared` and requires fresh preparation;
+revoked qualification and RPC/validation errors retain distinct meanings. The read-only wallet
+path can authenticate the public log locally when on-chain progress is not yet prepared.
+
+Progress is scoped to role, nonce and tag in the canonical Source contract. First-time preparation
+for a new code remains O(history), may involve multiple proofs/signatures/transactions, and adds
+per-code progress state. Subsequent preparation covers only unchecked entries. The final check
+has bounded work, but total proof work and total preparation cost are not constant. Newly appended
+target revocations still reject funds immediately; no retired-root grace window applies.
 
 ### Workers
 
@@ -283,6 +311,8 @@ VITE_ROOT_VERSION_INDEX=...
 | `VITE_SHOW_DEBUG`                                                                    | Enable debug UI (tree debug panel, etc.)                                   |
 | `VITE_SHOW_TRUSTED_SOURCE_FILTER_TOGGLE`                                             | Show trusted-source filter toggle (on by default; `0` forces filtering on) |
 | `VITE_SHIELDED_POOL_FACTORY_ADDRESS`, `VITE_SHIELDED_POOL_FACTORY_ADDRESS_<chainId>` | Canonical multi-asset pool factory for `/inheritance`                      |
+| `VITE_SHIELDED_STATE_READ_MODE` | Build-time Q/Source path reads: `rebuild` (default) or targeted `chain`; funds notes always replay locally |
+| `VITE_ZK_ASSET_BASE_URL` | Build-time WASM/zkey host using pinned hash paths; verification-key JSON remains local |
 
 ### Local auto-config
 
@@ -313,7 +343,7 @@ npm run frontend:check      # lint + source-rules + typecheck + locales + XSS sc
 npm run dev:all
 ```
 
-This starts a Hardhat node, checks the complete ZK artifact bundle (13 Circom circuits, including three receive presentations), deploys the complete system with one token and lineage index, seeds demo data, generates `frontend/.env.local`, and starts the Vite dev server. For step-by-step control, use `dev:node`, `dev:deploy`, `dev:fund`, `dev:seed`, `frontend:config`, and `frontend:dev` in that order.
+With the pinned proving files available, this starts a Hardhat node, checks the complete 14-relation artifact bundle, deploys the token, lineage index, eligibility source, receiving registry, letter archive and asset pools, seeds demo data, generates `frontend/.env.local`, and starts Vite. For step-by-step control, use `dev:node`, `dev:deploy`, `dev:fund`, `dev:seed`, `frontend:config`, and `frontend:dev` in that order.
 
 ### Inside `frontend/`
 
@@ -346,9 +376,25 @@ Translations live under `frontend/src/locales/`.
 
 ## ZK Artifacts
 
-The application uses 13 canonical Circom relations. Receiving artifacts are exported into `frontend/public/zk/protocol`; the build trusts the digest-bound `frontend/src/proof-artifacts.local.json` configuration. Local export is `npm run zk:frontend -- <chainId> <registry>`. Browser proof generation uses WASM, zkey and verification-key JSON, never a code-supplied key or R1CS download.
+The application uses 14 canonical Circom relations. Receiving artifacts are exported into `frontend/public/zk/protocol`; the build trusts the digest-bound `frontend/src/proof-artifacts.local.json` configuration. Local export is `npm run zk:frontend -- <chainId> <registry>`. Browser proof generation uses WASM, zkey and verification-key JSON, never a code-supplied key or R1CS download.
 
 Identity/disclosure assets retain their manifest-pinned `/zk/` loading flow. Boundary relations use Shield, Unshield and four-input Unshield; other funds operations use the fixed receiving relations. There are no presentation-link keys or alternative receive-code issuers. Development artifacts are local-only; production proof-ceremony evidence is still required before public release.
+
+With `VITE_ZK_ASSET_BASE_URL` configured, receiving and boundary WASM/zkey pins resolve to
+`<base>/<sha256>/<file name>.br`; verification-key JSON keeps its local pinned URL. The host
+serves `Content-Encoding: br`, and the browser validates the decoded bytes against the trusted
+hash. Remote builds omit local WASM/zkey files, so exact pinned files must be published before
+deploying the frontend. Empty-host local development uses same-origin artifact files.
+
+`zk:build` compiles all 14 relations without changing keys. Explicit `zk:dev` compiles the same
+graph, checks and reuses matching identity/disclosure keys, then regenerates the nine receiving
+and three boundary development key sets with updated manifests, vkeys and Solidity verifiers.
+Redeploy local contracts and rerun `zk:frontend` for the matching registry after rotation;
+the export also synchronizes boundary aliases under `/zk/protocol/`. The regenerated development
+bundle passes `zk:dev:check` for all 14 sets. `zk:check`, `test:proof` and `test:evm` separately
+validate real proofs and EVM execution. `zk:setup` and `release:preflight` remain closed pending a
+reviewed production ceremony for this complete graph. Development generation and deployment are
+for local use and do not provide production ceremony approval.
 
 ## Encrypted Version Metadata
 
@@ -528,4 +574,7 @@ read-only for other visitors, pending lookups and read failures. Access refreshe
 sealing and window focus; submissions recheck it before signing. Pending previews are bound to the
 original token, contract, network and wallet, and token/config changes reset the editor's draft.
 
-Claim proving automatically uses `shielded_claim_32` when both compact qualification paths have at most 32 siblings, and the existing 64-level `shielded_claim_64` otherwise. Only the selected WASM/zkey pair is downloaded and cached. Both variants use the same roots, checkpoint and fifteen public signals; trimming the zero-padded witness does not change the prepared transaction.
+Claim proving uses the single `budget_claim` relation with 23 public signals. It binds the current
+Q membership proof, budget-note spend, role tags, maturity and subject/policy/period allowance.
+The qualification path has up to 32 levels; current role revocation is checked separately by the
+registry at acceptance.

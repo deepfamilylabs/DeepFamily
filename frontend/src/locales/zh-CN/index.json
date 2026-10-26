@@ -1531,6 +1531,10 @@
       "StaleSourceRoot": "资格状态已变化，请刷新后重新准备证明。",
       "UnknownIssuanceRoot": "此资格尚未通过认证。",
       "QualificationRevoked": "当前资格已不允许此次预算操作。",
+      "QUALIFICATION_REVOKED": "当前资格已不允许此次预算操作。",
+      "RevocationStateNotPrepared": "资格状态已变化，请重新准备此次预算操作。",
+      "InvalidScanProgress": "资格检查进度已变化，请刷新后重试。",
+      "RevocationLogCapacityExceeded": "资格撤销日志已达到协议容量上限。",
       "DuplicateCredential": "此资格已登记。",
       "InvalidBudget": "预算与原规则或收款码不匹配。"
     },
@@ -1659,6 +1663,7 @@
     "balanceSource": "支出余额",
     "selectBalance": "选择可用余额",
     "withdrawAddress": "提取到钱包地址",
+    "preparingQualification": "正在更新预算资格检查（{{completed}}/{{total}}），请在钱包中确认所需的网络交易。",
     "depositDescription": "粘贴收款码及预算规则。同码、同规则会自动追加；每次存入都会检查当前资格。",
     "rule": "预算规则",
     "periods": "存入期数",

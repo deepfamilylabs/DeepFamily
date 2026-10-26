@@ -11,6 +11,8 @@ import {
 import { inspectSnarkjsRuntime } from "../scripts/lib/snarkjsToolchain.mjs";
 import { PROTOCOL_DEVELOPMENT_MANIFEST } from "../scripts/protocol-zk-development.mjs";
 import { BOUNDARY_DEVELOPMENT_MANIFEST } from "../scripts/lib/canonicalBoundaryArtifacts.mjs";
+import { INTEGRATED_DEPLOYMENT_RECORDS } from "../scripts/lib/zkDeploymentCatalog.mjs";
+import { MAINNET_TRANSACTION_LABELS } from "../scripts/lib/mainnetReleaseSafety.mjs";
 import {
   assertImplementationStorageSafe,
   assertImplementationMatchesArtifact,
@@ -108,8 +110,11 @@ describe("Upgrade tooling & governance deploy path", function () {
         },
       });
 
-      expect(Object.keys(deployed.transactionReceipts)).to.have.length(45);
-      expect(observed.size).to.equal(45);
+      // The local graph omits creating governance and transferring ownership to it.
+      const expectedLabels = MAINNET_TRANSACTION_LABELS.filter(label =>
+        label !== "governanceTimelock" && label !== "transferDeepFamilyOwnership");
+      expect(Object.keys(deployed.transactionReceipts)).to.have.members(expectedLabels);
+      expect(observed.size).to.equal(expectedLabels.length);
       for (const [label, receipt] of Object.entries(deployed.transactionReceipts)) {
         expect(observed.get(label)).to.equal(receipt.hash);
       }
@@ -127,7 +132,7 @@ describe("Upgrade tooling & governance deploy path", function () {
           deploymentDirectory,
         });
         const files = (await fs.readdir(deploymentDirectory)).sort();
-        expect(files).to.have.length(39);
+        expect(files).to.have.members(INTEGRATED_DEPLOYMENT_RECORDS.map(record => `${record.deploymentName}.json`));
         expect(files).to.include.members([
           "DeepFamilyArchive.json",
           "DeepFamilyReader.json",

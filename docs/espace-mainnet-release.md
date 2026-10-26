@@ -102,13 +102,11 @@ keys into this repository.
 
 ## Prerequisites
 
-1. From a clean frozen circuit commit, run `npm run zk:setup` as described in
-   [zk-ceremony.md](./zk-ceremony.md). Review and commit the generated manifest, transcript,
-   verifiers, and frontend proving artifacts together. The final `release:preflight` must wait
-   until the chain-specific deployment projection below has also been frozen into the protocol
-   manifest. The default path records one Phase 2 contributor under the explicit
-   `single-operator` trust model. A multi-party ZK ceremony is an optional enhancement, not a
-   prerequisite and not related to the Safe's three-owner, 2/3 policy.
+1. Complete a reviewed production ceremony for the current 14-relation graph, as described in
+   [zk-ceremony.md](./zk-ceremony.md). This prerequisite is currently blocked: `zk:setup` refuses
+   production setup, and development keys cannot authorize a release. Once that reviewed workflow
+   exists, freeze its manifests, transcripts, verifiers and artifact pins together with the exact
+   chain-specific deployment projection before final `release:preflight`.
 2. Use a clean, isolated checkout and the reviewed Node/npm versions. Install exact
    dependencies with `npm ci --ignore-scripts --no-audit --no-fund`, then complete the repository's
    build, test, frontend, ZK artifact, and storage-layout checks. Do not reuse an untrusted global

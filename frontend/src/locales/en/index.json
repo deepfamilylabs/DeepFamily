@@ -1531,6 +1531,10 @@
       "StaleSourceRoot": "Qualification state changed. Refresh and prepare the proof again.",
       "UnknownIssuanceRoot": "The qualification has not been authenticated.",
       "QualificationRevoked": "The current qualification no longer permits this budget operation.",
+      "QUALIFICATION_REVOKED": "The current qualification no longer permits this budget operation.",
+      "RevocationStateNotPrepared": "Qualification checks changed. Prepare this budget operation again.",
+      "InvalidScanProgress": "Qualification preparation changed. Refresh before retrying.",
+      "RevocationLogCapacityExceeded": "The qualification revocation log has reached its protocol capacity.",
       "DuplicateCredential": "This qualification is already registered.",
       "InvalidBudget": "The budget does not match its original rule or receiving code."
     },
@@ -1659,6 +1663,7 @@
     "balanceSource": "Balance to spend",
     "selectBalance": "Choose an available balance",
     "withdrawAddress": "Withdrawal wallet address",
+    "preparingQualification": "Updating budget eligibility ({{completed}}/{{total}}). Confirm the required network transactions in your wallet.",
     "depositDescription": "Paste the receive code and budget rule. Deposits automatically append for the same code and rule; every deposit checks current eligibility.",
     "rule": "Budget rule",
     "periods": "Periods to fund",

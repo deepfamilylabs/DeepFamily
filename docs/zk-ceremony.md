@@ -1,518 +1,103 @@
-# DeepFamily ZK Setup
+# ZK artifacts and production setup
 
-This runbook covers the single final setup for all sixteen Circom circuits (two core and
-fourteen shielded, including three receive presentations). Local development, CI and release share
-the resulting keys, verifiers, linking parameters and evidence:
+The current protocol has 14 Circom relations. Its keys are development-only, and no reviewed
+production ceremony is available for this complete graph. `npm run zk:setup`, ceremony
+verification and protocol release preflight currently fail closed. Local development generation
+does not approve keys for a public deployment.
 
-```bash
-npm run zk:setup
+## Current relation graph
+
+| Group | Count | Relations |
+| --- | ---: | --- |
+| Identity and disclosure | 2 | PersonRelation, DisclosureBinding |
+| Asset boundaries | 3 | Shield, Unshield, four-input Unshield |
+| Eligibility and receiving | 9 | SourceFact, SourceTrust, RevocationScan, Issue, Code, Capability, Deposit, Claim, Transfer |
+
+The data-only [circuit catalogue](../scripts/lib/protocolCircuitCatalog.mjs) and
+[canonical selection](../scripts/lib/zkCircuitSelection.mjs) define the graph consumed by builds,
+deployment, asset export and release gates. The reviewed production ceremony must cover all
+14 relations together, including `eligibility_revocation_scan` and its nine public signals.
+See [proof relations and public signals](zk-proofs.md#receiving-and-budget-circuits).
+
+## Local development workflow
+
+```sh
+npm run zk:fetch
+npm run zk:ptau:fetch
+npm run zk:build
+npm run zk:dev:check
+npm run test:circuits
+npm run test:proof
+npm run test:evm
 ```
 
-This command generates and verifies the Circom transcripts and manifests. It does
-not commit files, deploy contracts, upload assets or authorize a Mainnet release.
+`zk:build` compiles the current relations without replacing keys. `zk:dev:check` authenticates
+source and artifact pins for the complete bundle. Missing or mismatched proving files can be
+restored with `zk:assets:fetch` after the exact pinned files have been published.
 
-Receive presentations use ordinary Circom Groth16 proofs linked to their issuer
-proofs through LinkG16. They require no recursive pairing arithmetic, Go prover or
-separate ceremony. The same setup derives `shielded/receive-link-keys.json` and
-the three fixed Solidity verifiers; the shielded manifest's `linkKeys` pins their
-hashes and the shared verifier base. Artifact checks, production ceremony verification and
-release preflight also independently derive the public verification keys and delta G1 points
-from private snapshots of the five issuer/presentation zkeys, validate gamma and delta relations,
-and regenerate the link bundle and all three fixed verifiers for byte-for-byte comparison.
-The input snapshots and originals are rehashed before success, and production checks bind the
-derivation to the same manifest as the verified ceremony. Refreshing a manifest hash cannot
-make an incorrect generated linker artifact pass. Current checked-in keys remain
-`developmentOnly: true` and `productionReady: false`; they are unattested material awaiting the
-explicit final setup and review. Daily builds, downloads, checks and local acceptance reuse the
-pinned artifact set. They stop on stale or missing keys rather than generate replacements.
+Explicit `npm run zk:dev` compiles all 14 relations, verifies and reuses the existing matching
+identity/disclosure keys, and regenerates the nine receiving plus three boundary development key
+sets. It updates their development manifests, vkeys and generated Solidity verifiers. A focused
+command such as `npm run zk:dev -- --circuit protocol:revocationScan` regenerates only that
+selected development set; its final check still requires the complete bundle. `--ptau <path>`
+selects an explicit local Phase 1 file for development generation.
 
-## Trust model
+After key rotation, redeploy local contracts and synchronize trusted frontend pins for that
+registry with `npm run zk:frontend -- <chainId> <registry>`. The export includes the three boundary
+aliases under `/zk/protocol/`. The development export accepts only local chain IDs. Codes cannot
+select their own verifier, key or artifact host.
 
-Groth16 needs a circuit-specific Phase 2 setup. Anyone who retains all Phase 2 secrets could forge
-proofs accepted by the matching verifier. DeepFamily therefore records the production trust model
-explicitly:
+## Artifact records
 
-```text
-trustModel = single-operator
-minimumContributors = 1
-contributorCount = 1
-```
+| Record | Purpose |
+| --- | --- |
+| `circuits/zk-artifacts-manifest.json` | Identity/disclosure source and artifact pins |
+| `circuits/shielded-development-manifest.json` | Three development boundary key sets |
+| `circuits/receive-development-manifest.json` | Nine development receiving/eligibility key sets |
+| `protocol-release-manifest.json` | Protocol interfaces, pending deployment bindings and release evidence |
+| `frontend/src/proof-artifacts.local.json` | Exported, trusted chain/registry-bound frontend pins |
 
-For this model, production security trusts the operator who runs the setup command to use a
-controlled machine and destroy every circuit-specific Phase 2 secret after the command exits. This
-is a deliberate and visible trust assumption, not a claim that the proving keys are trustless.
-
-One contribution is sufficient for Groth16. Three contributors are **not** a cryptographic
-requirement. A multi-party ceremony remains a useful optional enhancement when independent
-contributors become available: its benefit is that the final parameters remain safe if at least one
-participant destroys their secret.
-
-ZK contributors and governance signers are separate concepts:
-
-- the ZK setup creates proving and verification material;
-- the production Safe uses three owners with a 2/3 threshold to govern contracts;
-- a ZK contributor does not become a Safe owner;
-- the Safe 2/3 policy does not require three ZK contributors.
+R1CS and witness WASM are compiled with the pinned Circom toolchain and explicit
+`--O2 --sanity_check 2` flags. Generated verifier contracts, vkeys, WASM and zkeys must belong to
+the same manifest-pinned set. Browser vkey JSON remains local; remote WASM/zkey delivery uses
+content-hash paths and validates decoded bytes. See [development and release](zk-proofs.md#development-and-release).
 
 ## Fixed Powers of Tau
 
-All 13 Circom circuits reuse the same published BN254 Phase 1 file:
+The repository pins this BN254 Phase 1 input:
 
 ```text
-File:
-ppot_0080_17.ptau
-
-Published provenance recorded in the manifest:
-https://pse-trusted-setup-ppot.s3.eu-central-1.amazonaws.com/pot28_0080/ppot_0080_17.ptau
-
-Capacity:
-2^17 constraints
-
-Bytes:
-151,088,274
-
-SHA-256:
-f807e065fde53f72f4bf4d57140fab85b26daa6cc95bdfec7cce93622b3a367c
-
-BLAKE2b-512:
-3010cec42bdd1583bb4477dfa1b11853a67e8611feaa39cd7b3311a353b3e1d8b3f318509d75208078dc6887500b61f3f46bc72c61abbb624bec3bad5ef16012
+Path: circuits/ptau/ppot_0080_17.ptau
+Power: 17
+Bytes: 151,088,274
+SHA-256: f807e065fde53f72f4bf4d57140fab85b26daa6cc95bdfec7cce93622b3a367c
+BLAKE2b-512: 3010cec42bdd1583bb4477dfa1b11853a67e8611feaa39cd7b3311a353b3e1d8b3f318509d75208078dc6887500b61f3f46bc72c61abbb624bec3bad5ef16012
 ```
 
-The setup command performs a separate circuit-specific Phase 2 for each circuit.
-
-Install the exact file with `npm run zk:ptau:fetch`. The explicit developer/CI download verifies the byte length and both pinned hashes before publishing it locally. The 151 MB file is Git-ignored and stored at:
-
-```text
-circuits/ptau/ppot_0080_17.ptau
-```
-
-The [PSE Perpetual Powers of Tau repository](https://github.com/privacy-ethereum/perpetualpowersoftau)
-links the published object above. The retrieval location needs no trust; the pinned digests decide
-whether the bytes are accepted.
-
-The setup and verification commands never download or replace the file. They reject symbolic
-links, an unexpected byte length, or either hash mismatch; the file is rehashed before use. The
-published URL above identifies the reviewed source bytes in ceremony evidence and is not accessed
-by these commands.
-
-`ZK_PTAU_PATH` selects a different copy, for example one obtained independently, for setup,
-verification, and release commands. When it is empty, they use the local file above. An
-override must still be an ordinary file whose byte length, SHA-256, and BLAKE2b-512 match the
-production manifest:
-
-```bash
-ZK_PTAU_PATH=/absolute/path/to/an-independent-copy \
-npm run release:preflight
-```
-
-`npm run zk:setup` runs from a clean, reviewed commit with a pinned toolchain on a controlled
-machine outside CI. It prepares the complete final artifact set and records the single-operator
-Phase 2 ceremony described below. Publish and commit that reviewed bundle once, then reuse it
-for development, CI and release. Circuit changes require a new explicit setup; build, fetch and
-check commands do not generate keys.
-
-## Circom host and release compiler
-
-`npm run zk:fetch` installs two separate copies of repository-pinned Circom 2.2.3:
-
-- a reusable native compiler at `bin/circom` (`bin/circom.exe` on Windows) for development and
-  diagnostic builds;
-- the canonical official Linux amd64 compiler at
-  `bin/circom-release-linux-amd64` as the fixed-digest audit reference.
-
-The compiler support matrix is:
-
-| Host/runtime         | Installation strategy          | Prerequisites                               | May run release gates |
-| -------------------- | ------------------------------ | ------------------------------------------- | --------------------- |
-| Linux x64 with glibc | Pinned official release asset  | None                                        | Yes                   |
-| macOS arm64          | Build the pinned source commit | `git`, Rust/Cargo, Xcode Command Line Tools | Yes                   |
-| Windows x64          | Pinned official release asset  | Visual C++ 2015–2022 Redistributable        | Yes                   |
-
-Circom 2.2.3 does not publish an official macOS arm64 binary, so the Apple Silicon target is built
-from the repository-pinned source commit with locked Cargo dependencies.
-
-Official assets must match their fixed SHA-256. Source builds must come from the pinned commit and
-report exactly Circom 2.2.3. Every circuit compilation passes `--O2 --sanity_check 2` explicitly,
-pinning both the optimization and sanity-check levels. The artifact gate compares rebuilt R1CS and
-WASM output hashes with the reviewed manifest and published files. A native compiler is therefore
-suitable for development only until its output has passed those comparisons; matching the version
-string alone is not release evidence.
-
-Both `zk:setup` and `release:preflight` support the three release-gate runtimes above.
-Linux libc is detected from Node's process report: Linux x64 with glibc uses the pinned official
-asset, while musl is rejected explicitly. Windows ARM64 hosts remain unsupported even with x64 Node
-emulation. The macOS arm64 release gates never execute the reusable
-source-built compiler from `bin/`: they perform a fresh locked build of the pinned commit in the
-current user's protected build directory and bind its binary hash, source commit, Cargo, and Rust
-versions into the evidence. The source builder rejects external ancestor Cargo configuration,
-removes inherited Git, Cargo, Rust, Node, dynamic-loader, npm, compiler, linker, and
-package-discovery overrides. It resolves Git/Cargo/Rustc to protected absolute executables and uses
-a controlled PATH, private home/Cargo/XDG/temporary directories, empty Git system/global
-configuration files, and an empty hooks directory. The resulting compiler is copied into the
-private release stage. Before any Groth16 Setup or Phase 2 contribution, the first setup records
-the reviewed clean-commit sources and compiles every circuit to establish the R1CS/WASM baseline.
-It then rechecks source and compiled-output hashes throughout the operation. Rotation instead
-requires those hashes to match the existing final manifest. The canonical Linux amd64 glibc
-binary remains a fixed-digest reference; other runtimes hash it but never execute it. The schema-v3
-ceremony transcript records which native compiler and Linux libc evidence actually produced the
-staged circuits.
-
-The setup reads the contribution helper and its local dependency from the exact
-release-commit Git blobs. It verifies their Git object IDs while staging and their SHA-256 digests
-both before creating Phase 2 entropy and immediately before passing that entropy to the helper
-process.
-
-Every release-only temporary root is hardened before use. On POSIX it must be a real directory
-owned by the current user with mode `0700`. On Windows the command disables ACL inheritance,
-removes existing access rules, sets the current user SID as owner and sole full-control principal,
-then re-reads and validates that ACL. Failure removes the temporary root and aborts the operation.
-
-On Windows x64, invoke these entry points through `npm run` so child npm commands use the real npm
-JavaScript CLI. The complete preflight test suite must run in an environment permitted to create
-symbolic links (for example, Windows Developer Mode). CI uses GitHub's `ubuntu-latest` x64/glibc
-runner and also exercises macOS arm64 and Windows x64. Repository
-`.gitattributes` keeps hashed circuit and source text on LF line endings across operating systems;
-evidence hashes cover the exact file bytes.
-
-The artifact manifest is schema v3 and includes the reviewed snarkjs runtime-graph digest.
-
-## Before running the command
-
-Run the setup only after the circuit source, public signals, packing rules, dependencies, and
-verifier interface have been frozen for a release candidate. Any later circuit change requires new
-production keys. The controlled checkout may use any host listed in the support matrix.
-
-The first setup validates the existing manifest and toolchain pins, then uses the reviewed
-clean-commit sources and freshly compiled outputs as its baseline. Earlier development proving
-files and their source/R1CS/WASM hashes are not prerequisites. Review the newly generated
-manifests, transcripts, verification keys and verifiers before committing the complete result.
-Rotation retains the strict existing-artifact checks described below.
-
-Use a clean, controlled checkout:
-
-```bash
-npm ci --ignore-scripts --no-audit --no-fund
-npm run zk:fetch
-git status --short
-git rev-parse HEAD
-```
-
-`git status --short` must have no output. The setup command refuses:
-
-- a dirty working tree;
-- CI execution;
-- a symbolic-link repository or artifact path;
-- a missing or unexpected pinned toolchain;
-- concurrent production pTau verification or setup execution;
-- overwriting an existing production manifest unless the explicit, hash-bound rotation mode below
-  is used.
-
-The operator should use a machine they control, stop unrelated backup/snapshot tools during the
-run, and avoid terminal recording. No Safe owner private key, funded wallet, CFX, or ETH is needed.
-
-## Run the setup
-
-The default command creates an audit ID automatically:
-
-```bash
-npm run zk:setup
-```
-
-An optional stable audit ID may be supplied:
-
-```bash
-npm run zk:setup -- \
-  --ceremony-id deepfamily-production-2026-001
-```
-
-To record shielded release thresholds, optionally pass
-`--shielded-release-criteria <reviewed-criteria.json>`. Supply a reviewed JSON file containing
-six positive integer limits: `fundMaxGas`, `claim3MaxGas`,
-`browserFundMaxMs`, `browserClaim3MaxMs`, `recoveryMaxMs`, and `recoveryMinEvents`.
-Key generation and cryptographic verification do not require these performance limits.
-`release:preflight` requires them alongside two independent audits and a hashed runtime benchmark
-report before publication. The benchmark report uses
-`deepfamily/shielded-runtime-benchmarks@1` and is referenced by
-`release-evidence/shielded/release-evidence.json` using
-`deepfamily/shielded-release-evidence@1`. Its full-depth result is a locally verified 64/32-depth
-cryptographic proof; initial fund and 3-period claim gas come from successful local pool
-transactions. Browser timing and public-event recovery are measured separately. The unified
-testnet acceptance command produces the on-chain deployment and receipt report after preflight;
-no separate shielded testnet report is required to start that command.
-
-### Rotate after a reviewed snarkjs runtime change
-
-Do not delete or downgrade a valid production manifest just because the committed dependency graph
-changed. First review and commit the dependency change, install exactly that clean commit, and
-record the three inputs printed by these read-only commands:
-
-```bash
-node --input-type=module -e "import { readCanonicalJsonFile, sha256Text } from './scripts/lib/zkArtifactTrust.mjs'; const { raw } = readCanonicalJsonFile('circuits/zk-artifacts-manifest.json'); console.log(sha256Text(raw));"
-node --input-type=module -e "import { createHash } from 'node:crypto'; import { readFileSync } from 'node:fs'; console.log(createHash('sha256').update(readFileSync('circuits/shielded-production-manifest.json')).digest('hex'));"
-node --input-type=module -e "import { inspectSnarkjsRuntime } from './scripts/lib/snarkjsToolchain.mjs'; console.log(inspectSnarkjsRuntime().sha256);"
-```
-
-After independently reviewing those exact digests, rotate with a new ceremony ID:
-
-```bash
-npm run zk:setup -- --rotate \
-  --expected-current-manifest-sha256 <current-production-manifest-sha256> \
-  --expected-current-shielded-manifest-sha256 <current-shielded-manifest-sha256> \
-  --expected-snarkjs-runtime-sha256 <reviewed-new-runtime-sha256> \
-  --ceremony-id <new-stable-audit-id>
-```
-
-The three expected digests are mandatory with `--rotate` and are rejected without it. Rotation only
-accepts an existing schema-v3 `production` manifest using the one-contributor `single-operator`
-trust model. It rejects a development or multi-party baseline, a reused ceremony ID, and a runtime
-digest equal to the current manifest. Before generating entropy it verifies the old canonical
-manifest digest, transcript, source, WASM, zkeys, verification keys, Solidity verifiers, compiler,
-snarkjs version/CLI, and pinned pTau identity. It then recompiles every circuit and requires the
-source/R1CS/WASM hashes to remain unchanged, snapshots the explicitly reviewed new runtime, and
-runs every Phase 2 setup, contribution, and finalization from scratch. The staged and rollback
-rules are identical to the initial setup.
-
-Fresh Phase 2 randomness changes every zkey, verification key, and generated verifier contract.
-Treat the result as a new cryptographic release: review and commit the complete bundle together,
-then redeploy the verifiers and update any governed references through the normal release process.
-The circuit WASM and R1CS are expected to stay unchanged for this runtime-only rotation.
-
-Internally the command:
-
-1. validates the clean reviewed commit and existing manifest/toolchain pins, or the explicitly
-   hash-bound final artifact baseline in rotation mode, and records the current source hashes;
-2. reads the pinned public power-17 pTau and checks both pinned digests;
-3. validates and snapshots an official compiler, or fresh-builds a source target, then copies the
-   pTau into the current user's private OS temporary directory and compiles every circuit there
-   with explicit `--O2 --sanity_check 2`;
-4. establishes fresh R1CS/WASM hashes for the first setup, or verifies them against the existing
-   final manifest for rotation, before creating any initial Groth16 zkey; the sources, compiled
-   circuit outputs and pTau are checked again immediately before each circuit's setup;
-5. hashes the logical installed snarkjs production dependency graph—each package's content,
-   identity, version, and logical dependency path—and compares it with the schema-v3 manifest or
-   the explicit reviewed rotation digest; it copies only that verified runtime into private
-   staging, makes package files read-only on POSIX, and executes snarkjs from the snapshot;
-6. before reading any secret, re-hashes that private runtime snapshot, strips inherited release
-   injection variables from the helper environment, and supplies a separate 64-byte OS CSPRNG input
-   for each circuit through a private stdin pipe, never through command arguments, environment
-   variables, or files;
-7. embeds one `deepfamily-single-operator` contribution in each zkey;
-8. only after every contribution, generates a separate 32-byte local CSPRNG finalization value and
-   applies it to every zkey;
-9. exports every verification key and Solidity verifier, derives the receive-link parameters and
-   three fixed receive verifiers, and stages the browser WASM/zkey assets;
-10. reads the real contribution metadata embedded in every final zkey;
-11. creates the identity/disclosure records at `circuits/zk-ceremony-transcript.json` and
-    `circuits/zk-artifacts-manifest.json`, plus the eleven-circuit shielded records at
-    `release-evidence/shielded/phase2-transcript.json` and
-    `circuits/shielded-production-manifest.json`;
-12. rechecks the source snapshot, R1CS/WASM baseline and pTau bytes, then validates the staged schema, pTau
-    mathematics, zkey mathematics, contribution order, finalization metadata, and real proofs
-    before any release file is replaced;
-13. installs every non-manifest artifact, reruns real proofs and the production contract build, and
-    only then installs the manifest as the atomic release commit marker;
-14. rechecks installed artifact hashes and zkey-derived outputs, restoring the previous artifact
-    set if final validation fails.
-
-The local finalization value is accurately recorded as:
-
-```text
-node:crypto.randomBytes(32), generated after every Phase 2 contribution
-```
-
-It closes and identifies the final transcript. It is **not** described as an independent public
-randomness event and does not remove the single-operator trust assumption.
-
-The secret Phase 2 inputs are not placed in shell history, process arguments, environment
-variables, the transcript, or normal command output. The operator must still protect the machine
-during execution and destroy VM snapshots, swap copies, backups, or other recoverable state that
-could contain those secrets.
-
-## Generated evidence
-
-The identity/disclosure production manifest records:
-
-- `status: production`;
-- `trustModel: single-operator`;
-- the explicit single-operator warning;
-- the fixed pTau source, byte length, SHA-256, BLAKE2b-512, and verification status;
-- schema v3, the canonical Circom reference, the exact snarkjs CLI hash, and the deterministic
-  logical dependency-graph hash of the installed snarkjs production runtime;
-- the source, R1CS, WASM, zkey, vkey, and Solidity verifier hashes for both circuits;
-- the transcript and local finalization hashes.
-
-The identity/disclosure schema-v3 transcript records:
-
-- the release ceremony ID;
-- the same `single-operator` trust model;
-- the actual native compiler version, target, platform, architecture, strategy, binary hash, and
-  Linux libc detection evidence (or `null` on macOS/Windows);
-- for source targets, the pinned repository/commit and the Cargo/Rust versions from the fresh
-  private build;
-- every source and R1CS hash;
-- the one operator contribution name;
-- one embedded BLAKE2b-512 contribution hash per circuit;
-- the finalization value, exponent, source, and embedded finalization contribution hashes.
-
-The same setup command generates the shielded production manifest and Phase 2 transcript. Their
-`@1` schemas bind all fourteen shielded circuits to their source and artifact hashes, the pinned
-toolchain and pTau, and each circuit's operator contribution and finalization metadata. The two
-manifests and two transcripts are generated and installed together. The shielded manifest also
-binds the shared receive-link parameters, verifier base and all three fixed receive verifiers
-through `linkKeys`; no standalone receive manifest is installed.
-
-`platform` and `architecture` describe the Node/compiler execution runtime, not a hardware
-attestation.
-
-The single-operator transcript intentionally has no generated EVM identity signature. An ephemeral
-self-generated wallet signature would not prove independent participation or improve the trust
-model.
-
-## Review and commit
-
-Success leaves the generated release files uncommitted so that they can be reviewed. Do not run
-`release:preflight` yet: it requires a clean commit.
-
-First inspect the result:
-
-```bash
-git status --short
-git diff --stat
-git diff -- \
-  circuits/zk-artifacts-manifest.json \
-  circuits/zk-ceremony-transcript.json \
-  circuits/shielded-production-manifest.json \
-  release-evidence/shielded/phase2-transcript.json \
-  contracts/PersonCommitmentVerifier.sol \
-  contracts/DisclosureBindingVerifier.sol \
-  contracts/Shielded*Verifier.sol \
-  contracts/*ReceivePresentationVerifier.sol \
-  contracts/libraries/LinkedGroth16Verifier.sol \
-  frontend/public/zk/shielded/receive-link-keys.json
-
-npm run zk:check
-```
-
-Review the large binary assets by comparing their hashes with the manifest rather than attempting
-to render their bytes. Publish the browser WASM/zkey files to R2, then commit the manifest,
-transcript, verifiers, and verification keys together:
-
-```bash
-npm run zk:assets:publish
-
-git add \
-  circuits/zk-artifacts-manifest.json \
-  circuits/zk-ceremony-transcript.json \
-  circuits/shielded-production-manifest.json \
-  release-evidence/shielded/phase2-transcript.json \
-  contracts/PersonCommitmentVerifier.sol \
-  contracts/DisclosureBindingVerifier.sol \
-  contracts/Shielded*Verifier.sol \
-  contracts/*ReceivePresentationVerifier.sol \
-  contracts/libraries/LinkedGroth16Verifier.sol \
-  frontend/public/zk/shielded/receive-link-keys.json \
-  'frontend/public/zk/*.vkey.json' \
-  'frontend/public/zk/shielded/*.vkey.json'
-
-git commit -m "chore: install production zk artifacts"
-```
-
-The controlled release archive includes both manifests and transcripts, all 11 verifier contracts,
-the shared `LinkedGroth16Verifier.sol` base and `receive-link-keys.json`,
-and all browser proving artifacts under `frontend/public/zk/`. Include the ignored R1CS/WASM build
-outputs from both `zk-artifacts/circuits/` and `zk-artifacts/shielded/`, matched to their production
-manifest hashes. The final proving and verification keys come from the public directories. A clean
-Git status alone does not archive ignored build outputs.
-
-From a clean checkout of the new commit, restore the exact dependencies, then rebuild and run the
-complete gate:
-
-```bash
-npm ci --ignore-scripts --no-audit --no-fund
-npm run zk:fetch
-npm run zk:assets:fetch
-npm run release:preflight
-```
-
-`release:preflight` runs on every release-gate runtime in the support matrix and requires a
-schema-v3 manifest. It validates the official native compiler identity or performs a fresh,
-environment-isolated private build for a source target, validates the canonical reference digest,
-checks the clean commit before and after the build, verifies that the R1CS and WASM produced with
-explicit `--O2 --sanity_check 2` match the reviewed artifact hashes, runs the ceremony's snarkjs
-verification from a private runtime snapshot, verifies every real proof and all published hashes,
-validates the single-operator transcript against the real zkey metadata, and runs the complete
-contract, frontend, localization, XSS, storage, and dependency checks.
-
-Mainnet release and release-rehearsal wrappers run those build, test and evidence checks through
-the same internal API, then perform the complete ceremony verification once in the final execution
-process before opening the RPC. They hold the shared build lock across both stages and recheck
-artifact hashes at each boundary. No verification result is reused across separate invocations.
-
-## Testnet and Mainnet sequence
-
-After the ZK artifacts are frozen, follow the target-chain runbook in this order:
-
-1. bootstrap and validate the production governance Safe, then reserve the deployer EOA;
-2. query its exact next pending protocol-release nonce and use the chain-specific
-   `mainnet:projection -- --chain <espace|ethereum>` command to freeze the resulting deployments object into the
-   production protocol manifest;
-3. commit that chain-specific state and run `release:preflight` from the clean final commit;
-4. run the target testnet acceptance command in `release-rehearsal` mode with
-   `MIN_DELAY >= 604800` from that same commit;
-5. accept only a schema-v1 fresh-release report with `status=passed`, `releaseReady=true`,
-   `evidenceType=initial-mainnet-release`, `governanceLifecycleIncluded=false`,
-   `zkArtifactTrust.productionReady=true`, and `zkCeremonyVerification.status=passed`;
-6. archive that exact report with the release commit and ZK evidence;
-7. generate the read-only Mainnet release plan, whose derived same-chain deployment projection must
-   exactly equal the manifest;
-8. obtain the required Safe-owner approvals over the exact plan;
-9. execute only the unchanged reviewed plan.
-
-If the deployer nonce or any tracked release input changes, regenerate and recommit the projection,
-then repeat preflight and the rehearsal. Testnet addresses/runtime hashes are verified against the
-testnet deployment itself; they are not compared to the final Mainnet addresses/runtime hashes.
-
-The release rehearsal deploys that Timelock delay but schedules no Timelock operation, so it has
-zero Timelock waits. Diagnostic mode uses the built-in 30-second delay for each of four governance
-windows; diagnostic output is never release evidence. A fresh Mainnet release also has zero
-Timelock waits. Its configured 7-day delay governs later changes.
-
-The Safe remains a separate 2/3 governance control. The testnet/Mainnet release tools validate the
-recorded ZK trust model but do not reinterpret one ZK contributor as one governance signer.
-
-## Optional multi-party enhancement
-
-When independent contributors are available, DeepFamily may perform a traditional sequential
-multi-party Phase 2 ceremony instead of the default command:
-
-```text
-initial zkeys
-  -> participant A contributes independently to every circuit
-  -> participant B contributes independently to every circuit
-  -> optional further participants
-  -> pre-announced public finalization beacon
-  -> final production zkeys
-```
-
-Each participant should verify the incoming R1CS, pTau, zkeys, and transcript; use separate fresh
-entropy for each circuit; return all outputs together; sign the exact public contribution
-record; and destroy their secret environment. The existing signed multi-party transcript format
-remains supported.
-
-This is an optional strengthening, not a current release prerequisite and not tied to the Safe
-owner count. If a multi-party setup is selected, use a separately reviewed coordinator procedure
-and do not claim completion merely by generating several keys on one operator's machine.
-
-## Restart conditions
-
-Generate a new final artifact set with `npm run zk:setup` when:
-
-- any circuit source or R1CS changes;
-- public-signal or packing semantics change;
-- the selected pTau or its hash is uncertain;
-- the operator believes Phase 2 secrets may have been retained or exposed;
-- a zkey, transcript, verifier, or artifact hash cannot be reproduced;
-- any pTau, zkey, proof, or artifact verification fails.
-
-Never repair a transcript by manually changing hashes or contribution order. Fix the cause and
-regenerate the complete artifact set.
+The pinned values and provenance are defined in
+[`productionPtau.mjs`](../scripts/lib/productionPtau.mjs). A matching Phase 1 file does not supply
+reviewed circuit-specific Phase 2 keys or complete production approval.
+
+## Production status
+
+[`protocolProductionArtifacts.mjs`](../scripts/lib/protocolProductionArtifacts.mjs) explicitly
+rejects production setup and release for the current graph. `zk:setup -- --help` explains that
+status; the command does not currently generate production transcripts or final keys. Editing a
+development manifest's status cannot satisfy this gate.
+
+Production work must provide a reviewed ceremony and verifier/evidence workflow for the same
+14 relations, then satisfy the existing clean-build, proof, deployment, capacity and release
+evidence checks. Its trust model and contributor evidence must be explicit. Governance Safe
+owners and ZK ceremony contributors perform separate roles; the Safe threshold does not supply
+trusted-setup evidence.
+
+The two Mainnet runbooks describe later deployment prerequisites, not permission to bypass this
+blocked ceremony: [Conflux eSpace](espace-mainnet-release.md#prerequisites) and
+[Ethereum](ethereum-mainnet-release.md#prerequisites).
+
+## Historical material
+
+Earlier revisions described issuer/presentation linking and a different ceremony graph. Those
+instructions do not apply to the current protocol. For historical analysis, read the earlier
+revision explicitly, for example `git show 69dc2571:docs/zk-ceremony.md`. Current operational
+commands and requirements are the ones above.

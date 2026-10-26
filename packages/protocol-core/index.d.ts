@@ -928,5 +928,6 @@ export function getProofDefinitionByPurpose(purpose: string): ProofDefinition;
 export * from "./receive-code.js";
 export * from "./budget.js";
 export * from "./eligibility.js";
+export * from "./revocation.js";
 export * from "./wallet.js";
 export * from "./value.js";

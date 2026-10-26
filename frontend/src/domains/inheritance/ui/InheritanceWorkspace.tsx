@@ -8,6 +8,7 @@ import { WalletConnectButton } from "../../wallet";
 import { FIELD_INPUT, FIELD_TEXTAREA, FieldBlock, PanelButton } from "./inheritanceControls";
 import { CopyIconButton } from "../../../shared/ui";
 import { PersonHashCalculator, type PersonHashCalculatorHandle } from "../../person";
+import { normalizeFriendlyError } from "../../../shared/lib/errors";
 
 type Task = "receive" | "shield" | "transfer" | "budget" | "unshield" | "letter";
 const LOCKED: WalletStateView = { unlocked: false, codeCount: "0", credentialCount: 0, backupChanged: false };
@@ -24,6 +25,7 @@ export function InheritanceWorkspace({ context, signer, account, symbol, decimal
   const client = useRef<ReceiveWorkerClient | null>(null);
   if (!client.current) client.current = new ReceiveWorkerClient();
   const current = useRef({ context, signer, account }); current.current = { context, signer, account };
+  const submissionEpoch = useRef(0);
   const [state, setState] = useState<WalletStateView>(LOCKED);
   const [notes, setNotes] = useState<WalletNoteView[]>([]), [letters, setLetters] = useState<WalletLetterView[]>([]);
   const [task, setTask] = useState<Task>("receive"), [busy, setBusy] = useState(false);
@@ -45,11 +47,14 @@ export function InheritanceWorkspace({ context, signer, account, symbol, decimal
     if (parsed <= 0n) throw new Error(tr("invalidAmount")); return String(parsed);
   };
   const worker = () => { if (!client.current) throw new Error(tr("locked")); return client.current; };
-  useEffect(() => () => { client.current?.close(); client.current = null; }, []);
+  useEffect(() => () => { ++submissionEpoch.current; client.current?.close(); client.current = null; }, []);
   useEffect(() => { setNotes([]); setLetters([]); setNoteHandle(""); setRule(""); setStatus(""); setError(""); }, [context.deployment.poolAddress]);
   const run = async (operation: () => Promise<void>) => {
     setBusy(true); setError(""); setStatus("");
-    try { await operation(); } catch (failure) { setError(failure instanceof Error ? failure.message : tr("failed")); }
+    try { await operation(); } catch (failure) {
+      const friendly = normalizeFriendlyError(failure, t);
+      setError(friendly.type === "UNKNOWN_ERROR" ? (failure instanceof Error ? failure.message : tr("failed")) : friendly.message);
+    }
     finally { setBusy(false); }
   };
   const recover = async () => {
@@ -100,14 +105,22 @@ export function InheritanceWorkspace({ context, signer, account, symbol, decimal
     downloadBackup(result.backup, String(context.deployment.chainId)); setQualificationFile(null); setState(result.state);
     await refreshQualifications(); setStatus(tr("qualificationsImported"));
   });
-  const lock = () => { worker().close(); client.current = new ReceiveWorkerClient(); setState(LOCKED); setNotes([]); setLetters([]); setPassword(""); setCode(""); setQualifications([]); setSelectedQualifications([]); setQualificationPassword(""); setQualificationFile(null); setStatus(tr("locked")); };
+  const lock = () => { ++submissionEpoch.current; worker().close(); client.current = new ReceiveWorkerClient(); setState(LOCKED); setNotes([]); setLetters([]); setPassword(""); setCode(""); setQualifications([]); setSelectedQualifications([]); setQualificationPassword(""); setQualificationFile(null); setStatus(tr("locked")); };
   const submit = (override?: { claim: WalletNoteView }) => run(async () => {
     const expected = current.current;
+    const expectedEpoch = submissionEpoch.current;
     if (!expected.signer || !expected.account) throw new Error(tr("connect"));
-    const chain = new ReceiveChain(expected.context.deployment, expected.signer);
     const assertCurrent = () => {
-      if (current.current.signer !== expected.signer || current.current.account !== expected.account || current.current.context.deployment.poolAddress !== expected.context.deployment.poolAddress) throw new Error(tr("walletChanged"));
+      if (submissionEpoch.current !== expectedEpoch || current.current.signer !== expected.signer || current.current.account !== expected.account || current.current.context.deployment.poolAddress !== expected.context.deployment.poolAddress) throw new Error(tr("walletChanged"));
     };
+    const chain = new ReceiveChain(expected.context.deployment, expected.signer, {
+      beforeTransaction: assertCurrent,
+      onRevocationPreparation: (completed, total) => setStatus(t("walletProtocol.preparingQualification", { completed, total })),
+      prepareRevocationScans: async status => {
+        assertCurrent();
+        return (await worker().call("prepareRevocationScans", status, expected.context)).revocationScans;
+      },
+    });
     let transaction;
     if (override) {
       const prepared = await worker().call("walletPrepareClaim", { noteHandle: override.claim.handle, periodIndex: override.claim.claimPeriod }, expected.context);

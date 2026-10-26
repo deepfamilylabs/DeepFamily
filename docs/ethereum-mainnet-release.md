@@ -75,13 +75,11 @@ wallet, CI job, or replacement-transaction tool. Maintain an external production
 
 ## Prerequisites
 
-1. From a clean frozen circuit commit, run `npm run zk:setup` as described in
-   [zk-ceremony.md](./zk-ceremony.md). Review and commit the generated manifest, transcript,
-   verifiers, and frontend proving artifacts together. Run the final `release:preflight` only after
-   the chain-specific deployment projection below has also been frozen into the protocol manifest.
-   The default path records one Phase 2 contributor under the explicit
-   `single-operator` trust model. A multi-party ZK ceremony is an optional enhancement, not a
-   prerequisite and not related to the Safe's three-owner, 2/3 policy.
+1. Complete a reviewed production ceremony for the current 14-relation graph, as described in
+   [zk-ceremony.md](./zk-ceremony.md). This prerequisite is currently blocked: `zk:setup` refuses
+   production setup, and development keys cannot authorize a release. Once that reviewed workflow
+   exists, freeze its manifests, transcripts, verifiers and artifact pins together with the exact
+   chain-specific deployment projection before final `release:preflight`.
 2. Use a clean, isolated checkout with exact dependencies and complete the
    contract, frontend, ZK artifact, and storage-layout checks.
 3. Obtain the final public addresses of three independent EOA/hardware-wallet controllers in their

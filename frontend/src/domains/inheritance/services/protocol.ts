@@ -10,13 +10,14 @@ export class ReceiveProtocol {
   private readonly provider: JsonRpcProvider;
   private readonly reader: ReceiveChain;
   private readonly context: ReceiveWorkerContext;
+  private transactionEpoch = 0;
   constructor(rpcUrl: string, deployment: ReceiveDeployment, manifest: PinnedManifest) {
     if (BigInt(deployment.chainId) !== BigInt(manifest.chainId) ||
         deployment.registryAddress.toLowerCase() !== manifest.registryAddress.toLowerCase()) {
       throw new Error(" deployment and trusted proof configuration differ");
     }
     this.context = { rpcUrl, deployment: { ...deployment }, manifest: structuredClone(manifest) };
-    this.provider = new JsonRpcProvider(rpcUrl);
+    this.provider = new JsonRpcProvider(rpcUrl, undefined, { cacheTimeout: -1 });
     this.reader = new ReceiveChain(deployment, this.provider);
   }
   createCode(input: ReceiveWorkerCalls["createCode"]["input"]) {
@@ -45,7 +46,24 @@ export class ReceiveProtocol {
     return this.worker.call("proveQualification", input, this.context);
   }
   readBudgetRecord(key: bigint) { return this.reader.readBudgetRecord(key); }
-  transactions(signer: Signer) { return new ReceiveChain(this.context.deployment, signer); }
-  cancel() { this.worker.cancel(); }
-  close() { this.worker.close(); this.provider.destroy(); }
+  readSourcePaths(factLeafIndex: string | bigint, trustedLeafIndex: string | bigint) {
+    return this.reader.readSourcePaths(factLeafIndex, trustedLeafIndex);
+  }
+  transactions(signer: Signer) {
+    const epoch = this.transactionEpoch;
+    const assertActive = () => {
+      if (this.transactionEpoch !== epoch) throw new Error("Receive transaction preparation cancelled");
+    };
+    return new ReceiveChain(this.context.deployment, signer, {
+      beforeTransaction: assertActive,
+      prepareRevocationScans: async status => {
+        assertActive();
+        const result = await this.worker.call("prepareRevocationScans", status, this.context);
+        assertActive();
+        return result.revocationScans;
+      },
+    });
+  }
+  cancel() { ++this.transactionEpoch; this.worker.cancel(); }
+  close() { ++this.transactionEpoch; this.worker.close(); this.provider.destroy(); }
 }

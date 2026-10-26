@@ -1,13 +1,19 @@
 // @vitest-environment jsdom
 import React from "react";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { Signer } from "ethers";
 import { InheritanceWorkspace } from "./InheritanceWorkspace";
 import type { ReceiveWorkerContext } from "../../../shared/workers/receiveWorkerClient";
 
-const mocks = vi.hoisted(() => ({ call: vi.fn(), close: vi.fn(), clearSecrets: vi.fn(), matches: true }));
+const mocks = vi.hoisted(() => ({ call: vi.fn(), close: vi.fn(), clearSecrets: vi.fn(), matches: true,
+  sendDeposit: vi.fn(), firstPreparation: vi.fn(), nextPreparation: vi.fn(), submitFunds: vi.fn() }));
 vi.mock("react-i18next", () => ({ useTranslation: () => ({ t: (key: string, values?: { index?: number }) => values?.index === undefined ? key : `${key} ${values.index}` }) }));
 vi.mock("../../../shared/workers/receiveWorkerClient", () => ({ ReceiveWorkerClient: class { call = mocks.call; close = mocks.close; } }));
+vi.mock("../../../shared/clients/receiveChain", () => ({ ReceiveChain: class {
+  constructor(_deployment: unknown, _signer: unknown, private readonly options: { beforeTransaction(): void }) {}
+  sendDeposit(prepared: unknown, shardId: unknown) { return mocks.sendDeposit(this.options, prepared, shardId); }
+} }));
 vi.mock("../../person", () => ({ PersonHashCalculator: React.forwardRef((_props, ref) => {
   React.useImperativeHandle(ref, () => ({ getRawIdentityFields: () => ({ fullName: "Family Subject", gender: 1, birthYear: 2000, birthMonth: 5, birthDay: 17, isBirthBC: false }),
     getSecretInputs: () => ({ passphrase: "identity passphrase" }), clearSecretInputs: mocks.clearSecrets, passphrasesMatch: () => mocks.matches }));
@@ -21,6 +27,7 @@ const context: ReceiveWorkerContext = { rpcUrl: "http://localhost:8545", deploym
 const state = { unlocked: true, codeCount: "1", credentialCount: 3, backupChanged: false };
 beforeEach(() => {
   vi.clearAllMocks(); mocks.matches = true;
+  mocks.sendDeposit.mockReset();
   mocks.call.mockImplementation(async (method: string) => {
     if (method === "walletReadQualifications") return { qualifications: [
       { index: 0, current: false, selected: false }, { index: 1, current: true, selected: true }, { index: 2, current: true, selected: true },
@@ -33,6 +40,13 @@ beforeEach(() => {
 });
 afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 const open = () => render(<InheritanceWorkspace context={context} signer={null} account={null} symbol="DEEP" decimals={18} />);
+const openConnected = () => render(<InheritanceWorkspace context={context} signer={{} as Signer}
+  account="0x1111111111111111111111111111111111111111" symbol="DEEP" decimals={18} />);
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>(ready => { resolve = ready; });
+  return { promise, resolve };
+}
 function enterPassword() { fireEvent.change(screen.getByLabelText("walletProtocol.backupPassword"), { target: { value: "encrypted backup password" } }); }
 async function createWallet() {
   enterPassword(); fireEvent.click(screen.getByRole("button", { name: "walletProtocol.create" }));
@@ -70,5 +84,43 @@ describe("receiving wallet identity and qualification controls", () => {
     enterPassword(); fireEvent.click(screen.getByRole("button", { name: "walletProtocol.generateCode" }));
     await screen.findByText("walletProtocol.codeReady");
     expect(mocks.call).toHaveBeenCalledWith("walletCreateCode", expect.objectContaining({ credentialIndices: [] }), context);
+  });
+  it("stops later preparation and funds when cancelled while awaiting a preparation receipt", async () => {
+    const receipt = deferred<void>();
+    mocks.sendDeposit.mockImplementation(async (options: { beforeTransaction(): void }) => {
+      options.beforeTransaction();
+      mocks.firstPreparation();
+      await receipt.promise;
+      options.beforeTransaction();
+      mocks.nextPreparation();
+      mocks.submitFunds();
+      return { wait: async () => ({ status: 1 }) };
+    });
+    openConnected(); await createWallet();
+    fireEvent.click(screen.getByRole("button", { name: "walletProtocol.budget" }));
+    fireEvent.click(screen.getByRole("button", { name: "walletProtocol.submit" }));
+    await waitFor(() => expect(mocks.firstPreparation).toHaveBeenCalledTimes(1));
+    fireEvent.click(screen.getByRole("button", { name: "walletProtocol.cancel" }));
+    expect(mocks.close).toHaveBeenCalledTimes(1);
+    await act(async () => { receipt.resolve(); await receipt.promise; });
+    expect(mocks.nextPreparation).not.toHaveBeenCalled();
+    expect(mocks.submitFunds).not.toHaveBeenCalled();
+    expect(screen.queryByText("walletProtocol.confirmed")).toBeNull();
+  });
+  it("does not begin preparation or send funds after unmounting while the worker is preparing a deposit", async () => {
+    const prepared = deferred<{ inputShardId: bigint }>();
+    const defaultCall = mocks.call.getMockImplementation()!;
+    mocks.call.mockImplementation((method: string, ...args: unknown[]) => method === "walletPrepareDeposit"
+      ? prepared.promise : defaultCall(method, ...args));
+    const view = openConnected(); await createWallet();
+    fireEvent.click(screen.getByRole("button", { name: "walletProtocol.budget" }));
+    fireEvent.click(screen.getByRole("button", { name: "walletProtocol.submit" }));
+    await waitFor(() => expect(mocks.call).toHaveBeenCalledWith("walletPrepareDeposit", expect.any(Object), context));
+    view.unmount();
+    expect(mocks.close).toHaveBeenCalledTimes(1);
+    await act(async () => { prepared.resolve({ inputShardId: 0n }); await prepared.promise; });
+    expect(mocks.sendDeposit).not.toHaveBeenCalled();
+    expect(mocks.firstPreparation).not.toHaveBeenCalled();
+    expect(mocks.submitFunds).not.toHaveBeenCalled();
   });
 });

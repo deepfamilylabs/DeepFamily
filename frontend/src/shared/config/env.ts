@@ -1,6 +1,12 @@
-
 export function getViteEnv(): Record<string, unknown> {
   return (import.meta.env || {}) as Record<string, unknown>;
+}
+
+export type PublicStateReadMode = "rebuild" | "chain";
+
+/** Recipient-specific path reads require an explicit build-time opt-in. */
+export function getPublicStateReadMode(): PublicStateReadMode {
+  return getStringEnv("VITE_SHIELDED_STATE_READ_MODE").trim() === "chain" ? "chain" : "rebuild";
 }
 
 export function readStringEnv(value: unknown, fallback = ""): string {

@@ -193,8 +193,8 @@ describe("eSpace Mainnet release transaction intents", function () {
     expect([...poolArgs]).to.deep.equal(["deepFamilyToken","shieldedBoundaryVerifierAdapter","shieldedNativePool","receiveRegistry","protocolFundVerifier","protocolClaimVerifier","protocolTransferVerifier"].map(label=>byLabel[label].predictedAddress));
     const nativeArgs = decodeConstructor("shieldedNativePool", "ShieldedNativePool", Array(5).fill("address"));
     expect([...nativeArgs]).to.deep.equal(["shieldedBoundaryVerifierAdapter","receiveRegistry","protocolFundVerifier","protocolClaimVerifier","protocolTransferVerifier"].map(label=>byLabel[label].predictedAddress));
-    const sourceArgs = decodeConstructor("eligibilitySource", "EligibilitySource", Array(3).fill("address"));
-    expect([...sourceArgs]).to.deep.equal(["deepFamilyLineageIndex","protocolSourceFactVerifier","protocolSourceTrustVerifier"].map(label=>byLabel[label].predictedAddress));
+    const sourceArgs = decodeConstructor("eligibilitySource", "EligibilitySource", Array(4).fill("address"));
+    expect([...sourceArgs]).to.deep.equal(["deepFamilyLineageIndex","protocolSourceFactVerifier","protocolSourceTrustVerifier","protocolRevocationScanVerifier"].map(label=>byLabel[label].predictedAddress));
     const registryArgs = decodeConstructor("receiveRegistry", "ReceiveRegistry", Array(4).fill("address"));
     expect([...registryArgs]).to.deep.equal(["eligibilitySource","protocolIssueVerifier","protocolCodeVerifier","protocolCapabilityVerifier"].map(label=>byLabel[label].predictedAddress));
     const letterArgs = decodeConstructor("letterArchive", "LetterArchive", Array(2).fill("address"));

@@ -6,7 +6,7 @@ import path from "node:path";
 import { ensureZkArtifacts } from "../scripts/ensure-zk-artifacts.mjs";
 import { SHIELDED_CIRCUITS } from "../scripts/lib/zkCircuitSelection.mjs";
 
-const circuitCount = 13;
+const circuitCount = 14;
 
 function writePinnedArtifacts(root, status) {
   const files = {

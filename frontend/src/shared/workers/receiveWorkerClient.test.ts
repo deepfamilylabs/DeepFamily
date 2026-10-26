@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ReceiveWorkerClient, type ReceiveWorkerContext } from "./receiveWorkerClient";
-import { publicWorkerResult } from "../../workers/receive.worker";
+import { publicWorkerResult, publicWorkerError } from "../../workers/receive.worker";
+import { ProtocolError } from "@deepfamily/protocol-core";
 class FakeWorker {
   static instances: FakeWorker[] = [];
   requests: unknown[] = [];
@@ -36,6 +37,19 @@ describe("receiving proof worker boundary", () => {
     abort.abort();
     await expect(pending).rejects.toThrow(/cancelled/);
     expect(worker.terminate).toHaveBeenCalledOnce();
+  });
+  it("preserves an explicit revoked status without sending prover messages or witnesses", async () => {
+    const secret = "private-error-witness";
+    const error = publicWorkerError(new ProtocolError("QUALIFICATION_REVOKED", secret));
+    expect(error).toEqual({ code: "QUALIFICATION_REVOKED", message: "This qualification has been revoked." });
+    const pending = client.call("verifyCode", { code: "public" }, context);
+    const worker = FakeWorker.instances[0];
+    worker.reply({ id: worker.clones[0].id, ok: false, error });
+    await expect(pending).rejects.toMatchObject({ code: "QUALIFICATION_REVOKED" });
+    for (const failure of [new Error(secret), new ProtocolError("INVALID_REVOCATION_SCAN", secret),
+      Object.assign(new Error(secret), { code: "NETWORK_ERROR", witness: secret })]) {
+      expect(publicWorkerError(failure)).toEqual({ message: "Receive proof operation failed" });
+    }
   });
   it("removes private witnesses and note openings even if a future SDK result grows extra fields", () => {
     const secret = "private-must-not-cross";

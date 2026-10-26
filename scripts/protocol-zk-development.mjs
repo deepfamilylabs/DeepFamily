@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// Isolated local development keys for the receive protocol. This command never
-// modifies production manifests, production proving files or existing keys.
+// Explicit local setup rotates the selected receive development keys together
+// with their pins and verifiers. Production manifests and keys are never changed.
 import { execFileSync } from "node:child_process";
 import { createHash, randomBytes } from "node:crypto";
 import fs from "node:fs";

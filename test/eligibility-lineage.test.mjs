@@ -60,7 +60,7 @@ describe("Qualification hooks in the actual lineage", function () {
       libraries: {
         PoseidonT3: await poseidonT3.getAddress(), PoseidonT4: await poseidonT4.getAddress(),
       },
-    })).deploy(await lineageIndex.getAddress(), await verifier.getAddress(), await verifier.getAddress());
+    })).deploy(await lineageIndex.getAddress(), await verifier.getAddress(), await verifier.getAddress(), await verifier.getAddress());
     await deepFamily.setEligibilitySource(await source.getAddress());
     const chainId = (await hre.ethers.provider.getNetwork()).chainId;
     const scope = BigInt(await source.getAddress());

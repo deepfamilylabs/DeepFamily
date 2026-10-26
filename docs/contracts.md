@@ -519,7 +519,9 @@ A fresh deployment wires protocol components in this order:
 
 ```text
 Token
-→ Poseidon/age-gate libraries, both Groth16 verifiers, and their adapter
+→ Poseidon/age-gate libraries, identity/disclosure verifiers and adapter
+→ Shield/Unshield/Unshield4 verifiers and ShieldedBoundaryVerifierAdapter
+→ nine receiving generated verifiers, each wrapped by FixedGroth16Verifier
 → DeepFamily implementation and ERC-1967 proxy
 → initialize proxy and perform the one-time Token/DeepFamily binding
 → DeepFamilyArchive(proxy)
@@ -528,8 +530,12 @@ Token
 → proxy.setCircuitVerifier(purpose,circuitId,adapter) for each permanent route
 → PoseidonT3/T4/T6 libraries, then DeepFamilyLineageIndex(proxy) linked to T3–T6
 → proxy.setLineageIndex(index) exactly once
-→ ShieldedNativePool(lineage index, shared verifier adapter)
-→ ShieldedPoolFactory(DEEP token, lineage index, adapter, native pool), creating ShieldedErc20Pool for DEEP
+→ EligibilitySource(lineage index, source-fact verifier, source-trust verifier)
+→ ReceiveRegistry(source, issue verifier, code verifier, capability verifier)
+→ LetterArchive(proxy, registry), then proxy.setEligibilitySource(source) exactly once
+→ ShieldedNativePool(boundary adapter, registry, deposit/claim/transfer verifiers)
+→ ShieldedPoolFactory(DEEP token, boundary adapter, native pool, registry,
+  deposit/claim/transfer verifiers), creating ShieldedErc20Pool for DEEP
 → transfer DeepFamily ownership to the validated governance Timelock on live networks
 → verify proxy/implementation slot, Archive reverse binding, Reader immutables, routes,
   parameterized runtimes, and release-manifest hashes
@@ -605,17 +611,17 @@ finality timeout, and testnet evidence:
 npm run mainnet:release -- --chain espace --plan
 ```
 
-Before this command can plan a release, the development proving keys must have been replaced with
-`npm run zk:setup` as described in [zk-ceremony.md](zk-ceremony.md), every generated
-artifact must have been reviewed and committed together, `npm run release:preflight` must pass from
+The current 14-relation graph has no reviewed production ceremony: `zk:setup` refuses production
+setup, and the release planner remains blocked. Before this command can plan a release, reviewed
+production artifacts for that complete graph must have been committed together,
+`npm run release:preflight` must pass from
 that clean commit, and a successful eSpace `release-rehearsal` must have automatically published the
 exact schema-v1 `releaseReady=true` evidence to the chain-specific, Git-ignored
 `tmp/release-evidence/espace-release-rehearsal.json`. The Mainnet release reads that fixed file
 automatically and rejects a missing file or evidence from an older commit, a different artifact
 input, or a different production `MIN_DELAY >= 604800`. Diagnostic, failed, and recovery acceptance
-runs never overwrite the published evidence. The default ZK setup records one Phase 2 contributor
-under `trustModel=single-operator`; this is
-independent of the three-owner, 2/3 governance Safe.
+runs never overwrite the published evidence. The earlier setup procedure does not approve this
+graph; its proving-key trust model is separate from the three-owner, 2/3 governance Safe.
 
 Acceptance modes deliberately prove different things:
 
@@ -1139,8 +1145,9 @@ event MiningReward(address indexed miner, uint256 reward, uint256 totalAdditions
 
 **Location**: `contracts/DeepFamilyLineageIndex.sol`
 **Description**: Immutable companion of the DeepFamily proxy. It mirrors endorsements and trusted
-endorsers (recommended sources) into two Poseidon LeanIMTs so that a shielded claim can prove
-membership without naming the record. Both trees mirror public DeepFamily state in full, so being
+endorsers (recommended sources) into two Poseidon LeanIMTs. SourceFact/SourceTrust proofs
+authenticate these current paths before hidden qualifications are issued. Both trees mirror
+public DeepFamily state in full, so being
 indexed reveals nothing DeepFamily does not already publish.
 **Upgradeability**: None. It binds the proxy in its constructor (`DEEP_FAMILY`), and the proxy binds
 it once through `setLineageIndex`, which checks ERC-165 support, the reverse binding,
@@ -1160,7 +1167,7 @@ cancelling it or removing a trusted endorser writes zero into the leaf. Leaves a
 The trees follow zk-kit LeanIMT semantics: a node hash is `PoseidonT3(left, right)` and a node
 without a right sibling rises unchanged. Every node stays in storage, so a write recomputes its
 path without caller-supplied siblings and concurrent writes never invalidate each other. Each tree
-accepts at most `2^64` leaf slots, matching the claim circuit's maximum proof depth; clearing a
+accepts at most `2^64` leaf slots, matching the source-attestation circuits' maximum path depth; clearing a
 leaf does not free its slot.
 
 ```solidity
@@ -1220,8 +1227,8 @@ returned siblings: bit `k` is one when the running node is the right child of `s
 `proofIndex` can differ from `leafIndex`. An allocated leaf cleared to zero still occupies its slot
 and can be a sibling in another proof. The read visits at most 64 tree levels and does not write
 storage. A targeted RPC call reveals `treeId` and `leafIndex` to the RPC provider, which can
-correlate the index with public `LeafWritten` events. The client defaults to reconstructing current global pages and subsequent unfiltered updates.
-Users may explicitly select direct chain paths; a view read uses no transaction gas in either mode.
+correlate the index with public `LeafWritten` events. These getter calls are view reads and do
+not themselves submit a transaction.
 
 Every actual root change creates a monotonically numbered checkpoint containing both roots and
 its creation timestamp, and retires the preceding checkpoint exactly once. `isKnownCheckpoint`
@@ -1229,14 +1236,13 @@ requires a nonzero root pair from that one checkpoint and `createdAt <= asOf <= 
 A retired checkpoint also requires `asOf <= retiredAt` and
 `block.timestamp < retiredAt + CHECKPOINT_RETIREMENT_WINDOW` (15 minutes). Checkpoints are not
 evicted by a fixed-size history buffer: any number of unrelated writes cannot shorten this
-window. Repeated root values receive new IDs; a proof's bound `asOf` prevents moving it to a
-checkpoint created later. The deadline of the original ID never changes.
+window. Repeated root values receive new IDs; this history API checks `asOf` against that exact
+checkpoint's timestamps. The deadline of the original ID never changes.
 
-This deliberately permits revoked qualifications for at most 15 minutes after revocation.
-During that window a claimant may still collect already mature unpaid periods; the window is
-not a cap on the amount paid. The pool never combines independently known historical roots,
-which could represent qualifications that never coexisted. `isKnownRoot` remains a separate
-per-tree history view with a one-hour window; it does not authorize pool actions.
+These lineage-history windows do not authorize budget actions or permit revoked qualifications
+to claim for another 15 minutes. Source publication verifies the corresponding current lineage
+root, and `ReceiveRegistry` checks current role revocations independently at every budget
+acceptance. `isKnownRoot` remains a separate per-tree history view with a one-hour window.
 
 Only the proxy may call the `on*` hooks. The index stores current tree nodes and exposes
 `getMerkleProof`, `versionParents` and `getEndorsementMetadata`. Global reconstruction uses
@@ -1246,13 +1252,9 @@ limits are 1–256, and an offset equal to the count returns an empty page. All 
 must use one fixed block. Version pages retain every indexed version; endorsement/trust pages
 retain their physical slots and keys after cancellation/removal, with inactive entries flagged.
 Reverse slot keys are allocated only once; adding a version or a first slot now incurs extra
-index storage writes, while later updates reuse them. By default, clients rebuild these global
-current pages, authenticate the paired checkpoint, then apply unfiltered subsequent updates.
-Optional chain mode reads selected family records and paths at one fixed block and recomputes
-their leaves and paths locally. Parent openings remain available even when a parent record is
-not registered. Both read modes retain root, checkpoint and block-anchor verification, and neither
-fails over to the other. Proof preparation and submission recheck checkpoint acceptance, not equality
-with the latest roots, while retaining block-reorganization and spent-nullifier checks.
+index storage writes, while later updates reuse them. These lineage getters are distinct from
+the Source and Q membership paths used by the receiving workflow; the frontend reading strategy
+for those paths is described below.
 
 The contract links the PoseidonT3–T6 libraries from `poseidon-solidity`. They are compiled without
 `viaIR` (see `hardhat.config.mjs`); with it, PoseidonT6 exceeds the contract size limit.
@@ -1267,7 +1269,41 @@ The public methods are `shield`, `unshield`, `transfer`, `depositBudget` and `cl
 
 Every spend rejects reused nullifiers; every append rejects duplicate commitments. Only completed two-output roots are eligible input roots. The money relations bind chain, pool, output ciphertext hashes and all relevant policy/code fields. ERC20 boundaries require exact sender/pool/recipient balance changes; native withdrawals and token calls use reentrancy guards.
 
-The deployment catalog contains 13 relations. Local development builds and real-proof checks are available; public deployment remains blocked pending reviewed production ceremony evidence. Role revocation checks currently scan published openings and have a gas-scaling limit still to resolve before release.
+The deployment catalog contains 14 relations: identity/disclosure, three asset boundaries and
+nine source/qualification/receiving/budget relations. The frontend's build-time
+`VITE_SHIELDED_STATE_READ_MODE` chooses local event reconstruction (`rebuild`, the default) or
+targeted contract paths (`chain`) for Source and Q membership. Both validate paths and roots at
+an anchored block; funds-note recovery and paths continue to replay the public ledger locally.
+Neither strategy replaces the current role status check performed by the contract.
+
+Explicit `zk:dev` compiles all 14 relations, reuses matching identity/disclosure keys and rotates
+the nine receiving plus three boundary development key sets. Their manifests, vkeys, generated
+verifiers, local deployments and frontend pins must be updated together. After local deployment,
+`zk:frontend` synchronizes the frontend pins and boundary aliases. The regenerated development
+bundle passes `zk:dev:check` for all 14 relations; real-proof/EVM execution is checked separately
+with `zk:check`, `test:proof` and `test:evm`.
+
+Development generation and deployment are for local use. Public setup/deployment/release remain
+blocked pending reviewed production ceremony evidence for all 14 relations.
+
+`EligibilitySource` additionally fixes `SCAN_VERIFIER` in its constructor. Each role has an
+append-only revocation hash chain and authenticated prefix checkpoints. Permissionless
+`prepareRoleScan(role, nonce, tag, start, end, proof)` verifies up to 32 consecutive entries with
+nine public signals: chain, Source, role, nonce, tag, start, end, start digest and end digest.
+Only a proof beginning at the exact cached progress can advance it; callers cannot skip entries,
+substitute checkpoints or reuse progress for another role/code/Source.
+
+`isRoleRevoked` reuses this proved prefix and checks at most eight newly published openings.
+More unchecked entries cause `RevocationStateNotPrepared(role, checked, total)` before an
+unbounded scan can occur. This error means preparation is required, not that the qualification
+is valid or revoked. A matching tail entry rejects the role immediately; relevant DeepFamily
+changes still publish revocations atomically. No 15-minute grace period is used for budget
+qualification.
+
+Preparation requires only public openings and public code fields. Initial total proof work and
+preparation transactions for a fresh nonce/tag remain O(history); caches add per-code state.
+Final-check work is bounded, while browser time, aggregate preparation gas and storage still
+require capacity measurement before public release.
 
 ## ZK Verifier Contracts
 
@@ -1289,7 +1325,7 @@ The deployment catalog contains 13 relations. Local development builds and real-
 
 `Groth16VerifierAdapter` handles identity/disclosure only. `ShieldedBoundaryVerifierAdapter` selects Shield (7 signals), Unshield (11) or four-input Unshield (20), with a 256-byte ABC payload.
 
-Eight generated verifiers under `contracts/generated/protocol/` are wrapped individually by `FixedGroth16Verifier`: source fact (10), source trust (8), issuance (5), code (10), capability (10), deposit (20), claim (23), transfer (12). The wrapper fixes the generated verifier and public arity at construction. Clients must use the same pinned keys and public-signal order.
+Nine generated verifiers under `contracts/generated/protocol/` are wrapped individually by `FixedGroth16Verifier`: source fact (10), source trust (8), revocation scan (9), issuance (5), code (10), capability (10), deposit (20), claim (23), transfer (12). The wrapper fixes the generated verifier and public arity at construction. Clients must use the same pinned keys and public-signal order.
 
 ## Contract Security Summary
 

@@ -4,6 +4,7 @@ import {
   getDefaultReaderAddress,
   getShieldedPoolFactoryAddress,
   getShieldedPoolFactoryDeploymentBlock,
+  getPublicStateReadMode,
   readBooleanEnv,
   readNumberEnv,
   readPositiveNumberEnv,
@@ -12,6 +13,17 @@ import {
 
 afterEach(() => {
   vi.unstubAllEnvs();
+});
+
+describe("receiving public-state path source", () => {
+  it("defaults to local reconstruction unless chain reads are explicitly configured", () => {
+    for (const value of [undefined, "", "rebuild", "invalid", "CHAIN"]) {
+      vi.stubEnv("VITE_SHIELDED_STATE_READ_MODE", value);
+      expect(getPublicStateReadMode()).toBe("rebuild");
+    }
+    vi.stubEnv("VITE_SHIELDED_STATE_READ_MODE", " chain ");
+    expect(getPublicStateReadMode()).toBe("chain");
+  });
 });
 
 describe("shielded module addresses", () => {

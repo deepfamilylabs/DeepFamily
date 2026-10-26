@@ -5,13 +5,15 @@ import {
   deriveReceiveKeyMaterial, encodeReceiveCode, verifyReceiveCode,
   prepareBudgetDeposit, prepareBudgetClaim, prepareTransfer,
   createShieldedLetterEnvelope, encryptShieldedLetter, prepareEligibilityIssue,
+  planRevocationScans, REVOCATION_SCAN_BATCH_SIZE, REVOCATION_SCAN_TAIL_SIZE,
   type ProtocolInteger, type ProtocolProof, type PoolScope,
   type ReceiveCode, type LocalProver,
 } from "@deepfamily/protocol-core";
 import { getBigInt } from "ethers";
 // @ts-ignore snarkjs does not publish complete browser typings.
 import * as snarkjs from "snarkjs";
-import { ReceiveChain } from "../clients/receiveChain";
+import { ReceiveChain, encodeProtocolProof, type RevocationScanSubmission } from "../clients/receiveChain";
+import { fetchPinnedZkAsset } from "./zkAssets";
 
 export const PROTOCOL_CIRCUITS = Object.freeze({
   shield: { name: "shielded_shield", count: 7 },
@@ -19,6 +21,7 @@ export const PROTOCOL_CIRCUITS = Object.freeze({
   unshield4: { name: "shielded_unshield_4", count: 20 },
   sourceFact: { name: "eligibility_source_fact", count: 10 },
   sourceTrust: { name: "eligibility_source_trust", count: 8 },
+  revocationScan: { name: "eligibility_revocation_scan", count: 9 },
   issue: { name: "eligibility_issue", count: 5 },
   code: { name: "receive_code", count: 10 },
   capability: { name: "budget_capability", count: 10 },
@@ -56,6 +59,13 @@ function assertSignals(circuit: Circuit, actual: readonly ProtocolInteger[], exp
   const parsed = publicSignalsOf(circuit, actual), wanted = publicSignalsOf(circuit, expected);
   if (parsed.some((value, i) => value !== wanted[i])) throw new Error(` ${circuit} proof returned a different statement`);
 }
+function publicProtocolProof(proof: ProtocolProof): ProtocolProof {
+  encodeProtocolProof(proof);
+  return { pi_a: proof.pi_a.slice(0, 3).map(value => getBigInt(value)),
+    pi_b: proof.pi_b.slice(0, 3).map(row => row.slice(0, 2).map(value => getBigInt(value))),
+    pi_c: proof.pi_c.slice(0, 3).map(value => getBigInt(value)),
+    ...(proof.protocol ? { protocol: proof.protocol } : {}), ...(proof.curve ? { curve: proof.curve } : {}) };
+}
 
 /** Hash-check every artifact, including local files and verification keys, before invoking snarkjs. */
 export function createProtocolProofProvider(manifest: PinnedManifest): ProtocolProofProvider {
@@ -70,12 +80,13 @@ export function createProtocolProofProvider(manifest: PinnedManifest): ProtocolP
     if (!entry || entry.circuit !== PROTOCOL_CIRCUITS[circuit].name) throw new Error(`Pinned receiving ${circuit} artifacts are unavailable`);
     return entry;
   }
-  async function artifact(pin: PinnedArtifact) {
+  async function artifact(pin: PinnedArtifact, proving = false) {
     if (!/^[0-9a-f]{64}$/iu.test(pin.sha256)) throw new Error("Missing pinned receiving artifact digest");
-    const cacheKey = `${pin.url}:${pin.sha256}`;
+    const cacheKey = `${proving ? "proving" : "verification"}:${pin.url}:${pin.sha256}`;
     const existing = assets.get(cacheKey);
     if (existing) return existing;
     const pending = (async () => {
+      if (proving) return fetchPinnedZkAsset(pin);
       const response = await fetch(pin.url, { cache: "no-cache", credentials: "same-origin" });
       if (!response.ok) throw new Error(`Receive artifact unavailable: ${pin.url}`);
       const bytes = new Uint8Array(await response.arrayBuffer());
@@ -100,7 +111,7 @@ export function createProtocolProofProvider(manifest: PinnedManifest): ProtocolP
   return {
     async prove(circuit, witness) {
       const entry = configured(circuit);
-      const [wasm, zkey, vkey] = await Promise.all([artifact(entry.wasm), artifact(entry.zkey), verificationKey(circuit)]);
+      const [wasm, zkey, vkey] = await Promise.all([artifact(entry.wasm, true), artifact(entry.zkey, true), verificationKey(circuit)]);
       const result = await snarkjs.groth16.fullProve(witness, wasm, zkey);
       const publicSignals = publicSignalsOf(circuit, result.publicSignals);
       if (!await snarkjs.groth16.verify(vkey, publicSignals.map(String), result.proof)) throw new Error(`Invalid receiving ${circuit} proof`);
@@ -184,11 +195,11 @@ export class ReceiveService {
     assertSignals("issue", result.publicSignals, prepared.publicSignals);
     return { proof: result.proof, publicSignals: result.publicSignals };
   }
-  async proveQualification(input: { circuit: "sourceFact" | "sourceTrust" | "issue";
+  async proveQualification(input: { circuit: "sourceFact" | "sourceTrust" | "issue" | "revocationScan";
     witness: Record<string, bigint | bigint[]>; expectedPublicSignals: readonly ProtocolInteger[] }) {
     const result = await this.proofs.prove(input.circuit, input.witness);
     assertSignals(input.circuit, result.publicSignals, input.expectedPublicSignals);
-    return { proof: result.proof, publicSignals: result.publicSignals };
+    return { proof: publicProtocolProof(result.proof), publicSignals: result.publicSignals.map(value => getBigInt(value)) };
   }
   async verifyCode(code: string, asOf?: ProtocolInteger): Promise<ReceiveCode> {
     return verifyReceiveCode({ code, chainId: this.chain.deployment.chainId,
@@ -198,16 +209,45 @@ export class ReceiveService {
   }
   async prepareDeposit(input: Omit<Parameters<typeof prepareBudgetDeposit>[0],
     "authorizerScope" | "readBudgetRecord" | "verifyAuthorization" | "verifyCapability" | "checkEligibility" | "proveFund" | "verifyFund">) {
-    return prepareBudgetDeposit({ ...input, authorizerScope: BigInt(this.chain.deployment.registryAddress),
+    const prepared = await prepareBudgetDeposit({ ...input, authorizerScope: BigInt(this.chain.deployment.registryAddress),
       readBudgetRecord: key => this.chain.readBudgetRecord(key), checkEligibility: (code, cap) => this.chain.checkEligibility(code, cap),
       verifyAuthorization: (proof, signals) => this.proofs.verify("code", proof, signals),
       verifyCapability: (proof, signals) => this.proofs.verify("capability", proof, signals),
       proveFund: witness => this.proofs.prove("fund", witness), verifyFund: (proof, signals) => this.proofs.verify("fund", proof, signals) }, this.scope);
+    const cap = prepared.code.capabilities[prepared.capabilityIndex];
+    const revocationScans = await this.prepareRevocationScans({ issuanceRoot: cap.issuanceRoot, nonce: prepared.code.nonce,
+      childTag: cap.childTag, endorsementTag: cap.endorsementTag, trustedTag: cap.trustedTag });
+    return { ...prepared, ...(revocationScans.length ? { revocationScans } : {}) };
   }
   async prepareClaim(input: Omit<Parameters<typeof prepareBudgetClaim>[0], "authorizerScope" | "checkQualification" | "proveClaim" | "verifyClaim" | "isPeriodSpent">) {
-    return prepareBudgetClaim({ ...input, authorizerScope: BigInt(this.chain.deployment.registryAddress),
+    const prepared = await prepareBudgetClaim({ ...input, authorizerScope: BigInt(this.chain.deployment.registryAddress),
       checkQualification: status => this.chain.checkClaimQualification(status), isPeriodSpent: nf => this.chain.isPeriodSpent(nf),
       proveClaim: witness => this.proofs.prove("claim", witness), verifyClaim: (proof, signals) => this.proofs.verify("claim", proof, signals) }, this.scope);
+    const revocationScans = await this.prepareRevocationScans({ issuanceRoot: getBigInt(prepared.publicInput.issuanceRoot),
+      nonce: getBigInt(prepared.publicInput.nonce), childTag: getBigInt(prepared.publicInput.childTag),
+      endorsementTag: getBigInt(prepared.publicInput.endorsementTag), trustedTag: getBigInt(prepared.publicInput.trustedTag) });
+    return { ...prepared, ...(revocationScans.length ? { revocationScans } : {}) };
+  }
+  async prepareRevocationScans(status: Parameters<ReceiveChain["readQualificationRevocations"]>[0]): Promise<RevocationScanSubmission[]> {
+    const states = await this.chain.readQualificationRevocations(status, undefined, { maxEntries: REVOCATION_SCAN_BATCH_SIZE });
+    const submissions: RevocationScanSubmission[] = [];
+    // One bounded round produces at most one proof per role. Public preparation
+    // transactions persist progress before another worker round begins.
+    // Authenticate all sampled roles first, so a detected revocation fails before proving.
+    const plans = states.map(state => {
+      if (state.secrets.length > REVOCATION_SCAN_BATCH_SIZE)
+        throw new Error("Revocation preparation exceeds one worker round");
+      const needsPreparation = state.count - state.checkedThrough > BigInt(REVOCATION_SCAN_TAIL_SIZE);
+      return { state, plan: planRevocationScans({ ...state, tailSize: needsPreparation ? 0 : REVOCATION_SCAN_TAIL_SIZE }) };
+    });
+    for (const { state, plan } of plans) for (const scan of plan.scans) {
+      const proved = await this.proofs.prove("revocationScan", scan.witness);
+      assertSignals("revocationScan", proved.publicSignals, scan.publicSignals);
+      submissions.push({ sourceAddress: state.sourceAddress, role: state.role, nonce: state.nonce, tag: state.tag,
+        start: scan.start, end: scan.end, startHash: scan.startHash, endHash: scan.endHash,
+        proof: publicProtocolProof(proved.proof), publicSignals: proved.publicSignals.map(value => getBigInt(value)) });
+    }
+    return submissions;
   }
   async prepareTransfer(input: Omit<Parameters<typeof prepareTransfer>[0], "authorizerScope" | "verifyAuthorization" | "verifyCapability" | "proveTransfer" | "verifyTransfer">) {
     const code = await this.verifyCode(typeof input.code === "string" ? input.code : encodeReceiveCode(input.code), input.asOf);

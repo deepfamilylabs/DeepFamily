@@ -2,60 +2,64 @@
 
 React/Vite SPA for exploring family-tree data, generating ZK proofs, submitting protocol transactions, and managing encrypted metadata.
 
-For local shielded inheritance development, run `npm run dev:all` from the repository root.
-The first run builds missing circuit outputs and downloads the manifest-pinned proving files from R2.
-It reuses the pinned keys and stops if they are stale or cannot be obtained. Final key generation
-is an explicit repository-root operation: `npm run zk:setup` from a clean, reviewed commit on a
-controlled machine outside CI. The resulting artifact set is shared by local development, CI and
-release.
-The local deploy command binds the shielded pool to the same DeepFamily token
-and lineage index. `npm run frontend:config` writes their addresses and deployment blocks to
-`.env.local` from the integrated deployment records.
-The setup command records the single-operator ceremony evidence and synchronizes browser
-WASM/zkey/vkey files to `public/zk/shielded/` and generated verifiers to `contracts/`, following
-the identity/disclosure flow. Only the `.vkey.json` files are
-committed; publish new WASM/zkey files with `npm run zk:assets:publish` from the repository root.
-The dev server serves the local copies at `/zk/`. Builds load WASM/zkey from
-`<VITE_ZK_ASSET_BASE_URL>/<sha256>/<file name>.br`. The host sends `Content-Encoding: br`, so
-the browser decodes the download before checking its original SHA-256 against the circuit
-manifests. `npm run zk:assets:publish` automatically prepares local Brotli files before uploading.
-Builds using this host omit local WASM/zkey files and their compressed
-copies from `dist`; local dev and builds with an empty host keep using raw files at `/zk/`.
-`npm run zk:check` rebuilds all 16 circuits and checks artifact consistency,
-proofs and available ceremony evidence using the same pinned artifact set.
-Publish the `.br` objects once before deploying this frontend, even when the circuit keys have
-not changed; existing raw objects use different URLs.
-The current checked-in keys remain development-only and unattested until the explicit final setup
-and review. `release:preflight` requires the final keys, ceremony evidence and other release
-evidence before publication. Daily builds, downloads and checks reuse keys without generating them.
+For a complete local stack, run `npm run dev:all` from the repository root with the
+manifest-pinned proving files available. The development bundle has been regenerated and passes
+`zk:dev:check` for all 14 relations. Local deployment compiles missing outputs and tries to fetch
+pinned files; it never regenerates keys. `npm run frontend:config` writes local contract addresses
+and deployment blocks from the integrated deployment records.
 
-The budget dialog offers **Public budget**, **Private (identity credentials)**, and
-**Private (independent key)**. All three spend donor VALUE from the selected pool; the ordinary wallet
-supplies public `shield` deposits and transaction gas. Public budget needs only the child's
-registered person hash and publishes the recipient and budget terms. Private modes need the
-child's verified receive code of the matching type. Identity credentials recreate their derived
-funds; the independent-key mode uses a separate root that those credentials cannot recreate.
-Users explicitly select **Deposit to** for the key controlling new VALUE notes and **Use balance from**
-for transfers, withdrawals and donor budget funding. Both identity credentials and the independent key
-use the same HPKE encryption; the choice determines spending authority and recovery requirements.
-The selected key must be available, and a missing or changed key never silently selects another
-owner. An independent deposit or payment choice is bound to its key fingerprint: restoring the
-same key preserves the choice, while a different verified key must be explicitly selected again.
-Payment planning stays within the selected owner, pool and allowed candidate notes,
-including same-owner consolidation when needed. Receive-code type, budget entry and claim filters
-separately select recipient authorization.
+The current graph has 14 relations: two identity/disclosure, three asset boundaries, and nine
+receiving/qualification/budget relations. `npm run zk:build` compiles them; `npm run zk:check`
+rebuilds and verifies their pinned artifacts and real proofs. Checks reuse existing keys.
+`npm run zk:dev` explicitly compiles all 14 relations, reuses matching identity/disclosure keys,
+and regenerates the nine receiving plus three boundary development key sets. Rotation updates
+their manifests, vkeys and Solidity verifiers; local contracts and frontend pins must then be
+updated together. `npm run zk:dev:check` verifies the complete 14-relation bundle without changing
+keys. `zk:setup` and `release:preflight` currently refuse production use because a reviewed
+ceremony covering all 14 relations is unavailable.
 
-Claims create private VALUE after identity, current family eligibility, maturity and allowance
-checks. Independent-key budgets also require the original independent key. Additional funding preserves the
-arrangement's original rate and clock.
+After local deployment, `npm run zk:frontend -- <chainId> <registry>` synchronizes the nine
+receiving and three boundary artifact sets, including boundary aliases, into `public/zk/protocol/`
+and writes trusted pins to `src/proof-artifacts.local.json`.
+Identity/disclosure files remain under `public/zk/`. Browser verification-key JSON is committed;
+WASM/zkey downloads must match the published hashes. Local dev uses same-origin files. Remote
+builds load WASM/zkey from `<VITE_ZK_ASSET_BASE_URL>/<sha256>/<file name>.br`, while vkeys remain
+local. The host must send `Content-Encoding: br`; the browser checks the decoded bytes against
+the trusted hash. Publish those exact files with `npm run zk:assets:publish` before relying on
+remote builds. Builds using the host omit local WASM/zkey files from `dist`.
 
-The separate **Independent key** wallet entry manages recovery, creation and backup. Receive-code
-settings only select credentials and generate a code. **Unlock independent key** accepts 24 English
-recovery words or a Shielded Key. New independent keys default
-to a random root, with wallet-signature derivation as an alternative. Both methods require saving
-and re-importing a backup after clearing the in-memory independent key. For signature-derived keys, the
-original signing wallet produces a recovery candidate until matching pool history confirms it. See
-[independent keys and recovery](../docs/shielded-independent-key-spec.md) for the exact rules.
+The inheritance page has one wallet and one `dfreceive` code format. The receiving Worker owns
+money secrets, code indices and qualification/controller openings. Users create or restore an
+authenticated encrypted wallet backup, then share codes with independently derived owner/viewing
+keys. A family wallet derives its canonical subject secret inside the Worker; qualifications from
+a matching encrypted backup can be merged without replacing existing money keys.
+
+`shield` creates VALUE in the selected native/ERC20 pool. `depositBudget` spends the payer's VALUE
+using a recipient code, a matching family capability and the public budget rule. The first deposit
+creates a code/policy record; additional deposits add independent contributions and preserve the
+original clock. Both recheck current qualification. Claims prove a current qualification and a
+matured period, and share the subject/policy/period allowance across codes. Ordinary transfers and
+letters use the same code without requiring a family capability.
+
+`VITE_SHIELDED_STATE_READ_MODE` is a build-time choice for qualification Q and Source membership
+paths: `rebuild` (default) replays public events locally and validates the resulting paths;
+`chain` requests selected paths from the contracts and reveals those indices to the RPC.
+Both use anchored block reads and validate roots. Missing, blank or unknown values select
+`rebuild`; there is no runtime switch or automatic fallback. Funds-note recovery and paths
+continue to use local ledger replay in both modes. This setting does not change the contract's
+bounded latest-tail role checks.
+
+Budget preparation also reads authenticated public revocation logs at an anchored block. The
+Worker proves continuous intervals of up to 32 entries using only the original code and public
+openings. Before a deposit or claim, the transaction client submits required `prepareRoleScan`
+transactions and waits for them before sending the funds transaction. The contract checks at
+most eight newer entries per role against the latest state; a larger tail reports
+`RevocationStateNotPrepared`, while a matching revocation rejects the qualification immediately.
+Read-only qualification checks can authenticate the public log locally without requiring a
+preparation transaction. Network failures and incomplete/corrupt logs remain errors. Preparation
+can require multiple proofs and transactions: the initial total for a new nonce/tag remains
+proportional to revocation history, and later calls reuse verified progress. No 15-minute grace
+period is introduced.
 
 For architecture, domain layout, ABI sync, workers, ZK artifacts, and troubleshooting, see [docs/frontend.md](../docs/frontend.md). For frontend security guidance, see [docs/frontend-security.md](../docs/frontend-security.md).
 

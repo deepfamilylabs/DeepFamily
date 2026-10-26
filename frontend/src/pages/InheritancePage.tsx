@@ -7,10 +7,14 @@ import { getReadonlyProvider } from "../shared/clients/providerRegistry";
 import { createShieldedPoolFactoryContract } from "../shared/clients/contractFactory";
 import { getLetterArchiveAddress, getShieldedPoolFactoryAddress } from "../shared/config/env";
 import { SUPPORTED_NETWORKS } from "../shared/config/networks";
-import { readShieldedAsset, resolveShieldedAssetPool } from "../domains/inheritance/services/shieldedAssetRegistry";
-import { InheritanceWorkspace } from "../domains/inheritance/ui/InheritanceWorkspace";
+import {
+  FIELD_INPUT,
+  FieldBlock,
+  InheritanceWorkspace,
+  readShieldedAsset,
+  resolveShieldedAssetPool,
+} from "../domains/inheritance";
 import { PageHead } from "../shared/ui";
-import { FIELD_INPUT, FieldBlock } from "../domains/inheritance/ui/inheritanceControls";
 import { configuredProofManifest as configuredPins } from "../shared/zk/proofConfiguration";
 import type { ReceiveWorkerContext } from "../shared/workers/receiveWorkerClient";
 

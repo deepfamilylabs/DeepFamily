@@ -49,6 +49,17 @@ contract EligibilitySourceMock is IEligibilitySource {
     }
   }
 
+  // This test source does not implement authenticated scan preparation.
+  function revocationCheckpoint(uint8, uint256) external pure returns (uint256) {
+    revert("Mock scan checkpoints unsupported");
+  }
+
+  function roleScanProgress(uint8, uint256, uint256) external pure returns (uint256) { return 0; }
+
+  function prepareRoleScan(uint8, uint256, uint256, uint256, uint256, bytes calldata) external pure {
+    revert("Mock scan preparation unsupported");
+  }
+
   function beforeEndorsementChange(uint256, address) external pure {}
   function beforeTrustedChange(uint256, uint256, address) external pure {}
 }

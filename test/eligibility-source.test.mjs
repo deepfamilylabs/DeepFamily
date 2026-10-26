@@ -20,7 +20,7 @@ describe(" eligibility source", function () {
     const lineage = await hre.ethers.deployContract("SourceLineageMock", [await family.getAddress()]);
     const source = await (await hre.ethers.getContractFactory("EligibilitySource", {
       libraries: { PoseidonT3: await t3.getAddress(), PoseidonT4: await t4.getAddress() },
-    })).deploy(await lineage.getAddress(), await verifier.getAddress(), await verifier.getAddress());
+    })).deploy(await lineage.getAddress(), await verifier.getAddress(), await verifier.getAddress(), await verifier.getAddress());
     const chain = (await hre.ethers.provider.getNetwork()).chainId;
     const scope = BigInt(await source.getAddress());
     await family.setSource(await source.getAddress());

@@ -3,7 +3,7 @@ import path from "node:path";
 import fs from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { execFileSync } from "node:child_process";
-import { inspectProtocolProductionArtifacts } from "./lib/protocolProductionArtifacts.mjs";
+import { PRODUCTION_CIRCUITS, inspectProtocolProductionArtifacts } from "./lib/protocolProductionArtifacts.mjs";
 import { inspectProtocolReleaseManifest } from "./lib/protocolReleaseManifest.mjs";
 import { inspectZkReleaseArtifacts } from "./lib/zkArtifactTrust.mjs";
 import { assertLocalCircomInstallation, buildPinnedCircomFromSource, resolveTrustedSourceBuildTool } from "./fetch-circom.mjs";
@@ -61,7 +61,7 @@ export async function runReleaseChecks({root=process.cwd(),env=process.env,platf
       throw new Error("Proof or protocol manifests changed while release preflight was running");
     if(cleanGitState({root,runner,env:baseEnvironment,gitExecutable})!==releaseCommit)
       throw new Error("Release commit changed while preflight was running");
-    return Object.freeze({status:"checks-passed",releaseCommit,circuitCount:13,protocolManifestSha256:protocol.manifestSha256});
+    return Object.freeze({status:"checks-passed",releaseCommit,circuitCount:PRODUCTION_CIRCUITS.length,protocolManifestSha256:protocol.manifestSha256});
   } finally { if(stage!==undefined) await fs.rm(stage,{recursive:true,force:true}); }
 }
 export async function runReleasePreflight(options = {}) { return runReleaseChecks(options); }

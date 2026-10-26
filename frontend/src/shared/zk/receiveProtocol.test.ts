@@ -5,8 +5,9 @@ import { computeFamilyTag, computeRoleTag, buildCapabilityPublicSignals, compute
   computeReceiveAuthorization, decodeReceiveCode, computeIdentityFromDerivedSecret, createSourceFact,
   createSourceTrust, prepareEligibilityIssue } from "@deepfamily/protocol-core";
 import { ReceiveChain } from "../clients/receiveChain";
-import { ReceiveService, createProtocolProofProvider, createReceiveService,
-  type ProtocolProofProvider, type PinnedManifest } from "./receiveProtocol";
+import * as zkAssets from "./zkAssets";
+import { PROTOCOL_CIRCUITS, ReceiveService, createProtocolProofProvider, createReceiveService,
+  type Circuit, type ProtocolProofProvider, type PinnedManifest } from "./receiveProtocol";
 const backend = vi.hoisted(() => ({ fullProve: vi.fn(), verify: vi.fn() }));
 vi.mock("snarkjs", () => ({ groth16: backend }));
 const proof = { pi_a: ["1", "2", "1"], pi_b: [["3", "4"], ["5", "6"], ["1", "0"]], pi_c: ["7", "8", "1"] };
@@ -31,15 +32,43 @@ function prover(): ProtocolProofProvider {
     return { proof, publicSignals: buildCapabilityPublicSignals(common, { ...cap, capabilityBinding: computeCapabilityBinding(common, cap) }) };
   } };
 }
-function artifacts(count = 10) {
+function artifacts(count = 10, circuit: Circuit = "code") {
   const bytes = { wasm: Uint8Array.of(1, 2), zkey: Uint8Array.of(3, 4),
     vkey: new TextEncoder().encode(JSON.stringify({ protocol: "groth16", curve: "bn128", nPublic: count })) };
-  const pin = (name: keyof typeof bytes) => ({ url: `/zk/protocol/${name}`, sha256: createHash("sha256").update(bytes[name]).digest("hex") });
+  const name = PROTOCOL_CIRCUITS[circuit].name;
+  const filenames = { wasm: `${name}.wasm`, zkey: `${name}_final.zkey`, vkey: `${name}.vkey.json` };
+  const pin = (kind: keyof typeof bytes) => ({ url: `/zk/protocol/${filenames[kind]}`,
+    sha256: createHash("sha256").update(bytes[kind]).digest("hex") });
+  const entry = { circuit: name, wasm: pin("wasm"), zkey: pin("zkey"), vkey: pin("vkey") };
   const manifest: PinnedManifest = { version: 1, chainId: "31337", registryAddress: deployment.registryAddress,
-    circuits: { code: { circuit: "receive_code", wasm: pin("wasm"), zkey: pin("zkey"), vkey: pin("vkey") } } };
-  vi.stubGlobal("fetch", vi.fn(async (url: string) => ({ ok: true,
-    arrayBuffer: async () => bytes[url.slice(url.lastIndexOf("/") + 1) as keyof typeof bytes].slice().buffer })));
-  return { bytes, manifest };
+    circuits: { [circuit]: entry } };
+  vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+    const kind = (Object.keys(filenames) as (keyof typeof bytes)[]).find(kind => url.endsWith(filenames[kind]));
+    if (!kind) throw new Error(`Unexpected asset fetch: ${url}`);
+    return { ok: true, arrayBuffer: async () => bytes[kind].slice().buffer };
+  }));
+  return { bytes, manifest, entry };
+}
+
+const fetchPinnedZkAsset = zkAssets.fetchPinnedZkAsset;
+function remoteArtifacts(circuit: Circuit) {
+  const fixture = artifacts(PROTOCOL_CIRCUITS[circuit].count, circuit);
+  const { entry, bytes } = fixture;
+  const baseUrl = "https://zk.example/receive";
+  const remoteUrl = (pin: typeof entry.wasm) => `${baseUrl}/${pin.sha256}/${pin.url.slice(pin.url.lastIndexOf("/") + 1)}.br`;
+  const inventoryPath = (url: string) => ["shield", "unshield", "unshield4"].includes(circuit)
+    ? url.replace("/zk/protocol/", "/zk/shielded/") : url;
+  const host = { baseUrl, digests: Object.fromEntries([entry.wasm, entry.zkey].map(pin => [inventoryPath(pin.url), pin.sha256])) };
+  vi.spyOn(zkAssets, "fetchPinnedZkAsset").mockImplementation(pin => fetchPinnedZkAsset(pin, host));
+  const responses = new Map([
+    [remoteUrl(entry.wasm), bytes.wasm], [remoteUrl(entry.zkey), bytes.zkey], [entry.vkey.url, bytes.vkey],
+  ]);
+  const fetchMock = vi.fn(async (url: string) => {
+    const body = responses.get(url);
+    return body ? new Response(body.slice()) : new Response(null, { status: 404 });
+  });
+  vi.stubGlobal("fetch", fetchMock);
+  return { ...fixture, fetchMock, responses, remoteUrl };
 }
 
 describe("explicit receiving receive service", () => {
@@ -98,6 +127,60 @@ describe("explicit receiving receive service", () => {
     const valid = artifacts();
     backend.verify.mockResolvedValue(false);
     await expect(createProtocolProofProvider(valid.manifest).prove("code", {})).rejects.toThrow(/Invalid receiving/);
+  });
+  it.each(Object.keys(PROTOCOL_CIRCUITS) as Circuit[])("loads remote proving files and local keys for %s", async circuit => {
+    const { manifest, entry, bytes, fetchMock, remoteUrl } = remoteArtifacts(circuit);
+    const count = PROTOCOL_CIRCUITS[circuit].count;
+    backend.fullProve.mockResolvedValue({ proof, publicSignals: Array(count).fill("1") });
+    const provider = createProtocolProofProvider(manifest);
+    await Promise.all([provider.prove(circuit, {}), provider.prove(circuit, {})]);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(fetchMock).toHaveBeenCalledWith(remoteUrl(entry.wasm));
+    expect(fetchMock).toHaveBeenCalledWith(remoteUrl(entry.zkey));
+    expect(fetchMock).toHaveBeenCalledWith(entry.vkey.url, { cache: "no-cache", credentials: "same-origin" });
+    expect(backend.fullProve).toHaveBeenCalledWith({}, bytes.wasm, bytes.zkey);
+    await expect(provider.verify(circuit, proof, Array(count).fill(1n))).resolves.toBe(true);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+  it.each(["http", "corruption"])("retries rejected remote artifacts after %s failures without caching them", async failure => {
+    const { manifest, entry, responses, fetchMock, remoteUrl, bytes } = remoteArtifacts("code");
+    const wasmUrl = remoteUrl(entry.wasm);
+    const provider = createProtocolProofProvider(manifest);
+    if (failure === "http") responses.delete(wasmUrl);
+    else responses.set(wasmUrl, Uint8Array.of(99));
+    await expect(provider.prove("code", {})).rejects.toThrow(failure === "http" ? /404/ : /digest mismatch/);
+    expect(backend.fullProve).not.toHaveBeenCalled();
+    responses.set(wasmUrl, bytes.wasm);
+    await provider.prove("code", {});
+    expect(fetchMock.mock.calls.filter(([url]) => url === wasmUrl)).toHaveLength(2);
+    expect(fetchMock.mock.calls.filter(([url]) => url === remoteUrl(entry.zkey))).toHaveLength(1);
+    expect(fetchMock.mock.calls.filter(([url]) => url === entry.vkey.url)).toHaveLength(1);
+    expect(backend.fullProve).toHaveBeenCalledOnce();
+  });
+  it("rejects and retries replaced same-origin verification keys in remote builds", async () => {
+    const { manifest, entry, responses, fetchMock, bytes } = remoteArtifacts("code");
+    const provider = createProtocolProofProvider(manifest);
+    responses.set(entry.vkey.url, new TextEncoder().encode("untrusted verification key"));
+    await expect(provider.verify("code", proof, Array(10).fill(1n))).rejects.toThrow(/digest mismatch/);
+    expect(backend.verify).not.toHaveBeenCalled();
+    responses.set(entry.vkey.url, bytes.vkey);
+    await expect(provider.verify("code", proof, Array(10).fill(1n))).resolves.toBe(true);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenNthCalledWith(2, entry.vkey.url, { cache: "no-cache", credentials: "same-origin" });
+  });
+  it("snapshots every trusted artifact pin before later manifest mutation", async () => {
+    const { manifest, entry, fetchMock, remoteUrl, bytes } = remoteArtifacts("code");
+    const expectedWasmUrl = remoteUrl(entry.wasm), expectedZkeyUrl = remoteUrl(entry.zkey), expectedVkeyUrl = entry.vkey.url;
+    const provider = createProtocolProofProvider(manifest);
+    for (const kind of ["wasm", "zkey", "vkey"] as const) {
+      Object.assign(entry[kind], { url: `https://untrusted.example/${kind}`, sha256: "a".repeat(64) });
+    }
+    Object.assign(entry, { circuit: "substituted_circuit" });
+    await provider.prove("code", {});
+    expect(fetchMock).toHaveBeenCalledWith(expectedWasmUrl);
+    expect(fetchMock).toHaveBeenCalledWith(expectedZkeyUrl);
+    expect(fetchMock).toHaveBeenCalledWith(expectedVkeyUrl, { cache: "no-cache", credentials: "same-origin" });
+    expect(backend.fullProve).toHaveBeenCalledWith({}, bytes.wasm, bytes.zkey);
   });
   it("issues only against current authenticated source roots and returns no private credential opening", async () => {
     const identity = { fullName: " subject", isBirthBC: false, birthYear: 2010, birthMonth: 5, birthDay: 17, gender: 1 };

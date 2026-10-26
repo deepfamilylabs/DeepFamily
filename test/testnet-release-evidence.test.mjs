@@ -309,7 +309,7 @@ const bindDeploymentEvidence = (report) => {
   return report;
 };
 
-const SCOPES = {sourceFact:[3,4,"eligibilitySource"],sourceTrust:[2,3,"eligibilitySource"],issue:[1,2,"receiveRegistry"],code:[3,4,"receiveRegistry"],capability:[5,6,"receiveRegistry"]};
+const SCOPES = {sourceFact:[3,4,"eligibilitySource"],sourceTrust:[2,3,"eligibilitySource"],revocationScan:[0,1,"eligibilitySource"],issue:[1,2,"receiveRegistry"],code:[3,4,"receiveRegistry"],capability:[5,6,"receiveRegistry"]};
 const shieldedProofs = chainId => Object.fromEntries(Object.entries(ACCEPTANCE_CIRCUITS).map(([action,spec])=>{
   const signals=Array(spec.publicSignals).fill("0");
   const [chainIndex,scopeIndex,scope]=SCOPES[action]??[0,1,"shieldedErc20Pool"];
@@ -429,10 +429,10 @@ const validReportTemplate = () => ({
       blake2b512: ZK_PRODUCTION_PHASE1.blake2b512,
     },
     circuits: Object.keys(ZK_RELEASE_ARTIFACTS),
-    circuitCount: 13,
+    circuitCount: 14,
     shielded: {
       status: "passed",
-      circuitCount: 11,
+      circuitCount: 12,
       manifestSha256: SHIELDED_MANIFEST_SHA256,
       ptau: {
         bytes: ZK_PRODUCTION_PHASE1.bytes,
@@ -706,9 +706,9 @@ describe("schema v1 initial-mainnet-release rehearsal evidence", function () {
     expect(result.publicSummary.finality.revalidatedTransactionCount).to.equal(Object.keys(REPORT_TRANSACTIONS).length);
     expect(result.publicSummary.shielded).to.deep.include({
       manifestSha256: SHIELDED_MANIFEST_SHA256,
-      proofCount: 11,
+      proofCount: 12,
     });
-    expect(result.publicSummary.shielded.verifierCallActions).to.deep.equal(["unshield4", "sourceFact", "sourceTrust", "issue", "code", "capability", "claim"]);
+    expect(result.publicSummary.shielded.verifierCallActions).to.deep.equal(["unshield4", "sourceFact", "sourceTrust", "revocationScan", "issue", "code", "capability", "claim"]);
     expect(result.publicSummary.shielded.transactionActions).to.have.length(4);
     expect(result.publicSummary.refund.transactionHash).to.equal(REFUND_TRANSACTION_HASH);
     expect(Object.isFrozen(result)).to.equal(true);
@@ -1429,7 +1429,7 @@ describe("schema v1 initial-mainnet-release rehearsal evidence", function () {
     }
   });
 
-  it("binds all eleven proof artifacts, statements and scopes to the selected chain", async function () {
+  it("binds all twelve proof artifacts, statements and scopes to the selected chain", async function () {
     const cases = [
       [report=>report.shieldedArtifacts.manifestSha256="ff".repeat(32), /shieldedArtifacts.manifestSha256/u],
       [report=>delete report.shieldedArtifacts.circuits.code, /shieldedArtifacts.circuits/u],

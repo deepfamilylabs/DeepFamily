@@ -562,6 +562,11 @@ export const assertIntegratedShieldedWiring = async (deployed) => {
       "source trust verifier",
     ],
     [
+      await source.SCAN_VERIFIER(),
+      await deployed.protocolVerifiers.revocationScan.getAddress(),
+      "source revocation scan verifier",
+    ],
+    [
       await registry.ISSUE_VERIFIER(),
       await deployed.protocolVerifiers.issue.getAddress(),
       "issue verifier",
