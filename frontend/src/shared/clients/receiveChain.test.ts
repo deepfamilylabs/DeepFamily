@@ -2,8 +2,9 @@ import { describe, expect, it } from "vitest";
 import { AbiCoder, Interface, type ContractRunner } from "ethers";
 import PoolArtifact from "../../abi/ShieldedNativePool.json";
 import RegistryArtifact from "../../abi/ReceiveRegistry.json";
+import SourceArtifact from "../../abi/EligibilitySource.json";
 import LetterArtifact from "../../abi/LetterArchive.json";
-import { POOL_ABI, RECEIVE_REGISTRY_ABI, LETTER_ABI,
+import { POOL_ABI, RECEIVE_REGISTRY_ABI, ELIGIBILITY_SOURCE_ABI, LETTER_ABI,
   ReceiveChain, buildActionData, encodeProtocolProof } from "./receiveChain";
 const proof = { pi_a: ["1", "2", "1"], pi_b: [["3", "4"], ["5", "6"], ["1", "0"]], pi_c: ["7", "8", "1"] };
 describe("receiving chain transport", () => {
@@ -11,6 +12,7 @@ describe("receiving chain transport", () => {
     for (const [declared, compiled, methods] of [
       [POOL_ABI, PoolArtifact.abi, ["depositBudget", "claimBudget", "transfer", "shield", "unshield", "budgetRecords", "RECEIVE_REGISTRY"]],
       [RECEIVE_REGISTRY_ABI, RegistryArtifact.abi, ["verifyReceive", "verifyBudgetCapability", "validateBudgetRoleStatus"]],
+      [ELIGIBILITY_SOURCE_ABI, SourceArtifact.abi, ["isRoleRevoked", "getSourceProof"]],
       [LETTER_ABI, LetterArtifact.abi, ["registerLetter", "RECEIVE_REGISTRY"]],
     ] as const) {
       const actual = new Interface(declared), expected = new Interface(compiled);
@@ -53,7 +55,7 @@ describe("receiving chain transport", () => {
       },
     } as unknown as ContractRunner;
     const chain = new ReceiveChain(deployment, runner);
-    const status = { issuanceRoot: 11n, nonce: 13n, childTag: 17n, endorsementTag: 19n, trustedTag: 23n };
+    const status = { issuanceRoot: 11n, childRoleIndex: 17n, endorsementRoleIndex: 19n, trustedRoleIndex: 23n };
     expect(await chain.checkClaimQualification(status)).toBe(true);
     for (const [name, args] of [["UnknownIssuanceRoot", []], ["QualificationRevoked", [0]], ["QualificationRevoked", [2]]] as const) {
       failure = { code: "CALL_EXCEPTION", data: registry.encodeErrorResult(name, args) };

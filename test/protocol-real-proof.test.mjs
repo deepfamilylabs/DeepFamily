@@ -25,7 +25,6 @@ import {
   poolTag,
 } from "../circuits/test/budget_fixture.mjs";
 
-import { revocationScanFixture } from "../circuits/test/revocation_fixture.mjs";
 
 const root = path.resolve(import.meta.dirname, "..");
 const required = process.env.REQUIRE_PROTOCOL_REAL_PROOFS === "1";
@@ -96,7 +95,6 @@ export function realProofFixtures() {
   return {
     sourceFact: sourceFactFixture(),
     sourceTrust: sourceTrustFixture(),
-    revocationScan: revocationScanFixture(),
     issue: issueFixture,
     code: codeFixture,
     capability: capabilityFixture(issueFixture, codeFixture),

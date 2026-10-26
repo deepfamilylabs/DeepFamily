@@ -1,14 +1,13 @@
 import assert from "node:assert/strict";
-import { poseidon2, poseidon3 } from "poseidon-lite";
-import { computeShieldedCiphertextHashField, prepareRevocationScan } from "@deepfamily/protocol-core";
-import { proveProtocol } from "../../scripts/protocol-zk-development.mjs";
+import { poseidon2 } from "poseidon-lite";
+import { computeShieldedCiphertextHashField, computeRoleStatusIndex } from "@deepfamily/protocol-core";
 
 // Gas/state fixture only: the source, registry and pools are the actual contracts.
-// Family/lineage authentication and money proofs are explicit mocks. Revocation
-// scan proofs use the real fixed Groth16 verifier unless explicitly disabled.
+// Family/lineage authentication and money proofs are explicit mocks. Role status
+// is the actual production Source mapping; no history proofs or preparation exist.
 // This fixture is not full cryptographic acceptance of the money/qualification flow.
 // Source state is populated through publication/revocation, never storage writes.
-export async function createReceiveRevocationGasFixture(hre, { realScan = true } = {}) {
+export async function createReceiveRevocationGasFixture(hre) {
   const { ethers, networkHelpers } = hre;
   const [endorser, manager] = await ethers.getSigners();
   const abi = ethers.AbiCoder.defaultAbiCoder();
@@ -19,20 +18,15 @@ export async function createReceiveRevocationGasFixture(hre, { realScan = true }
   const mined = async (promise) => (await promise).wait();
   const chainId = (await ethers.provider.getNetwork()).chainId;
   const t3 = await ethers.deployContract("PoseidonT3");
-  const t4 = await ethers.deployContract("PoseidonT4");
   const verifier = await ethers.deployContract("FixedProofVerifierMock");
   const boundaryVerifier = await ethers.deployContract("PoolBoundaryVerifierMock");
-  const rawScanVerifier = realScan ? await ethers.deployContract("EligibilityRevocationScanVerifier") : null;
-  const scanVerifier = realScan
-    ? await ethers.deployContract("FixedGroth16Verifier", [await rawScanVerifier.getAddress(), 9])
-    : verifier;
   const family = await ethers.deployContract("SourceFamilyMock");
   const lineage = await ethers.deployContract("SourceLineageMock", [await family.getAddress()]);
   const source = await (
     await ethers.getContractFactory("EligibilitySource", {
-      libraries: { PoseidonT3: await t3.getAddress(), PoseidonT4: await t4.getAddress() },
+      libraries: { PoseidonT3: await t3.getAddress() },
     })
-  ).deploy(await lineage.getAddress(), await verifier.getAddress(), await verifier.getAddress(), await scanVerifier.getAddress());
+  ).deploy(await lineage.getAddress(), await verifier.getAddress(), await verifier.getAddress());
   const sourceAddress = await source.getAddress();
   const familyAddress = await family.getAddress();
   await mined(family.setSource(sourceAddress));
@@ -108,8 +102,8 @@ export async function createReceiveRevocationGasFixture(hre, { realScan = true }
     ),
   );
   const nonce = 64n;
-  const tags = targetSecrets.map((secret, role) =>
-    poseidon3([73301n + BigInt(role), secret, nonce]),
+  const roleIndices = targetSecrets.map((secret, role) =>
+    computeRoleStatusIndex({ role: ["child", "endorsement", "trusted"][role], roleSecret: secret }),
   );
   const code = {
     codeAlias: 61n,
@@ -138,14 +132,14 @@ export async function createReceiveRevocationGasFixture(hre, { realScan = true }
     parentVersion: 1n,
     capabilityBinding: 72n,
     familyTag: 73n,
-    childTag: tags[0],
-    endorsementTag: tags[1],
-    trustedTag: tags[2],
+    childRoleIndex: roleIndices[0],
+    endorsementRoleIndex: roleIndices[1],
+    trustedRoleIndex: roleIndices[2],
   };
   const capabilityProof = echo([
     capability.capabilityBinding,
     capability.familyTag,
-    ...tags,
+    ...roleIndices,
     chainId,
     BigInt(registryAddress),
     capability.issuanceRoot,
@@ -281,9 +275,9 @@ export async function createReceiveRevocationGasFixture(hre, { realScan = true }
         asOf: now,
         periodNullifier: 1200n,
         issuanceRoot: capability.issuanceRoot,
-        childTag: tags[0],
-        endorsementTag: tags[1],
-        trustedTag: tags[2],
+        childRoleIndex: roleIndices[0],
+        endorsementRoleIndex: roleIndices[1],
+        trustedRoleIndex: roleIndices[2],
       };
       const claim = {
         method: "claimBudget",
@@ -307,7 +301,7 @@ export async function createReceiveRevocationGasFixture(hre, { realScan = true }
             ...outputs(action),
             BigInt(registryAddress),
             capability.issuanceRoot,
-            ...tags,
+            ...roleIndices,
           ]),
         ],
         data: action,
@@ -382,62 +376,16 @@ export async function createReceiveRevocationGasFixture(hre, { realScan = true }
       family.connect(actor).revoke(sourceAddress, actor.address, [role], [targetSecrets[role]]),
     );
   };
-  const buildScanPlans = async ({ leaveTail = 0 } = {}) => {
-    assert.ok(Number.isInteger(leaveTail) && leaveTail >= 0 && leaveTail <= 8, "Invalid live tail size");
-    const plans = [];
-    for (const role of [0, 1, 2]) {
-      let start = await source.roleScanProgress(role, nonce, tags[role]);
-      const total = await source.revokedRoleCount(role);
-      while (total - start > BigInt(leaveTail)) {
-        const end = start + 32n < total ? start + 32n : total;
-        const prepared = prepareRevocationScan({ chainId, sourceAddress, role, nonce, tag: tags[role],
-          start, startHash: await source.revocationCheckpoint(role, start),
-          endHash: await source.revocationCheckpoint(role, end),
-          secrets: Array.from(await source.getRevokedRolePage(role, start, end - start)) });
-        const before = process.hrtime.bigint();
-        const result = realScan
-          ? await proveProtocol({ circuit: "revocationScan", witness: prepared.witness, expectedPublicSignals: prepared.publicSignals })
-          : { solidityProof: echo(prepared.publicSignals) };
-        plans.push({ role, nonce, tag: tags[role], start, end, proof: result.solidityProof,
-          proofMilliseconds: Number(process.hrtime.bigint() - before) / 1e6,
-          proofBytes: ethers.getBytes(result.solidityProof).length,
-          nodeRssBytesAfterProof: process.memoryUsage().rss });
-        start = end;
-      }
-    }
-    return plans;
-  };
-  const submitScanPlans = async plans => {
-    const rows = [];
-    for (const plan of plans) {
-      const previous = await source.roleScanProgress(plan.role, plan.nonce, plan.tag);
-      const receipt = await mined(source.prepareRoleScan(plan.role, plan.nonce, plan.tag,
-        plan.start, plan.end, plan.proof));
-      rows.push({ role: plan.role, start: String(plan.start), end: String(plan.end),
-        proofMilliseconds: plan.proofMilliseconds, proofBytes: plan.proofBytes,
-        nodeRssBytesAfterProof: plan.nodeRssBytesAfterProof,
-        gasUsed: String(receipt.gasUsed), transactionHash: receipt.hash,
-        newProgressStorageWords: previous === 0n ? 1 : 0,
-        updatedProgressStorageWords: previous === 0n ? 0 : 1 });
-    }
-    return rows;
-  };
-  const prepareStatus = async options => submitScanPlans(await buildScanPlans(options));
   return {
     source,
     registry,
     family,
     pools,
     seedTo,
-    buildScanPlans,
-    submitScanPlans,
-    prepareStatus,
-    scanVerifier,
-    realScan,
     targetSecrets,
     revokeTarget,
     nonce,
-    tags,
+    roleIndices,
     token,
     code,
     capability,

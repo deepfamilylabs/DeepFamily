@@ -51,7 +51,7 @@ export const RECEIVE_DEPLOYMENT_CONTRACTS = Object.freeze(
 export const receiveDeploymentConstructorArgs = (property, a) => {
   switch (property) {
     case "eligibilitySource":
-      return [a.lineageIndex, a.protocolSourceFactVerifier, a.protocolSourceTrustVerifier, a.protocolRevocationScanVerifier];
+      return [a.lineageIndex, a.protocolSourceFactVerifier, a.protocolSourceTrustVerifier];
     case "receiveRegistry":
       return [
         a.eligibilitySource,
@@ -67,7 +67,7 @@ export const receiveDeploymentConstructorArgs = (property, a) => {
 };
 export const receiveDeploymentLibraries = (property, a) =>
   property === "eligibilitySource"
-    ? { PoseidonT3: a.poseidonT3, PoseidonT4: a.poseidonT4 }
+    ? { PoseidonT3: a.poseidonT3 }
     : property === "receiveRegistry"
       ? { PoseidonT3: a.poseidonT3 }
       : {};
@@ -77,7 +77,6 @@ export const RECEIVE_DEPLOYMENT_IMMUTABLES = Object.freeze({
     DEEP_FAMILY: "deepFamily",
     FACT_VERIFIER: "protocolSourceFactVerifier",
     TRUST_VERIFIER: "protocolSourceTrustVerifier",
-    SCAN_VERIFIER: "protocolRevocationScanVerifier",
   },
   receiveRegistry: {
     SOURCE: "eligibilitySource",

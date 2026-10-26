@@ -4,19 +4,19 @@ React/Vite SPA for exploring family-tree data, generating ZK proofs, submitting 
 
 For a complete local stack, run `npm run dev:all` from the repository root with the
 manifest-pinned proving files available. The development bundle has been regenerated and passes
-`zk:dev:check` for all 14 relations. Local deployment compiles missing outputs and tries to fetch
+`zk:dev:check` for all 13 relations. Local deployment compiles missing outputs and tries to fetch
 pinned files; it never regenerates keys. `npm run frontend:config` writes local contract addresses
 and deployment blocks from the integrated deployment records.
 
-The current graph has 14 relations: two identity/disclosure, three asset boundaries, and nine
+The current graph has 13 relations: two identity/disclosure, three asset boundaries, and nine
 receiving/qualification/budget relations. `npm run zk:build` compiles them; `npm run zk:check`
 rebuilds and verifies their pinned artifacts and real proofs. Checks reuse existing keys.
-`npm run zk:dev` explicitly compiles all 14 relations, reuses matching identity/disclosure keys,
-and regenerates the nine receiving plus three boundary development key sets. Rotation updates
+`npm run zk:dev` explicitly compiles all 13 relations, reuses matching identity/disclosure keys,
+and regenerates the eight receiving plus three boundary development key sets. Rotation updates
 their manifests, vkeys and Solidity verifiers; local contracts and frontend pins must then be
-updated together. `npm run zk:dev:check` verifies the complete 14-relation bundle without changing
+updated together. `npm run zk:dev:check` verifies the complete 13-relation bundle without changing
 keys. `zk:setup` and `release:preflight` currently refuse production use because a reviewed
-ceremony covering all 14 relations is unavailable.
+ceremony covering all 13 relations is unavailable.
 
 After local deployment, `npm run zk:frontend -- <chainId> <registry>` synchronizes the nine
 receiving and three boundary artifact sets, including boundary aliases, into `public/zk/protocol/`

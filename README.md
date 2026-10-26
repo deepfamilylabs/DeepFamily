@@ -60,7 +60,7 @@ DeepFamily creates the decentralized family tree infrastructure, using zero-know
 - A public `shield` deposit places the selected ERC-20 or native asset in its canonical pool. `depositBudget` spends the payer's VALUE and creates an encrypted BUDGET contribution. The first deposit creates a code/policy record; later deposits add independent contributions and preserve its original eligibility clock. Both paths check current qualification.
 - One `dfreceive` code authorizes letters and ordinary transfers, with optional family capabilities for child budgets. A payer can use the original code and a future public family rule while the recipient stays offline. Ordinary receipt and letters remain available after a family qualification is revoked.
 - `claimBudget` proves a current qualification, spends a matured contribution and creates VALUE plus the remaining BUDGET output. The subject/policy/period allowance is shared across codes. Transfers and public `unshield` exits are separate transactions.
-- Qualification revocation takes effect immediately. Public-log scan proofs prepare at most 32 entries per interval; each final role check examines at most eight new entries. A larger unchecked tail requires preparation instead of an unbounded scan. First-time preparation for a new code still grows with the history size; this is not a constant-total-cost protocol.
+- Qualification revocation takes effect immediately. Budget deposits, contributions and claims use three direct role-index lookups, independent of total revocation history. Codes using the same qualification expose the same role indices and can be linked; recipient spending/viewing keys remain independently derived.
 - Wallet secrets and qualification/controller openings remain inside the receiving Worker. Authenticated encrypted backups preserve money keys, code indices and openings; each new external code requires an updated backup. A family wallet derives its canonical subject secret from identity inputs inside the Worker. Recovery replays public ledger events and decrypts locally. See [receiving codes and letters](docs/private-letters.md).
 - Gas-paying wallets, public deposits, and public exit addresses and amounts remain visible. Privacy depends on avoiding address funding and timing links; the pool does not offer absolute anonymity. Each asset has its own balances, budgets and anonymity set.
 
@@ -147,38 +147,38 @@ npm run frontend:check # Run frontend lint + typecheck + tests
 npm run check          # Run circuit constraints, frontend checks and contract lint/build/test
 ```
 
-The development artifacts have been regenerated and pass `zk:dev:check` for all 14 relations.
+The development artifacts have been regenerated and pass `zk:dev:check` for all 13 relations.
 Real-proof and EVM checks are separate; they require the matching manifest-pinned files and
 reject missing or mismatched artifacts. See [ZK proofs](docs/zk-proofs.md#development-and-release).
 
 ### ZK Artifact Workflow
 
-The protocol uses 14 Circom relations: two identity/disclosure, three money boundaries and nine receiving/qualification/budget relations. `dfreceive` is the sole receiving-code format. A payer can use the code for letters, transfers and future budget contributions while the recipient remains offline. See [receiving codes and letters](docs/private-letters.md).
+The protocol uses 13 Circom relations: two identity/disclosure, three money boundaries and eight receiving/qualification/budget relations. `dfreceive` is the sole receiving-code format. A payer can use the code for letters, transfers and future budget contributions while the recipient remains offline. See [receiving codes and letters](docs/private-letters.md).
 
 | Command | Purpose |
 | --- | --- |
 | `npm run zk:fetch` | Install the pinned Circom toolchain |
-| `npm run zk:build` | Compile the 14 canonical relations |
+| `npm run zk:build` | Compile the 13 canonical relations |
 | `npm run zk:assets:fetch` | Download and verify the manifest-pinned proving files |
-| `npm run zk:dev` | Compile all 14 relations, regenerate 12 receiving/boundary development key sets and reuse identity/disclosure keys |
-| `npm run zk:dev:check` | Verify the complete 14-relation artifact bundle without replacing keys |
-| `npm run zk:check` | Rebuild all 14 relations and check pinned artifacts and real proofs |
+| `npm run zk:dev` | Compile all 13 relations, regenerate 11 receiving/boundary development key sets and reuse identity/disclosure keys |
+| `npm run zk:dev:check` | Verify the complete 13-relation artifact bundle without replacing keys |
+| `npm run zk:check` | Rebuild all 13 relations and check pinned artifacts and real proofs |
 | `npm run zk:frontend -- <chainId> <registry>` | Export trusted frontend receiving artifacts |
 | `npm run test:circuits` | Check current circuit constraints without proving keys |
-| `npm run test:proof` | Verify nine real receiving proofs and public-signal binding |
+| `npm run test:proof` | Verify eight real receiving proofs and public-signal binding |
 | `npm run test:evm` | Exercise the complete real-proof money and eligibility flow |
 
-Local development keys are not approved production keys. Production setup and release remain blocked until all 14 relations have reviewed ceremony evidence. Browser WASM/zkey files are generated/downloaded artifacts; proof keys cannot be selected by a scanned receiving code. The project has one protocol and no compatibility entry points for previous receiving designs.
+Local development keys are not approved production keys. Production setup and release remain blocked until all 13 relations have reviewed ceremony evidence. Browser WASM/zkey files are generated/downloaded artifacts; proof keys cannot be selected by a scanned receiving code. The project has one protocol and no compatibility entry points for previous receiving designs.
 
 `zk:setup` currently refuses production setup because that reviewed ceremony is unavailable;
 it does not generate final keys or promote development artifacts. `zk:dev` is explicit local
-development rotation: it compiles all 14 relations, verifies and reuses existing matching
-identity/disclosure keys, and generates new keys for the nine receiving and three boundary
+development rotation: it compiles all 13 relations, verifies and reuses existing matching
+identity/disclosure keys, and generates new keys for the eight receiving and three boundary
 relations. It updates their development manifests, vkeys and Solidity verifiers; redeploy local
 contracts and run `zk:frontend` to synchronize pins and boundary aliases after rotation.
-`zk:dev:check` checks all 14 sets without regeneration. Use `--circuit protocol:code` or `--circuit shielded:unshield4` to rotate a selected
+`zk:dev:check` checks all 13 sets without regeneration. Use `--circuit protocol:code` or `--circuit shielded:unshield4` to rotate a selected
 current relation, or `--ptau <path>` to choose the local Phase 1 file; focused runs still require
-all 14 artifact sets to pass the final check.
+all 13 artifact sets to pass the final check.
 
 `zk:fetch` installs two distinct compiler roles. The native compiler is written to `bin/circom`
 (`bin/circom.exe` on Windows) and is used by local and diagnostic builds. Release gates snapshot it
@@ -206,7 +206,7 @@ target-specific binary or source-provenance checks. All circuit compilation uses
 `--O2 --sanity_check 2`, pinning both the optimization and sanity-check levels instead of relying
 on compiler defaults.
 `zk:build` compiles the two identity/disclosure relations into `zk-artifacts/circuits`, the
-three asset boundaries into `zk-artifacts/shielded`, and the nine receiving relations into
+three asset boundaries into `zk-artifacts/shielded`, and the eight receiving relations into
 `zk-artifacts/protocol`. Compilation does not replace proving keys.
 
 The receiving development manifest is `circuits/receive-development-manifest.json`.
@@ -217,11 +217,11 @@ The receiving development manifest is `circuits/receive-development-manifest.jso
 `VITE_ZK_ASSET_BASE_URL` using `<sha256>/<file name>.br`; verification-key JSON stays local.
 The browser checks the decoded files against the pinned hashes.
 
-`zk:check` rebuilds all 14 relations and verifies the current artifacts and real receiving proofs;
+`zk:check` rebuilds all 13 relations and verifies the current artifacts and real receiving proofs;
 it never generates replacement keys.
 
 `npm run zk:ptau:fetch` downloads the pinned power-17 Phase 1 file for explicit local development
-setup. A reviewed production ceremony for the current 14-relation graph is still required;
+setup. A reviewed production ceremony for the current 13-relation graph is still required;
 `zk:setup` and `release:preflight` remain closed. Previous ceremony/runbook procedures do not
 provide production approval for this graph.
 
@@ -262,7 +262,7 @@ evidence, or authorization digest. Do not invoke a lower-level script with an ar
 
 ### Recommended eSpace Mainnet release
 
-Production release is blocked: the current 14-relation graph has no reviewed production
+Production release is blocked: the current 13-relation graph has no reviewed production
 ceremony, and `zk:setup` refuses to create or approve production keys. The release flow below
 remains gated on reviewed production artifacts, a passing `release:preflight` from their clean
 commit, and an exact eSpace Testnet `release-rehearsal` report with `releaseReady=true`. A prior

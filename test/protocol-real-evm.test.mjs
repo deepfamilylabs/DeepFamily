@@ -18,7 +18,6 @@ import {
   encryptShieldedLetter,
   encryptShieldedNote,
   generateShieldedRandomField,
-  prepareRevocationScan,
   verifyShieldedNotePayload,
 } from "@deepfamily/protocol-core";
 import {
@@ -60,7 +59,7 @@ const tupleOf = code => {
     ownerCommitment: values[6], viewKeyLo: values[7], viewKeyHi: values[8], expiresAt: values[9] };
 };
 const capTuple = cap => Object.fromEntries(["issuanceRoot", "parentVersion", "capabilityBinding", "familyTag",
-  "childTag", "endorsementTag", "trustedTag"].map(name => [name, cap[name]]));
+  "childRoleIndex", "endorsementRoleIndex", "trustedRoleIndex"].map(name => [name, cap[name]]));
 
 async function noteMembership(pool, leafIndex, depth = 32) {
   const value = await pool.getNoteMerkleProof(0, leafIndex);
@@ -200,8 +199,8 @@ describe("Receive protocol actual Groth16 / EVM / HPKE acceptance", function () 
       const cap = capabilityFixture(issuance, common);
       const capProof = await proveProtocol({ circuit: "capability", witness: cap.witness, expectedPublicSignals: cap.publicSignals });
       const values = cap.publicSignals;
-      const capability = { capabilityBinding: values[0], familyTag: values[1], childTag: values[2],
-        endorsementTag: values[3], trustedTag: values[4], issuanceRoot: values[7], parentVersion: values[9], proof: capProof.proof };
+      const capability = { capabilityBinding: values[0], familyTag: values[1], childRoleIndex: values[2],
+        endorsementRoleIndex: values[3], trustedRoleIndex: values[4], issuanceRoot: values[7], parentVersion: values[9], proof: capProof.proof };
       const encodedCode = encodeReceiveCode({ ...authorization, proof: codeProof.proof, capabilities: [capability] });
       const decoded = decodeReceiveCode(encodedCode);
       return { encodedCode, keyMaterial, decoded, tuple: tupleOf(decoded), capability: capTuple(capability),
@@ -285,25 +284,12 @@ describe("Receive protocol actual Groth16 / EVM / HPKE acceptance", function () 
       { ...policy, familyCommitment: familyCommitment + 1n }), /Command failed/u);
     const firstDeposit = await prepared(native, first, nativeDonor.donor, 0n);
     const originalSize = (await native.noteShard(0)).size;
-    await expect(submitDeposit(native, first, firstDeposit))
-      .to.be.revertedWithCustomError(source, "RevocationStateNotPrepared").withArgs(0, 0, 9);
-    assert.equal((await native.noteShard(0)).size, originalSize);
-    assert.equal(await native.nullifierSpent(firstDeposit.publicInput.inputNullifier), false);
-    assert.equal((await native.budgetRecords(firstDeposit.budgetKey)).exists, false);
-    // The offline payer needs only the code's public nonce/tags and published log
-    // openings; it never receives the qualification/identity secrets to prepare status.
-    for (const recipient of [first, second]) for (const role of [0, 1, 2]) {
-      const tag = recipient.capability[["childTag", "endorsementTag", "trustedTag"][role]];
-      const end = await source.revokedRoleCount(role);
-      const scan = prepareRevocationScan({ chainId, sourceAddress: await source.getAddress(), role,
-        nonce: recipient.tuple.nonce, tag, start: 0n,
-        startHash: await source.revocationCheckpoint(role, 0), endHash: await source.revocationCheckpoint(role, end),
-        secrets: Array.from(await source.getRevokedRolePage(role, 0, end)) });
-      const scanProof = await proveProtocol({ circuit: "revocationScan", witness: scan.witness,
-        expectedPublicSignals: scan.publicSignals });
-      await source.connect(payer).prepareRoleScan(role, recipient.tuple.nonce, tag, 0, end, scanProof.solidityProof);
-      assert.equal(await source.roleScanProgress(role, recipient.tuple.nonce, tag), 9n);
-      assert.equal(await source.isRoleRevoked(role, recipient.tuple.nonce, tag), false);
+    // A code's authenticated public role indices support direct latest-state lookups,
+    // regardless of the unrelated revocations already recorded by the Source.
+    for (const role of [0, 1, 2]) {
+      const field = ["childRoleIndex", "endorsementRoleIndex", "trustedRoleIndex"][role];
+      assert.equal(first.capability[field], second.capability[field]);
+      assert.equal(await source.isRoleRevoked(role, first.capability[field]), false);
     }
     const altered = structuredClone(firstDeposit);
     altered.outputCiphertexts[0] = hre.ethers.hexlify(new Uint8Array(512).fill(1));
@@ -346,8 +332,8 @@ describe("Receive protocol actual Groth16 / EVM / HPKE acceptance", function () 
     }, nativeDonor.scope);
     const claimDataOf = (claim) => ({ budgetKey: claim.publicInput.budgetKey,
       asOf: claim.publicInput.asOf, periodNullifier: claim.periodNullifier,
-      issuanceRoot: claim.publicInput.issuanceRoot, childTag: claim.publicInput.childTag,
-      endorsementTag: claim.publicInput.endorsementTag, trustedTag: claim.publicInput.trustedTag });
+      issuanceRoot: claim.publicInput.issuanceRoot, childRoleIndex: claim.publicInput.childRoleIndex,
+      endorsementRoleIndex: claim.publicInput.endorsementRoleIndex, trustedRoleIndex: claim.publicInput.trustedRoleIndex });
     const claimFirst = await claimInput(first, firstDeposit, 2n);
     await native.claimBudget(claimDataOf(claimFirst), dataOf(claimFirst), encodeProof(claimFirst.proof));
     const payout = await decryptShieldedNote({ ...nativeDonor.scope, hpkeIkm: first.keyMaterial.hpkeIkm,

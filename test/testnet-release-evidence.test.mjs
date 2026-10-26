@@ -309,7 +309,7 @@ const bindDeploymentEvidence = (report) => {
   return report;
 };
 
-const SCOPES = {sourceFact:[3,4,"eligibilitySource"],sourceTrust:[2,3,"eligibilitySource"],revocationScan:[0,1,"eligibilitySource"],issue:[1,2,"receiveRegistry"],code:[3,4,"receiveRegistry"],capability:[5,6,"receiveRegistry"]};
+const SCOPES = {sourceFact:[3,4,"eligibilitySource"],sourceTrust:[2,3,"eligibilitySource"],issue:[1,2,"receiveRegistry"],code:[3,4,"receiveRegistry"],capability:[5,6,"receiveRegistry"]};
 const shieldedProofs = chainId => Object.fromEntries(Object.entries(ACCEPTANCE_CIRCUITS).map(([action,spec])=>{
   const signals=Array(spec.publicSignals).fill("0");
   const [chainIndex,scopeIndex,scope]=SCOPES[action]??[0,1,"shieldedErc20Pool"];
@@ -708,7 +708,7 @@ describe("schema v1 initial-mainnet-release rehearsal evidence", function () {
       manifestSha256: SHIELDED_MANIFEST_SHA256,
       proofCount: 12,
     });
-    expect(result.publicSummary.shielded.verifierCallActions).to.deep.equal(["unshield4", "sourceFact", "sourceTrust", "revocationScan", "issue", "code", "capability", "claim"]);
+    expect(result.publicSummary.shielded.verifierCallActions).to.deep.equal(["unshield4", "sourceFact", "sourceTrust", "issue", "code", "capability", "claim"]);
     expect(result.publicSummary.shielded.transactionActions).to.have.length(4);
     expect(result.publicSummary.refund.transactionHash).to.equal(REFUND_TRANSACTION_HASH);
     expect(Object.isFrozen(result)).to.equal(true);

@@ -174,12 +174,12 @@ describe("planned production protocol deployment projection", function () {
     expect(inspected.deployments.poseidonT4).to.equal(plannedAddresses.poseidonT4);
     for (const name of ["poseidonT3", "poseidonT4"])
       expect(inspected.artifacts.eligibilitySource.runtimeBytecode).to.include(plannedAddresses[name].slice(2).toLowerCase());
-    expect(PROTOCOL_DEPLOYMENT_ARTIFACTS.eligibilitySource.libraryFields).to.deep.equal(["PoseidonT3", "PoseidonT4"]);
+    expect(PROTOCOL_DEPLOYMENT_ARTIFACTS.eligibilitySource.libraryFields).to.deep.equal(["PoseidonT3"]);
     const wrongSourceLibrary = inspectProtocolDeploymentArtifact({
       artifactName: "eligibilitySource",
       immutableValues: { LINEAGE_INDEX: plannedAddresses.deepFamilyLineageIndex, DEEP_FAMILY: plannedAddresses.deepFamily,
-        FACT_VERIFIER: plannedAddresses.protocolSourceFactVerifier, TRUST_VERIFIER: plannedAddresses.protocolSourceTrustVerifier, SCAN_VERIFIER: plannedAddresses.protocolRevocationScanVerifier },
-      libraries: { PoseidonT3: plannedAddresses.poseidonT3, PoseidonT4: plannedAddresses.poseidonT6 },
+        FACT_VERIFIER: plannedAddresses.protocolSourceFactVerifier, TRUST_VERIFIER: plannedAddresses.protocolSourceTrustVerifier },
+      libraries: { PoseidonT3: plannedAddresses.poseidonT6 },
     });
     expect(wrongSourceLibrary.runtimeSha256).not.to.equal(inspected.artifacts.eligibilitySource.runtimeSha256);
     expect(PROTOCOL_DEPLOYMENT_ARTIFACTS.shieldedErc20Pool.libraryFields).to.deep.equal([

@@ -1,6 +1,5 @@
 import type { BoundarySubmission } from "../workers/walletWorkerTypes";
 import { getPublicStateReadMode, type PublicStateReadMode } from "../config/env";
-import { readRoleRevocationState } from "./receiveRevocations";
 import {
   assertReceiveTreeAnchor,
   readReceiveTreeAnchor,
@@ -18,9 +17,6 @@ import {
   type PreparedTransfer,
   type ProtocolInteger,
   type ClaimRoleStatus,
-  SNARK_SCALAR_FIELD,
-  REVOCATION_SCAN_BATCH_SIZE,
-  REVOCATION_SCAN_TAIL_SIZE,
 } from "@deepfamily/protocol-core";
 import {
   AbiCoder, Contract, getAddress, getBigInt, hexlify, isError, toBeHex,
@@ -28,17 +24,16 @@ import {
 } from "ethers";
 
 const CODE_TUPLE = "(uint256 codeAlias,uint256 commonBinding,uint256 revocationTag,uint256 nonce,uint256 ownerCommitment,uint256 viewKeyLo,uint256 viewKeyHi,uint64 expiresAt)";
-const CAP_TUPLE = "(uint256 issuanceRoot,uint256 parentVersion,uint256 capabilityBinding,uint256 familyTag,uint256 childTag,uint256 endorsementTag,uint256 trustedTag)";
+const CAP_TUPLE = "(uint256 issuanceRoot,uint256 parentVersion,uint256 capabilityBinding,uint256 familyTag,uint256 childRoleIndex,uint256 endorsementRoleIndex,uint256 trustedRoleIndex)";
 export const POOL_ACTION_TUPLE = "(uint256[] inputShardIds,uint256[] inputRoots,uint256[] inputNullifiers,uint256[2] outputCommitments,bytes[2] outputCiphertexts)";
 const ACTION_TUPLE = POOL_ACTION_TUPLE;
 export const RECEIVE_REGISTRY_ABI = [
-  "error RevocationStateNotPrepared(uint8 role,uint256 checked,uint256 total)",
   "error QualificationRevoked(uint8 role)",
   "error UnknownIssuanceRoot()",
   `function verifyReceive(${CODE_TUPLE} code,bytes codeProof) view returns (bool)`,
   `function verifyBudgetCapability(${CODE_TUPLE} code,${CAP_TUPLE} capability,bytes codeProof,bytes capabilityProof) view returns (bool)`,
   "function isKnownIssuanceRoot(uint256 root) view returns (bool)",
-  "function validateBudgetRoleStatus(uint256 issuanceRoot,uint256 nonce,uint256 childTag,uint256 endorsementTag,uint256 trustedTag) view returns (bool)",
+  "function validateBudgetRoleStatus(uint256 issuanceRoot,uint256 childRoleIndex,uint256 endorsementRoleIndex,uint256 trustedRoleIndex) view returns (bool)",
   "function isCodeRevoked(uint256 tag) view returns (bool)",
   "function revokeCode(uint256 secret) returns (uint256)",
   "function issuanceRoot() view returns (uint256)",
@@ -49,14 +44,7 @@ export const RECEIVE_REGISTRY_ABI = [
   "function getCredentialProof(uint256 leafIndex) view returns (uint256 leaf,uint256 root,uint256 index,uint256 depth,uint256[] siblings)",
 ] as const;
 export const ELIGIBILITY_SOURCE_ABI = [
-  "error RevocationStateNotPrepared(uint8 role,uint256 checked,uint256 total)",
-  "function MAX_REVOCATION_BATCH() view returns (uint256)",
-  "function MAX_REVOCATION_TAIL() view returns (uint256)",
-  "function revokedRoleCount(uint8 role) view returns (uint256)",
-  "function roleScanProgress(uint8 role,uint256 nonce,uint256 tag) view returns (uint256)",
-  "function revocationCheckpoint(uint8 role,uint256 count) view returns (uint256)",
-  "function getRevokedRolePage(uint8 role,uint256 start,uint256 limit) view returns (uint256[])",
-  "function prepareRoleScan(uint8 role,uint256 nonce,uint256 tag,uint256 start,uint256 end,bytes proof)",
+  "function isRoleRevoked(uint8 role,uint256 roleIndex) view returns (bool)",
   "function sourceRoot() view returns (uint256)",
   "function trustedRoot() view returns (uint256)",
   "function sourceSize(uint8 treeId) view returns (uint256)",
@@ -66,7 +54,6 @@ export const ELIGIBILITY_SOURCE_ABI = [
   "function publishTrust(uint256 parentIdentity,address endorser,uint256 parentVersion,uint256 trustLeaf,uint256 trustRoleCommitment,bytes proof) returns (uint256 leafIndex,uint256 root)",
 ] as const;
 export const POOL_ABI = [
-  "error RevocationStateNotPrepared(uint8 role,uint256 checked,uint256 total)",
   "function protocolVersion() view returns (uint256)",
   "function RECEIVE_REGISTRY() view returns (address)",
   "function assetKind() view returns (uint8)",
@@ -85,7 +72,7 @@ export const POOL_ABI = [
   `function unshield(address recipient,uint256 amount,${ACTION_TUPLE} data,bytes proof)`,
   "function budgetRecords(uint256) view returns (bool exists,uint256 commonBinding,uint256 policyCommitment,uint64 eligibleFrom,uint256 codeAlias,uint256 nonce,uint256 ownerCommitment,uint256 viewKeyLo,uint256 viewKeyHi)",
   `function depositBudget(${CODE_TUPLE} code,${CAP_TUPLE} capability,bytes codeProof,bytes capabilityProof,(uint256 policyCommitment,uint256 budgetKey,uint64 eligibleFrom) deposit,${ACTION_TUPLE} data,bytes proof)`,
-  `function claimBudget((uint256 budgetKey,uint64 asOf,uint256 periodNullifier,uint256 issuanceRoot,uint256 childTag,uint256 endorsementTag,uint256 trustedTag) claimData,${ACTION_TUPLE} data,bytes proof)`,
+  `function claimBudget((uint256 budgetKey,uint64 asOf,uint256 periodNullifier,uint256 issuanceRoot,uint256 childRoleIndex,uint256 endorsementRoleIndex,uint256 trustedRoleIndex) claimData,${ACTION_TUPLE} data,bytes proof)`,
   `function transfer(${CODE_TUPLE} code,bytes codeProof,${ACTION_TUPLE} data,bytes proof)`,
 ] as const;
 export const LETTER_ABI = [
@@ -93,20 +80,8 @@ export const LETTER_ABI = [
   `function registerLetter(uint128 messageId,${CODE_TUPLE} code,bytes codeProof,bytes ciphertext)`,
 ] as const;
 
-export interface RevocationScanSubmission {
-  sourceAddress: string;
-  role: 0 | 1 | 2;
-  nonce: bigint;
-  tag: bigint;
-  start: bigint;
-  end: bigint;
-  startHash: bigint;
-  endHash: bigint;
-  publicSignals: bigint[];
-  proof: ProtocolProof;
-}
-export type DepositSubmission = Omit<PreparedDeposit, "note" | "changeNote"> & { revocationScans?: RevocationScanSubmission[] };
-export type ClaimSubmission = Omit<PreparedClaim, "note" | "valueNote"> & { revocationScans?: RevocationScanSubmission[] };
+export type DepositSubmission = Omit<PreparedDeposit, "note" | "changeNote">;
+export type ClaimSubmission = Omit<PreparedClaim, "note" | "valueNote">;
 export type TransferSubmission = Omit<PreparedTransfer, "note" | "changeNote">;
 
 export interface ReceiveDeployment {
@@ -118,8 +93,6 @@ export interface ReceiveDeployment {
 interface ReceiveChainOptions {
   stateReadMode?: PublicStateReadMode;
   beforeTransaction?: () => void;
-  onRevocationPreparation?: (completed: number, total: number) => void;
-  prepareRevocationScans?: (status: ClaimRoleStatus) => Promise<RevocationScanSubmission[]>;
 }
 const BASE_FIELD = 21888242871839275222246405745257275088696311157297823662689037894645226208583n;
 /** The adapter expects abi.encode(a,b,c), including Solidity's reversed Fp2 coordinates. */
@@ -145,7 +118,7 @@ export function receivingCodeStruct(code: ReceiveCode) {
 }
 export function receivingCapabilityStruct(cap: Capability) {
   return { issuanceRoot: cap.issuanceRoot, parentVersion: cap.parentVersion, capabilityBinding: cap.capabilityBinding,
-    familyTag: cap.familyTag, childTag: cap.childTag, endorsementTag: cap.endorsementTag, trustedTag: cap.trustedTag };
+    familyTag: cap.familyTag, childRoleIndex: cap.childRoleIndex, endorsementRoleIndex: cap.endorsementRoleIndex, trustedRoleIndex: cap.trustedRoleIndex };
 }
 export function buildActionData(input: {
   inputShardId: BigNumberish; inputRoot: BigNumberish; inputNullifier: BigNumberish;
@@ -347,132 +320,15 @@ export class ReceiveChain {
   }
   async checkEligibility(code: ReceiveCode, cap: Capability): Promise<boolean> {
     await this.assertDeployment(); this.assertCode(code);
-    try {
-      return Boolean(await this.registry.verifyBudgetCapability(receivingCodeStruct(code), receivingCapabilityStruct(cap),
-        encodeProtocolProof(code.proof), encodeProtocolProof(cap.proof)));
-    } catch (error) {
-      // The registry verifies both fixed-key proofs before asking Source for status.
-      // Read-only preparation authenticates the public suffix when the on-chain cache
-      // needs advancing. The final transaction still checks the canonical latest tail.
-      if (!this.needsRevocationPreparation(error)) throw error;
-      return !(await this.readQualificationRevocations({ issuanceRoot: cap.issuanceRoot, nonce: code.nonce,
-        childTag: cap.childTag, endorsementTag: cap.endorsementTag, trustedTag: cap.trustedTag }, code)).some(state => state.revoked);
-    }
-  }
-  private needsRevocationPreparation(error: unknown): boolean {
-    if (!isError(error, "CALL_EXCEPTION") || typeof error.data !== "string") return false;
-    try {
-      const source = new Contract(this.deployment.registryAddress, ELIGIBILITY_SOURCE_ABI, this.runner);
-      const decoded = source.interface.parseError(error.data);
-      return decoded?.name === "RevocationStateNotPrepared" && BigInt(decoded.args[0]) <= 2n
-        && BigInt(decoded.args[1]) >= 0n && BigInt(decoded.args[2]) < 1n << 64n
-        && BigInt(decoded.args[2]) > BigInt(decoded.args[1]) + BigInt(REVOCATION_SCAN_TAIL_SIZE)
-        && source.interface.encodeErrorResult(decoded.fragment, decoded.args).toLowerCase() === error.data.toLowerCase();
-    } catch { return false; }
-  }
-  /** Authenticate public revocation logs without requiring a holder secret or a transaction. */
-  async readQualificationRevocations(status: ClaimRoleStatus, code?: ReceiveCode, options: { maxEntries?: number } = {}) {
-    const provider = this.provider(), anchor = await readReceiveTreeAnchor(provider);
-    await this.assertDeployment(anchor.blockNumber);
-    if (!await this.registry.isKnownIssuanceRoot(status.issuanceRoot, { blockTag: anchor.blockNumber }))
-      throw new Error("Qualification root is not registered");
-    if (code) {
-      this.assertCode(code);
-      if (!await this.registry.verifyReceive(receivingCodeStruct(code), encodeProtocolProof(code.proof), { blockTag: anchor.blockNumber }))
-        throw new Error("Receive authorization is no longer valid");
-    }
-    const { source } = await this.sourceAt(anchor);
-    const tags = [status.childTag, status.endorsementTag, status.trustedTag];
-    const states = await Promise.all(tags.map((tag, role) => readRoleRevocationState({ source,
-      chainId: this.deployment.chainId, anchor, role: role as 0 | 1 | 2,
-      nonce: getBigInt(status.nonce), tag: getBigInt(tag), ...options })));
-    await assertReceiveTreeAnchor(provider, anchor);
-    return states;
-  }
-  async sendRevocationScans(scans: readonly RevocationScanSubmission[], status: ClaimRoleStatus): Promise<void> {
-    if (!scans.length) return;
-    const provider = this.provider(), anchor = await readReceiveTreeAnchor(provider);
-    await this.assertDeployment(anchor.blockNumber);
-    const { sourceAddress, source } = await this.sourceAt(anchor);
-    const tags = [status.childTag, status.endorsementTag, status.trustedTag].map(value => getBigInt(value));
-    // Validate the entire public plan before sending the first preparation transaction.
-    for (const scan of scans) {
-      if (![0, 1, 2].includes(scan.role) || getAddress(scan.sourceAddress) !== sourceAddress
-        || scan.nonce !== getBigInt(status.nonce) || scan.tag !== tags[scan.role]
-        || scan.start < 0n || scan.end <= scan.start || scan.end >= 1n << 64n
-        || scan.end - scan.start > BigInt(REVOCATION_SCAN_BATCH_SIZE))
-        throw new Error("Revocation preparation does not match this budget qualification");
-      const expected = [this.deployment.chainId, BigInt(sourceAddress), BigInt(scan.role), scan.nonce,
-        scan.tag, scan.start, scan.end, scan.startHash, scan.endHash];
-      if (expected.some(value => value < 0n || value >= SNARK_SCALAR_FIELD)
-        || scan.publicSignals.length !== expected.length || scan.publicSignals.some((value, index) => getBigInt(value) !== expected[index]))
-        throw new Error("Revocation proof returned a different statement");
-      encodeProtocolProof(scan.proof);
-    }
-    const roleProgress = new Map<number, { checked: bigint; count: bigint }>();
-    const overrides = { blockTag: anchor.blockNumber };
-    for (const scan of scans) {
-      if (!roleProgress.has(scan.role)) {
-        const [checked, count] = await Promise.all([
-          source.roleScanProgress(scan.role, scan.nonce, scan.tag, overrides),
-          source.revokedRoleCount(scan.role, overrides),
-        ]);
-        roleProgress.set(scan.role, { checked: getBigInt(checked), count: getBigInt(count) });
-      }
-      const progress = roleProgress.get(scan.role)!;
-      const [startHash, endHash] = await Promise.all([
-        source.revocationCheckpoint(scan.role, scan.start, overrides),
-        source.revocationCheckpoint(scan.role, scan.end, overrides),
-      ]);
-      if (progress.checked < 0n || progress.checked > progress.count || scan.end > progress.count
-        || getBigInt(startHash) !== scan.startHash || getBigInt(endHash) !== scan.endHash)
-        throw new Error("Revocation preparation checkpoint does not match its source");
-      if (scan.end > progress.checked) {
-        if (scan.start !== progress.checked) throw new Error("Qualification preparation changed; refresh before retrying");
-        progress.checked = scan.end;
-      }
-    }
-    await assertReceiveTreeAnchor(provider, anchor);
-    this.options.onRevocationPreparation?.(0, scans.length);
-    let completed = 0;
-    for (const scan of scans) {
-      this.options.beforeTransaction?.();
-      await this.assertDeployment();
-      const checked = getBigInt(await source.roleScanProgress(scan.role, scan.nonce, scan.tag));
-      if (checked < scan.end) {
-        if (checked !== scan.start) throw new Error("Qualification preparation changed; refresh before retrying");
-        this.options.beforeTransaction?.();
-        const transaction = await source.prepareRoleScan(scan.role, scan.nonce, scan.tag, scan.start, scan.end, encodeProtocolProof(scan.proof));
-        const receipt = await transaction.wait();
-        if (!receipt || receipt.status !== 1) throw new Error("Qualification preparation transaction failed");
-      }
-      this.options.onRevocationPreparation?.(++completed, scans.length);
-    }
-  }
-  private async synchronizeQualification(status: ClaimRoleStatus, initial: readonly RevocationScanSubmission[]) {
-    let scans = initial;
-    for (;;) {
-      this.options.beforeTransaction?.();
-      await this.sendRevocationScans(scans, status);
-      if (!this.options.prepareRevocationScans) return;
-      this.options.beforeTransaction?.();
-      const next = await this.options.prepareRevocationScans(status);
-      this.options.beforeTransaction?.();
-      if (!next.length) return;
-      if (next.every(candidate => scans.some(previous => previous.role === candidate.role
-        && previous.nonce === candidate.nonce && previous.tag === candidate.tag && previous.end >= candidate.end)))
-        throw new Error("Qualification preparation made no progress; refresh before retrying");
-      scans = next;
-    }
+    return Boolean(await this.registry.verifyBudgetCapability(receivingCodeStruct(code), receivingCapabilityStruct(cap),
+      encodeProtocolProof(code.proof), encodeProtocolProof(cap.proof)));
   }
   async checkClaimQualification(status: ClaimRoleStatus): Promise<boolean> {
     await this.assertDeployment();
     try {
-      return Boolean(await this.registry.validateBudgetRoleStatus(status.issuanceRoot, status.nonce,
-        status.childTag, status.endorsementTag, status.trustedTag));
+      return Boolean(await this.registry.validateBudgetRoleStatus(status.issuanceRoot,
+        status.childRoleIndex, status.endorsementRoleIndex, status.trustedRoleIndex));
     } catch (error) {
-      if (this.needsRevocationPreparation(error))
-        return !(await this.readQualificationRevocations(status)).some(state => state.revoked);
       if (isError(error, "CALL_EXCEPTION") && typeof error.data === "string") {
         try {
           const decoded = this.registry.interface.parseError(error.data);
@@ -507,8 +363,6 @@ export class ReceiveChain {
     await this.assertDeployment(); this.assertCode(prepared.code); assertCiphertexts(prepared);
     const cap = prepared.code.capabilities[prepared.capabilityIndex];
     if (!cap) throw new Error("Missing prepared budget capability");
-    await this.synchronizeQualification({ issuanceRoot: cap.issuanceRoot, nonce: prepared.code.nonce,
-      childTag: cap.childTag, endorsementTag: cap.endorsementTag, trustedTag: cap.trustedTag }, prepared.revocationScans ?? []);
     this.options.beforeTransaction?.();
     return this.pool.depositBudget(receivingCodeStruct(prepared.code), receivingCapabilityStruct(cap),
       encodeProtocolProof(prepared.code.proof), encodeProtocolProof(cap.proof),
@@ -518,15 +372,10 @@ export class ReceiveChain {
   }
   async sendClaim(prepared: ClaimSubmission, inputShardId: BigNumberish): Promise<ContractTransactionResponse> {
     await this.assertDeployment(); assertCiphertexts(prepared);
-    const record = prepared.revocationScans?.length ? await this.readBudgetRecord(getBigInt(prepared.publicInput.budgetKey)) : undefined;
-    if (record && !record.exists) throw new Error("Prepared budget does not exist");
-    await this.synchronizeQualification({ issuanceRoot: getBigInt(prepared.publicInput.issuanceRoot),
-      nonce: record?.nonce ?? getBigInt(prepared.publicInput.nonce), childTag: getBigInt(prepared.publicInput.childTag),
-      endorsementTag: getBigInt(prepared.publicInput.endorsementTag), trustedTag: getBigInt(prepared.publicInput.trustedTag) }, prepared.revocationScans ?? []);
     this.options.beforeTransaction?.();
     return this.pool.claimBudget({ budgetKey: prepared.publicInput.budgetKey, asOf: prepared.publicInput.asOf, periodNullifier: prepared.periodNullifier,
-      issuanceRoot: prepared.publicInput.issuanceRoot, childTag: prepared.publicInput.childTag,
-      endorsementTag: prepared.publicInput.endorsementTag, trustedTag: prepared.publicInput.trustedTag },
+      issuanceRoot: prepared.publicInput.issuanceRoot, childRoleIndex: prepared.publicInput.childRoleIndex,
+      endorsementRoleIndex: prepared.publicInput.endorsementRoleIndex, trustedRoleIndex: prepared.publicInput.trustedRoleIndex },
       buildActionData({ inputShardId, inputRoot: prepared.publicInput.inputRoot, inputNullifier: prepared.publicInput.inputNullifier,
         outputCommitments: prepared.outputCommitments, outputCiphertexts: prepared.outputCiphertexts }), encodeProtocolProof(prepared.proof));
   }

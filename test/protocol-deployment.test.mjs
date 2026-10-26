@@ -18,8 +18,8 @@ describe("Canonical receive deployment", function () {
   this.timeout(180000);
   it("builds exactly identity, value boundaries and protocol relations by default", function () {
     const selected = selectCircuitNames("all");
-    assert.equal(selected.length, 14);
-    assert.equal(selected.filter((name) => name.startsWith("protocol:")).length, 9);
+    assert.equal(selected.length, 13);
+    assert.equal(selected.filter((name) => name.startsWith("protocol:")).length, 8);
     assert.deepEqual(selectCircuitNames("shielded"), [
       "shielded:shield",
       "shielded:unshield",

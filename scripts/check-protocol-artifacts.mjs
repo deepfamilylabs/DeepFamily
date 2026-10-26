@@ -15,7 +15,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   try {
     inspectCanonicalDevelopmentArtifacts({ requireCompiledProtocol: true });
     console.log(
-      "Canonical development artifacts verified: three VALUE boundary relations and nine protocol relations. This is not a production ceremony approval.",
+      "Canonical development artifacts verified: three VALUE boundary relations and eight protocol relations. This is not a production ceremony approval.",
     );
   } catch (error) {
     console.error(error.message);

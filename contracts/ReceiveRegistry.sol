@@ -105,15 +105,15 @@ contract ReceiveRegistry is IReceiveRegistry {
     _nonzeroField(capability.parentVersion);
     _nonzeroField(capability.capabilityBinding);
     _nonzeroField(capability.familyTag);
-    _nonzeroField(capability.childTag);
-    _nonzeroField(capability.endorsementTag);
-    _nonzeroField(capability.trustedTag);
+    _nonzeroField(capability.childRoleIndex);
+    _nonzeroField(capability.endorsementRoleIndex);
+    _nonzeroField(capability.trustedRoleIndex);
     uint256[] memory signals = new uint256[](10);
     signals[0] = capability.capabilityBinding;
     signals[1] = capability.familyTag;
-    signals[2] = capability.childTag;
-    signals[3] = capability.endorsementTag;
-    signals[4] = capability.trustedTag;
+    signals[2] = capability.childRoleIndex;
+    signals[3] = capability.endorsementRoleIndex;
+    signals[4] = capability.trustedRoleIndex;
     signals[5] = block.chainid;
     signals[6] = uint256(uint160(address(this)));
     signals[7] = capability.issuanceRoot;
@@ -121,9 +121,9 @@ contract ReceiveRegistry is IReceiveRegistry {
     signals[9] = capability.parentVersion;
     if (!CAPABILITY_VERIFIER.verifyProof(capabilityProof, signals)) revert InvalidProof();
     // Each read observes the current canonical source state; callers cannot select a stale root.
-    if (SOURCE.isRoleRevoked(0, code.nonce, capability.childTag)) revert QualificationRevoked(0);
-    if (SOURCE.isRoleRevoked(1, code.nonce, capability.endorsementTag)) revert QualificationRevoked(1);
-    if (SOURCE.isRoleRevoked(2, code.nonce, capability.trustedTag)) revert QualificationRevoked(2);
+    if (SOURCE.isRoleRevoked(0, capability.childRoleIndex)) revert QualificationRevoked(0);
+    if (SOURCE.isRoleRevoked(1, capability.endorsementRoleIndex)) revert QualificationRevoked(1);
+    if (SOURCE.isRoleRevoked(2, capability.trustedRoleIndex)) revert QualificationRevoked(2);
     return true;
   }
 
@@ -141,16 +141,16 @@ contract ReceiveRegistry is IReceiveRegistry {
     return _revokedCodes[revocationTag];
   }
 
-  /// @notice Latest status for qualification tags authenticated inside the fixed Claim proof.
+  /// @notice Latest status for qualification indices authenticated inside the fixed Claim proof.
   /// @dev This does not authenticate a credential by itself. Fund uses verifyBudgetCapability;
   ///      Claim additionally proves current-Q membership and the same subject/family itself.
-  function validateBudgetRoleStatus(uint256 root, uint256 nonce, uint256 childTag,
-    uint256 endorsementTag, uint256 trustedTag) external view returns (bool) {
+  function validateBudgetRoleStatus(uint256 root, uint256 childRoleIndex,
+    uint256 endorsementRoleIndex, uint256 trustedRoleIndex) external view returns (bool) {
     if (!_knownIssuanceRoots[root]) revert UnknownIssuanceRoot();
-    _nonzeroField(nonce); _nonzeroField(childTag); _nonzeroField(endorsementTag); _nonzeroField(trustedTag);
-    if (SOURCE.isRoleRevoked(0, nonce, childTag)) revert QualificationRevoked(0);
-    if (SOURCE.isRoleRevoked(1, nonce, endorsementTag)) revert QualificationRevoked(1);
-    if (SOURCE.isRoleRevoked(2, nonce, trustedTag)) revert QualificationRevoked(2);
+    _nonzeroField(childRoleIndex); _nonzeroField(endorsementRoleIndex); _nonzeroField(trustedRoleIndex);
+    if (SOURCE.isRoleRevoked(0, childRoleIndex)) revert QualificationRevoked(0);
+    if (SOURCE.isRoleRevoked(1, endorsementRoleIndex)) revert QualificationRevoked(1);
+    if (SOURCE.isRoleRevoked(2, trustedRoleIndex)) revert QualificationRevoked(2);
     return true;
   }
 

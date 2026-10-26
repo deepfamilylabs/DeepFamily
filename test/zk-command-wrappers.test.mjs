@@ -16,7 +16,7 @@ describe("current proving command surface", function () {
     assert.equal(Object.keys(scripts).some(name => /anon|v2/iu.test(name)), false);
     for (const value of Object.values(scripts)) assert.doesNotMatch(value, /(?:anonymous|Anonymous|ANONYMOUS)/u);
   });
-  it("accepts only the current 14 relations, with no obsolete proof selectors", function () {
+  it("accepts only the current 13 relations, with no obsolete proof selectors", function () {
     for (const parser of [parseBuild, parseCheck]) {
       assert.deepEqual(parser([]), { help: false, circuit: "all" });
       assert.deepEqual(parser(["--circuit=protocol:claim"]), { help: false, circuit: "protocol:claim" });
@@ -33,7 +33,7 @@ describe("current proving command surface", function () {
     const commands = await runZkBuild({ root, compilerInspector, overrideInspector: async () => null,
       directoryCreator: directory => events.push(["mkdir", directory]), runner: command => events.push(["run", command.circuit]) });
     assert.deepEqual(commands.map(command => command.circuit), CANONICAL_CIRCUIT_NAMES);
-    assert.equal(commands.length, 14);
+    assert.equal(commands.length, 13);
     assert.deepEqual(events.slice(0,3), ["circuits", "shielded", "protocol"].map(name => ["mkdir", path.join(root, "zk-artifacts", name)]));
     for (const command of commands) {
       assert.equal(command.executable, path.join(root, "bin/circom"));

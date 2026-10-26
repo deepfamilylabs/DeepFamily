@@ -455,22 +455,17 @@
         },
         {
           "internalType": "uint256",
-          "name": "nonce",
+          "name": "childRoleIndex",
           "type": "uint256"
         },
         {
           "internalType": "uint256",
-          "name": "childTag",
+          "name": "endorsementRoleIndex",
           "type": "uint256"
         },
         {
           "internalType": "uint256",
-          "name": "endorsementTag",
-          "type": "uint256"
-        },
-        {
-          "internalType": "uint256",
-          "name": "trustedTag",
+          "name": "trustedRoleIndex",
           "type": "uint256"
         }
       ],
@@ -558,17 +553,17 @@
             },
             {
               "internalType": "uint256",
-              "name": "childTag",
+              "name": "childRoleIndex",
               "type": "uint256"
             },
             {
               "internalType": "uint256",
-              "name": "endorsementTag",
+              "name": "endorsementRoleIndex",
               "type": "uint256"
             },
             {
               "internalType": "uint256",
-              "name": "trustedTag",
+              "name": "trustedRoleIndex",
               "type": "uint256"
             }
           ],

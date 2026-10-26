@@ -1,18 +1,17 @@
 import {
-  SNARK_SCALAR_FIELD, RECEIVE_MAX_CAPABILITIES, computeFamilyTag, computeRoleTag,
+  SNARK_SCALAR_FIELD, RECEIVE_MAX_CAPABILITIES, computeFamilyTag, computeRoleStatusIndex,
   buildCapabilityPublicSignals, buildReceivePublicSignals,
   computeCapabilityBinding, computeReceiveAuthorization,
   deriveReceiveKeyMaterial, encodeReceiveCode, verifyReceiveCode,
   prepareBudgetDeposit, prepareBudgetClaim, prepareTransfer,
   createShieldedLetterEnvelope, encryptShieldedLetter, prepareEligibilityIssue,
-  planRevocationScans, REVOCATION_SCAN_BATCH_SIZE, REVOCATION_SCAN_TAIL_SIZE,
   type ProtocolInteger, type ProtocolProof, type PoolScope,
   type ReceiveCode, type LocalProver,
 } from "@deepfamily/protocol-core";
 import { getBigInt } from "ethers";
 // @ts-ignore snarkjs does not publish complete browser typings.
 import * as snarkjs from "snarkjs";
-import { ReceiveChain, encodeProtocolProof, type RevocationScanSubmission } from "../clients/receiveChain";
+import { ReceiveChain, encodeProtocolProof } from "../clients/receiveChain";
 import { fetchPinnedZkAsset } from "./zkAssets";
 
 export const PROTOCOL_CIRCUITS = Object.freeze({
@@ -21,7 +20,6 @@ export const PROTOCOL_CIRCUITS = Object.freeze({
   unshield4: { name: "shielded_unshield_4", count: 20 },
   sourceFact: { name: "eligibility_source_fact", count: 10 },
   sourceTrust: { name: "eligibility_source_trust", count: 8 },
-  revocationScan: { name: "eligibility_revocation_scan", count: 9 },
   issue: { name: "eligibility_issue", count: 5 },
   code: { name: "receive_code", count: 10 },
   capability: { name: "budget_capability", count: 10 },
@@ -163,9 +161,9 @@ export class ReceiveService {
     for (const credential of input.credentials ?? []) {
       const cap = { issuanceRoot: getBigInt(credential.issuanceRoot), parentVersion: getBigInt(credential.parentVersion),
         familyTag: computeFamilyTag({ familyCommitment: credential.familyRoot, nonce: key.nonce }),
-        childTag: computeRoleTag({ role: "child", roleSecret: credential.xChild, nonce: key.nonce }),
-        endorsementTag: computeRoleTag({ role: "endorsement", roleSecret: credential.xEndorse, nonce: key.nonce }),
-        trustedTag: computeRoleTag({ role: "trusted", roleSecret: credential.xTrust, nonce: key.nonce }) };
+        childRoleIndex: computeRoleStatusIndex({ role: "child", roleSecret: credential.xChild}),
+        endorsementRoleIndex: computeRoleStatusIndex({ role: "endorsement", roleSecret: credential.xEndorse}),
+        trustedRoleIndex: computeRoleStatusIndex({ role: "trusted", roleSecret: credential.xTrust}) };
       const capabilityBinding = computeCapabilityBinding(common, cap);
       const credentialFields = ["issuanceRoot", "parentVersion", "issueNonce", "familyRoot", "endorser", "xChild", "xEndorse", "xTrust",
         "credentialSalt", "credentialDepth", "credentialIndex", "credentialSiblings"] as const;
@@ -195,7 +193,7 @@ export class ReceiveService {
     assertSignals("issue", result.publicSignals, prepared.publicSignals);
     return { proof: result.proof, publicSignals: result.publicSignals };
   }
-  async proveQualification(input: { circuit: "sourceFact" | "sourceTrust" | "issue" | "revocationScan";
+  async proveQualification(input: { circuit: "sourceFact" | "sourceTrust" | "issue";
     witness: Record<string, bigint | bigint[]>; expectedPublicSignals: readonly ProtocolInteger[] }) {
     const result = await this.proofs.prove(input.circuit, input.witness);
     assertSignals(input.circuit, result.publicSignals, input.expectedPublicSignals);
@@ -209,45 +207,17 @@ export class ReceiveService {
   }
   async prepareDeposit(input: Omit<Parameters<typeof prepareBudgetDeposit>[0],
     "authorizerScope" | "readBudgetRecord" | "verifyAuthorization" | "verifyCapability" | "checkEligibility" | "proveFund" | "verifyFund">) {
-    const prepared = await prepareBudgetDeposit({ ...input, authorizerScope: BigInt(this.chain.deployment.registryAddress),
+    return prepareBudgetDeposit({ ...input, authorizerScope: BigInt(this.chain.deployment.registryAddress),
       readBudgetRecord: key => this.chain.readBudgetRecord(key), checkEligibility: (code, cap) => this.chain.checkEligibility(code, cap),
       verifyAuthorization: (proof, signals) => this.proofs.verify("code", proof, signals),
       verifyCapability: (proof, signals) => this.proofs.verify("capability", proof, signals),
       proveFund: witness => this.proofs.prove("fund", witness), verifyFund: (proof, signals) => this.proofs.verify("fund", proof, signals) }, this.scope);
-    const cap = prepared.code.capabilities[prepared.capabilityIndex];
-    const revocationScans = await this.prepareRevocationScans({ issuanceRoot: cap.issuanceRoot, nonce: prepared.code.nonce,
-      childTag: cap.childTag, endorsementTag: cap.endorsementTag, trustedTag: cap.trustedTag });
-    return { ...prepared, ...(revocationScans.length ? { revocationScans } : {}) };
+
   }
   async prepareClaim(input: Omit<Parameters<typeof prepareBudgetClaim>[0], "authorizerScope" | "checkQualification" | "proveClaim" | "verifyClaim" | "isPeriodSpent">) {
-    const prepared = await prepareBudgetClaim({ ...input, authorizerScope: BigInt(this.chain.deployment.registryAddress),
+    return prepareBudgetClaim({ ...input, authorizerScope: BigInt(this.chain.deployment.registryAddress),
       checkQualification: status => this.chain.checkClaimQualification(status), isPeriodSpent: nf => this.chain.isPeriodSpent(nf),
       proveClaim: witness => this.proofs.prove("claim", witness), verifyClaim: (proof, signals) => this.proofs.verify("claim", proof, signals) }, this.scope);
-    const revocationScans = await this.prepareRevocationScans({ issuanceRoot: getBigInt(prepared.publicInput.issuanceRoot),
-      nonce: getBigInt(prepared.publicInput.nonce), childTag: getBigInt(prepared.publicInput.childTag),
-      endorsementTag: getBigInt(prepared.publicInput.endorsementTag), trustedTag: getBigInt(prepared.publicInput.trustedTag) });
-    return { ...prepared, ...(revocationScans.length ? { revocationScans } : {}) };
-  }
-  async prepareRevocationScans(status: Parameters<ReceiveChain["readQualificationRevocations"]>[0]): Promise<RevocationScanSubmission[]> {
-    const states = await this.chain.readQualificationRevocations(status, undefined, { maxEntries: REVOCATION_SCAN_BATCH_SIZE });
-    const submissions: RevocationScanSubmission[] = [];
-    // One bounded round produces at most one proof per role. Public preparation
-    // transactions persist progress before another worker round begins.
-    // Authenticate all sampled roles first, so a detected revocation fails before proving.
-    const plans = states.map(state => {
-      if (state.secrets.length > REVOCATION_SCAN_BATCH_SIZE)
-        throw new Error("Revocation preparation exceeds one worker round");
-      const needsPreparation = state.count - state.checkedThrough > BigInt(REVOCATION_SCAN_TAIL_SIZE);
-      return { state, plan: planRevocationScans({ ...state, tailSize: needsPreparation ? 0 : REVOCATION_SCAN_TAIL_SIZE }) };
-    });
-    for (const { state, plan } of plans) for (const scan of plan.scans) {
-      const proved = await this.proofs.prove("revocationScan", scan.witness);
-      assertSignals("revocationScan", proved.publicSignals, scan.publicSignals);
-      submissions.push({ sourceAddress: state.sourceAddress, role: state.role, nonce: state.nonce, tag: state.tag,
-        start: scan.start, end: scan.end, startHash: scan.startHash, endHash: scan.endHash,
-        proof: publicProtocolProof(proved.proof), publicSignals: proved.publicSignals.map(value => getBigInt(value)) });
-    }
-    return submissions;
   }
   async prepareTransfer(input: Omit<Parameters<typeof prepareTransfer>[0], "authorizerScope" | "verifyAuthorization" | "verifyCapability" | "proveTransfer" | "verifyTransfer">) {
     const code = await this.verifyCode(typeof input.code === "string" ? input.code : encodeReceiveCode(input.code), input.asOf);

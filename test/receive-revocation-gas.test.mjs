@@ -20,20 +20,20 @@ function sourceHashes() {
   return Object.fromEntries([
     "contracts/EligibilitySource.sol", "contracts/ReceiveRegistry.sol", "contracts/ShieldedPoolCore.sol",
     "contracts/ShieldedNativePool.sol", "contracts/ShieldedErc20Pool.sol", "hardhat.config.mjs",
-    "circuits/eligibility_revocation_scan.circom", "packages/protocol-core/revocation.js",
+    "circuits/budget_capability.circom", "circuits/budget_claim.circom", "packages/protocol-core/receive-code.js",
     "test/fixtures/receive-revocation-gas.mjs", "test/receive-revocation-gas.test.mjs",
     "scripts/benchmark-revocation-gas.mjs",
   ].map(file => [file, createHash("sha256").update(fs.readFileSync(path.join(ROOT, file))).digest("hex")]));
 }
 
-describe("Receive bounded revocation gas and latest-state regression", function () {
+describe("Receive direct role-index gas and latest-state regression", function () {
   this.timeout(1_800_000);
   after(async () => {
     await globalThis.curve_bn128?.terminate?.();
     delete globalThis.curve_bn128;
   });
 
-  it("uses real scan proofs for bounded native/ERC20 transactions and immediately rejects new revocations", async function () {
+  it("reads role-index state directly for native/ERC20 transactions and immediately rejects new revocations", async function () {
     const counts = benchmark ? process.env.RECEIVE_REVOCATION_GAS_COUNTS.split(",").map(Number) : [0, 9];
     const gasLimit = BigInt(benchmark ? process.env.RECEIVE_REVOCATION_GAS_LIMIT : 15_000_000);
     const headroomBps = BigInt(benchmark ? process.env.RECEIVE_REVOCATION_GAS_HEADROOM_BPS : 2000);
@@ -44,19 +44,19 @@ describe("Receive bounded revocation gas and latest-state regression", function 
     const { source, registry, pools } = fixture;
     const provider = context.ethers.provider;
     const report = {
-      schemaVersion: 2,
+      schemaVersion: 3,
       protocol: "deepfamily.receive",
-      measurementModel: "real-groth16-revocation-scan-with-echo-money-and-source-proofs",
-      revocationScanCryptographicAcceptance: true,
+      measurementModel: "direct-role-index-status-with-echo-money-and-source-proofs",
+      directRoleStatusAcceptance: true,
+      preparationProofs: 0, preparationTransactions: 0,
       fullMoneyCryptographicAcceptance: false,
       productionCapacityEstablished: false,
       limitations: [
-        "Revocation interval proofs and their fixed Solidity verifier are real Groth16; money, source-fact/source-trust and family/lineage authentication remain explicit mocks.",
-        "These complete Source/Registry/native/ERC20 pool transactions measure the bounded revocation integration, not full-money Groth16 gas or a strict full-transaction lower bound.",
-        "Source history is created through publication/revocation entrypoints without storage injection; each pool starts with six notes.",
-        "First preparation for a new role/nonce/tag remains O(history/32) proofs and transactions; only individual preparation and final funds transactions have bounded work.",
-        "Proof timings and RSS are measured in Node; they do not establish browser performance or production capacity.",
-        "Progress storage estimates count data words only, excluding mapping trie overhead, and exclude shared log checkpoint storage.",
+        "The actual Source/Registry/native/ERC20 contracts perform fixed role-index lookups; money, source-fact/source-trust and family/lineage proofs remain explicit mocks.",
+        "Full-money Groth16 correctness is tested separately; these gas values are not full cryptographic acceptance or a strict transaction lower bound.",
+        "History is created through publication/revocation entrypoints without storage injection; each pool starts with six notes, not a full-depth note tree.",
+        "The suite does not claim one million on-chain revocations were executed. Opcode traces independently verify one storage read for each role status query.",
+        "Source audit-history storage grows with revocations, but readers do not scan it or prepare per-code proofs/transactions.",
         "The configured gas budget is local, not a live-chain transaction limit or production safety cap.",
       ],
       createdAt: new Date().toISOString(),
@@ -64,9 +64,7 @@ describe("Receive bounded revocation gas and latest-state regression", function 
         hardhat: JSON.parse(fs.readFileSync(path.join(ROOT, "node_modules/hardhat/package.json"))).version },
       chainId: String(fixture.chainId), gasLimit: String(gasLimit), headroomBps: Number(headroomBps),
       countsPerRole: counts, sourceSha256: sourceHashes(),
-      maxBatchEntries: Number(await source.MAX_REVOCATION_BATCH()),
-      maxLiveTailPerRole: Number(await source.MAX_REVOCATION_TAIL()),
-      rows: [], queryRows: [], preparationRows: [], cacheReuseRows: [],
+      rows: [], queryRows: [],
     };
     function parseFailure(data) {
       for (const contract of [registry, source]) {
@@ -77,19 +75,15 @@ describe("Receive bounded revocation gas and latest-state regression", function 
     async function measureQuery(role, expected, scenario) {
       const snapshot = await context.networkHelpers.takeSnapshot();
       let receipt;
-      try { receipt = await (await source.isRoleRevoked.send(role, fixture.nonce, fixture.tags[role], { gasLimit })).wait(); }
+      try { receipt = await (await source.isRoleRevoked.send(role, fixture.roleIndices[role], { gasLimit })).wait(); }
       catch (error) { receipt = error.receipt; if (!receipt) throw error; }
-      if (expected === "needs-preparation") {
-        assert.equal(receipt.status, 0);
-        await assert.rejects(() => source.isRoleRevoked(role, fixture.nonce, fixture.tags[role]), error =>
-          parseFailure(failureData(error))?.name === "RevocationStateNotPrepared");
-      } else {
-        assert.equal(receipt.status, 1);
-        assert.equal(await source.isRoleRevoked(role, fixture.nonce, fixture.tags[role]), expected === "revoked");
-      }
+      assert.equal(receipt.status, 1);
+      assert.equal(await source.isRoleRevoked(role, fixture.roleIndices[role]), expected === "revoked");
+      const trace = await provider.send("debug_traceTransaction", [receipt.hash, { disableMemory: true, disableStack: true, disableStorage: true }]);
+      const storageReads = trace.structLogs.filter(step => step.op === "SLOAD").length;
+      assert.equal(storageReads, 1, "Each role status query must read exactly one mapping slot");
       report.queryRows.push({ role, scenario, revocationCount: String(await source.revokedRoleCount(role)),
-        checkedThrough: String(await source.roleScanProgress(role, fixture.nonce, fixture.tags[role])),
-        outcome: expected, gasUsed: String(receipt.gasUsed), transactionHash: receipt.hash });
+        outcome: expected, storageReads, gasUsed: String(receipt.gasUsed), transactionHash: receipt.hash });
       await snapshot.restore();
     }
     async function measure(entry, operationName, scenario, expected = "accepted", expectedRole = null) {
@@ -123,10 +117,7 @@ describe("Receive bounded revocation gas and latest-state regression", function 
         if (decoded.name === "QualificationRevoked") {
           outcome = "qualification-revoked";
           assert.equal(Number(decoded.args[0]), expectedRole);
-        } else {
-          assert.equal(decoded.name, "RevocationStateNotPrepared");
-          outcome = "needs-preparation";
-        }
+        } else throw new Error(`Unexpected rejection: ${decoded.name}`);
         assert.deepEqual(Array.from(await pool.noteShard(0)), before.shard);
         assert.equal(await pool.nullifierCount(), before.nullifiers);
         assert.deepEqual(Array.from(await pool.budgetRecords(operation.budgetKey)), before.budget);
@@ -139,7 +130,7 @@ describe("Receive bounded revocation gas and latest-state regression", function 
         : await fixture.token.balanceOf(await pool.getAddress());
       assert.equal(collateral, before.collateral);
       const gasWithHeadroom = (receipt.gasUsed * (10_000n + headroomBps) + 9999n) / 10_000n;
-      if (outcome === "accepted") assert.ok(gasWithHeadroom <= gasLimit, "Prepared transaction exceeds local budget");
+      if (outcome === "accepted") assert.ok(gasWithHeadroom <= gasLimit, "Direct-status transaction exceeds local budget");
       report.rows.push({ asset: entry.asset, operation: operationName, scenario, revokedRole: expectedRole,
         revocationsPerRole: countsBefore.map(String), outcome, gasUsed: String(receipt.gasUsed),
         gasWithHeadroom: String(gasWithHeadroom), fitsLocalBudgetWithHeadroom: outcome === "accepted" && gasWithHeadroom <= gasLimit,
@@ -153,85 +144,47 @@ describe("Receive bounded revocation gas and latest-state regression", function 
       }
       await snapshot.restore();
     }
-    let checkedOverflow = false;
     for (const count of counts) {
       await fixture.seedTo(count);
-      const unprepared = await Promise.all([0, 1, 2].map(async role =>
-        await source.revokedRoleCount(role) - await source.roleScanProgress(role, fixture.nonce, fixture.tags[role]) > 8n));
-      const plans = await fixture.buildScanPlans();
-      if (plans.length) {
-        if (unprepared.some(Boolean)) await measureAll("unprepared-prefix", "needs-preparation");
-        // Generate once before revocation, then submit the authenticated historical prefixes.
-        const snapshot = await context.networkHelpers.takeSnapshot();
-        for (const role of [0, 1, 2]) {
-          await snapshot.restore();
-          await fixture.revokeTarget(role);
-          await fixture.submitScanPlans(plans);
-          await measureQuery(role, "revoked", "target-revoked-after-proof-generation");
-          await measureAll("target-revoked-after-proof-generation", "qualification-revoked", role);
-        }
-        await snapshot.restore();
-      }
-      const prepared = await fixture.submitScanPlans(plans);
-      report.preparationRows.push(...prepared.map(row => ({ ...row, countPerRole: count })));
-      for (const role of [0, 1, 2]) await measureQuery(role, "valid", "prepared-prefix");
-      await measureAll("prepared-prefix");
-      const reused = await fixture.buildScanPlans();
-      assert.deepEqual(reused, [], "A fully prepared status must not require repeated proofs or transactions");
-      report.cacheReuseRows.push({ countPerRole: count, additionalProofs: reused.length, additionalPrepareTransactions: 0 });
+      for (const role of [0, 1, 2]) await measureQuery(role, "valid", "direct-status");
+      await measureAll("direct-status");
       const snapshot = await context.networkHelpers.takeSnapshot();
       for (const role of [0, 1, 2]) {
         await snapshot.restore();
         await fixture.revokeTarget(role);
-        await measureQuery(role, "revoked", "target-revoked-after-cache-update");
+        await measureQuery(role, "revoked", "target-revoked-after-business-proof");
         assert.equal(await registry.verifyReceive(fixture.code, fixture.codeProof), true);
-        await measureAll("target-revoked-after-cache-update", "qualification-revoked", role);
+        await measureAll("target-revoked-after-business-proof", "qualification-revoked", role);
       }
       await snapshot.restore();
-      if (!checkedOverflow) {
-        await fixture.seedTo(count + 9);
-        await measureQuery(0, "needs-preparation", "latest-tail-overflow");
-        await measureAll("latest-tail-overflow", "needs-preparation");
-        await snapshot.restore();
-        checkedOverflow = true;
-      }
-      if (benchmark) console.log(`[revocation-gas] ${count}/role; ${plans.length} new interval proofs, final funds transactions bounded`);
+      if (benchmark) console.log(`[revocation-gas] ${count}/role; zero preparation proofs or transactions; one status SLOAD per role`);
     }
     report.gasSpread = [];
     for (const asset of ["native", "erc20"]) for (const operation of ["first", "append", "claim"]) {
       const values = report.rows.filter(row => row.asset === asset && row.operation === operation
-        && row.scenario === "prepared-prefix").map(row => BigInt(row.gasUsed));
+        && row.scenario === "direct-status").map(row => BigInt(row.gasUsed));
       const min = values.reduce((a, b) => a < b ? a : b), max = values.reduce((a, b) => a > b ? a : b);
-      assert.ok(max - min < 50_000n, "Fully prepared final transaction gas must not grow with total history");
+      assert.ok(max - min < 50_000n, "Direct status transaction gas must not grow with total history");
       report.gasSpread.push({ asset, operation, min: String(min), max: String(max), spread: String(max - min) });
     }
-    report.preparationTotals = {
-      generatedProofs: report.preparationRows.length,
-      prepareTransactions: report.preparationRows.length,
-      proofMilliseconds: report.preparationRows.reduce((sum, row) => sum + row.proofMilliseconds, 0),
-      gasUsed: String(report.preparationRows.reduce((sum, row) => sum + BigInt(row.gasUsed), 0n)),
-      newProgressStorageWords: report.preparationRows.reduce((sum, row) => sum + row.newProgressStorageWords, 0),
-      note: "Totals count the normal incremental preparation path; adversarial snapshot branches reuse those proofs and are excluded.",
-    };
     if (benchmark) {
       const output = process.env.RECEIVE_REVOCATION_GAS_REPORT;
       fs.mkdirSync(path.dirname(output), { recursive: true });
       fs.writeFileSync(output, `${JSON.stringify(report, null, 2)}\n`);
-      console.table(report.rows.filter(row => row.scenario === "prepared-prefix").map(row => ({ asset: row.asset,
+      console.table(report.rows.filter(row => row.scenario === "direct-status").map(row => ({ asset: row.asset,
         operation: row.operation, countPerRole: row.revocationsPerRole[0], gas: row.gasUsed, outcome: row.outcome })));
-      console.log(`[revocation-gas] Real-scan / echo-money report: ${path.relative(ROOT, output)}`);
+      console.log(`[revocation-gas] Direct-status / echo-money report: ${path.relative(ROOT, output)}`);
     }
     await connection.close();
   });
 
-  it("rejects a target revoked before preparation and accepts no incomplete non-revocation proof", async () => {
+  it("does not share status across unrelated roles and keeps ordinary receiving valid after a role revocation", async () => {
     const connection = await hre.network.create({ network: "default" });
-    const fixture = await createReceiveRevocationGasFixture({ ethers: connection.ethers,
-      networkHelpers: connection.networkHelpers });
+    const fixture = await createReceiveRevocationGasFixture({ ethers: connection.ethers, networkHelpers: connection.networkHelpers });
     await fixture.revokeTarget(0);
-    await fixture.seedTo(9);
-    await assert.rejects(() => fixture.buildScanPlans(), error => error.code === "QUALIFICATION_REVOKED");
-    assert.equal(await fixture.source.roleScanProgress(0, fixture.nonce, fixture.tags[0]), 0n);
+    assert.equal(await fixture.source.isRoleRevoked(0, fixture.roleIndices[0]), true);
+    assert.equal(await fixture.source.isRoleRevoked(1, fixture.roleIndices[1]), false);
+    assert.equal(await fixture.registry.verifyReceive(fixture.code, fixture.codeProof), true);
     await connection.close();
   });
 

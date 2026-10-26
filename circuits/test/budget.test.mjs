@@ -5,6 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { WitnessCalculatorBuilder } from "circom_runtime";
+import { poseidon2 } from "poseidon-lite";
 import { receiveCodeFixture, eligibilityFixture } from "./receive_fixture.mjs";
 import { fundFixture, claimFixture } from "./budget_fixture.mjs";
 import { assertConstraintViolation } from "./constraint_assertions.mjs";
@@ -181,9 +182,9 @@ test("budget independent contributions and canonical subject period claims", asy
           "periodNullifier",
           "authorizerScope",
           "issuanceRoot",
-          "childTag",
-          "endorsementTag",
-          "trustedTag",
+          "childRoleIndex",
+          "endorsementRoleIndex",
+          "trustedRoleIndex",
           "issueNonce",
           "endorser",
           "xChild",
@@ -217,6 +218,13 @@ test("budget independent contributions and canonical subject period claims", asy
         }
       },
     );
+    await t.test("Claim rejects another qualification's valid status index and source-domain substitutions", async () => {
+      for (const [offset, field] of ["childRoleIndex", "endorsementRoleIndex", "trustedRoleIndex"].entries()) {
+        await invalid(claim, withdraw, { [field]: poseidon2([74321n + BigInt(offset), 999999n]).toString() });
+        const secret = ["xChild", "xEndorse", "xTrust"][offset];
+        await invalid(claim, withdraw, { [field]: poseidon2([74201n + BigInt(offset), BigInt(withdraw.witness[secret])]).toString() });
+      }
+    });
     await t.test(
       "maturity uses the immutable start and never wraps a far-future index",
       async () => {

@@ -11,10 +11,10 @@ import { checkCurrentArtifacts } from "./check-zk-artifacts.mjs";
 const ROOT = path.resolve(import.meta.dirname, "..");
 const USAGE = `Usage: npm run zk:dev -- [--circuit <all|core|person|disclosure|shielded|shielded:action|protocol|protocol:action>] [--ptau path]
 
-The default compiles all 14 current relations, reuses matching identity/disclosure keys,
-and regenerates the nine receiving and three asset-boundary development key sets.
+The default compiles all 13 current relations, reuses matching identity/disclosure keys,
+and regenerates the eight receiving and three asset-boundary development key sets.
 Focused selections rebuild and regenerate only the selected relations; the final check
-still requires the complete 14-relation bundle. Identity keys are checked, never rotated.
+still requires the complete 13-relation bundle. Identity keys are checked, never rotated.
 An explicit --ptau applies to receiving and boundary development setup.
 This command does not create production keys or approve a production ceremony.`;
 
@@ -81,7 +81,7 @@ export async function main(argv = process.argv.slice(2), { log = console.log, ..
     return;
   }
   const result = await runDevelopment({ ...options, circuit: parsed.circuit, ptauPath: parsed.ptauPath });
-  log(`[zk-development] All 14 artifact sets verified; ${result.regeneratedCircuits.length} development key sets regenerated. Identity and production keys are unchanged.`);
+  log(`[zk-development] All 13 artifact sets verified; ${result.regeneratedCircuits.length} development key sets regenerated. Identity and production keys are unchanged.`);
   return result;
 }
 

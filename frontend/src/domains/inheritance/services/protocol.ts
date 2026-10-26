@@ -56,12 +56,7 @@ export class ReceiveProtocol {
     };
     return new ReceiveChain(this.context.deployment, signer, {
       beforeTransaction: assertActive,
-      prepareRevocationScans: async status => {
-        assertActive();
-        const result = await this.worker.call("prepareRevocationScans", status, this.context);
-        assertActive();
-        return result.revocationScans;
-      },
+
     });
   }
   cancel() { ++this.transactionEpoch; this.worker.cancel(); }

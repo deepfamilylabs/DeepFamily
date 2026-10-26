@@ -209,9 +209,9 @@ export function claimFixture(fund = fundFixture(), options = {}) {
         ? poseidon2([w.credentialSiblings[i], w.issuanceRoot])
         : poseidon2([w.issuanceRoot, w.credentialSiblings[i]]);
   w.issuanceRoot = options.issuanceRoot ?? w.issuanceRoot;
-  w.childTag = options.childTag ?? poseidon3([73301n, w.xChild, w.nonce]);
-  w.endorsementTag = options.endorsementTag ?? poseidon3([73302n, w.xEndorse, w.nonce]);
-  w.trustedTag = options.trustedTag ?? poseidon3([73303n, w.xTrust, w.nonce]);
+  w.childRoleIndex = options.childRoleIndex ?? poseidon2([74321n, w.xChild]);
+  w.endorsementRoleIndex = options.endorsementRoleIndex ?? poseidon2([74322n, w.xEndorse]);
+  w.trustedRoleIndex = options.trustedRoleIndex ?? poseidon2([74323n, w.xTrust]);
   const oldNote = budgetNote(w);
   w.inputRoot = oldNote;
   for (let i = 0; i < Number(w.noteDepth); i++)
@@ -261,9 +261,9 @@ export function claimFixture(fund = fundFixture(), options = {}) {
       ...w.ciphertextHashes,
       w.authorizerScope,
       w.issuanceRoot,
-      w.childTag,
-      w.endorsementTag,
-      w.trustedTag,
+      w.childRoleIndex,
+      w.endorsementRoleIndex,
+      w.trustedRoleIndex,
     ],
   };
 }

@@ -35,9 +35,9 @@ export interface CapabilityInput {
   issuanceRoot: ProtocolInteger;
   parentVersion: ProtocolInteger;
   familyTag: ProtocolInteger;
-  childTag: ProtocolInteger;
-  endorsementTag: ProtocolInteger;
-  trustedTag: ProtocolInteger;
+  childRoleIndex: ProtocolInteger;
+  endorsementRoleIndex: ProtocolInteger;
+  trustedRoleIndex: ProtocolInteger;
   capabilityBinding: ProtocolInteger;
   proof: ProtocolProof;
 }
@@ -45,9 +45,9 @@ export interface Capability {
   issuanceRoot: bigint;
   parentVersion: bigint;
   familyTag: bigint;
-  childTag: bigint;
-  endorsementTag: bigint;
-  trustedTag: bigint;
+  childRoleIndex: bigint;
+  endorsementRoleIndex: bigint;
+  trustedRoleIndex: bigint;
   capabilityBinding: bigint;
   proof: ProtocolProof;
   publicSignals: bigint[];
@@ -128,10 +128,9 @@ export function computeFamilyTag(input: {
   familyCommitment: ProtocolInteger;
   nonce: ProtocolInteger;
 }): bigint;
-export function computeRoleTag(input: {
+export function computeRoleStatusIndex(input: {
   role: "child" | "endorsement" | "trusted";
   roleSecret: ProtocolInteger;
-  nonce: ProtocolInteger;
 }): bigint;
 /** Restore the selected private branch. codeIndex must be explicitly supplied and backed up privately. */
 export function deriveReceiveKeyMaterial(input: {

@@ -10,7 +10,7 @@ A code carries a proof of its receiving authorization: independently derived spe
 
 `EligibilitySource` authenticates actual current lineage facts and the publisher's authority. `ReceiveRegistry` verifies qualification issuance and code capabilities. Every budget deposit and additional contribution rechecks current role revocations and expiry; `claimBudget` also requires current qualification. Revoking family qualification does not disable ordinary receipt or letters. The recipient can revoke an individual code separately.
 
-A public family rule can reveal that a code qualifies for its family commitment. The protocol does not publish the mapping from that commitment to an actual parent. Revocation publishes role openings and may associate historical codes; that behavior is an accepted requirement.
+Qualified codes expose shared pseudorandom role indices, so codes using the same qualification can be linked before revocation. The indices use a different hash domain from identity-associated source registration commitments. A public family rule can reveal that a code qualifies for its family commitment. Revocation publishes role openings and may associate historical codes with their source registrations; that behavior is retained.
 
 ## Budgets
 
@@ -26,8 +26,8 @@ The wallet exports an authenticated encrypted backup containing its root, code i
 
 ## Artifacts and verification
 
-The single deployment uses 14 relations: two identity/disclosure, three asset boundaries and nine receiving/qualification/budget relations, including the revocation scan. Each submitted Groth16 ABC proof is 256 bytes; a transaction may include several proofs. Public signals and ciphertext are separate transaction data.
+The single deployment uses 13 relations: two identity/disclosure, three asset boundaries and eight receiving/qualification/budget relations, using direct role-index status checks. Each submitted Groth16 ABC proof is 256 bytes; a transaction may include several proofs. Public signals and ciphertext are separate transaction data.
 
 Run `npm run zk:dev` for local development keys, `npm run zk:dev:check` to check them, and `npm run test:proof` / `npm run test:evm` for real-proof checks. `npm run zk:frontend -- <chainId> <registry>` exports trusted frontend artifacts and a local build configuration. A scanned code cannot choose proof keys or replace that configuration.
 
-Development keys are not a reviewed production ceremony. Public deployment and release remain blocked until all 14 relations have reviewed production evidence. Revocation preparation proves authenticated intervals of at most 32 published openings; final acceptance checks at most eight newer entries per role. A longer unchecked tail requires further preparation, and a target revocation remains effective immediately. A new code can require multiple proofs and preparation transactions proportional to the existing history; browser cost, aggregate gas and per-code cache storage still require capacity review.
+Development keys are not a reviewed production ceremony. Public deployment and release remain blocked until all 13 relations have reviewed production evidence. Budget qualification checks use three direct current-status reads, independent of revocation history. There are no preparation proofs or preparation transactions. A target revocation remains effective immediately, including when committed after business-proof generation. See [revocation checks and capacity](receive-revocation-capacity.md) for the measured scope and limitations.

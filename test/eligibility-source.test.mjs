@@ -1,26 +1,25 @@
 import "../hardhat-test-setup.mjs";
 import { expect } from "chai";
 import hre from "hardhat";
-import { poseidon2, poseidon3 } from "poseidon-lite";
+import { poseidon2 } from "poseidon-lite";
 import { replayLineageTree } from "@deepfamily/protocol-core";
 
 describe(" eligibility source", function () {
   const abi = hre.ethers.AbiCoder.defaultAbiCoder();
   const proof = (signals) => abi.encode(["uint256[]"], [signals]);
   const commitment = (role, secret) => poseidon2([74201n + BigInt(role), secret]);
-  const tag = (role, secret, nonce = 12345n) => poseidon3([73301n + BigInt(role), secret, nonce]);
+  const roleIndex = (role, secret) => poseidon2([74321n + BigInt(role), secret]);
   const personHash = (identity) => hre.ethers.keccak256(hre.ethers.toBeHex(identity, 32));
 
   async function setup() {
     const [endorser, manager, stranger] = await hre.ethers.getSigners();
     const t3 = await hre.ethers.deployContract("PoseidonT3");
-    const t4 = await hre.ethers.deployContract("PoseidonT4");
     const verifier = await hre.ethers.deployContract("FixedProofVerifierMock");
     const family = await hre.ethers.deployContract("SourceFamilyMock");
     const lineage = await hre.ethers.deployContract("SourceLineageMock", [await family.getAddress()]);
     const source = await (await hre.ethers.getContractFactory("EligibilitySource", {
-      libraries: { PoseidonT3: await t3.getAddress(), PoseidonT4: await t4.getAddress() },
-    })).deploy(await lineage.getAddress(), await verifier.getAddress(), await verifier.getAddress(), await verifier.getAddress());
+      libraries: { PoseidonT3: await t3.getAddress() },
+    })).deploy(await lineage.getAddress(), await verifier.getAddress(), await verifier.getAddress());
     const chain = (await hre.ethers.provider.getNetwork()).chainId;
     const scope = BigInt(await source.getAddress());
     await family.setSource(await source.getAddress());
@@ -123,9 +122,9 @@ describe(" eligibility source", function () {
     await family.connect(endorser).revokeAndEndorse(
       await source.getAddress(), await lineage.getAddress(), 201, endorser.address, [0, 1], [30000, 40000], false,
     );
-    expect(await source.isRoleRevoked(0, 12345, tag(0, 30000n))).to.equal(true);
-    expect(await source.isRoleRevoked(1, 12345, tag(1, 40000n))).to.equal(true);
-    expect(await source.isRoleRevoked(0, 12346, tag(0, 30000n))).to.equal(false);
+    expect(await source.isRoleRevoked(0, roleIndex(0, 30000n))).to.equal(true);
+    expect(await source.isRoleRevoked(1, roleIndex(1, 40000n))).to.equal(true);
+    expect(await source.isRoleRevoked(1, roleIndex(0, 30000n))).to.equal(false);
     expect(await lineage.root(0)).to.equal(1002n);
     await expect(family.revoke(await source.getAddress(), endorser.address, [0], [30000]))
       .to.be.revertedWithCustomError(source, "RoleAlreadyRevoked");
@@ -146,7 +145,7 @@ describe(" eligibility source", function () {
     await family.connect(stranger).revokeAndUntrust(
       await source.getAddress(), await lineage.getAddress(), 202, 1, endorser.address, [2], [50000],
     );
-    expect(await source.isRoleRevoked(2, 12345, tag(2, 50000n))).to.equal(true);
+    expect(await source.isRoleRevoked(2, roleIndex(2, 50000n))).to.equal(true);
     expect(await lineage.root(1)).to.equal(1003n);
   });
 

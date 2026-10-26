@@ -124,7 +124,7 @@ describe("Canonical pool", function () {
     const code = { codeAlias: 61n, commonBinding: 62n, revocationTag: 63n, nonce: 64n,
       ownerCommitment: 65n, viewKeyLo: 66n, viewKeyHi: 67n, expiresAt: 2_000_000_000n };
     const cap = { issuanceRoot: 71n, parentVersion: 1n, capabilityBinding: 72n, familyTag: 73n,
-      childTag: 74n, endorsementTag: 75n, trustedTag: 76n };
+      childRoleIndex: 74n, endorsementRoleIndex: 75n, trustedRoleIndex: 76n };
     const now = BigInt((await hre.ethers.provider.getBlock("latest")).timestamp);
     const deposit = { policyCommitment: 81n, budgetKey: 82n, eligibleFrom: now + 7200n };
     const fundData = (nf, cm) => data(cm, { inputShardIds: [0n], inputRoots: [root], inputNullifiers: [nf] });

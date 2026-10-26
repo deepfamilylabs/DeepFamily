@@ -35,7 +35,6 @@ const deployment = { chainId: 31337n,
   registryAddress: "0x0000000000000000000000000000000000001234",
   poolAddress: "0x0000000000000000000000000000000000004321" };
 const manifest = { version: 1 as const, chainId: "31337", registryAddress: deployment.registryAddress, circuits: {} };
-const status = { issuanceRoot: 11n, nonce: 13n, childTag: 17n, endorsementTag: 19n, trustedTag: 23n };
 const protocols: ReceiveProtocol[] = [];
 const setup = () => {
   const protocol = new ReceiveProtocol("http://localhost:8545", deployment, manifest);
@@ -55,53 +54,33 @@ afterEach(() => {
 });
 
 describe("public receive transaction cancellation", () => {
-  it.each(["cancel", "close"] as const)("invalidates an existing transaction adapter on %s before another worker starts", async action => {
+  it.each(["cancel", "close"] as const)("invalidates an existing transaction adapter on %s", action => {
     const { protocol, options } = setup();
     expect(() => options.beforeTransaction!()).not.toThrow();
     protocol[action]();
     expect(() => options.beforeTransaction!()).toThrow("cancelled");
-    await expect(options.prepareRevocationScans!(status)).rejects.toThrow("cancelled");
     expect(FakeWorker.instances).toHaveLength(0);
     expect(mocks.destroy).toHaveBeenCalledTimes(action === "close" ? 1 : 0);
   });
-
-  it.each(["cancel", "close"] as const)("terminates an outstanding preparation on %s and keeps the old adapter invalid", async action => {
+  it.each(["cancel", "close"] as const)("stops an outstanding proof job on %s", async action => {
     const { protocol, options } = setup();
-    const pending = options.prepareRevocationScans!(status);
+    const input = { code: "public-code", body: "letter", asOf: 100n, messageId: 1n };
+    const pending = protocol.prepareLetter(input);
     const worker = FakeWorker.instances[0];
-    expect(worker.requests[0]).toMatchObject({ method: "prepareRevocationScans", input: status });
+    expect(worker.requests[0]).toMatchObject({ method: "prepareLetter", input });
     protocol[action]();
     await expect(pending).rejects.toThrow();
     expect(worker.terminate).toHaveBeenCalledOnce();
     expect(() => options.beforeTransaction!()).toThrow("cancelled");
-    await expect(options.prepareRevocationScans!(status)).rejects.toThrow("cancelled");
-    expect(FakeWorker.instances).toHaveLength(1);
   });
-
-  it.each(["cancel", "close"] as const)("rejects an already delivered proof response if %s occurs before its await resumes", async action => {
-    const { protocol, options } = setup();
-    const pending = options.prepareRevocationScans!(status);
-    const worker = FakeWorker.instances[0];
-    worker.reply({ revocationScans: [] });
-    protocol[action]();
-    await expect(pending).rejects.toThrow("cancelled");
-    expect(worker.terminate).toHaveBeenCalledOnce();
-    expect(() => options.beforeTransaction!()).toThrow("cancelled");
-    expect(FakeWorker.instances).toHaveLength(1);
-  });
-
-  it("allows an explicitly created adapter after cancellation while the old one stays invalid", async () => {
+  it("allows an explicitly created adapter after cancellation while the old one stays invalid", () => {
     const { protocol, options: old } = setup();
     protocol.cancel();
     protocol.transactions({} as Signer);
     const next = mocks.options[mocks.options.length - 1]!;
     expect(() => old.beforeTransaction!()).toThrow("cancelled");
     expect(() => next.beforeTransaction!()).not.toThrow();
-    const pending = next.prepareRevocationScans!(status);
-    expect(FakeWorker.instances).toHaveLength(1);
-    FakeWorker.instances[0].reply({ revocationScans: [] });
-    await expect(pending).resolves.toEqual([]);
-    await expect(old.prepareRevocationScans!(status)).rejects.toThrow("cancelled");
-    expect(FakeWorker.instances).toHaveLength(1);
+    expect(FakeWorker.instances).toHaveLength(0);
+    expect(next).not.toHaveProperty("prepareRevocationScans");
   });
 });

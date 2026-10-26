@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { poseidon3, poseidon4, poseidon5, poseidon7, poseidon8 } from "poseidon-lite";
 import {
   deriveReceiveKeyMaterial, computeReceiveAuthorization, encodeReceiveCode,
-  computeFamilyTag, computeRoleTag, computeCapabilityBinding,
+  computeFamilyTag, computeRoleStatusIndex, computeCapabilityBinding,
 } from "../receive-code.js";
 import {
   BUDGET_NOTE_PAYLOAD_BYTES, computePolicyCommitment, computeBudgetKey,
@@ -28,7 +28,7 @@ const fundPublicFields = ["chainId", "pool", "commonBinding", "codeAlias", "nonc
   "viewKeyLo", "viewKeyHi", "capabilityBinding", "familyTag", "parentVersion", "policyCommitment", "budgetKey", "eligibleFrom",
   "inputRoot", "inputNullifier", "outputCommitments", "ciphertextHashes"];
 const claimPublicFields = ["chainId", "pool", "codeAlias", "nonce", "ownerCommitment", "viewKeyLo", "viewKeyHi",
-  "policyCommitment", "budgetKey", "eligibleFrom", "asOf", "inputRoot", "inputNullifier", "periodNullifier", "outputCommitments", "ciphertextHashes", "authorizerScope", "issuanceRoot", "childTag", "endorsementTag", "trustedTag"];
+  "policyCommitment", "budgetKey", "eligibleFrom", "asOf", "inputRoot", "inputNullifier", "periodNullifier", "outputCommitments", "ciphertextHashes", "authorizerScope", "issuanceRoot", "childRoleIndex", "endorsementRoleIndex", "trustedRoleIndex"];
 const echo = fields => async witness => ({ proof, publicSignals: fields.flatMap(key => witness[key]) });
 async function fixture() {
   const recipient = await deriveReceiveKeyMaterial({ masterKey: new Uint8Array(32).fill(37),
@@ -38,9 +38,9 @@ async function fixture() {
   const common = computeReceiveAuthorization({ ...recipient, expiresAt: 2_000_000_000n });
   const cap = { issuanceRoot: 997n, parentVersion: policy.parentVersion,
     familyTag: computeFamilyTag({ familyCommitment: policy.familyCommitment, nonce: common.nonce }),
-    childTag: computeRoleTag({ role: "child", roleSecret: 13n, nonce: common.nonce }),
-    endorsementTag: computeRoleTag({ role: "endorsement", roleSecret: 17n, nonce: common.nonce }),
-    trustedTag: computeRoleTag({ role: "trusted", roleSecret: 19n, nonce: common.nonce }), proof };
+    childRoleIndex: computeRoleStatusIndex({ role: "child", roleSecret: 13n}),
+    endorsementRoleIndex: computeRoleStatusIndex({ role: "endorsement", roleSecret: 17n}),
+    trustedRoleIndex: computeRoleStatusIndex({ role: "trusted", roleSecret: 19n}), proof };
   cap.capabilityBinding = computeCapabilityBinding(common, cap);
   const code = encodeReceiveCode({ ...common, proof, capabilities: [cap] });
   const donorNote = { ownerCommitment: donor.ownerCommitment, amount: 25n, nonce: 43n };

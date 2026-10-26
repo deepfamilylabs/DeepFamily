@@ -5,6 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { WitnessCalculatorBuilder } from "circom_runtime";
+import { poseidon2 } from "poseidon-lite";
 import { assertConstraintViolation } from "./constraint_assertions.mjs";
 import {
   receiveCodeFixture,
@@ -191,6 +192,20 @@ test("receive issuance, independent receive code and optional capabilities", asy
       await invalid(cap, boundary.witness, { credentialIndex: String(1n << 32n) });
     });
 
+    await t.test("stable role indices remain authenticated to the original qualification openings", async () => {
+      const other = eligibilityFixture({ xChild: 98701n, xEndorse: 98702n, xTrust: 98703n });
+      const otherCap = capabilityFixture(other, common);
+      await valid(issue, other);
+      await valid(cap, otherCap);
+      for (const [offset, secret] of ["xChild", "xEndorse", "xTrust"].entries()) {
+        assert.notEqual(capability.publicSignals[offset + 2], otherCap.publicSignals[offset + 2]);
+        assert.notEqual(capability.publicSignals[offset + 2],
+          poseidon2([74201n + BigInt(offset), BigInt(issuance.witness[secret])]));
+        // A different active credential's opening cannot be spliced into this Q.
+        await invalid(cap, capability.witness, { [secret]: other.witness[secret] });
+      }
+    });
+
     await t.test(
       "different issuances and parent capabilities bind one canonical subject and one code",
       async () => {
@@ -213,8 +228,8 @@ test("receive issuance, independent receive code and optional capabilities", asy
         const otherSubject = eligibilityFixture({ derivedSecretField: 111111n });
         const splice = capabilityFixture(otherSubject, common);
         await invalid(cap, splice.witness, {});
-        // A second code is independently authorized and does not share alias,
-        // receiving keys or role tags with the first code.
+        // A second code has independent authorization and receiving keys.
+        // Role status indices intentionally remain shared for the same qualification.
         const fresh = receiveCodeFixture({
           nonce: 9002n,
           codeSecret: 335n,
@@ -225,8 +240,8 @@ test("receive issuance, independent receive code and optional capabilities", asy
         await valid(code, fresh);
         const freshCap = capabilityFixture(issuance, fresh);
         await valid(cap, freshCap);
-        for (let i = 0; i < 5; i++)
-          assert.notEqual(capability.publicSignals[i], freshCap.publicSignals[i]);
+        for (const i of [0, 1]) assert.notEqual(capability.publicSignals[i], freshCap.publicSignals[i]);
+        for (const i of [2, 3, 4]) assert.equal(capability.publicSignals[i], freshCap.publicSignals[i]);
       },
     );
   } finally {

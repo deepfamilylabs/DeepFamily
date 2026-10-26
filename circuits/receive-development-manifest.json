@@ -183,12 +183,12 @@
       "source": "budget_capability",
       "contract": "BudgetCapabilityVerifier",
       "publicSignals": 10,
-      "wires": 14125,
+      "wires": 14062,
       "outputs": 5,
       "inputs": 5,
-      "constraints": 14085,
+      "constraints": 14022,
       "sources": {
-        "circuits/budget_capability.circom": "cb860bad4862c66334ddca236ea1d206d47e20a2fb7b87bfb839e142ff79c09f",
+        "circuits/budget_capability.circom": "b8a2e9a268d3a829ca4f3b79e643c7b3e4fd84cd586bb4b75b42a83bae343c70",
         "circuits/lib/identity.circom": "1d4e816446dcb1bc0a9f98ba0de2c35be4b95c9477a1f58ee767a901a33c91e3",
         "circuits/receive_common.circom": "6691d1e1505456127a29adcc3d4cb433ea558d1674d72b2581949b8693aba8af",
         "circuits/shielded_merkle_common.circom": "1cfb6de220dd25a11f5efffa894cb636fdbac31e69940a7b2fa239700728bb3e",
@@ -203,19 +203,19 @@
         "node_modules/circomlib/circuits/poseidon.circom": "2582464669b69827164bd08ee0337997e1957f2ab4f00cdd86d533ca5e9d9234"
       },
       "compiled": {
-        "zk-artifacts/protocol/budget_capability.r1cs": "deede64e372306426d8c4e7fc106e3c5294064518997c1e4165e6f01cb995eab",
-        "frontend/public/zk/protocol/budget_capability.wasm": "d33323fa3d6d5a837605edb412409fea66d04bc60663820d47912d5dc2de5357"
+        "zk-artifacts/protocol/budget_capability.r1cs": "41fbeaefb3cfce5cf337dc02a71a3e1b073835dec878fda4fce5d3a8f2412fc0",
+        "frontend/public/zk/protocol/budget_capability.wasm": "deb2711db0d2771c4a376c5dcb894a3cff42396c772c20bd47545206233130ce"
       },
       "setup": {
         "production": false,
         "ptauPath": "circuits/ptau/ppot_0080_17.ptau",
         "ptauSha256": "f807e065fde53f72f4bf4d57140fab85b26daa6cc95bdfec7cce93622b3a367c",
         "ptauPower": 17,
-        "contributionHash": "a84353acbc6d9ddc1fdbd44d155e7c1f24eeee12a31a0f3ac31241bfdd162eed4617b3fa90f45c516830d68583e75073a82c845b19bffe191a588efb53fb2908",
+        "contributionHash": "d720e2bf6cf2df768c8f7608d7ba7ff593066b4fe0cf356143501dbf3c1fd561281c3ef058f3741d7b78b70e78f1435779313ac2b3bb2d300a0e596df81d7ad6",
         "artifacts": {
-          "frontend/public/zk/protocol/budget_capability_final.zkey": "1f3f4e9993c3cef55fb5105b7d49f571fe227691b971ab9affd44662d88a5568",
-          "frontend/public/zk/protocol/budget_capability.vkey.json": "544664d214d2ea990932ad84b24f3f8a168cfaa936b7bb51cb37c28bfbec712d",
-          "contracts/generated/protocol/BudgetCapabilityVerifier.sol": "d8312f2f829e5d6addbe0adef76a3c9c5b1a9e07bf1012823d79aec362bf9978"
+          "frontend/public/zk/protocol/budget_capability_final.zkey": "435f36cea4405ace319662075fdef09d49fe2d83a2af0e9d7f4e7f32bb6f5703",
+          "frontend/public/zk/protocol/budget_capability.vkey.json": "1dc35003aa82c44e14f9dc1485c80ebd9d075f4cd00781dc35db1f0e80a99700",
+          "contracts/generated/protocol/BudgetCapabilityVerifier.sol": "f0974cc2e0920248f272d779d27c879ddc640d5e77c256b098f4cea0d88488ae"
         }
       }
     },
@@ -266,12 +266,12 @@
       "source": "budget_claim",
       "contract": "BudgetClaimVerifier",
       "publicSignals": 23,
-      "wires": 26665,
+      "wires": 26602,
       "outputs": 0,
       "inputs": 23,
-      "constraints": 26595,
+      "constraints": 26532,
       "sources": {
-        "circuits/budget_claim.circom": "a8793bd914f32306d85d58af25c761fac5d5e8d785328681107cb625cc4543e2",
+        "circuits/budget_claim.circom": "864d533f97447ab5c47e9adde8d695c4d654e39099a7bed09deb93daf24bcb67",
         "circuits/budget_common.circom": "f3d981de4e2487d250627d9225477e5dfb1ccba5717623dcf0f6d54a564649e8",
         "circuits/lib/identity.circom": "1d4e816446dcb1bc0a9f98ba0de2c35be4b95c9477a1f58ee767a901a33c91e3",
         "circuits/receive_common.circom": "6691d1e1505456127a29adcc3d4cb433ea558d1674d72b2581949b8693aba8af",
@@ -289,19 +289,19 @@
         "node_modules/circomlib/circuits/poseidon.circom": "2582464669b69827164bd08ee0337997e1957f2ab4f00cdd86d533ca5e9d9234"
       },
       "compiled": {
-        "zk-artifacts/protocol/budget_claim.r1cs": "ecaf5f220e368da2034f48ba24c0fb6df6672c493bc34ff7526c221915d8f694",
-        "frontend/public/zk/protocol/budget_claim.wasm": "4b6144c2ce0d6571280dd50a8e708a2e2c182c38f54b7450c7ad6801bff28f04"
+        "zk-artifacts/protocol/budget_claim.r1cs": "1ac3cc8b10ab5aa04602e7fd03ac4ef5757d7091b9838f9279675585d75dd057",
+        "frontend/public/zk/protocol/budget_claim.wasm": "9935a4abf81e9329e77e154078451521ddb05dfee48a2ba61f07c6c027582e77"
       },
       "setup": {
         "production": false,
         "ptauPath": "circuits/ptau/ppot_0080_17.ptau",
         "ptauSha256": "f807e065fde53f72f4bf4d57140fab85b26daa6cc95bdfec7cce93622b3a367c",
         "ptauPower": 17,
-        "contributionHash": "184029b74163da77b3c425e1e51a587efaa7d408afbf2dd1b6b821fd55a9f06ac3eb9e884b1d0ebffe4b3a399c3aee4063d9c3aa795de4d18e61706fc085505a",
+        "contributionHash": "f317911038e2c41f0c00c4909f15167f66ee3282cbbf2e9ecf3cc9478994c48191862024a7135e4302459da535d612485e8e2f898285750a5563620afd65366e",
         "artifacts": {
-          "frontend/public/zk/protocol/budget_claim_final.zkey": "c23623db446060505237e1c05cce412c7c3d8b91b24ed00c333d23c99d7a6aad",
-          "frontend/public/zk/protocol/budget_claim.vkey.json": "11d715e0067ae10a46d9a2a784e5a4f30ceae7676bc8ddf48ff3a448c60209bd",
-          "contracts/generated/protocol/BudgetClaimVerifier.sol": "692de4e2a63c4c8e0703a34eb74559c1d4204c8a94b07355dd0176a0ebc30435"
+          "frontend/public/zk/protocol/budget_claim_final.zkey": "5106743b8a4af8626edba2e331a4a9340dd3b61cc4c61fbe9adec96f73505f44",
+          "frontend/public/zk/protocol/budget_claim.vkey.json": "32f4e6dacb34d67d296bf8da535103eb1150b547a5039e9a5e9fb79c8eadd00d",
+          "contracts/generated/protocol/BudgetClaimVerifier.sol": "99863deebf840fa312b36f2c7cbe05598116e0c0b72dcb3730c8cbb42e358a57"
         }
       }
     },
@@ -342,41 +342,6 @@
           "frontend/public/zk/protocol/value_transfer_final.zkey": "e00b9bc99519130c2a33d11741742306e915e7626b879684cfe219e3312956d3",
           "frontend/public/zk/protocol/value_transfer.vkey.json": "db1e35f77a198f636ef1f352aa9b5dcac723b62885e55d1599d16e3955c1e800",
           "contracts/generated/protocol/ValueTransferVerifier.sol": "3e8f64ac90740df378f44884e8a6b41152ee9817b843777e0b7c442b0011c4cb"
-        }
-      }
-    },
-    "revocationScan": {
-      "source": "eligibility_revocation_scan",
-      "contract": "EligibilityRevocationScanVerifier",
-      "publicSignals": 9,
-      "wires": 17787,
-      "outputs": 0,
-      "inputs": 9,
-      "constraints": 17884,
-      "sources": {
-        "circuits/eligibility_revocation_scan.circom": "2d8a4c450c1ab15590d5949de582025c937b1c29f88aa48440a6b5fa32527a0a",
-        "node_modules/circomlib/circuits/aliascheck.circom": "7df7542461a68c1564a55be8f01d75571c0e2555a08a078abeba43e1ea032eb4",
-        "node_modules/circomlib/circuits/binsum.circom": "8aa153baf5791d96d06dce837c1e19b9ecc3a7dc65054132d5dd189b60bfcfc2",
-        "node_modules/circomlib/circuits/bitify.circom": "688f121303a2dd0154ceeda8d2f53a9d2d26789d10a69a46acd534642725683e",
-        "node_modules/circomlib/circuits/comparators.circom": "fd0c7723ee56e1467df1861131157cbb108e156fe2d9ec64895c8e68de14db20",
-        "node_modules/circomlib/circuits/compconstant.circom": "94c5cc93b589a940acbfecdb98babc2efc253ad4298814399fb41109faa3b50d",
-        "node_modules/circomlib/circuits/poseidon_constants.circom": "94c9e4b5ea891ab4d1ba626f1d719f8c661014d9b628f6096c803f75f39e3eee",
-        "node_modules/circomlib/circuits/poseidon.circom": "2582464669b69827164bd08ee0337997e1957f2ab4f00cdd86d533ca5e9d9234"
-      },
-      "compiled": {
-        "zk-artifacts/protocol/eligibility_revocation_scan.r1cs": "52d0dee46a1031c0c08765f4fd182c0308b4be8880472893570fc3270624fb23",
-        "frontend/public/zk/protocol/eligibility_revocation_scan.wasm": "531c43eabb561e268d5a64fe15e8225b0c1d57c7dc3bab689e7af96328ac6012"
-      },
-      "setup": {
-        "production": false,
-        "ptauPath": "circuits/ptau/ppot_0080_17.ptau",
-        "ptauSha256": "f807e065fde53f72f4bf4d57140fab85b26daa6cc95bdfec7cce93622b3a367c",
-        "ptauPower": 17,
-        "contributionHash": "37e98dcd22754c444ff0ba7fea82de7d0ca394c6be0bf408a26c852e5782c9b87f756b33f7d0a8d7d7934847666beee65dc4b725adea361086d748472efad552",
-        "artifacts": {
-          "frontend/public/zk/protocol/eligibility_revocation_scan_final.zkey": "9612bd6ea68766ec323a5422fcbf8052f6f1b829a9d8d39c2f7778b6d41f6d4c",
-          "frontend/public/zk/protocol/eligibility_revocation_scan.vkey.json": "bccbc68e1d44d6545a9d973d5ebea4c23133735b6ecaac05c654666ac15b5669",
-          "contracts/generated/protocol/EligibilityRevocationScanVerifier.sol": "11a62c8c8ca8c778cf8eced8bb6ef9d606fa251dfd9559bbdae1b62b44a7345e"
         }
       }
     }

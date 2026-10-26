@@ -106,9 +106,9 @@ function capabilityOf(input) {
     issuanceRoot: nonzero(input.issuanceRoot, "issuanceRoot"),
     parentVersion: uint64(input.parentVersion, "parentVersion"),
     familyTag: nonzero(input.familyTag, "familyTag"),
-    childTag: nonzero(input.childTag, "childTag"),
-    endorsementTag: nonzero(input.endorsementTag, "endorsementTag"),
-    trustedTag: nonzero(input.trustedTag, "trustedTag"),
+    childRoleIndex: nonzero(input.childRoleIndex, "childRoleIndex"),
+    endorsementRoleIndex: nonzero(input.endorsementRoleIndex, "endorsementRoleIndex"),
+    trustedRoleIndex: nonzero(input.trustedRoleIndex, "trustedRoleIndex"),
     capabilityBinding: nonzero(input.capabilityBinding, "capabilityBinding"),
   };
 }
@@ -117,8 +117,8 @@ function capabilityOf(input) {
 export function computeCapabilityBinding(commonInput, capabilityInput) {
   const common = commonOf(commonInput);
   return poseidon8([74004n, common.commonBinding, uint64(capabilityInput.parentVersion, "parentVersion"),
-    nonzero(capabilityInput.familyTag, "familyTag"), nonzero(capabilityInput.childTag, "childTag"),
-    nonzero(capabilityInput.endorsementTag, "endorsementTag"), nonzero(capabilityInput.trustedTag, "trustedTag"),
+    nonzero(capabilityInput.familyTag, "familyTag"), nonzero(capabilityInput.childRoleIndex, "childRoleIndex"),
+    nonzero(capabilityInput.endorsementRoleIndex, "endorsementRoleIndex"), nonzero(capabilityInput.trustedRoleIndex, "trustedRoleIndex"),
     nonzero(capabilityInput.issuanceRoot, "issuanceRoot")]);
 }
 
@@ -127,7 +127,7 @@ export function buildCapabilityPublicSignals(commonInput, capabilityInput) {
   const common = commonOf(commonInput);
   const cap = capabilityOf(capabilityInput);
   fail(cap.capabilityBinding === computeCapabilityBinding(common, cap), "Budget capability does not match receive fields");
-  return [cap.capabilityBinding, cap.familyTag, cap.childTag, cap.endorsementTag, cap.trustedTag,
+  return [cap.capabilityBinding, cap.familyTag, cap.childRoleIndex, cap.endorsementRoleIndex, cap.trustedRoleIndex,
     common.chainId, common.authorizerScope, cap.issuanceRoot, common.commonBinding, cap.parentVersion];
 }
 
@@ -150,8 +150,8 @@ export function encodeReceiveCode(input) {
       fail(!seen.has(key), "Duplicate budget capability");
       seen.add(key);
       return concatBytes(fixed(cap.issuanceRoot, 32), fixed(cap.parentVersion, 8),
-        fixed(cap.familyTag, 32), fixed(cap.childTag, 32), fixed(cap.endorsementTag, 32),
-        fixed(cap.trustedTag, 32), fixed(cap.capabilityBinding, 32),
+        fixed(cap.familyTag, 32), fixed(cap.childRoleIndex, 32), fixed(cap.endorsementRoleIndex, 32),
+        fixed(cap.trustedRoleIndex, 32), fixed(cap.capabilityBinding, 32),
         ...proofWords(inputCap.proof).map(value => fixed(value, 32)));
     }),
   );
@@ -198,7 +198,7 @@ export function decodeReceiveCode(code) {
   const seen = new Set();
   for (let index = 0; index < count; index++) {
     const cap = capabilityOf({ issuanceRoot: read(32), parentVersion: read(8), familyTag: read(32),
-      childTag: read(32), endorsementTag: read(32), trustedTag: read(32), capabilityBinding: read(32) });
+      childRoleIndex: read(32), endorsementRoleIndex: read(32), trustedRoleIndex: read(32), capabilityBinding: read(32) });
     const capProof = readProof();
     fail(!seen.has(cap.capabilityBinding.toString()), "Duplicate budget capability");
     seen.add(cap.capabilityBinding.toString());
@@ -231,11 +231,11 @@ export function computeFamilyTag({ familyCommitment, nonce }) {
   return poseidon3([73104n, nonzero(familyCommitment, "familyCommitment"), nonzero(nonce, "nonce")]);
 }
 
-/** A revealed role secret can link historical tags only after its publication. */
-export function computeRoleTag({ role, roleSecret, nonce }) {
-  const domains = { child: 73301n, endorsement: 73302n, trusted: 73303n };
+/** Stable, domain-separated role indices intentionally link codes sharing a qualification. */
+export function computeRoleStatusIndex({ role, roleSecret }) {
+  const domains = { child: 74321n, endorsement: 74322n, trusted: 74323n };
   fail(Object.hasOwn(domains, role), "Unknown eligibility role");
-  return poseidon3([domains[role], nonzero(roleSecret, "roleSecret"), nonzero(nonce, "nonce")]);
+  return poseidon2([domains[role], nonzero(roleSecret, "roleSecret")]);
 }
 
 // RFC 5869 with one SHA-256 output block. All derivation context is fixed-width.

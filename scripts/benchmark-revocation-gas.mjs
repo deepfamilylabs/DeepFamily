@@ -11,7 +11,7 @@ export function parseRevocationGasArguments(argv) {
     counts: [0, 32, 64, 128, 256],
     gasLimit: 15_000_000,
     headroomBps: 2000,
-    output: "tmp/receive-revocation-bounded-gas.json",
+    output: "tmp/receive-revocation-direct-status-gas.json",
   };
   const seen = new Set();
   for (let index = 0; index < argv.length; index += 2) {

@@ -14,14 +14,14 @@ import { compressZkAssets } from "../scripts/compress-zk-assets.mjs";
 const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
 const CORE = ["person_commitment", "disclosure_binding"];
 const BOUNDARIES = ["shielded_shield", "shielded_unshield", "shielded_unshield_4"];
-const PROTOCOL = ["eligibility_source_fact", "eligibility_source_trust", "eligibility_revocation_scan", "eligibility_issue", "receive_code", "budget_capability", "budget_deposit", "budget_claim", "value_transfer"];
+const PROTOCOL = ["eligibility_source_fact", "eligibility_source_trust", "eligibility_issue", "receive_code", "budget_capability", "budget_deposit", "budget_claim", "value_transfer"];
 const BYTES = Object.fromEntries([
   ...CORE.map(name => ["", name]), ...BOUNDARIES.map(name => ["shielded/", name]), ...PROTOCOL.map(name => ["protocol/", name]),
 ].flatMap(([directory, name]) => [
   [`frontend/public/zk/${directory}${name}.wasm`, Buffer.from(`${name}-wasm`)],
   [`frontend/public/zk/${directory}${name}_final.zkey`, Buffer.from(`${name}-zkey`)],
 ]));
-const ASSET_COUNT = 28;
+const ASSET_COUNT = 26;
 const digest = (file) => sha256(BYTES[`frontend/public/zk/${file}`]);
 const CREDENTIALS = {
   R2_ACCOUNT_ID: "account",
@@ -64,7 +64,7 @@ describe("ZK public proving assets", function () {
       return asset ? new Response(bytesFor(asset.file)) : new Response("missing", { status: 404 });
     };
 
-  it("lists exactly the current 14 public relation pairs by pinned digest", function () {
+  it("lists exactly the current 13 public relation pairs by pinned digest", function () {
     const assets = listZkPublicAssets(root);
     expect(assets).to.have.length(ASSET_COUNT);
     expect(new Set(assets.map(asset => asset.path)).size).to.equal(ASSET_COUNT);
@@ -72,7 +72,7 @@ describe("ZK public proving assets", function () {
       expect(asset.sha256).to.equal(sha256(BYTES[asset.file]));
       expect(asset.key).to.equal(`${asset.sha256}/${path.basename(asset.file)}.br`);
     }
-    expect(assets.filter(asset => asset.path.includes("/protocol/"))).to.have.length(18);
+    expect(assets.filter(asset => asset.path.includes("/protocol/"))).to.have.length(16);
     expect(fs.existsSync(path.join(root, "zk-artifacts"))).to.equal(false,
       "a fresh checkout can enumerate and fetch artifacts using only committed manifests");
   });
@@ -81,7 +81,7 @@ describe("ZK public proving assets", function () {
     const manifest = JSON.parse(fs.readFileSync(file,"utf8"));
     delete manifest.circuits.receive_code;
     fs.writeFileSync(file, JSON.stringify(manifest));
-    expect(()=>listZkPublicAssets(root)).to.throw("All nine receiving proof statements are required");
+    expect(()=>listZkPublicAssets(root)).to.throw("All eight receiving proof statements are required");
   });
 
   it("rejects substituted or duplicated statement sources even when the relation count matches", function () {
@@ -89,9 +89,9 @@ describe("ZK public proving assets", function () {
     const original = JSON.parse(fs.readFileSync(file, "utf8"));
     for (const source of ["retired_statement", "eligibility_source_fact"]) {
       const manifest = structuredClone(original);
-      manifest.circuits.eligibility_revocation_scan.source = source;
+      manifest.circuits.eligibility_source_trust.source = source;
       fs.writeFileSync(file, JSON.stringify(manifest));
-      expect(() => listZkPublicAssets(root)).to.throw("All nine receiving proof statements are required");
+      expect(() => listZkPublicAssets(root)).to.throw("All eight receiving proof statements are required");
     }
   });
 

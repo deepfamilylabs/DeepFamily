@@ -11,11 +11,6 @@ export const PROTOCOL_CIRCUITS = Object.freeze({
     contract: "EligibilitySourceTrustVerifier",
     publicSignals: 8,
   }),
-  revocationScan: Object.freeze({
-    source: "eligibility_revocation_scan",
-    contract: "EligibilityRevocationScanVerifier",
-    publicSignals: 9,
-  }),
   issue: Object.freeze({
     source: "eligibility_issue",
     contract: "EligibilityIssueVerifier",

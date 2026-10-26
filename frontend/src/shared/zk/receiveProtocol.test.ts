@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { getBytes, toBeHex } from "ethers";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { computeFamilyTag, computeRoleTag, buildCapabilityPublicSignals, computeCapabilityBinding,
+import { computeFamilyTag, computeRoleStatusIndex, buildCapabilityPublicSignals, computeCapabilityBinding,
   computeReceiveAuthorization, decodeReceiveCode, computeIdentityFromDerivedSecret, createSourceFact,
   createSourceTrust, prepareEligibilityIssue } from "@deepfamily/protocol-core";
 import { ReceiveChain } from "../clients/receiveChain";
@@ -26,9 +26,9 @@ function prover(): ProtocolProofProvider {
     if (circuit === "code") return { proof, publicSignals: common.publicSignals };
     const cap = { issuanceRoot: witness.issuanceRoot as bigint, parentVersion: witness.parentVersion as bigint,
       familyTag: computeFamilyTag({ familyCommitment: witness.familyRoot as bigint, nonce: common.nonce }),
-      childTag: computeRoleTag({ role: "child", roleSecret: witness.xChild as bigint, nonce: common.nonce }),
-      endorsementTag: computeRoleTag({ role: "endorsement", roleSecret: witness.xEndorse as bigint, nonce: common.nonce }),
-      trustedTag: computeRoleTag({ role: "trusted", roleSecret: witness.xTrust as bigint, nonce: common.nonce }) };
+      childRoleIndex: computeRoleStatusIndex({ role: "child", roleSecret: witness.xChild as bigint}),
+      endorsementRoleIndex: computeRoleStatusIndex({ role: "endorsement", roleSecret: witness.xEndorse as bigint}),
+      trustedRoleIndex: computeRoleStatusIndex({ role: "trusted", roleSecret: witness.xTrust as bigint}) };
     return { proof, publicSignals: buildCapabilityPublicSignals(common, { ...cap, capabilityBinding: computeCapabilityBinding(common, cap) }) };
   } };
 }
@@ -105,6 +105,24 @@ describe("explicit receiving receive service", () => {
     const code = (await new ReceiveService(chain, base).createCode(params)).code;
     const elsewhere = { deployment: { ...deployment, registryAddress: "0x0000000000000000000000000000000000001235" } } as unknown as ReceiveChain;
     await expect(new ReceiveService(elsewhere, base).verifyCode(code)).rejects.toThrow(/another registry/);
+  });
+  it("shares only qualification status indices across independently generated codes", async () => {
+    const service = new ReceiveService(chain, prover());
+    const credential = { issuanceRoot: 997n, parentVersion: 1n, issueNonce: 11n, familyRoot: 101n,
+      endorser: 13n, xChild: 17n, xEndorse: 19n, xTrust: 23n, credentialSalt: 29n,
+      credentialDepth: 0n, credentialIndex: 0n, credentialSiblings: [] };
+    const first = decodeReceiveCode((await service.createCode({ ...params, credentials: [credential] })).code);
+    const second = decodeReceiveCode((await service.createCode({ ...params, codeIndex: 8n, credentials: [credential] })).code);
+    const [a, b] = [first.capabilities[0], second.capabilities[0]];
+    for (const field of ["childRoleIndex", "endorsementRoleIndex", "trustedRoleIndex"] as const)
+      expect(a[field]).toBe(b[field]);
+    expect(first.codeAlias).not.toBe(second.codeAlias);
+    expect(first.ownerCommitment).not.toBe(second.ownerCommitment);
+    expect(first.viewingKey).not.toEqual(second.viewingKey);
+    expect(a.familyTag).not.toBe(b.familyTag);
+    expect(a.capabilityBinding).not.toBe(b.capabilityBinding);
+    for (const code of [first, second]) for (const secret of ["xChild", "xEndorse", "xTrust", "credentialSalt", "familyRoot"])
+      expect(code.capabilities[0]).not.toHaveProperty(secret);
   });
   it("hash-checks all local artifacts, verifies using the pinned key and caches only accepted bytes", async () => {
     const { manifest } = artifacts();

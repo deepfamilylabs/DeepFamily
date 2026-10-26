@@ -521,7 +521,7 @@ A fresh deployment wires protocol components in this order:
 Token
 → Poseidon/age-gate libraries, identity/disclosure verifiers and adapter
 → Shield/Unshield/Unshield4 verifiers and ShieldedBoundaryVerifierAdapter
-→ nine receiving generated verifiers, each wrapped by FixedGroth16Verifier
+→ eight receiving generated verifiers, each wrapped by FixedGroth16Verifier
 → DeepFamily implementation and ERC-1967 proxy
 → initialize proxy and perform the one-time Token/DeepFamily binding
 → DeepFamilyArchive(proxy)
@@ -611,7 +611,7 @@ finality timeout, and testnet evidence:
 npm run mainnet:release -- --chain espace --plan
 ```
 
-The current 14-relation graph has no reviewed production ceremony: `zk:setup` refuses production
+The current 13-relation graph has no reviewed production ceremony: `zk:setup` refuses production
 setup, and the release planner remains blocked. Before this command can plan a release, reviewed
 production artifacts for that complete graph must have been committed together,
 `npm run release:preflight` must pass from
@@ -1269,41 +1269,43 @@ The public methods are `shield`, `unshield`, `transfer`, `depositBudget` and `cl
 
 Every spend rejects reused nullifiers; every append rejects duplicate commitments. Only completed two-output roots are eligible input roots. The money relations bind chain, pool, output ciphertext hashes and all relevant policy/code fields. ERC20 boundaries require exact sender/pool/recipient balance changes; native withdrawals and token calls use reentrancy guards.
 
-The deployment catalog contains 14 relations: identity/disclosure, three asset boundaries and
-nine source/qualification/receiving/budget relations. The frontend's build-time
+The deployment catalog contains 13 relations: identity/disclosure, three asset boundaries and
+eight source/qualification/receiving/budget relations. The frontend's build-time
 `VITE_SHIELDED_STATE_READ_MODE` chooses local event reconstruction (`rebuild`, the default) or
 targeted contract paths (`chain`) for Source and Q membership. Both validate paths and roots at
 an anchored block; funds-note recovery and paths continue to replay the public ledger locally.
 Neither strategy replaces the current role status check performed by the contract.
 
-Explicit `zk:dev` compiles all 14 relations, reuses matching identity/disclosure keys and rotates
-the nine receiving plus three boundary development key sets. Their manifests, vkeys, generated
+Explicit `zk:dev` compiles all 13 relations, reuses matching identity/disclosure keys and rotates
+the eight receiving plus three boundary development key sets. Their manifests, vkeys, generated
 verifiers, local deployments and frontend pins must be updated together. After local deployment,
 `zk:frontend` synchronizes the frontend pins and boundary aliases. The regenerated development
-bundle passes `zk:dev:check` for all 14 relations; real-proof/EVM execution is checked separately
+bundle passes `zk:dev:check` for all 13 relations; real-proof/EVM execution is checked separately
 with `zk:check`, `test:proof` and `test:evm`.
 
 Development generation and deployment are for local use. Public setup/deployment/release remain
-blocked pending reviewed production ceremony evidence for all 14 relations.
+blocked pending reviewed production ceremony evidence for all 13 relations.
 
-`EligibilitySource` additionally fixes `SCAN_VERIFIER` in its constructor. Each role has an
-append-only revocation hash chain and authenticated prefix checkpoints. Permissionless
-`prepareRoleScan(role, nonce, tag, start, end, proof)` verifies up to 32 consecutive entries with
-nine public signals: chain, Source, role, nonce, tag, start, end, start digest and end digest.
-Only a proof beginning at the exact cached progress can advance it; callers cannot skip entries,
-substitute checkpoints or reuse progress for another role/code/Source.
+`EligibilitySource` is constructed with the lineage index and fixed SourceFact/SourceTrust
+verifiers. It links only PoseidonT3. For role `r`, a qualification publishes the shared status
+index `Poseidon2(74321 + r, roleSecret)` in its Capability and Claim statements. These relations
+bind the index to the same hidden role secret authenticated by qualification Q; substituting
+another active index invalidates the proof. This domain differs from the source registration
+commitment `Poseidon2(74201 + r, roleSecret)`, whose publication is associated with actual lineage
+identities. The source registration commitment is never reused as the public code index.
 
-`isRoleRevoked` reuses this proved prefix and checks at most eight newly published openings.
-More unchecked entries cause `RevocationStateNotPrepared(role, checked, total)` before an
-unbounded scan can occur. This error means preparation is required, not that the qualification
-is valid or revoked. A matching tail entry rejects the role immediately; relevant DeepFamily
-changes still publish revocations atomically. No 15-minute grace period is used for budget
-qualification.
+Authorized `revokeRoles` calls mark `_revokedRoleIndices[role][index]` atomically with relevant
+DeepFamily changes. `isRoleRevoked(role, index)` reads one mapping slot. Every first deposit,
+additional contribution and claim reads the three current role states; the work does not grow
+with the revocation log. A revocation committed after proof generation still causes the money
+transaction to reject. No preparation proof, per-code progress cache, preparation transaction
+or old-state grace period is required. Historical Q roots authenticate issuance only.
 
-Preparation requires only public openings and public code fields. Initial total proof work and
-preparation transactions for a fresh nonce/tag remain O(history); caches add per-code state.
-Final-check work is bounded, while browser time, aggregate preparation gas and storage still
-require capacity measurement before public release.
+The append-only opening log and its paged getters remain available for public audit; money
+operations do not read or scan that log. An unknown index returning false authenticates no
+qualification: valid Q/Capability/Claim proofs are still required. Codes sharing a qualification
+can be linked through their shared indices; this accepted privacy boundary does not publish the
+hidden role secrets or directly reuse an identity-linked registration commitment.
 
 ## ZK Verifier Contracts
 
@@ -1325,7 +1327,7 @@ require capacity measurement before public release.
 
 `Groth16VerifierAdapter` handles identity/disclosure only. `ShieldedBoundaryVerifierAdapter` selects Shield (7 signals), Unshield (11) or four-input Unshield (20), with a 256-byte ABC payload.
 
-Nine generated verifiers under `contracts/generated/protocol/` are wrapped individually by `FixedGroth16Verifier`: source fact (10), source trust (8), revocation scan (9), issuance (5), code (10), capability (10), deposit (20), claim (23), transfer (12). The wrapper fixes the generated verifier and public arity at construction. Clients must use the same pinned keys and public-signal order.
+Eight generated verifiers under `contracts/generated/protocol/` are wrapped individually by `FixedGroth16Verifier`: source fact (10), source trust (8), issuance (5), code (10), capability (10), deposit (20), claim (23), transfer (12). The wrapper fixes the generated verifier and public arity at construction. Clients must use the same pinned keys and public-signal order.
 
 ## Contract Security Summary
 

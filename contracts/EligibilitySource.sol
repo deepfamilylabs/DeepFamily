@@ -2,7 +2,6 @@
 pragma solidity ^0.8.24;
 
 import {PoseidonT3} from "poseidon-solidity/PoseidonT3.sol";
-import {PoseidonT4} from "poseidon-solidity/PoseidonT4.sol";
 import {IEligibilitySource} from "./interfaces/IEligibilitySource.sol";
 import {IFixedProofVerifier} from "./interfaces/IFixedProofVerifier.sol";
 
@@ -41,23 +40,17 @@ contract EligibilitySource is IEligibilitySource {
   error TreeCapacityExceeded();
   error InvalidLeafIndex();
   error InvalidPage();
-  error InvalidScanProgress();
-  error RevocationLogCapacityExceeded();
-  error RevocationStateNotPrepared(uint8 role, uint256 checked, uint256 total);
 
   uint256 public constant SNARK_SCALAR_FIELD =
     21888242871839275222246405745257275088548364400416034343698204186575808495617;
   uint256 public constant MAX_TREE_LEAVES = uint256(1) << 64;
   uint256 public constant MAX_ACTIVE_ROLES_PER_KEY = 64;
   uint256 public constant MAX_PAGE_SIZE = 256;
-  uint256 public constant MAX_REVOCATION_BATCH = 32;
-  uint256 public constant MAX_REVOCATION_TAIL = 8;
 
   ISourceLineage public immutable LINEAGE_INDEX;
   address public immutable DEEP_FAMILY;
   IFixedProofVerifier public immutable FACT_VERIFIER;
   IFixedProofVerifier public immutable TRUST_VERIFIER;
-  IFixedProofVerifier public immutable SCAN_VERIFIER;
 
   struct Tree {
     uint256 size;
@@ -81,17 +74,14 @@ contract EligibilitySource is IEligibilitySource {
   mapping(bytes32 key => uint256[] commitments) private _endorsementRoles;
   mapping(bytes32 key => uint256[] commitments) private _trustedRoles;
   uint256[][3] private _revokedSecrets;
-  mapping(uint8 role => mapping(uint256 count => uint256 digest)) private _revocationCheckpoints;
-  mapping(uint8 role => mapping(bytes32 key => uint256 checked)) private _roleScanProgress;
+  mapping(uint8 role => mapping(uint256 roleIndex => bool revoked)) private _revokedRoleIndices;
 
   event SourceLeafPublished(uint8 indexed treeId, uint256 indexed leafIndex, uint256 leaf, uint256 root);
   event RoleRegistered(uint8 indexed role, uint256 indexed commitment);
   event RoleRevoked(uint8 indexed role, uint256 secret, uint256 indexed commitment);
-  event RoleScanPrepared(uint8 indexed role, uint256 indexed nonce, uint256 indexed tag, uint256 start, uint256 end);
 
-  constructor(address lineageIndex, address factVerifier, address trustVerifier, address revocationScanVerifier) {
-    if (lineageIndex.code.length == 0 || factVerifier.code.length == 0 || trustVerifier.code.length == 0
-      || revocationScanVerifier.code.length == 0) {
+  constructor(address lineageIndex, address factVerifier, address trustVerifier) {
+    if (lineageIndex.code.length == 0 || factVerifier.code.length == 0 || trustVerifier.code.length == 0) {
       revert InvalidDependency();
     }
     LINEAGE_INDEX = ISourceLineage(lineageIndex);
@@ -100,10 +90,6 @@ contract EligibilitySource is IEligibilitySource {
     DEEP_FAMILY = deepFamily;
     FACT_VERIFIER = IFixedProofVerifier(factVerifier);
     TRUST_VERIFIER = IFixedProofVerifier(trustVerifier);
-    SCAN_VERIFIER = IFixedProofVerifier(revocationScanVerifier);
-    for (uint8 role; role < 3; ++role) {
-      _revocationCheckpoints[role][0] = PoseidonT4.hash([uint256(74300) + role, block.chainid, uint256(uint160(address(this)))]);
-    }
   }
 
   function sourceRoot() external view returns (uint256) { return _trees[0].root; }
@@ -198,13 +184,9 @@ contract EligibilitySource is IEligibilitySource {
       if (role == 2) {
         if (!_isManager(record.parentHash, record.parentVersion, actor)) revert UnauthorizedCaller();
       } else if (record.controller != actor) revert UnauthorizedCaller();
-      uint256 count = _revokedSecrets[role].length;
-      if (count == type(uint64).max) revert RevocationLogCapacityExceeded();
       record.revoked = true;
       _revokedSecrets[role].push(secret);
-      _revocationCheckpoints[role][count + 1] = PoseidonT4.hash([
-        uint256(74310) + role, _revocationCheckpoints[role][count], secret
-      ]);
+      _revokedRoleIndices[role][PoseidonT3.hash([uint256(74321) + role, secret])] = true;
       emit RoleRevoked(role, secret, commitment);
     }
   }
@@ -222,64 +204,14 @@ contract EligibilitySource is IEligibilitySource {
     _requireRevoked(2, _trustedRoles[key]);
   }
 
-  function isRoleRevoked(uint8 role, uint256 nonce, uint256 tag) external view returns (bool) {
+  /// @notice Latest status for a stable, proof-authenticated qualification index.
+  /// @dev Each lookup reads one mapping slot, regardless of the global revocation history.
+  ///      This index uses a domain distinct from source registration commitments so that an
+  ///      unrevoked code does not directly reveal its public source publication record.
+  function isRoleRevoked(uint8 role, uint256 roleIndex) external view returns (bool) {
     if (role > 2) revert InvalidRole();
-    _nonzeroField(nonce);
-    _nonzeroField(tag);
-    uint256[] storage secrets = _revokedSecrets[role];
-    uint256 checked = _roleScanProgress[role][_scanKey(nonce, tag)];
-    uint256 total = secrets.length;
-    // The proof covers a contiguous authenticated prefix. Always inspect the actual latest tail,
-    // including revocations added after proof preparation; never accept an old state as current.
-    if (total - checked > MAX_REVOCATION_TAIL) revert RevocationStateNotPrepared(role, checked, total);
-    for (uint256 index = checked; index < total; ++index) {
-      if (PoseidonT4.hash([uint256(73301) + role, secrets[index], nonce]) == tag) return true;
-    }
-    return false;
-  }
-
-  /// @notice Authenticate one complete prefix interval before checking the latest bounded tail.
-  /// @dev Anyone may prepare a public code's status. The fixed verifier proves that no secret in
-  ///      [start,end) produces this code's tag, and authenticates every entry against both digests.
-  ///      Progress is scoped to this source, role, nonce and tag; callers cannot skip an interval.
-  function prepareRoleScan(uint8 role, uint256 nonce, uint256 tag, uint256 start, uint256 end, bytes calldata proof) external {
-    _requireActive();
-    if (role > 2) revert InvalidRole();
-    _nonzeroField(nonce);
-    _nonzeroField(tag);
-    bytes32 key = _scanKey(nonce, tag);
-    if (start != _roleScanProgress[role][key] || end <= start || end - start > MAX_REVOCATION_BATCH
-      || end > _revokedSecrets[role].length) revert InvalidScanProgress();
-    uint256[] memory signals = new uint256[](9);
-    signals[0] = block.chainid;
-    signals[1] = uint256(uint160(address(this)));
-    signals[2] = role;
-    signals[3] = nonce;
-    signals[4] = tag;
-    signals[5] = start;
-    signals[6] = end;
-    signals[7] = _revocationCheckpoints[role][start];
-    signals[8] = _revocationCheckpoints[role][end];
-    if (!SCAN_VERIFIER.verifyProof(proof, signals)) revert InvalidProof();
-    _roleScanProgress[role][key] = end;
-    emit RoleScanPrepared(role, nonce, tag, start, end);
-  }
-
-  function revocationCheckpoint(uint8 role, uint256 count) external view returns (uint256) {
-    if (role > 2) revert InvalidRole();
-    if (count > _revokedSecrets[role].length) revert InvalidScanProgress();
-    return _revocationCheckpoints[role][count];
-  }
-
-  function roleScanProgress(uint8 role, uint256 nonce, uint256 tag) external view returns (uint256) {
-    if (role > 2) revert InvalidRole();
-    _nonzeroField(nonce);
-    _nonzeroField(tag);
-    return _roleScanProgress[role][_scanKey(nonce, tag)];
-  }
-
-  function _scanKey(uint256 nonce, uint256 tag) private pure returns (bytes32) {
-    return keccak256(abi.encode(nonce, tag));
+    _nonzeroField(roleIndex);
+    return _revokedRoleIndices[role][roleIndex];
   }
 
   function roleRecord(uint8 role, uint256 commitment) external view returns (RoleRecord memory) {

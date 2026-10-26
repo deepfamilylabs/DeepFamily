@@ -1,7 +1,7 @@
 import "../hardhat-test-setup.mjs";
 import { expect } from "chai";
 import hre from "hardhat";
-import { poseidon2, poseidon3 } from "poseidon-lite";
+import { poseidon2 } from "poseidon-lite";
 import { replayLineageTree } from "@deepfamily/protocol-core";
 
 // These tests isolate state-machine/input binding with explicitly labelled mock verifiers.
@@ -12,9 +12,8 @@ describe(" receive registry", function () {
 
   async function setup() {
     const t3 = await (await hre.ethers.getContractFactory("PoseidonT3")).deploy();
-    const t4 = await (await hre.ethers.getContractFactory("PoseidonT4")).deploy();
     const source = await (await hre.ethers.getContractFactory("EligibilitySourceMock", {
-      libraries: { PoseidonT4: await t4.getAddress() },
+      libraries: { PoseidonT3: await t3.getAddress() },
     })).deploy();
     const verifier = await (await hre.ethers.getContractFactory("FixedProofVerifierMock")).deploy();
     const registry = await (await hre.ethers.getContractFactory("ReceiveRegistry", {
@@ -110,13 +109,13 @@ describe(" receive registry", function () {
       const { registry, source, code, codeSignals, issue, scope, chainId } = await setup();
       await issue(301n);
       const secrets = [701n, 702n, 703n];
-      const tags = secrets.map((secret, index) => poseidon3([73301n + BigInt(index), secret, code.nonce]));
+      const indices = secrets.map((secret, index) => poseidon2([74321n + BigInt(index), secret]));
       const capability = {
         issuanceRoot: await registry.issuanceRoot(), parentVersion: 1n,
         capabilityBinding: 401n, familyTag: 402n,
-        childTag: tags[0], endorsementTag: tags[1], trustedTag: tags[2],
+        childRoleIndex: indices[0], endorsementRoleIndex: indices[1], trustedRoleIndex: indices[2],
       };
-      const signals = [401n, 402n, ...tags, chainId, scope, capability.issuanceRoot, code.commonBinding, 1n];
+      const signals = [401n, 402n, ...indices, chainId, scope, capability.issuanceRoot, code.commonBinding, 1n];
       const call = (item = capability, capProof = proof(signals)) =>
         registry.verifyBudgetCapability(code, item, proof(codeSignals()), capProof);
       expect(await call()).to.equal(true);
@@ -126,8 +125,25 @@ describe(" receive registry", function () {
         .to.be.revertedWithCustomError(registry, "InvalidProof");
       await expect(call({ ...capability, issuanceRoot: 999n }))
         .to.be.revertedWithCustomError(registry, "UnknownIssuanceRoot");
+      for (const field of ["childRoleIndex", "endorsementRoleIndex", "trustedRoleIndex"]) {
+        // A different, currently unrevoked index is not interchangeable with the
+        // qualification authenticated by the capability proof.
+        await expect(call({ ...capability, [field]: capability[field] + 1n }))
+          .to.be.revertedWithCustomError(registry, "InvalidProof");
+      }
+      const anotherCode = { ...code, codeAlias: code.codeAlias + 10n,
+        nonce: code.nonce + 10n, commonBinding: code.commonBinding + 10n };
+      const anotherSignals = [...signals];
+      anotherSignals[8] = anotherCode.commonBinding;
+      const anotherCall = () => registry.verifyBudgetCapability(anotherCode, capability,
+        proof(codeSignals(anotherCode)), proof(anotherSignals));
+      expect(await anotherCall()).to.equal(true);
+      expect(await registry.validateBudgetRoleStatus(capability.issuanceRoot, ...indices)).to.equal(true);
       await source.revokeRole(role, secrets[role]);
       await expect(call()).to.be.revertedWithCustomError(registry, "QualificationRevoked").withArgs(role);
+      await expect(anotherCall()).to.be.revertedWithCustomError(registry, "QualificationRevoked").withArgs(role);
+      await expect(registry.validateBudgetRoleStatus(capability.issuanceRoot, ...indices))
+        .to.be.revertedWithCustomError(registry, "QualificationRevoked").withArgs(role);
       expect(await registry.verifyReceive(code, proof(codeSignals()))).to.equal(true);
     }
   });

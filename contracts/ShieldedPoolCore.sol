@@ -66,9 +66,9 @@ abstract contract ShieldedPoolCore is ReentrancyGuardTransient {
     uint64 asOf;
     uint256 periodNullifier;
     uint256 issuanceRoot;
-    uint256 childTag;
-    uint256 endorsementTag;
-    uint256 trustedTag;
+    uint256 childRoleIndex;
+    uint256 endorsementRoleIndex;
+    uint256 trustedRoleIndex;
   }
 
   struct Shard {
@@ -270,8 +270,8 @@ abstract contract ShieldedPoolCore is ReentrancyGuardTransient {
     if (nullifierSpent[claimData.periodNullifier] || claimData.periodNullifier == data.inputNullifiers[0]) {
       revert NullifierAlreadySpent();
     }
-    if (!RECEIVE_REGISTRY.validateBudgetRoleStatus(claimData.issuanceRoot, record.nonce,
-        claimData.childTag, claimData.endorsementTag, claimData.trustedTag)) revert InvalidReceiveProof();
+    if (!RECEIVE_REGISTRY.validateBudgetRoleStatus(claimData.issuanceRoot,
+        claimData.childRoleIndex, claimData.endorsementRoleIndex, claimData.trustedRoleIndex)) revert InvalidReceiveProof();
     uint256[] memory signals = new uint256[](23);
     signals[0] = block.chainid; signals[1] = uint256(uint160(address(this)));
     signals[2] = record.codeAlias; signals[3] = record.nonce; signals[4] = record.ownerCommitment;
@@ -284,9 +284,9 @@ abstract contract ShieldedPoolCore is ReentrancyGuardTransient {
     signals[17] = _ciphertextHash(data.outputCiphertexts[1]);
     signals[18] = uint256(uint160(address(RECEIVE_REGISTRY)));
     signals[19] = claimData.issuanceRoot;
-    signals[20] = claimData.childTag;
-    signals[21] = claimData.endorsementTag;
-    signals[22] = claimData.trustedTag;
+    signals[20] = claimData.childRoleIndex;
+    signals[21] = claimData.endorsementRoleIndex;
+    signals[22] = claimData.trustedRoleIndex;
     if (!CLAIM_VERIFIER.verifyProof(proof, signals)) revert InvalidZKProof();
     _spendInputs(data);
     _spendNullifier(claimData.periodNullifier);

@@ -1,6 +1,6 @@
 # ZK artifacts and production setup
 
-The current protocol has 14 Circom relations. Its keys are development-only, and no reviewed
+The current protocol has 13 Circom relations. Its keys are development-only, and no reviewed
 production ceremony is available for this complete graph. `npm run zk:setup`, ceremony
 verification and protocol release preflight currently fail closed. Local development generation
 does not approve keys for a public deployment.
@@ -11,12 +11,13 @@ does not approve keys for a public deployment.
 | --- | ---: | --- |
 | Identity and disclosure | 2 | PersonRelation, DisclosureBinding |
 | Asset boundaries | 3 | Shield, Unshield, four-input Unshield |
-| Eligibility and receiving | 9 | SourceFact, SourceTrust, RevocationScan, Issue, Code, Capability, Deposit, Claim, Transfer |
+| Eligibility and receiving | 8 | SourceFact, SourceTrust, Issue, Code, Capability, Deposit, Claim, Transfer |
 
 The data-only [circuit catalogue](../scripts/lib/protocolCircuitCatalog.mjs) and
 [canonical selection](../scripts/lib/zkCircuitSelection.mjs) define the graph consumed by builds,
 deployment, asset export and release gates. The reviewed production ceremony must cover all
-14 relations together, including `eligibility_revocation_scan` and its nine public signals.
+13 relations together. Revocation status uses three direct role-index reads and has no separate
+scan relation. Capability and Claim bind those indices to qualification secrets.
 See [proof relations and public signals](zk-proofs.md#receiving-and-budget-circuits).
 
 ## Local development workflow
@@ -35,10 +36,10 @@ npm run test:evm
 source and artifact pins for the complete bundle. Missing or mismatched proving files can be
 restored with `zk:assets:fetch` after the exact pinned files have been published.
 
-Explicit `npm run zk:dev` compiles all 14 relations, verifies and reuses the existing matching
-identity/disclosure keys, and regenerates the nine receiving plus three boundary development key
+Explicit `npm run zk:dev` compiles all 13 relations, verifies and reuses the existing matching
+identity/disclosure keys, and regenerates the eight receiving plus three boundary development key
 sets. It updates their development manifests, vkeys and generated Solidity verifiers. A focused
-command such as `npm run zk:dev -- --circuit protocol:revocationScan` regenerates only that
+command such as `npm run zk:dev -- --circuit protocol:capability` regenerates only that
 selected development set; its final check still requires the complete bundle. `--ptau <path>`
 selects an explicit local Phase 1 file for development generation.
 
@@ -53,7 +54,7 @@ select their own verifier, key or artifact host.
 | --- | --- |
 | `circuits/zk-artifacts-manifest.json` | Identity/disclosure source and artifact pins |
 | `circuits/shielded-development-manifest.json` | Three development boundary key sets |
-| `circuits/receive-development-manifest.json` | Nine development receiving/eligibility key sets |
+| `circuits/receive-development-manifest.json` | Eight development receiving/eligibility key sets |
 | `protocol-release-manifest.json` | Protocol interfaces, pending deployment bindings and release evidence |
 | `frontend/src/proof-artifacts.local.json` | Exported, trusted chain/registry-bound frontend pins |
 
@@ -86,7 +87,7 @@ status; the command does not currently generate production transcripts or final 
 development manifest's status cannot satisfy this gate.
 
 Production work must provide a reviewed ceremony and verifier/evidence workflow for the same
-14 relations, then satisfy the existing clean-build, proof, deployment, capacity and release
+13 relations, then satisfy the existing clean-build, proof, deployment, capacity and release
 evidence checks. Its trust model and contributor evidence must be explicit. Governance Safe
 owners and ZK ceremony contributors perform separate roles; the Safe threshold does not supply
 trusted-setup evidence.

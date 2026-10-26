@@ -46,7 +46,7 @@ describe("receiving proof worker boundary", () => {
     const worker = FakeWorker.instances[0];
     worker.reply({ id: worker.clones[0].id, ok: false, error });
     await expect(pending).rejects.toMatchObject({ code: "QUALIFICATION_REVOKED" });
-    for (const failure of [new Error(secret), new ProtocolError("INVALID_REVOCATION_SCAN", secret),
+    for (const failure of [new Error(secret), new ProtocolError("INVALID_PROOF", secret),
       Object.assign(new Error(secret), { code: "NETWORK_ERROR", witness: secret })]) {
       expect(publicWorkerError(failure)).toEqual({ message: "Receive proof operation failed" });
     }

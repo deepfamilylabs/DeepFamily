@@ -19,11 +19,6 @@
           "internalType": "address",
           "name": "trustVerifier",
           "type": "address"
-        },
-        {
-          "internalType": "address",
-          "name": "revocationScanVerifier",
-          "type": "address"
         }
       ],
       "stateMutability": "nonpayable",
@@ -80,11 +75,6 @@
       "type": "error"
     },
     {
-      "inputs": [],
-      "name": "InvalidScanProgress",
-      "type": "error"
-    },
-    {
       "inputs": [
         {
           "internalType": "uint8",
@@ -98,32 +88,6 @@
         }
       ],
       "name": "MissingRoleRevocation",
-      "type": "error"
-    },
-    {
-      "inputs": [],
-      "name": "RevocationLogCapacityExceeded",
-      "type": "error"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "uint8",
-          "name": "role",
-          "type": "uint8"
-        },
-        {
-          "internalType": "uint256",
-          "name": "checked",
-          "type": "uint256"
-        },
-        {
-          "internalType": "uint256",
-          "name": "total",
-          "type": "uint256"
-        }
-      ],
-      "name": "RevocationStateNotPrepared",
       "type": "error"
     },
     {
@@ -193,43 +157,6 @@
         }
       ],
       "name": "RoleRevoked",
-      "type": "event"
-    },
-    {
-      "anonymous": false,
-      "inputs": [
-        {
-          "indexed": true,
-          "internalType": "uint8",
-          "name": "role",
-          "type": "uint8"
-        },
-        {
-          "indexed": true,
-          "internalType": "uint256",
-          "name": "nonce",
-          "type": "uint256"
-        },
-        {
-          "indexed": true,
-          "internalType": "uint256",
-          "name": "tag",
-          "type": "uint256"
-        },
-        {
-          "indexed": false,
-          "internalType": "uint256",
-          "name": "start",
-          "type": "uint256"
-        },
-        {
-          "indexed": false,
-          "internalType": "uint256",
-          "name": "end",
-          "type": "uint256"
-        }
-      ],
-      "name": "RoleScanPrepared",
       "type": "event"
     },
     {
@@ -330,51 +257,12 @@
     },
     {
       "inputs": [],
-      "name": "MAX_REVOCATION_BATCH",
-      "outputs": [
-        {
-          "internalType": "uint256",
-          "name": "",
-          "type": "uint256"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [],
-      "name": "MAX_REVOCATION_TAIL",
-      "outputs": [
-        {
-          "internalType": "uint256",
-          "name": "",
-          "type": "uint256"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [],
       "name": "MAX_TREE_LEAVES",
       "outputs": [
         {
           "internalType": "uint256",
           "name": "",
           "type": "uint256"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [],
-      "name": "SCAN_VERIFIER",
-      "outputs": [
-        {
-          "internalType": "contract IFixedProofVerifier",
-          "name": "",
-          "type": "address"
         }
       ],
       "stateMutability": "view",
@@ -558,12 +446,7 @@
         },
         {
           "internalType": "uint256",
-          "name": "nonce",
-          "type": "uint256"
-        },
-        {
-          "internalType": "uint256",
-          "name": "tag",
+          "name": "roleIndex",
           "type": "uint256"
         }
       ],
@@ -576,44 +459,6 @@
         }
       ],
       "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "uint8",
-          "name": "role",
-          "type": "uint8"
-        },
-        {
-          "internalType": "uint256",
-          "name": "nonce",
-          "type": "uint256"
-        },
-        {
-          "internalType": "uint256",
-          "name": "tag",
-          "type": "uint256"
-        },
-        {
-          "internalType": "uint256",
-          "name": "start",
-          "type": "uint256"
-        },
-        {
-          "internalType": "uint256",
-          "name": "end",
-          "type": "uint256"
-        },
-        {
-          "internalType": "bytes",
-          "name": "proof",
-          "type": "bytes"
-        }
-      ],
-      "name": "prepareRoleScan",
-      "outputs": [],
-      "stateMutability": "nonpayable",
       "type": "function"
     },
     {
@@ -727,30 +572,6 @@
     {
       "inputs": [
         {
-          "internalType": "uint8",
-          "name": "role",
-          "type": "uint8"
-        },
-        {
-          "internalType": "uint256",
-          "name": "count",
-          "type": "uint256"
-        }
-      ],
-      "name": "revocationCheckpoint",
-      "outputs": [
-        {
-          "internalType": "uint256",
-          "name": "",
-          "type": "uint256"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
           "internalType": "address",
           "name": "actor",
           "type": "address"
@@ -836,35 +657,6 @@
           "internalType": "struct EligibilitySource.RoleRecord",
           "name": "",
           "type": "tuple"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "uint8",
-          "name": "role",
-          "type": "uint8"
-        },
-        {
-          "internalType": "uint256",
-          "name": "nonce",
-          "type": "uint256"
-        },
-        {
-          "internalType": "uint256",
-          "name": "tag",
-          "type": "uint256"
-        }
-      ],
-      "name": "roleScanProgress",
-      "outputs": [
-        {
-          "internalType": "uint256",
-          "name": "",
-          "type": "uint256"
         }
       ],
       "stateMutability": "view",

@@ -115,11 +115,7 @@ export function InheritanceWorkspace({ context, signer, account, symbol, decimal
     };
     const chain = new ReceiveChain(expected.context.deployment, expected.signer, {
       beforeTransaction: assertCurrent,
-      onRevocationPreparation: (completed, total) => setStatus(t("walletProtocol.preparingQualification", { completed, total })),
-      prepareRevocationScans: async status => {
-        assertCurrent();
-        return (await worker().call("prepareRevocationScans", status, expected.context)).revocationScans;
-      },
+
     });
     let transaction;
     if (override) {
@@ -172,7 +168,7 @@ export function InheritanceWorkspace({ context, signer, account, symbol, decimal
       {task === "receive" ? <>
         <p className="text-sm text-ink-muted">{tr("receiveDescription")}</p>
         <FieldBlock label={tr("expiryDays")}><input className={FIELD_INPUT} type="number" min="1" max="3650" value={expiryDays} onChange={event => setExpiryDays(event.target.value)} disabled={working} /></FieldBlock>
-        {qualifications.length ? <fieldset className="space-y-2"><legend className="text-sm font-medium">{tr("codeQualifications")}</legend><p className="text-xs text-ink-muted">{tr("codeQualificationsDescription")}</p>{qualifications.map(item => <label key={item.index} className="flex items-center gap-2 text-sm"><input type="checkbox" checked={selectedQualifications.includes(item.index)} disabled={working || !item.current || (!selectedQualifications.includes(item.index) && selectedQualifications.length >= 2)} onChange={event => setSelectedQualifications(previous => event.target.checked ? [...previous, item.index] : previous.filter(index => index !== item.index))} />{t("walletProtocol.qualification", { index: item.index + 1 })}{!item.current ? ` · ${tr("qualificationWithdrawn")}` : ""}</label>)}</fieldset> : null}
+        {qualifications.length ? <fieldset className="space-y-2"><legend className="text-sm font-medium">{tr("codeQualifications")}</legend><p className="text-xs text-ink-muted">{tr("codeQualificationsDescription")}</p><p className="text-xs text-ink-muted">{tr("qualificationPrivacy")}</p>{qualifications.map(item => <label key={item.index} className="flex items-center gap-2 text-sm"><input type="checkbox" checked={selectedQualifications.includes(item.index)} disabled={working || !item.current || (!selectedQualifications.includes(item.index) && selectedQualifications.length >= 2)} onChange={event => setSelectedQualifications(previous => event.target.checked ? [...previous, item.index] : previous.filter(index => index !== item.index))} />{t("walletProtocol.qualification", { index: item.index + 1 })}{!item.current ? ` · ${tr("qualificationWithdrawn")}` : ""}</label>)}</fieldset> : null}
         <PanelButton variant="primary" disabled={working || !state.unlocked} busy={busy} onClick={() => void generateCode()}>{tr("generateCode")}</PanelButton>
         {code ? <div className="space-y-2"><textarea className={FIELD_TEXTAREA} rows={7} value={code} readOnly aria-label={tr("receiveCode")} /><CopyIconButton label={tr("copyCode")} onClick={() => void navigator.clipboard.writeText(code)} /></div> : null}
       </> : <>

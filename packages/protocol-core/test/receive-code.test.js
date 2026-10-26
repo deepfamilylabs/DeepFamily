@@ -6,7 +6,7 @@ import { getBytes, hexlify } from "ethers";
 import { poseidon2, poseidon3, poseidon4, poseidon8 } from "poseidon-lite";
 import {
   RECEIVE_VERSION, RECEIVE_MAX_CAPABILITIES,
-  computeFamilyTag, computeRoleTag, buildReceivePublicSignals,
+  computeFamilyTag, computeRoleStatusIndex, buildReceivePublicSignals,
   buildCapabilityPublicSignals, computeCapabilityBinding,
   computeReceiveAuthorization, deriveReceiveKeyMaterial,
   encodeReceiveCode, decodeReceiveCode, isReceiveCode,
@@ -28,9 +28,9 @@ async function statement(patch = {}) {
 }
 function capability(common, familyCommitment = 37n, parentVersion = 1n) {
   const cap = { issuanceRoot: 997n, parentVersion, familyTag: computeFamilyTag({ familyCommitment, nonce: common.nonce }),
-    childTag: computeRoleTag({ role: "child", roleSecret: 13n, nonce: common.nonce }),
-    endorsementTag: computeRoleTag({ role: "endorsement", roleSecret: 17n, nonce: common.nonce }),
-    trustedTag: computeRoleTag({ role: "trusted", roleSecret: 19n, nonce: common.nonce }), proof };
+    childRoleIndex: computeRoleStatusIndex({ role: "child", roleSecret: 13n}),
+    endorsementRoleIndex: computeRoleStatusIndex({ role: "endorsement", roleSecret: 17n}),
+    trustedRoleIndex: computeRoleStatusIndex({ role: "trusted", roleSecret: 19n}), proof };
   return { ...cap, capabilityBinding: computeCapabilityBinding(common, cap) };
 }
 function raw(code) { return bech32m.fromWords(bech32m.decode(code, false).words); }
@@ -111,18 +111,40 @@ test("one code round trips ordinary receiving and multiple family capabilities",
   }
 });
 
-test("capability tag/binding formulas and public-signal order match the fixed circuit", async () => {
+test("stable role indices and per-code binding match the fixed circuit", async () => {
   const common = await statement();
   const cap = capability(common);
   assert.equal(cap.familyTag, poseidon3([73104n, 37n, common.nonce]));
-  assert.equal(cap.childTag, poseidon3([73301n, 13n, common.nonce]));
-  assert.equal(cap.endorsementTag, poseidon3([73302n, 17n, common.nonce]));
-  assert.equal(cap.trustedTag, poseidon3([73303n, 19n, common.nonce]));
-  assert.equal(cap.capabilityBinding, poseidon8([74004n, common.commonBinding, 1n, cap.familyTag, cap.childTag, cap.endorsementTag, cap.trustedTag, cap.issuanceRoot]));
+  assert.equal(cap.childRoleIndex, poseidon2([74321n, 13n]));
+  assert.equal(cap.endorsementRoleIndex, poseidon2([74322n, 17n]));
+  assert.equal(cap.trustedRoleIndex, poseidon2([74323n, 19n]));
+  assert.equal(cap.capabilityBinding, poseidon8([74004n, common.commonBinding, 1n, cap.familyTag, cap.childRoleIndex, cap.endorsementRoleIndex, cap.trustedRoleIndex, cap.issuanceRoot]));
   assert.deepEqual(buildCapabilityPublicSignals(common, cap), [cap.capabilityBinding, cap.familyTag,
-    cap.childTag, cap.endorsementTag, cap.trustedTag, common.chainId, common.authorizerScope,
+    cap.childRoleIndex, cap.endorsementRoleIndex, cap.trustedRoleIndex, common.chainId, common.authorizerScope,
     cap.issuanceRoot, common.commonBinding, cap.parentVersion]);
-  assert.throws(() => computeRoleTag({ role: "unknown", roleSecret: 13n, nonce: common.nonce }));
+  assert.throws(() => computeRoleStatusIndex({ role: "unknown", roleSecret: 13n}));
+});
+
+test("qualification indices link same-role codes without reusing source registration commitments", async () => {
+  const first = await statement(), second = await statement({ ...await material({ codeIndex: 8n }) });
+  const firstCap = capability(first), secondCap = capability(second);
+  for (const field of ["childRoleIndex", "endorsementRoleIndex", "trustedRoleIndex"])
+    assert.equal(firstCap[field], secondCap[field], field);
+  assert.notEqual(first.codeAlias, second.codeAlias);
+  assert.notEqual(first.ownerCommitment, second.ownerCommitment);
+  assert.notDeepEqual(first.viewingKey, second.viewingKey);
+  assert.notEqual(firstCap.familyTag, secondCap.familyTag);
+  assert.notEqual(firstCap.capabilityBinding, secondCap.capabilityBinding);
+  for (const [offset, role] of ["child", "endorsement", "trusted"].entries()) {
+    const index = computeRoleStatusIndex({ role, roleSecret: 13n });
+    assert.equal(index, poseidon2([74321n + BigInt(offset), 13n]));
+    assert.notEqual(index, poseidon2([74201n + BigInt(offset), 13n]));
+    assert.notEqual(index, computeRoleStatusIndex({ role, roleSecret: 17n }));
+  }
+  assert.equal(new Set(["child", "endorsement", "trusted"].map(role =>
+    computeRoleStatusIndex({ role, roleSecret: 13n }))).size, 3);
+  assert.throws(() => computeRoleStatusIndex({ role: "child", roleSecret: 0n }));
+  assert.throws(() => computeRoleStatusIndex({ role: "child", roleSecret: SNARK_SCALAR_FIELD }));
 });
 
 test("common field tampering and foreign-code capability splicing fail before proof verification", async () => {

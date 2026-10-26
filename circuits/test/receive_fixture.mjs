@@ -226,17 +226,17 @@ export function capabilityFixture(
         : poseidon2([issuanceRoot, BigInt(witness.credentialSiblings[i])]);
   witness.issuanceRoot = String(issuanceRoot);
   const familyTag = poseidon3([73104n, BigInt(witness.familyRoot), BigInt(witness.nonce)]);
-  const childTag = poseidon3([73301n, BigInt(witness.xChild), BigInt(witness.nonce)]);
-  const endorsementTag = poseidon3([73302n, BigInt(witness.xEndorse), BigInt(witness.nonce)]);
-  const trustedTag = poseidon3([73303n, BigInt(witness.xTrust), BigInt(witness.nonce)]);
+  const childRoleIndex = poseidon2([74321n, BigInt(witness.xChild)]);
+  const endorsementRoleIndex = poseidon2([74322n, BigInt(witness.xEndorse)]);
+  const trustedRoleIndex = poseidon2([74323n, BigInt(witness.xTrust)]);
   const capabilityBinding = poseidon8([
     74004n,
     common.commonBinding,
     BigInt(witness.parentVersion),
     familyTag,
-    childTag,
-    endorsementTag,
-    trustedTag,
+    childRoleIndex,
+    endorsementRoleIndex,
+    trustedRoleIndex,
     issuanceRoot,
   ]);
   return {
@@ -244,9 +244,9 @@ export function capabilityFixture(
     publicSignals: [
       capabilityBinding,
       familyTag,
-      childTag,
-      endorsementTag,
-      trustedTag,
+      childRoleIndex,
+      endorsementRoleIndex,
+      trustedRoleIndex,
       BigInt(witness.chainId),
       BigInt(witness.authorizerScope),
       issuanceRoot,

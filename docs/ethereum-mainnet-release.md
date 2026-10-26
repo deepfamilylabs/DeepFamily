@@ -75,7 +75,7 @@ wallet, CI job, or replacement-transaction tool. Maintain an external production
 
 ## Prerequisites
 
-1. Complete a reviewed production ceremony for the current 14-relation graph, as described in
+1. Complete a reviewed production ceremony for the current 13-relation graph, as described in
    [zk-ceremony.md](./zk-ceremony.md). This prerequisite is currently blocked: `zk:setup` refuses
    production setup, and development keys cannot authorize a release. Once that reviewed workflow
    exists, freeze its manifests, transcripts, verifiers and artifact pins together with the exact

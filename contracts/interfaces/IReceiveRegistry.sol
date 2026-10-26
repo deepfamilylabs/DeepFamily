@@ -18,9 +18,9 @@ interface IReceiveRegistry {
     uint256 parentVersion;
     uint256 capabilityBinding;
     uint256 familyTag;
-    uint256 childTag;
-    uint256 endorsementTag;
-    uint256 trustedTag;
+    uint256 childRoleIndex;
+    uint256 endorsementRoleIndex;
+    uint256 trustedRoleIndex;
   }
 
   function verifyReceive(Code calldata code, bytes calldata codeProof) external view returns (bool);
@@ -33,8 +33,8 @@ interface IReceiveRegistry {
   ) external view returns (bool);
 
   function isKnownIssuanceRoot(uint256 root) external view returns (bool);
-  /// @dev State check only: the caller's fixed Claim circuit must authenticate these tags.
-  function validateBudgetRoleStatus(uint256 issuanceRoot, uint256 nonce, uint256 childTag,
-    uint256 endorsementTag, uint256 trustedTag) external view returns (bool);
+  /// @dev State check only: the caller's fixed Claim circuit must authenticate these indices.
+  function validateBudgetRoleStatus(uint256 issuanceRoot, uint256 childRoleIndex,
+    uint256 endorsementRoleIndex, uint256 trustedRoleIndex) external view returns (bool);
   function isCodeRevoked(uint256 revocationTag) external view returns (bool);
 }

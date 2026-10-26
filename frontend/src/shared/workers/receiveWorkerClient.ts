@@ -9,7 +9,6 @@ export interface ReceiveWorkerContext {
   manifest: PinnedManifest;
 }
 export interface ReceiveWorkerCalls extends WalletCalls {
-  prepareRevocationScans: { input: Parameters<ReceiveService["prepareRevocationScans"]>[0]; result: { revocationScans: Awaited<ReturnType<ReceiveService["prepareRevocationScans"]>> } };
   proveIssue: { input: Parameters<ReceiveService["proveIssue"]>[0]; result: Awaited<ReturnType<ReceiveService["proveIssue"]>> };
   proveQualification: { input: Parameters<ReceiveService["proveQualification"]>[0]; result: Awaited<ReturnType<ReceiveService["proveQualification"]>> };
   createCode: { input: Parameters<ReceiveService["createCode"]>[0]; result: Awaited<ReturnType<ReceiveService["createCode"]>> };

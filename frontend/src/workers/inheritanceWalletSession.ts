@@ -3,7 +3,7 @@ import {
   recoverWalletNotes, normalizeWalletState, deriveReceiveKeyMaterial, computePeriodNullifier,
   prepareShield, prepareUnshield, generateShieldedRandomField, decryptShieldedLetter,
   readArchiveBlob, computePolicyCommitment,
-  deriveIdentityMaterial, wipeBytes, computeRoleTag, RECEIVE_MAX_CAPABILITIES,
+  deriveIdentityMaterial, wipeBytes, computeRoleStatusIndex, RECEIVE_MAX_CAPABILITIES,
   type ProtocolInteger, type BudgetPolicyInput,
 } from "@deepfamily/protocol-core";
 import { Contract, getBytes, getBigInt, type JsonRpcProvider } from "ethers";
@@ -82,18 +82,17 @@ export class WalletSession {
     if (hash !== path.root) throw new Error("Qualification membership path does not authenticate the credential");
     return { ...item, issuanceRoot: path.root, credentialDepth: path.depth, credentialIndex: path.index, credentialSiblings: path.siblings };
   }
-  private async currentQualification(credential: CredentialWitness, nonce: bigint, env: SessionEnvironment) {
-    return env.chain.checkClaimQualification({ issuanceRoot: getBigInt(credential.issuanceRoot), nonce,
-      childTag: computeRoleTag({ role: "child", roleSecret: credential.xChild, nonce }),
-      endorsementTag: computeRoleTag({ role: "endorsement", roleSecret: credential.xEndorse, nonce }),
-      trustedTag: computeRoleTag({ role: "trusted", roleSecret: credential.xTrust, nonce }) });
+  private async currentQualification(credential: CredentialWitness, env: SessionEnvironment) {
+    return env.chain.checkClaimQualification({ issuanceRoot: getBigInt(credential.issuanceRoot),
+      childRoleIndex: computeRoleStatusIndex({ role: "child", roleSecret: credential.xChild }),
+      endorsementRoleIndex: computeRoleStatusIndex({ role: "endorsement", roleSecret: credential.xEndorse }),
+      trustedRoleIndex: computeRoleStatusIndex({ role: "trusted", roleSecret: credential.xTrust }) });
   }
   private async qualificationOptions(wallet: Wallet, env: SessionEnvironment): Promise<WalletQualificationView[]> {
     if (!wallet.credentials.length) return [];
-    const nonce = (await this.key(wallet, 0n)).nonce;
     const options = await Promise.all(wallet.credentials.map(async (_, index) => {
       const credential = await this.credential(env, index);
-      return { index, current: await this.currentQualification(credential, nonce, env), selected: false };
+      return { index, current: await this.currentQualification(credential, env), selected: false };
     }));
     const families = new Set<string>();
     let selected = 0;
@@ -213,11 +212,10 @@ export class WalletSession {
       try {
         if (imported.codeRootSecret !== wallet.codeRootSecret) throw new Error("Qualification backup belongs to another wallet identity; create the matching family wallet first");
         if (!imported.credentials.length && !imported.revocationRoles.length) throw new Error("This backup contains no qualification or controller openings");
-        const nonce = (await this.key(wallet, 0n)).nonce;
         const currentCredentials: Wallet["credentials"] = [];
         for (const credential of imported.credentials) {
           const authenticated = await this.authenticatedCredential(credential, env);
-          if (await this.currentQualification(authenticated, nonce, env)) currentCredentials.push(credential);
+          if (await this.currentQualification(authenticated, env)) currentCredentials.push(credential);
         }
         if (!currentCredentials.length && !imported.revocationRoles.length) throw new Error("This backup contains no current qualification or controller openings");
         const credentials = [...new Map([...wallet.credentials, ...currentCredentials]
@@ -243,7 +241,7 @@ export class WalletSession {
       if (indices.length > RECEIVE_MAX_CAPABILITIES || new Set(indices).size !== indices.length
         || indices.some(index => !Number.isSafeInteger(index) || index < 0 || index >= wallet.credentials.length)) throw new Error("Choose at most two current qualifications");
       const credentials = await Promise.all(indices.map(index => this.credential(env, index)));
-      for (const credential of credentials) if (!await this.currentQualification(credential, (await this.key(wallet, allocation.codeIndex)).nonce, env)) throw new Error("A selected qualification is no longer current; use ordinary receipt or choose another qualification");
+      for (const credential of credentials) if (!await this.currentQualification(credential, env)) throw new Error("A selected qualification is no longer current; use ordinary receipt or choose another qualification");
       const result = await env.service.createCode({ masterKey: wallet.masterKey, chainId: wallet.chainId, authorizerScope: wallet.authorizerScope,
         codeIndex: allocation.codeIndex, codeRootSecret: wallet.codeRootSecret, expiresAt: parameters.expiresAt, credentials });
       const backup = await encryptWalletBackup({ wallet: allocation.state, rawPassphrase: parameters.rawPassphrase });
@@ -281,7 +279,7 @@ export class WalletSession {
         const item = wallet.credentials[index];
         if (BigInt(item.familyRoot) !== BigInt(note.familyCommitment) || BigInt(item.parentVersion) !== BigInt(note.parentVersion)) continue;
         const candidate = await this.credential(env, index);
-        if (await this.currentQualification(candidate, getBigInt(note.codeNonce), env)) { qualification = candidate; break; }
+        if (await this.currentQualification(candidate, env)) { qualification = candidate; break; }
       }
       if (!qualification) throw new Error("A current qualification for this budget family and version is required");
       const result = await env.service.prepareClaim({ note: record.note as Parameters<ReceiveService["prepareClaim"]>[0]["note"], ciphertext: record.ciphertext, noteCommitment: record.commitment, keyMaterial: record.keyMaterial,

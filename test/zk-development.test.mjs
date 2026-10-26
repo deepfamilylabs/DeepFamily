@@ -5,7 +5,7 @@ import { CANONICAL_CIRCUIT_NAMES, PROTOCOL_CIRCUIT_NAMES, BOUNDARY_CIRCUIT_NAMES
 
 const root = path.resolve("/fixture/deepfamily");
 function fixture(failingOperation) {
-  const calls = [], artifacts = { status: "development", circuitCount: 14 };
+  const calls = [], artifacts = { status: "development", circuitCount: 13 };
   const failure = new Error("operation failed");
   const options = { root };
   for (const name of ["buildCore", "inspectIdentity", "buildProtocol", "setupProtocol", "buildBoundary", "setupBoundary", "check"])
@@ -30,7 +30,7 @@ describe("complete local development artifact workflow", function () {
       assert.throws(() => parseDevelopmentArguments(args), undefined, JSON.stringify(args));
   });
 
-  it("compiles all 14, checks existing identity keys first, rotates only the 12 development sets and checks the full result", async function () {
+  it("compiles all 13, checks existing identity keys first, rotates only the 11 development sets and checks the full result", async function () {
     const { options, calls, artifacts } = fixture();
     const result = await runDevelopment({ ...options, ptauPath: "local.ptau" });
     const protocol = PROTOCOL_CIRCUIT_NAMES.map(name => name.slice("protocol:".length));
@@ -45,7 +45,7 @@ describe("complete local development artifact workflow", function () {
       ["check", { root }],
     ]);
     assert.deepEqual(result.circuits, CANONICAL_CIRCUIT_NAMES);
-    assert.equal(result.regeneratedCircuits.length, 12);
+    assert.equal(result.regeneratedCircuits.length, 11);
     assert.ok(result.regeneratedCircuits.every(name => name.startsWith("protocol:") || name.startsWith("shielded:")));
     assert.equal(result.artifacts, artifacts);
   });
@@ -81,7 +81,7 @@ describe("complete local development artifact workflow", function () {
     const messages = [];
     await main(["--help"], { ...options, log: message => messages.push(message) });
     assert.deepEqual(calls, []);
-    assert.match(messages[0], /all 14/u);
+    assert.match(messages[0], /all 13/u);
     assert.match(messages[0], /does not create production keys/u);
   });
 

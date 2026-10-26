@@ -305,7 +305,7 @@ intentionally public NFT data.
 
 ## Receiving and budget circuits
 
-There are 14 canonical relations: PersonRelation, DisclosureBinding, Shield, Unshield, four-input Unshield, source fact, source trust, revocation scan, qualification issuance, receive code, budget capability, budget deposit, budget claim and transfer.
+There are 13 canonical relations: PersonRelation, DisclosureBinding, Shield, Unshield, four-input Unshield, source fact, source trust, qualification issuance, receive code, budget capability, budget deposit, budget claim and transfer.
 
 The source relations authenticate actual lineage roots and hidden revocation-role openings. Issuance authenticates the same underlying subject as the identity circuit. The code relation independently binds its owner/viewing key, expiry, nonce and revocation tag. A capability proves that this code belongs to a qualified subject and hidden family rule without revealing the qualification opening.
 
@@ -317,7 +317,6 @@ Deposit and transfer witnesses contain the payer's spending material plus public
 | DisclosureBinding | `disclosure_binding` | 4 |
 | Source fact | `eligibility_source_fact` | 10 |
 | Source trust | `eligibility_source_trust` | 8 |
-| Revocation scan | `eligibility_revocation_scan` | 9 |
 | Issuance | `eligibility_issue` | 5 |
 | Code | `receive_code` | 10 |
 | Capability | `budget_capability` | 10 |
@@ -330,25 +329,23 @@ Deposit and transfer witnesses contain the payer's spending material plus public
 
 SourceFact and SourceTrust authenticate actual current lineage paths and publish salted source
 leaves. Issue proves membership in both source trees and registers a qualification Q. Capability
-proves Q membership, the same subject as the code, and code-specific family/role tags. Deposit
+proves Q membership, the same subject as the code, and a code-specific family tag and shared role status indices. Deposit
 proves the payer's funds and the future rule against that capability; Claim proves current Q,
 the budget-note spend, maturity and allowance. Shield/Unshield are the public asset boundaries,
 and ValueTransfer uses the generic code without requiring Q.
 
 Historical Q roots certify issuance; they do not grant a grace period after role revocation.
 Every `depositBudget` call, including an additional contribution, and every `claimBudget` call
-checks the latest published role revocations. `eligibility_revocation_scan` proves that a
-continuous interval of at most 32 published openings contains no match for the selected public
-role/nonce/tag. Its nine public signals bind the chain, Source, role, nonce, tag, interval start
-and end, and both authenticated prefix digests. Private witness slots contain the public log
-openings with canonical zero padding; no recipient secret or qualification opening is needed.
+checks the three latest Source role states directly. Capability and Claim publish
+`Poseidon2(74321 + role, roleSecret)` and constrain it to the same hidden role secret inside Q.
+A payer cannot substitute another currently active index without invalidating the proof.
+The distinct source-registration domain is `74201 + role`; reusing that identity-associated
+commitment as the public status index is prohibited by this protocol.
 
-The Source verifies that the interval begins at its exact cached progress, authenticates both
-endpoints and advances progress only after the fixed verifier accepts. Final funds acceptance
-checks at most eight unchecked entries per role against the live log. A larger tail reports
-`RevocationStateNotPrepared` and must be prepared before retrying. A target revocation appended
-after proof generation remains effective immediately; historical issuance roots never authorize
-ignoring that tail.
+Authorized revocation marks the role-index mapping. Each status query reads one mapping slot,
+independent of the number of historical revocations. The audit log is not part of business
+validation. There is no history proof, per-code progress or preparation transaction. A target
+revocation committed after business-proof generation still rejects the transaction immediately.
 
 ## Proof transport
 
@@ -363,35 +360,43 @@ their local pinned URLs. A supplied code cannot override the host, hashes or ver
 
 ## Development and release
 
-`npm run zk:build` compiles the canonical 14 relations without replacing keys. Explicit
+`npm run zk:build` compiles the canonical 13 relations without replacing keys. Explicit
 `npm run zk:dev` compiles the full graph, verifies and reuses matching identity/disclosure keys,
-and regenerates development keys for the nine receiving and three boundary relations. It updates
+and regenerates development keys for the eight receiving and three boundary relations. It updates
 their development manifests, vkeys and Solidity verifiers; local contracts and frontend pins must
-be synchronized with that bundle. `npm run zk:dev:check` checks all 14 artifact sets without
+be synchronized with that bundle. `npm run zk:dev:check` checks all 13 artifact sets without
 regeneration. After local deployment, `npm run zk:frontend -- <chainId> <registry>` synchronizes
 boundary aliases and exports a chain/registry-bound frontend bundle.
 `zk:dev -- --circuit protocol:code` or `--circuit shielded:unshield4` selects a current relation, and `--ptau <path>` selects the local Phase 1 file. Focused generation
-still ends with a check of the complete 14-relation bundle.
+still ends with a check of the complete 13-relation bundle.
 
-`npm run test:circuits` checks current constraints. `npm run test:proof` generates all nine receiving proofs and rejects changes to every public coordinate. `npm run test:evm` combines real proofs with actual lineage state, native/ERC20 money, offline-payer proof generation, HPKE recovery, deposits, contributions, claims, withdrawals, letters and revocation.
+`npm run test:circuits` checks current constraints. `npm run test:proof` generates all eight receiving proofs and rejects changes to every public coordinate. `npm run test:evm` combines real proofs with actual lineage state, native/ERC20 money, offline-payer proof generation, HPKE recovery, deposits, contributions, claims, withdrawals, letters and revocation.
 
-The development bundle has been regenerated and passes `zk:dev:check` for all 14 relations.
+The development bundle has been regenerated and passes `zk:dev:check` for all 13 relations.
 This verifies artifact integrity; `zk:check`, `test:proof` and `test:evm` separately validate real
 proofs and EVM execution. Development key rotation requires coordinated manifest, verifier,
 local deployment and frontend updates.
 
-Current keys are development-only. A reviewed production ceremony covering all 14 relations is
+Current keys are development-only. A reviewed production ceremony covering all 13 relations is
 not yet available. `zk:setup` currently fails closed rather than generating production keys;
 `release:preflight` and public deployment/release gates are also closed. `zk:dev` is an explicit
 local development setup, and no development command implicitly promotes its artifacts.
 
 ## Privacy and operational limits
 
-Fresh codes contain independently derived owner/viewing keys and no public subject identifier or derivation index. A public family rule can reveal a matching family commitment. Publishing revocation openings may associate historical codes; this is allowed by the requirements. Different codes may create separate initial budget records, while claims preserve the subject-wide period allowance.
+Fresh codes contain independently derived owner/viewing keys and no public identity or private
+derivation index. Qualified codes expose shared pseudorandom role indices, so codes using the
+same qualification can be linked before revocation. A public family rule can reveal a matching
+family commitment. Source registration commitments use a different hash domain and are not
+published as these code indices. Publishing a revoked role secret may associate its historical
+codes with the original source registration; this revocation disclosure is retained.
+Different codes may create separate initial budget records, while claims preserve the
+subject-wide period allowance.
 
 The protocol does not hide public chain metadata, timing or amounts at shield/unshield
-boundaries. Revocation proofs bound each interval and the final live-tail check; initial proof
-work and preparation transactions for a new nonce/tag still grow with the complete history.
-Caches retain per-code progress, so browser time, aggregate gas and storage remain capacity
-constraints. This is not a claim of constant total cost or unlimited scale. Public release still
-requires those capacity measurements, a reviewed ceremony and the remaining production gates.
+boundaries. The three direct status lookups have fixed work independent of total revocation
+history; source audit storage still grows with revoked roles. Gas traces and history-size
+regressions are documented in [revocation checks and capacity](receive-revocation-capacity.md).
+These results do not claim one million revocations were executed on chain or establish a
+production transaction limit. Public release still requires a reviewed ceremony and the
+remaining production gates.

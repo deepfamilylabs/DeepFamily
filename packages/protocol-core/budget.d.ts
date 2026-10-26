@@ -77,10 +77,9 @@ export interface FundPublicInput {
 }
 export interface ClaimRoleStatus {
   issuanceRoot: bigint;
-  nonce: bigint;
-  childTag: bigint;
-  endorsementTag: bigint;
-  trustedTag: bigint;
+  childRoleIndex: bigint;
+  endorsementRoleIndex: bigint;
+  trustedRoleIndex: bigint;
 }
 export interface ClaimQualificationInput {
   issuanceRoot: ProtocolInteger;
@@ -99,9 +98,9 @@ export interface ClaimQualificationInput {
 export interface ClaimPublicInput {
   authorizerScope: ProtocolInteger;
   issuanceRoot: ProtocolInteger;
-  childTag: ProtocolInteger;
-  endorsementTag: ProtocolInteger;
-  trustedTag: ProtocolInteger;
+  childRoleIndex: ProtocolInteger;
+  endorsementRoleIndex: ProtocolInteger;
+  trustedRoleIndex: ProtocolInteger;
   codeAlias: ProtocolInteger;
   nonce: ProtocolInteger;
   ownerCommitment: ProtocolInteger;

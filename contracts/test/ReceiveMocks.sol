@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {PoseidonT4} from "poseidon-solidity/PoseidonT4.sol";
+import {PoseidonT3} from "poseidon-solidity/PoseidonT3.sol";
 import {IFixedProofVerifier} from "../interfaces/IFixedProofVerifier.sol";
 import {IEligibilitySource} from "../interfaces/IEligibilitySource.sol";
 
@@ -16,7 +16,7 @@ contract FixedProofVerifierMock is IFixedProofVerifier {
 contract EligibilitySourceMock is IEligibilitySource {
   uint256 public sourceRoot = 101;
   uint256 public trustedRoot = 102;
-  uint256[3][] private _revocations;
+  mapping(uint8 role => mapping(uint256 roleIndex => bool revoked)) private _revoked;
 
   function setRoots(uint256 facts, uint256 trusted) external {
     sourceRoot = facts;
@@ -25,39 +25,20 @@ contract EligibilitySourceMock is IEligibilitySource {
 
   function revokeRole(uint8 role, uint256 secret) external {
     require(role < 3);
-    uint256[3] memory item;
-    item[role] = secret;
-    _revocations.push(item);
+    _revoked[role][PoseidonT3.hash([uint256(74321) + role, secret])] = true;
   }
 
-  function isRoleRevoked(uint8 role, uint256 nonce, uint256 tag) external view returns (bool) {
+  function isRoleRevoked(uint8 role, uint256 roleIndex) external view returns (bool) {
     require(role < 3);
-    for (uint256 index; index < _revocations.length; ++index) {
-      uint256 secret = _revocations[index][role];
-      if (secret != 0 && PoseidonT4.hash([uint256(73301) + role, secret, nonce]) == tag) return true;
-    }
-    return false;
+    return _revoked[role][roleIndex];
   }
 
   function revokeRoles(address, uint8[] calldata roles, uint256[] calldata secrets) external {
     require(roles.length == secrets.length);
     for (uint256 index; index < roles.length; ++index) {
       require(roles[index] < 3);
-      uint256[3] memory item;
-      item[roles[index]] = secrets[index];
-      _revocations.push(item);
+      _revoked[roles[index]][PoseidonT3.hash([uint256(74321) + roles[index], secrets[index]])] = true;
     }
-  }
-
-  // This test source does not implement authenticated scan preparation.
-  function revocationCheckpoint(uint8, uint256) external pure returns (uint256) {
-    revert("Mock scan checkpoints unsupported");
-  }
-
-  function roleScanProgress(uint8, uint256, uint256) external pure returns (uint256) { return 0; }
-
-  function prepareRoleScan(uint8, uint256, uint256, uint256, uint256, bytes calldata) external pure {
-    revert("Mock scan preparation unsupported");
   }
 
   function beforeEndorsementChange(uint256, address) external pure {}

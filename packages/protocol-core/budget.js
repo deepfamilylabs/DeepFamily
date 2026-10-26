@@ -3,7 +3,7 @@ import { asUint8Array, bigintFrom, bytesToHex, concatBytes, wipeBytes } from "./
 import { MAX_UINT32, MAX_UINT64, MAX_UINT128, SNARK_SCALAR_FIELD } from "./constants.js";
 import { ProtocolError, protocolAssert } from "./errors.js";
 import {
-  RECEIVE_MAX_CAPABILITIES, computeFamilyTag, computeRoleTag, buildCapabilityPublicSignals,
+  RECEIVE_MAX_CAPABILITIES, computeFamilyTag, computeRoleStatusIndex, buildCapabilityPublicSignals,
   encodeReceiveCode, verifyReceiveCode,
 } from "./receive-code.js";
 import { decryptShieldedNote, encryptShieldedNote, splitShieldedViewPublicKey } from "./shielded-hpke.js";
@@ -273,7 +273,7 @@ export function buildClaimPublicSignals(input, scope) {
     ...input.outputCommitments.map((value, index) => nonzero(value, `outputCommitments[${index}]`)),
     ...input.ciphertextHashes.map((value, index) => field(value, `ciphertextHashes[${index}]`)),
     authorizerScopeOf(input.authorizerScope), nonzero(input.issuanceRoot, "issuanceRoot"),
-    nonzero(input.childTag, "childTag"), nonzero(input.endorsementTag, "endorsementTag"), nonzero(input.trustedTag, "trustedTag")];
+    nonzero(input.childRoleIndex, "childRoleIndex"), nonzero(input.endorsementRoleIndex, "endorsementRoleIndex"), nonzero(input.trustedRoleIndex, "trustedRoleIndex")];
 }
 
 /** Subject/policy/period allowance stays canonical across different codes and contributions. */
@@ -328,10 +328,10 @@ export async function prepareBudgetClaim(input, scope) {
   const credential = poseidon5([73400n, fact, trust, credentialSalt, domain]);
   const credentialMembership = membershipOf({ root: issuanceRoot, depth: qualification.credentialDepth,
     index: qualification.credentialIndex, siblings: qualification.credentialSiblings }, credential, "qualification");
-  const roleStatus = { issuanceRoot, nonce: note.codeNonce,
-    childTag: computeRoleTag({ role: "child", roleSecret: xChild, nonce: note.codeNonce }),
-    endorsementTag: computeRoleTag({ role: "endorsement", roleSecret: xEndorse, nonce: note.codeNonce }),
-    trustedTag: computeRoleTag({ role: "trusted", roleSecret: xTrust, nonce: note.codeNonce }) };
+  const roleStatus = { issuanceRoot,
+    childRoleIndex: computeRoleStatusIndex({ role: "child", roleSecret: xChild}),
+    endorsementRoleIndex: computeRoleStatusIndex({ role: "endorsement", roleSecret: xEndorse}),
+    trustedRoleIndex: computeRoleStatusIndex({ role: "trusted", roleSecret: xTrust}) };
   if (input.checkQualification !== undefined) {
     fail(typeof input.checkQualification === "function" && await input.checkQualification(roleStatus) === true,
       "Current claim qualification has been revoked or is no longer authenticated");
@@ -370,7 +370,7 @@ export async function prepareBudgetClaim(input, scope) {
     viewKeyLo, viewKeyHi, policyCommitment: verified.policyCommitment, budgetKey: verified.budgetKey,
     eligibleFrom: note.eligibleFrom, asOf, inputRoot: membership.root, inputNullifier,
     periodNullifier, outputCommitments, ciphertextHashes, authorizerScope, issuanceRoot,
-    childTag: roleStatus.childTag, endorsementTag: roleStatus.endorsementTag, trustedTag: roleStatus.trustedTag };
+    childRoleIndex: roleStatus.childRoleIndex, endorsementRoleIndex: roleStatus.endorsementRoleIndex, trustedRoleIndex: roleStatus.trustedRoleIndex };
   const publicSignals = buildClaimPublicSignals(publicInput, normalized);
   const witness = { chainId: normalized.chainId, pool: BigInt(normalized.poolAddress), ...publicInput,
     derivedSecretField, codeSecret, ownerSecret, familyCommitment: note.familyCommitment,

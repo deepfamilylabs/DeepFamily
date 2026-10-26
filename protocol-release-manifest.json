@@ -1577,8 +1577,7 @@
         "LINEAGE_INDEX": null,
         "DEEP_FAMILY": null,
         "FACT_VERIFIER": null,
-        "TRUST_VERIFIER": null,
-        "SCAN_VERIFIER": null
+        "TRUST_VERIFIER": null
       },
       "artifactSha256": null,
       "runtimeSha256": null
@@ -1639,11 +1638,6 @@
         "artifactSha256": null,
         "runtimeSha256": null
       },
-      "revocationScan": {
-        "address": null,
-        "artifactSha256": null,
-        "runtimeSha256": null
-      },
       "issue": {
         "address": null,
         "artifactSha256": null,
@@ -1683,12 +1677,6 @@
         "runtimeSha256": null
       },
       "sourceTrust": {
-        "address": null,
-        "verifierImmutable": null,
-        "artifactSha256": null,
-        "runtimeSha256": null
-      },
-      "revocationScan": {
         "address": null,
         "verifierImmutable": null,
         "artifactSha256": null,

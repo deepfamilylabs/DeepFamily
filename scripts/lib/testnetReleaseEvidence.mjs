@@ -1290,7 +1290,7 @@ const requireShieldedAcceptanceEvidence = (report, repositoryRoot, expectedChain
   requireExact(evidence.manifestSha256,inspected.manifestSha256,"shielded.manifestSha256");
   const proofs = requireExactRecordKeys(evidence.proofs,"shielded.proofs",actions);
   const transactions = requireRecord(report.transactions,"transactions");
-  const contractInputs = {sourceFact:[3,4,"eligibilitySource"],sourceTrust:[2,3,"eligibilitySource"],revocationScan:[0,1,"eligibilitySource"],issue:[1,2,"receiveRegistry"],code:[3,4,"receiveRegistry"],capability:[5,6,"receiveRegistry"]};
+  const contractInputs = {sourceFact:[3,4,"eligibilitySource"],sourceTrust:[2,3,"eligibilitySource"],issue:[1,2,"receiveRegistry"],code:[3,4,"receiveRegistry"],capability:[5,6,"receiveRegistry"]};
   for (const [action,proof] of Object.entries(proofs)) {
     const spec = specs[action], item = inspected.manifest.circuits[action], label=`shielded.proofs.${action}`;
     requireExact(proof.source,spec.source,`${label}.source`);

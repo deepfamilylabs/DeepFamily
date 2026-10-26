@@ -243,7 +243,7 @@ The tree can hide person versions that aren't vouched for by a root-defined allo
 
 Wallet secrets and qualification openings stay in `inheritanceWalletSession`. Worker responses use a public result allowlist. Code branch zero is reserved for wallet change; externally shared codes use newly allocated indices. The wallet updates its encrypted backup before exposing each new external code. Restore validates the chain and registry and recovers notes locally from public ledger events. A family wallet can derive its canonical subject secret inside the Worker from the existing identity form. Same-subject encrypted backups can merge registered, current qualifications without replacing money keys or code indices; code generation selects at most two current qualifications. Claims select a current credential when an earlier one has been revoked.
 
-`shared/zk/receiveProtocol.ts` accepts the trusted `proof-artifacts.local.json` build configuration. It verifies artifact digests and exact public signals for all nine receiving relations and the three asset boundaries. Scanned codes cannot choose the verifier or artifact source. `RECEIVE_REGISTRY` on the configured factory/pool binds chain calls to that same scope.
+`shared/zk/receiveProtocol.ts` accepts the trusted `proof-artifacts.local.json` build configuration. It verifies artifact digests and exact public signals for all eight receiving relations and the three asset boundaries. Scanned codes cannot choose the verifier or artifact source. `RECEIVE_REGISTRY` on the configured factory/pool binds chain calls to that same scope.
 
 The configured letter archive uses `VITE_LETTER_ARCHIVE_*`. A single code authorizes both ordinary letters and money transfers; child-budget operations additionally require a current capability. `depositBudget` creates or adds a contribution automatically and rechecks current qualification in both cases. See [receiving codes and letters](private-letters.md).
 
@@ -260,21 +260,23 @@ client membership-path reads; it does not replace the on-chain latest-role check
 roots certify issuance, while current role status is checked again for budget deposits,
 contributions and claims.
 
-`receiveRevocations` reads public log pages, counts, checkpoints and verified progress at one
-block, authenticates the complete returned interval, then rechecks its block anchor. The Worker
-uses `eligibility_revocation_scan` to prove continuous ranges of up to 32 entries; the witness
-requires published openings and the code's public nonce/tag, never holder secrets. The transaction
-client submits necessary `prepareRoleScan` transactions and waits for their receipts before the
-funds transaction. Final acceptance checks the current tail of at most eight entries per role. Each worker round reads and proves at most 32 entries per role (three proofs total). The client waits for confirmed preparation progress before requesting the next round; interrupted operations resume from that progress instead of rebuilding every proof in one timed job.
-A longer unchecked tail returns `RevocationStateNotPrepared` and requires fresh preparation;
-revoked qualification and RPC/validation errors retain distinct meanings. The read-only wallet
-path can authenticate the public log locally when on-chain progress is not yet prepared.
+`receiveChain` verifies a code capability through `ReceiveRegistry` and checks claim status with
+`validateBudgetRoleStatus(issuanceRoot, childRoleIndex, endorsementRoleIndex, trustedRoleIndex)`.
+The contract reads each current role index directly from Source. Code creation and wallet
+recovery use the same shared role indices; the selected Merkle-path read mode does not affect
+this latest-state check. Revoked qualification and RPC/validation errors retain distinct meanings.
 
-Progress is scoped to role, nonce and tag in the canonical Source contract. First-time preparation
-for a new code remains O(history), may involve multiple proofs/signatures/transactions, and adds
-per-code progress state. Subsequent preparation covers only unchecked entries. The final check
-has bounded work, but total proof work and total preparation cost are not constant. Newly appended
-target revocations still reject funds immediately; no retired-root grace window applies.
+Capability and Claim circuits bind `Poseidon2(74321 + role, roleSecret)` to the qualification's
+hidden role secrets. Codes using the same qualification therefore expose the same role indices
+and can be linked; the UI explains this before sharing a qualified code. These indices use a
+different domain from identity-associated source registration commitments. The code's owner and
+viewing keys remain independently derived, and its family tag remains specific to that code.
+
+The client generates the ordinary business proof and submits the money transaction. There are
+no history scans, revocation preparation proofs or preparation transactions. Cancellation,
+locking, unmounting or wallet changes invalidate the pending transaction guard. The contract
+still checks live status when the transaction executes, so revocation after proof generation
+rejects immediately without waiting for an old-root window.
 
 ### Workers
 
@@ -343,7 +345,7 @@ npm run frontend:check      # lint + source-rules + typecheck + locales + XSS sc
 npm run dev:all
 ```
 
-With the pinned proving files available, this starts a Hardhat node, checks the complete 14-relation artifact bundle, deploys the token, lineage index, eligibility source, receiving registry, letter archive and asset pools, seeds demo data, generates `frontend/.env.local`, and starts Vite. For step-by-step control, use `dev:node`, `dev:deploy`, `dev:fund`, `dev:seed`, `frontend:config`, and `frontend:dev` in that order.
+With the pinned proving files available, this starts a Hardhat node, checks the complete 13-relation artifact bundle, deploys the token, lineage index, eligibility source, receiving registry, letter archive and asset pools, seeds demo data, generates `frontend/.env.local`, and starts Vite. For step-by-step control, use `dev:node`, `dev:deploy`, `dev:fund`, `dev:seed`, `frontend:config`, and `frontend:dev` in that order.
 
 ### Inside `frontend/`
 
@@ -386,12 +388,12 @@ serves `Content-Encoding: br`, and the browser validates the decoded bytes again
 hash. Remote builds omit local WASM/zkey files, so exact pinned files must be published before
 deploying the frontend. Empty-host local development uses same-origin artifact files.
 
-`zk:build` compiles all 14 relations without changing keys. Explicit `zk:dev` compiles the same
-graph, checks and reuses matching identity/disclosure keys, then regenerates the nine receiving
+`zk:build` compiles all 13 relations without changing keys. Explicit `zk:dev` compiles the same
+graph, checks and reuses matching identity/disclosure keys, then regenerates the eight receiving
 and three boundary development key sets with updated manifests, vkeys and Solidity verifiers.
 Redeploy local contracts and rerun `zk:frontend` for the matching registry after rotation;
 the export also synchronizes boundary aliases under `/zk/protocol/`. The regenerated development
-bundle passes `zk:dev:check` for all 14 sets. `zk:check`, `test:proof` and `test:evm` separately
+bundle passes `zk:dev:check` for all 13 sets. `zk:check`, `test:proof` and `test:evm` separately
 validate real proofs and EVM execution. `zk:setup` and `release:preflight` remain closed pending a
 reviewed production ceremony for this complete graph. Development generation and deployment are
 for local use and do not provide production ceremony approval.

@@ -1,7 +1,7 @@
 import "../hardhat-test-setup.mjs";
 import { expect } from "chai";
 import hre from "hardhat";
-import { poseidon2, poseidon3 } from "poseidon-lite";
+import { poseidon2 } from "poseidon-lite";
 import {
   addPerson,
   deployLineageIndex,
@@ -17,7 +17,7 @@ describe("Qualification hooks in the actual lineage", function () {
   const abi = hre.ethers.AbiCoder.defaultAbiCoder();
   const encoded = (signals) => abi.encode(["uint256[]"], [signals]);
   const roleCommitment = (role, secret) => poseidon2([74201n + BigInt(role), secret]);
-  const roleTag = (role, secret) => poseidon3([73301n + BigInt(role), secret, 901n]);
+  const roleIndex = (role, secret) => poseidon2([74321n + BigInt(role), secret]);
 
   async function setup() {
     const [owner] = await hre.ethers.getSigners();
@@ -58,9 +58,9 @@ describe("Qualification hooks in the actual lineage", function () {
     const verifier = await hre.ethers.deployContract("FixedProofVerifierMock");
     const source = await (await hre.ethers.getContractFactory("EligibilitySource", {
       libraries: {
-        PoseidonT3: await poseidonT3.getAddress(), PoseidonT4: await poseidonT4.getAddress(),
+        PoseidonT3: await poseidonT3.getAddress(),
       },
-    })).deploy(await lineageIndex.getAddress(), await verifier.getAddress(), await verifier.getAddress(), await verifier.getAddress());
+    })).deploy(await lineageIndex.getAddress(), await verifier.getAddress(), await verifier.getAddress());
     await deepFamily.setEligibilitySource(await source.getAddress());
     const chainId = (await hre.ethers.provider.getNetwork()).chainId;
     const scope = BigInt(await source.getAddress());
@@ -108,9 +108,9 @@ describe("Qualification hooks in the actual lineage", function () {
       .to.emit(deepFamily, "EndorsementCancelled");
     expect(await deepFamily.endorsedVersionIndex(childHash, endorser.address)).to.equal(0n);
     expect([...(await lineageIndex.getEndorsementMetadata(childHash, endorser.address))]).to.deep.equal([0n, 0n]);
-    expect(await source.isRoleRevoked(0, 901, roleTag(0, secrets[0]))).to.equal(true);
-    expect(await source.isRoleRevoked(1, 901, roleTag(1, secrets[1]))).to.equal(true);
-    expect(await source.isRoleRevoked(2, 901, roleTag(2, secrets[2]))).to.equal(false);
+    expect(await source.isRoleRevoked(0, roleIndex(0, secrets[0]))).to.equal(true);
+    expect(await source.isRoleRevoked(1, roleIndex(1, secrets[1]))).to.equal(true);
+    expect(await source.isRoleRevoked(2, roleIndex(2, secrets[2]))).to.equal(false);
     expect(await deepFamily.trustedEndorserOf(parentHash, 1, endorser.address)).to.equal(true);
   });
 
@@ -129,7 +129,7 @@ describe("Qualification hooks in the actual lineage", function () {
       .to.be.revertedWithCustomError(deepFamily, "NotEndorsed");
     expect(await source.revokedRoleCount(0)).to.equal(0n);
     expect(await source.revokedRoleCount(1)).to.equal(0n);
-    expect(await source.isRoleRevoked(0, 901, roleTag(0, secrets[0]))).to.equal(false);
+    expect(await source.isRoleRevoked(0, roleIndex(0, secrets[0]))).to.equal(false);
     expect(await deepFamily.endorsedVersionIndex(childHash, endorser.address)).to.equal(1n);
     expect(await lineageIndex.root(0)).to.equal(rootBefore);
     expect(await lineageIndex.currentCheckpointId()).to.equal(checkpointBefore);
@@ -145,7 +145,7 @@ describe("Qualification hooks in the actual lineage", function () {
       .to.be.revertedWithCustomError(deepFamily, "InvalidEligibilityMutation");
     expect(await source.revokedRoleCount(2)).to.equal(0n);
     await deepFamily.connect(manager).withEligibilityRevocations([2], [secrets[2]], remove());
-    expect(await source.isRoleRevoked(2, 901, roleTag(2, secrets[2]))).to.equal(true);
+    expect(await source.isRoleRevoked(2, roleIndex(2, secrets[2]))).to.equal(true);
     expect(await deepFamily.trustedEndorserOf(parentHash, 1, endorser.address)).to.equal(false);
     expect(await lineageIndex.root(1)).not.to.equal(rootBefore);
   });
@@ -156,6 +156,6 @@ describe("Qualification hooks in the actual lineage", function () {
     await deepFamily.removeTrustedEndorser(parentHash, 1, outsider.address);
     expect(await source.revokedRoleCount(0)).to.equal(0n);
     await deepFamily.connect(endorser).revokeEligibilityRoles([0], [secrets[0]]);
-    expect(await source.isRoleRevoked(0, 901, roleTag(0, secrets[0]))).to.equal(true);
+    expect(await source.isRoleRevoked(0, roleIndex(0, secrets[0]))).to.equal(true);
   });
 });

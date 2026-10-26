@@ -32,7 +32,7 @@ contract PoolReceiveRegistryMock is IReceiveRegistry {
   function verifyReceive(Code calldata, bytes calldata) external view returns (bool) { return receiving; }
   function verifyBudgetCapability(Code calldata, Capability calldata, bytes calldata, bytes calldata)
     external view returns (bool) { return receiving && qualified; }
-  function validateBudgetRoleStatus(uint256 root, uint256, uint256, uint256, uint256)
+  function validateBudgetRoleStatus(uint256 root, uint256, uint256, uint256)
     external view returns (bool) { return qualified && root != 0; }
   function isKnownIssuanceRoot(uint256 root) external pure returns (bool) { return root != 0; }
   function isCodeRevoked(uint256) external view returns (bool) { return !receiving; }

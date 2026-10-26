@@ -3,7 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { inspectProtocolProductionArtifacts } from "./lib/protocolProductionArtifacts.mjs";
 
-/** Production approval covers exactly the current 14 relations. */
+/** Production approval covers exactly the current 13 relations. */
 export async function verifyProductionCeremony(options = {}) {
   return inspectProtocolProductionArtifacts(options);
 }

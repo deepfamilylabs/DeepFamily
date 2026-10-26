@@ -7,7 +7,7 @@ import { InheritanceWorkspace } from "./InheritanceWorkspace";
 import type { ReceiveWorkerContext } from "../../../shared/workers/receiveWorkerClient";
 
 const mocks = vi.hoisted(() => ({ call: vi.fn(), close: vi.fn(), clearSecrets: vi.fn(), matches: true,
-  sendDeposit: vi.fn(), firstPreparation: vi.fn(), nextPreparation: vi.fn(), submitFunds: vi.fn() }));
+  sendDeposit: vi.fn(), firstValidation: vi.fn(), nextSubmission: vi.fn(), submitFunds: vi.fn() }));
 vi.mock("react-i18next", () => ({ useTranslation: () => ({ t: (key: string, values?: { index?: number }) => values?.index === undefined ? key : `${key} ${values.index}` }) }));
 vi.mock("../../../shared/workers/receiveWorkerClient", () => ({ ReceiveWorkerClient: class { call = mocks.call; close = mocks.close; } }));
 vi.mock("../../../shared/clients/receiveChain", () => ({ ReceiveChain: class {
@@ -76,6 +76,7 @@ describe("receiving wallet identity and qualification controls", () => {
     await waitFor(() => expect((screen.getByRole("button", { name: "walletProtocol.importQualificationsAndBackup" }) as HTMLButtonElement).disabled).toBe(false));
     fireEvent.click(screen.getByRole("button", { name: "walletProtocol.importQualificationsAndBackup" }));
     await screen.findByText("walletProtocol.qualificationsImported");
+    expect(screen.getByText("walletProtocol.qualificationPrivacy")).toBeTruthy();
     expect(mocks.call).toHaveBeenCalledWith("walletImportQualifications", { backup: new Uint8Array([4, 5]),
       sourcePassphrase: "source backup password", rawPassphrase: "encrypted backup password" }, context);
     expect((screen.getByLabelText(/walletProtocol.qualification 1/u) as HTMLInputElement).disabled).toBe(true);
@@ -85,29 +86,29 @@ describe("receiving wallet identity and qualification controls", () => {
     await screen.findByText("walletProtocol.codeReady");
     expect(mocks.call).toHaveBeenCalledWith("walletCreateCode", expect.objectContaining({ credentialIndices: [] }), context);
   });
-  it("stops later preparation and funds when cancelled while awaiting a preparation receipt", async () => {
+  it("stops submission when cancelled while awaiting transaction validation", async () => {
     const receipt = deferred<void>();
     mocks.sendDeposit.mockImplementation(async (options: { beforeTransaction(): void }) => {
       options.beforeTransaction();
-      mocks.firstPreparation();
+      mocks.firstValidation();
       await receipt.promise;
       options.beforeTransaction();
-      mocks.nextPreparation();
+      mocks.nextSubmission();
       mocks.submitFunds();
       return { wait: async () => ({ status: 1 }) };
     });
     openConnected(); await createWallet();
     fireEvent.click(screen.getByRole("button", { name: "walletProtocol.budget" }));
     fireEvent.click(screen.getByRole("button", { name: "walletProtocol.submit" }));
-    await waitFor(() => expect(mocks.firstPreparation).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(mocks.firstValidation).toHaveBeenCalledTimes(1));
     fireEvent.click(screen.getByRole("button", { name: "walletProtocol.cancel" }));
     expect(mocks.close).toHaveBeenCalledTimes(1);
     await act(async () => { receipt.resolve(); await receipt.promise; });
-    expect(mocks.nextPreparation).not.toHaveBeenCalled();
+    expect(mocks.nextSubmission).not.toHaveBeenCalled();
     expect(mocks.submitFunds).not.toHaveBeenCalled();
     expect(screen.queryByText("walletProtocol.confirmed")).toBeNull();
   });
-  it("does not begin preparation or send funds after unmounting while the worker is preparing a deposit", async () => {
+  it("does not send funds after unmounting while the worker is proving a deposit", async () => {
     const prepared = deferred<{ inputShardId: bigint }>();
     const defaultCall = mocks.call.getMockImplementation()!;
     mocks.call.mockImplementation((method: string, ...args: unknown[]) => method === "walletPrepareDeposit"
@@ -120,7 +121,7 @@ describe("receiving wallet identity and qualification controls", () => {
     expect(mocks.close).toHaveBeenCalledTimes(1);
     await act(async () => { prepared.resolve({ inputShardId: 0n }); await prepared.promise; });
     expect(mocks.sendDeposit).not.toHaveBeenCalled();
-    expect(mocks.firstPreparation).not.toHaveBeenCalled();
+    expect(mocks.firstValidation).not.toHaveBeenCalled();
     expect(mocks.submitFunds).not.toHaveBeenCalled();
   });
 });

@@ -24,9 +24,9 @@ template Claim() {
     signal input ciphertextHashes[2];
     signal input authorizerScope;
     signal input issuanceRoot;
-    signal input childTag;
-    signal input endorsementTag;
-    signal input trustedTag;
+    signal input childRoleIndex;
+    signal input endorsementRoleIndex;
+    signal input trustedRoleIndex;
 
     signal input derivedSecretField;
     signal input codeSecret;
@@ -99,21 +99,18 @@ template Claim() {
     qualification.index <== credentialIndex;
     qualification.siblings <== credentialSiblings;
     qualification.out === issuanceRoot;
-    component childRole = Poseidon(3);
-    childRole.inputs[0] <== 73301;
+    component childRole = Poseidon(2);
+    childRole.inputs[0] <== 74321;
     childRole.inputs[1] <== xChild;
-    childRole.inputs[2] <== nonce;
-    childTag === childRole.out;
-    component endorsementRole = Poseidon(3);
-    endorsementRole.inputs[0] <== 73302;
+    childRoleIndex === childRole.out;
+    component endorsementRole = Poseidon(2);
+    endorsementRole.inputs[0] <== 74322;
     endorsementRole.inputs[1] <== xEndorse;
-    endorsementRole.inputs[2] <== nonce;
-    endorsementTag === endorsementRole.out;
-    component trustedRole = Poseidon(3);
-    trustedRole.inputs[0] <== 73303;
+    endorsementRoleIndex === endorsementRole.out;
+    component trustedRole = Poseidon(2);
+    trustedRole.inputs[0] <== 74323;
     trustedRole.inputs[1] <== xTrust;
-    trustedRole.inputs[2] <== nonce;
-    trustedTag === trustedRole.out;
+    trustedRoleIndex === trustedRole.out;
     component key = BudgetKey();
     key.poolDomain <== scope.domain;
     key.codeAlias <== codeAlias;
@@ -199,4 +196,4 @@ template Claim() {
     nz[3] = NonZero(); nz[3].in <== nonce;
 }
 
-component main { public [chainId,pool,codeAlias,nonce,ownerCommitment,viewKeyLo,viewKeyHi,policyCommitment,budgetKey,eligibleFrom,asOf,inputRoot,inputNullifier,periodNullifier,outputCommitments,ciphertextHashes,authorizerScope,issuanceRoot,childTag,endorsementTag,trustedTag] } = Claim();
+component main { public [chainId,pool,codeAlias,nonce,ownerCommitment,viewKeyLo,viewKeyHi,policyCommitment,budgetKey,eligibleFrom,asOf,inputRoot,inputNullifier,periodNullifier,outputCommitments,ciphertextHashes,authorizerScope,issuanceRoot,childRoleIndex,endorsementRoleIndex,trustedRoleIndex] } = Claim();
