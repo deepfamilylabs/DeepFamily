@@ -16,6 +16,7 @@ import { WalletSession } from "./inheritanceWalletSession";
 import { ReceiveService, type ProtocolProofProvider } from "../shared/zk/receiveProtocol";
 import { ReceiveChain, RECEIVE_REGISTRY_ABI, POOL_ABI } from "../shared/clients/receiveChain";
 import type { ReceiveWorkerContext } from "../shared/workers/receiveWorkerClient";
+import type { WalletStateView } from "../shared/workers/walletWorkerTypes";
 const proof = {
   pi_a: [1n, 2n, 1n],
   pi_b: [
@@ -254,11 +255,21 @@ describe("family wallet qualifications", () => {
       "walletCreate",
       { rawPassphrase: password, identity: { fields, rawPassphrase: identityPassphrase } },
       env,
-    )) as { backup: Uint8Array };
+    )) as { backup: Uint8Array; state: WalletStateView };
     const wallet = await decryptWalletBackup({ backup: result.backup, rawPassphrase: password });
     expect(wallet.codeRootSecret).toBe(expected.derivedSecretField);
     expect(Object.keys(result).sort()).toEqual(["backup", "state"]);
     expect(new TextDecoder().decode(result.backup)).not.toContain(identityPassphrase);
+    // The page names the wallet by its person; no derived secret leaves the session.
+    expect(result.state.identity).toEqual({
+      fullName: "Wallet Family Subject",
+      personHash: expected.personHash,
+    });
+    expect(
+      JSON.stringify(result.state, (_, value) =>
+        typeof value === "bigint" ? String(value) : value,
+      ),
+    ).not.toContain(String(expected.derivedSecretField));
   });
   it("uses renewed current qualification for an existing budget and checks its shared role indices", async () => {
     const session = new WalletSession(),

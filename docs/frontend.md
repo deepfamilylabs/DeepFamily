@@ -67,7 +67,9 @@ Use the directory tree for ownership boundaries, and these files as first-read e
   `packages/protocol-core/identity.js`, `frontend/src/shared/crypto/identityHash.ts`, and
   `frontend/src/shared/zk/proofDescriptors.ts`
 - Family inheritance: `frontend/src/pages/InheritancePage.tsx`,
-  `frontend/src/domains/inheritance/ui/InheritanceWorkspace.tsx` (wallet and transaction UI),
+  `frontend/src/domains/inheritance/ui/ShieldedInheritancePanel.tsx` (wallet and task UI),
+  `frontend/src/domains/inheritance/ui/ShieldedWalletSessionContext.tsx` (unlocked wallet across
+  asset pools),
   `frontend/src/shared/clients/receiveChain.ts` (canonical receiving contracts and state reads),
   `frontend/src/shared/zk/receiveProtocol.ts` (trusted prover and receiving service),
   `frontend/src/domains/inheritance/services/shieldedAssetRegistry.ts` (pool discovery), and
@@ -239,7 +241,7 @@ The tree can hide person versions that aren't vouched for by a root-defined allo
 
 ### Receiving and budgets
 
-`InheritancePage` renders `InheritanceWorkspace`, using `ReceiveService`, `receiveChain` and the stateful `receive.worker`. There is one receiving-code format (`dfreceive`) and one wallet workflow. The page supports wallet creation, encrypted backup/restore, code generation, asset shielding, budget deposits and contributions, claims, transfers, withdrawals and letters.
+`InheritancePage` keeps the unlocked wallet in `ShieldedWalletSessionProvider`, so choosing another asset pool remounts only `ShieldedInheritancePanel`. The panel uses `ReceiveService`, `receiveChain` and the stateful `receive.worker`. Its workspace has an asset overview with the wallet's balances, a task rail grouped into private assets (deposit, transfer, withdraw), child budgets (fund, claim, budget rules, family qualifications) and letters, each form beside a live receipt, and side sheets for the receive code and the encrypted backup. There is one receiving-code format (`dfreceive`) and one wallet workflow. The page supports wallet creation, encrypted backup/restore, code generation, asset shielding, budget deposits and contributions, claims, transfers, withdrawals and letters.
 
 Wallet secrets and qualification openings stay in `inheritanceWalletSession` and `qualificationWallet`. Worker responses use a public result allowlist, including nested qualification summaries. Code branch zero is reserved for wallet change; externally shared codes use newly allocated indices. The wallet updates its encrypted backup before exposing each new external code. Restore validates the chain and registry and recovers notes locally from public ledger events. A family wallet derives its canonical subject secret inside the Worker from the existing identity form; code generation selects at most two current qualifications. Claims select a current credential when an earlier one has been revoked.
 

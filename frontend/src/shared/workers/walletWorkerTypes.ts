@@ -10,6 +10,8 @@ export interface WalletStateView {
   codeCount: string;
   credentialCount: number;
   backupChanged: boolean;
+  /** Present for a family wallet: the person it was derived from. */
+  identity?: { fullName: string; personHash: string };
 }
 export interface WalletNoteView {
   handle: string;
@@ -26,6 +28,8 @@ export interface WalletLetterView {
   sender: string;
   body: string;
   transactionHash: string;
+  /** Block timestamp of the letter's registration, in seconds. */
+  registeredAt: string;
 }
 export interface WalletQualificationView {
   index: number;

@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { Interface, JsonRpcProvider, ZeroAddress } from "ethers";
+import { Interface, JsonRpcProvider } from "ethers";
 import { chromium } from "playwright-core";
 import { assertLocalAcceptanceRpc } from "../../test/helpers/qualification-browser-fixture.mjs";
 import { installQualificationBrowserWallet } from "./lib/qualification-browser-wallet.mjs";
@@ -27,13 +27,18 @@ async function latestBackup(directory, role) {
   assert.ok(entries.length, `Missing ${role} backup`);
   return path.join(directory, entries[0].name);
 }
-function field(page, label) {
-  return page
-    .locator("label")
-    .filter({ hasText: label })
-    .locator("..")
-    .locator("input,textarea,select")
-    .first();
+/** The unlocked overview's asset menu lists DEEP first and the network's native asset second. */
+async function selectNativeAsset(page) {
+  const overview = page.getByRole("region", { name: labels.shielded.balanceTitle, exact: true });
+  const menu = new RegExp(`^${labels.shielded.assets.label} `, "u");
+  await overview.getByRole("button", { name: menu }).click();
+  const native = page.getByRole("option").nth(1);
+  const symbol = (await native.textContent()).trim();
+  await native.click();
+  await page
+    .getByRole("region", { name: labels.shielded.balanceTitle, exact: true })
+    .getByRole("button", { name: `${labels.shielded.assets.label} ${symbol}`, exact: true })
+    .waitFor();
 }
 
 export async function runQualificationRecoveryAcceptance({
@@ -154,17 +159,17 @@ export async function runQualificationRecoveryAcceptance({
       });
       pages[role] = { context, page };
       await page.goto(new URL("/inheritance", url).toString(), { waitUntil: "networkidle" });
-      await field(page, w("asset")).selectOption(ZeroAddress);
       await page.getByLabel(w("backupFile"), { exact: true }).setInputFiles(backup);
       await page.getByLabel(w("backupPassword"), { exact: true }).fill(password(role));
       await page.getByRole("button", { name: w("restore"), exact: true }).click();
       await page.getByText(w("restored"), { exact: true }).waitFor();
+      await selectNativeAsset(page);
       return page;
     };
     const panel = async (role, tab) => {
       const page = pages[role].page;
       await page
-        .getByRole("navigation", { name: w("tasks"), exact: true })
+        .getByRole("navigation", { name: labels.shielded.actionsTitle, exact: true })
         .getByRole("button", { name: q("title"), exact: true })
         .click();
       const manager = page.getByTestId("qualification-manager");

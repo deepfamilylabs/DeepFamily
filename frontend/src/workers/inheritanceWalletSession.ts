@@ -13,6 +13,7 @@ import {
   readArchiveBlob,
   computePolicyCommitment,
   deriveIdentityMaterial,
+  computeIdentityFromDerivedSecret,
   wipeBytes,
   computeRoleStatusIndex,
   RECEIVE_MAX_CAPABILITIES,
@@ -40,6 +41,7 @@ import {
   type ShieldedPoolSnapshot,
 } from "../domains/inheritance/services/shieldedPoolChain";
 import { getEventScanConfig, getLetterArchiveDeploymentBlock } from "../shared/config/env";
+import { decodeBudgetRule, encodeBudgetRule } from "../shared/zk/budgetRule";
 import { poseidon2 } from "poseidon-lite";
 import { QUALIFICATION_WALLET_METHODS, runQualificationWallet } from "./qualificationWallet";
 
@@ -54,41 +56,11 @@ type SessionEnvironment = {
 };
 const BLOB = "(bytes32 payloadHash,address pointer,uint64 payloadLength,uint32 segmentCount)";
 const LETTER_EVENT = `event LetterRegistered(uint128 indexed messageId,uint256 indexed commonBinding,address indexed sender,${BLOB} blob)`;
-const fieldNames = [
-  "familyCommitment",
-  "parentVersion",
-  "rate",
-  "periodDays",
-  "policySalt",
-  "allocationKeyCommitment",
-] as const;
-function encodeRule(rule: Record<string, string>) {
-  const bytes = new TextEncoder().encode(JSON.stringify(rule));
-  return `dfpolicy.${btoa(String.fromCharCode(...bytes))
-    .replace(/\+/gu, "-")
-    .replace(/\//gu, "_")
-    .replace(/=+$/gu, "")}`;
-}
 function decodeRule(encoded: string, chainId: bigint, pool: string): BudgetPolicyInput {
-  if (!encoded.startsWith("dfpolicy.") || encoded.length > 4096)
-    throw new Error("Invalid receiving budget rule");
-  const raw = JSON.parse(atob(encoded.slice(9).replace(/-/gu, "+").replace(/_/gu, "/"))) as Record<
-    string,
-    unknown
-  >;
-  if (
-    raw.chainId !== String(chainId) ||
-    typeof raw.poolAddress !== "string" ||
-    raw.poolAddress.toLowerCase() !== pool.toLowerCase()
-  )
+  const rule = decodeBudgetRule(encoded);
+  if (rule.chainId !== String(chainId) || rule.poolAddress.toLowerCase() !== pool.toLowerCase())
     throw new Error("Budget rule belongs to another asset pool");
-  const result = Object.fromEntries(
-    fieldNames.map((name) => {
-      if (typeof raw[name] !== "string" || !/^[1-9]\d*$/u.test(raw[name] as string))
-        throw new Error("Invalid receiving budget rule");
-      return [name, BigInt(raw[name] as string)];
-    }),
-  ) as unknown as BudgetPolicyInput;
+  const result = rule.policy as unknown as BudgetPolicyInput;
   computePolicyCommitment(result, { chainId, poolAddress: pool });
   return result;
 }
@@ -113,11 +85,22 @@ export class WalletSession {
     return this.view();
   }
   private view(): WalletStateView {
+    const identity = this.wallet?.identity
+      ? computeIdentityFromDerivedSecret({
+          identity: this.wallet.identity.fields,
+          identitySuiteId: this.wallet.identity.identitySuiteId,
+          derivedSecretField: this.wallet.codeRootSecret,
+        })
+      : null;
     return {
       unlocked: this.wallet !== null,
       codeCount: String(this.wallet?.nextCodeIndex ?? 0),
       credentialCount: this.wallet?.credentials.length ?? 0,
       backupChanged: this.backupChanged,
+      // The page names a family wallet by its person; the secret stays here.
+      ...(identity
+        ? { identity: { fullName: identity.identity.fullName, personHash: identity.personHash } }
+        : {}),
     };
   }
   private current(env: SessionEnvironment): Wallet {
@@ -389,11 +372,13 @@ export class WalletSession {
               ciphertext: blob.payload,
               relationCommitment: 0n,
             });
+            const block = await env.provider.getBlock(log.blockNumber);
             messages.push({
               messageId: String(args.messageId),
               sender: String(args.sender),
               body: opened.body,
               transactionHash: log.transactionHash,
+              registeredAt: String(block?.timestamp ?? 0),
             });
             break;
           } catch {
@@ -559,7 +544,7 @@ export class WalletSession {
       };
       computePolicyCommitment(policy, env.service.scope);
       return {
-        rule: encodeRule(
+        rule: encodeBudgetRule(
           Object.fromEntries(
             Object.entries({
               chainId: wallet.chainId,

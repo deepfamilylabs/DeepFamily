@@ -5,7 +5,7 @@ import { createHash } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { JsonRpcProvider, getAddress, ZeroAddress } from "ethers";
+import { JsonRpcProvider, getAddress } from "ethers";
 import { chromium } from "playwright-core";
 import {
   prepareQualificationBrowserFixture,
@@ -19,10 +19,36 @@ const labels = JSON.parse(
   await fs.readFile(path.join(ROOT, "frontend/src/locales/en/index.json"), "utf8"),
 );
 const t = (key) => key.split(".").reduce((value, part) => value?.[part], labels);
+const tx = (key, values) => t(key).replace(/\{\{(\w+)\}\}/gu, (_, name) => String(values[name]));
+/** A label's fixed beginning, before its first interpolated value. */
+const lead = (key) => t(key).split("{{")[0];
 const walletLabel = (key) => t(`walletProtocol.${key}`);
 const digest = (bytes) => createHash("sha256").update(bytes).digest("hex");
 const qLabel = (key) => t(`qualificationManager.${key}`);
 const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+const TASK_LABELS = {
+  shield: "shielded.actions.shield",
+  privateTransfer: "shielded.actions.privateTransfer",
+  fund: "shielded.actions.fund",
+  claim: "shielded.actions.claim",
+  rule: "walletProtocol.createRule",
+  qualifications: "qualificationManager.title",
+  writeLetter: "shielded.privateLetters.write",
+  letterInbox: "shielded.privateLetters.inbox",
+};
+/** The unlocked overview's asset menu lists DEEP first and the network's native asset second. */
+async function selectNativeAsset(page) {
+  const overview = () =>
+    page.getByRole("region", { name: t("shielded.balanceTitle"), exact: true });
+  const menu = new RegExp(`^${escapeRegex(t("shielded.assets.label"))} `, "u");
+  await overview().getByRole("button", { name: menu }).click();
+  const native = page.getByRole("option").nth(1);
+  const symbol = (await native.textContent()).trim();
+  await native.click();
+  await overview()
+    .getByRole("button", { name: `${t("shielded.assets.label")} ${symbol}`, exact: true })
+    .waitFor();
+}
 function field(scope, name, { prefix = false } = {}) {
   return scope
     .locator("label")
@@ -141,10 +167,6 @@ export async function runQualificationAcceptance({
       await page.goto(new URL("/inheritance", pageUrl).toString(), { waitUntil: "networkidle" });
       await page.getByRole("button", { name: walletLabel("create"), exact: true }).waitFor();
       pages[role] = { page, context };
-      await field(page, walletLabel("asset")).selectOption(ZeroAddress);
-      await page
-        .getByRole("button", { name: walletLabel("create"), exact: true })
-        .waitFor({ state: "visible" });
       return page;
     };
     const waitForDownload = async (role, action, suffix) => {
@@ -175,7 +197,7 @@ export async function runQualificationAcceptance({
     const createWallet = async (role, person) => {
       const page = await open(role);
       if (person) {
-        await page.getByLabel(walletLabel("walletKind"), { exact: true }).selectOption("family");
+        await page.getByRole("radio", { name: walletLabel("familyWallet"), exact: true }).check();
         await page.locator('input[name="fullName"]').fill(person.identityFields.fullName);
         for (const field of ["birthYear", "birthMonth", "birthDay"])
           await page.locator(`input[name="${field}"]`).fill(String(person.identityFields[field]));
@@ -194,7 +216,8 @@ export async function runQualificationAcceptance({
         () => page.getByRole("button", { name: walletLabel("create"), exact: true }).click(),
         ".dfwallet",
       );
-      await page.getByRole("button", { name: walletLabel("lock"), exact: true }).waitFor();
+      await page.getByRole("button", { name: t("shielded.lock"), exact: true }).waitFor();
+      await selectNativeAsset(page);
       return { account: fixture.actors[role].address };
     };
     await step("create issuer wallet through page", () => createWallet("issuer"));
@@ -205,11 +228,8 @@ export async function runQualificationAcceptance({
     const task = async (role, name) => {
       const page = pages[role].page;
       await page
-        .getByRole("navigation", { name: walletLabel("tasks"), exact: true })
-        .getByRole("button", {
-          name: name === "qualifications" ? qLabel("title") : walletLabel(name),
-          exact: true,
-        })
+        .getByRole("navigation", { name: t("shielded.actionsTitle"), exact: true })
+        .getByRole("button", { name: t(TASK_LABELS[name]), exact: true })
         .click();
       return page;
     };
@@ -302,14 +322,20 @@ export async function runQualificationAcceptance({
       () => issueQualification(packages),
     );
     const makeRule = async () => {
-      const page = await task("recipient", "receive");
-      const previous = (await page.getByLabel(walletLabel("rule"), { exact: true }).count())
-        ? await page.getByLabel(walletLabel("rule"), { exact: true }).inputValue()
-        : "";
-      await field(page, walletLabel("amountPerPeriod"), { prefix: true }).fill("0.00001");
-      await field(page, walletLabel("periodDays")).fill("1");
-      await page.getByRole("button", { name: walletLabel("createRule"), exact: true }).click();
-      await page.getByText(walletLabel("ruleReady"), { exact: true }).waitFor();
+      const page = await task("recipient", "rule");
+      const composer = page.getByRole("region", { name: walletLabel("createRule"), exact: true });
+      const output = composer.getByRole("textbox", { name: walletLabel("rule"), exact: true });
+      const previous = (await output.count()) ? await output.inputValue() : "";
+      await field(composer, lead("shielded.fields.rate"), { prefix: true }).fill("0.00001");
+      await composer
+        .getByRole("button", {
+          name: new RegExp(`^${escapeRegex(t("shielded.fields.periodDays"))} `, "u"),
+        })
+        .click();
+      await page
+        .getByRole("option", { name: tx("shielded.periodDaysSummary", { days: 1 }), exact: true })
+        .click();
+      await composer.getByRole("button", { name: walletLabel("createRule"), exact: true }).click();
       await page.waitForFunction(
         ({ label, previous }) =>
           Array.from(document.querySelectorAll("textarea")).some(
@@ -318,7 +344,7 @@ export async function runQualificationAcceptance({
           ),
         { label: walletLabel("rule"), previous },
       );
-      return page.getByLabel(walletLabel("rule"), { exact: true }).inputValue();
+      return output.inputValue();
     };
     const rule = await step("recipient creates future budget rule", makeRule);
     const unusedRule = await step(
@@ -326,14 +352,27 @@ export async function runQualificationAcceptance({
       makeRule,
     );
     const code = await step("recipient generates reusable qualified receive code", async () => {
-      const page = await task("recipient", "receive");
-      await enterPassword("recipient");
+      const page = pages.recipient.page;
+      await page
+        .getByRole("button", { name: t("shielded.actions.receiveCode"), exact: true })
+        .click();
+      const sheet = page.getByRole("dialog", { name: t("shielded.receiveCodeLabel"), exact: true });
+      await sheet
+        .getByLabel(walletLabel("backupPassword"), { exact: true })
+        .fill(password("recipient"));
       await waitForDownload(
         "recipient",
-        () => page.getByRole("button", { name: walletLabel("generateCode"), exact: true }).click(),
+        () =>
+          sheet
+            .getByRole("button", { name: t("shielded.generateReceiveCode"), exact: true })
+            .click(),
         ".dfwallet",
       );
-      return page.getByLabel(walletLabel("receiveCode"), { exact: true }).inputValue();
+      const value = await sheet
+        .getByRole("textbox", { name: t("shielded.receiveCodeLabel"), exact: true })
+        .inputValue();
+      await sheet.getByRole("button", { name: t("common.close"), exact: true }).click();
+      return value;
     });
     const recipientBackup = await latestBackup("recipient");
     await step("recipient goes offline with encrypted backup preserved", async () => {
@@ -341,14 +380,26 @@ export async function runQualificationAcceptance({
       delete pages.recipient;
       return { backupSha256: digest(await fs.readFile(recipientBackup)) };
     });
-    const submitMoney = async (expected = "accepted") => {
+    /** A task's own confirmation, as the receipt beside its form names it. */
+    const confirm = (page, action) =>
+      page
+        .getByRole("button", {
+          name: tx("shielded.submit", { action: t(`shielded.actions.${action}`) }),
+          exact: true,
+        })
+        .click();
+    const confirmed = (page) =>
+      page
+        .getByRole("status")
+        .filter({ hasText: t("transaction.success") })
+        .first();
+    const submitMoney = async (submit, expected = "accepted") => {
       const page = pages.payer.page,
         submitted = report.transactions.length;
-      await page.getByRole("button", { name: walletLabel("submit"), exact: true }).click();
+      await submit(page);
       if (expected === "accepted") {
         const outcome = await Promise.race([
-          page
-            .getByText(walletLabel("confirmed"), { exact: true })
+          confirmed(page)
             .waitFor()
             .then(() => "confirmed"),
           page
@@ -374,27 +425,37 @@ export async function runQualificationAcceptance({
         );
       }
     };
+    const chooseBalance = (page) =>
+      page
+        .getByRole("radio", {
+          name: new RegExp(`^${escapeRegex(lead("shielded.valueOption"))}`, "u"),
+        })
+        .first()
+        .check();
+    const submitBudget = (page) => confirm(page, "fund");
     await step("payer shields actual native collateral through page", async () => {
       const page = await task("payer", "shield");
-      await field(page, walletLabel("amount"), { prefix: true }).fill("0.01");
-      await submitMoney();
+      await field(page, lead("shielded.fields.amount"), { prefix: true }).fill("0.01");
+      await submitMoney((page) => confirm(page, "shield"));
     });
     const fillBudget = async (selectedRule = rule) => {
-      const page = await task("payer", "budget");
-      await field(page, walletLabel("receiveCode")).fill(code);
-      await field(page, walletLabel("rule")).fill(selectedRule);
-      await field(page, walletLabel("periods")).fill("2");
-      const balance = field(page, walletLabel("balanceSource"));
-      const value = await balance.locator("option").nth(1).getAttribute("value");
-      await balance.selectOption(value);
+      const page = await task("payer", "fund");
+      await page
+        .getByRole("textbox", { name: t("shielded.receiveCodeInputLabel"), exact: true })
+        .fill(code);
+      await page
+        .getByRole("textbox", { name: walletLabel("rule"), exact: true })
+        .fill(selectedRule);
+      await page.getByLabel(t("shielded.fields.periods"), { exact: true }).fill("2");
+      await chooseBalance(page);
     };
     await step("offline recipient code accepts first actual budget deposit", async () => {
       await fillBudget();
-      await submitMoney();
+      await submitMoney(submitBudget);
     });
     await step("same offline recipient code accepts actual append", async () => {
       await fillBudget();
-      await submitMoney();
+      await submitMoney(submitBudget);
     });
     await step("issuer revokes authenticated fact roles through page", async () => {
       const panel = await management("issuer", "roles");
@@ -411,35 +472,63 @@ export async function runQualificationAcceptance({
     });
     await step("revocation immediately prevents another append from old code", async () => {
       await fillBudget();
-      await submitMoney("rejected");
+      await submitMoney(submitBudget, "rejected");
     });
     await step("revocation immediately prevents first deposit under an unused rule", async () => {
       await fillBudget(unusedRule);
-      await submitMoney("rejected");
+      await submitMoney(submitBudget, "rejected");
     });
     await step(
       "ordinary transfer remains valid after family qualification revocation",
       async () => {
-        const page = await task("payer", "transfer");
-        await field(page, walletLabel("receiveCode")).fill(code);
-        await field(page, walletLabel("amount"), { prefix: true }).fill("0.000003");
-        const balance = field(page, walletLabel("balanceSource"));
-        await balance.selectOption(await balance.locator("option").nth(1).getAttribute("value"));
-        await submitMoney();
+        const page = await task("payer", "privateTransfer");
+        await page
+          .getByRole("textbox", { name: t("shielded.receiveCodeInputLabel"), exact: true })
+          .fill(code);
+        await field(page, lead("shielded.fields.transferAmount"), { prefix: true }).fill(
+          "0.000003",
+        );
+        await chooseBalance(page);
+        await submitMoney(async (page) => {
+          await page
+            .getByRole("button", {
+              name: tx("shielded.spendReview.preview", {
+                action: t("shielded.actions.privateTransfer"),
+              }),
+              exact: true,
+            })
+            .click();
+          await page
+            .getByRole("button", { name: t("shielded.spendReview.confirm"), exact: true })
+            .click();
+        });
       },
     );
     const letter = `Family qualification was revoked; ordinary letter ${fixture.runId}`;
     await step(
       "ordinary encrypted letter remains valid after qualification revocation",
       async () => {
-        const page = await task("payer", "letter");
-        await field(page, walletLabel("receiveCode")).fill(code);
-        await field(page, walletLabel("letterBody")).fill(letter);
-        await submitMoney();
+        const page = await task("payer", "writeLetter");
+        await page
+          .getByLabel(t("shielded.privateLetters.recipientCode"), { exact: true })
+          .fill(code);
+        await page.getByLabel(t("shielded.privateLetters.body"), { exact: true }).fill(letter);
+        await submitMoney((page) =>
+          page
+            .getByRole("button", { name: t("shielded.privateLetters.send"), exact: true })
+            .click(),
+        );
       },
     );
     await provider.send("evm_increaseTime", [2 * 86400]);
     await provider.send("evm_mine", []);
+    const confirmClaim = (page) =>
+      page
+        .getByRole("button", {
+          name: tx("shielded.submit", { action: t("shielded.actions.claim") }),
+          exact: true,
+        })
+        .click();
     await step("recipient restores backup and recovers offline funds and letter", async () => {
       const page = await open("recipient");
       await page
@@ -448,18 +537,23 @@ export async function runQualificationAcceptance({
       await enterPassword("recipient");
       await page.getByRole("button", { name: walletLabel("restore"), exact: true }).click();
       await page.getByText(walletLabel("restored"), { exact: true }).waitFor();
+      await selectNativeAsset(page);
+      await task("recipient", "letterInbox");
       await page.getByText(letter, { exact: true }).waitFor();
+      await task("recipient", "claim");
       assert.ok(
-        await page.getByRole("button", { name: walletLabel("claim"), exact: true }).count(),
+        await page
+          .getByRole("checkbox", {
+            name: new RegExp(`^${escapeRegex(lead("shielded.claimPeriodOption"))}`, "u"),
+          })
+          .count(),
+        "The restored wallet must offer its due budget period",
       );
     });
     await step("revocation immediately prevents mature budget claim", async () => {
       const page = pages.recipient.page,
         submitted = report.transactions.length;
-      await page
-        .getByRole("button", { name: walletLabel("claim"), exact: true })
-        .first()
-        .click();
+      await confirmClaim(page);
       await page.locator('[role="alert"]').last().waitFor();
       assert.equal(report.transactions.length, submitted);
     });
@@ -476,11 +570,10 @@ export async function runQualificationAcceptance({
       () => issueQualification(replacementPackages),
     );
     await step("replacement qualification claims original existing budget", async () => {
-      const page = await task("recipient", "receive");
-      await page.getByRole("button", { name: walletLabel("refresh"), exact: true }).click();
-      const claim = page.getByRole("button", { name: walletLabel("claim"), exact: true }).first();
-      await claim.click();
-      await page.getByText(walletLabel("confirmed"), { exact: true }).waitFor();
+      const page = await task("recipient", "claim");
+      await page.getByRole("button", { name: t("shielded.actions.recover"), exact: true }).click();
+      await confirmClaim(page);
+      await confirmed(page).waitFor();
     });
     report.receiptEvidence = await step(
       "reconcile actual receipts, replacement indices and original budget claim",

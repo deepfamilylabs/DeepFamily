@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import React from "react";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import InheritancePage from "./InheritancePage";
 const registry = "0x0000000000000000000000000000000000000006";
@@ -11,25 +11,34 @@ const mocks = vi.hoisted(() => ({
     chainId: 31337,
     tokenAddress: "0x0000000000000000000000000000000000000003",
   },
-  wallet: { address: "0x0000000000000000000000000000000000000005", chainId: 31337, signer: {} },
+  wallet: {
+    address: "0x0000000000000000000000000000000000000005" as string | null,
+    chainId: 31337,
+    signer: {},
+    switchOrAddChain: vi.fn(async () => true),
+  },
   pins: undefined as unknown,
   factory: "0x0000000000000000000000000000000000000007",
   token: "0x0000000000000000000000000000000000000003",
   registry: "0x0000000000000000000000000000000000000006",
   translate: (key: string) => key,
   resolve: vi.fn(),
-  workspace: vi.fn(),
+  panel: vi.fn(),
   unmount: vi.fn(),
 }));
 vi.mock("react-i18next", () => ({ useTranslation: () => ({ t: mocks.translate }) }));
 vi.mock("../domains/config", () => ({ useConfig: () => mocks.config }));
-vi.mock("../domains/wallet", () => ({ useWallet: () => mocks.wallet }));
+vi.mock("../domains/wallet", () => ({
+  useWallet: () => mocks.wallet,
+  WalletConnectButton: () => <button type="button">connect</button>,
+}));
 vi.mock("../shared/zk/proofConfiguration", () => ({
   get configuredProofManifest() {
     return mocks.pins;
   },
 }));
-vi.mock("../shared/config/env", () => ({
+vi.mock("../shared/config/env", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../shared/config/env")>()),
   getShieldedPoolFactoryAddress: () => mocks.factory,
   getLetterArchiveAddress: () => "",
 }));
@@ -46,21 +55,26 @@ vi.mock("../shared/clients/contractFactory", () => ({
   }),
 }));
 vi.mock("../domains/inheritance/services/shieldedAssetRegistry", () => ({
-  readShieldedAsset: async () => ({ symbol: "DEEP", decimals: 18 }),
+  readShieldedAsset: async (address: string) => ({
+    address,
+    kind: "erc20",
+    symbol: "DEEP",
+    decimals: 18,
+  }),
   resolveShieldedAssetPool: mocks.resolve,
 }));
-vi.mock("../domains/inheritance/ui/InheritanceWorkspace", () => ({
-  InheritanceWorkspace: (props: unknown) => {
-    mocks.workspace(props);
+vi.mock("../domains/inheritance/ui/ShieldedInheritancePanel", () => ({
+  ShieldedInheritancePanel: (props: { head: React.ReactNode }) => {
+    mocks.panel(props);
     React.useEffect(() => () => mocks.unmount(), []);
-    return <div data-testid="workspace" />;
+    return <div data-testid="panel">{props.head}</div>;
   },
 }));
-vi.mock("../shared/ui", () => ({ PageHead: ({ title }: { title: string }) => <h1>{title}</h1> }));
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.config.rpcUrl = "http://localhost:8545";
   mocks.config.chainId = 31337;
+  mocks.wallet.address = "0x0000000000000000000000000000000000000005";
   mocks.wallet.chainId = 31337;
   mocks.token = mocks.config.tokenAddress;
   mocks.registry = registry;
@@ -68,16 +82,31 @@ beforeEach(() => {
   mocks.resolve.mockResolvedValue({ poolAddress: pool });
 });
 afterEach(cleanup);
-describe("canonical receiving page", () => {
-  it("opens the workspace only with matching pinned chain and registry", async () => {
+describe("inheritance page", () => {
+  it("asks for a connected wallet before reading any pool", () => {
+    mocks.wallet.address = null;
     render(<InheritancePage />);
-    await screen.findByTestId("workspace");
-    expect(mocks.workspace).toHaveBeenLastCalledWith(
+    expect(screen.getByText("inheritance.gate.walletTitle")).toBeTruthy();
+    expect(screen.getByText("shielded.connectWallet")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "connect" })).toBeTruthy();
+    expect(mocks.panel).not.toHaveBeenCalled();
+  });
+  it("opens the panel only with matching pinned chain and registry", async () => {
+    render(<InheritancePage />);
+    await screen.findByTestId("panel");
+    expect(screen.getByRole("heading", { name: "shielded.title" })).toBeTruthy();
+    expect(mocks.panel).toHaveBeenLastCalledWith(
       expect.objectContaining({
-        context: expect.objectContaining({
-          deployment: { chainId: 31337n, registryAddress: registry, poolAddress: pool },
+        modules: expect.objectContaining({
+          assetSymbol: "DEEP",
+          tokenDecimals: 18,
+          context: expect.objectContaining({
+            deployment: { chainId: 31337n, registryAddress: registry, poolAddress: pool },
+            manifest: mocks.pins,
+          }),
         }),
         signer: mocks.wallet.signer,
+        account: mocks.wallet.address,
       }),
     );
   });
@@ -90,33 +119,37 @@ describe("canonical receiving page", () => {
       if (kind === "token") mocks.token = "0x0000000000000000000000000000000000000008";
       render(<InheritancePage />);
       expect((await screen.findByRole("alert")).textContent).toBe("shielded.configurationMismatch");
-      expect(mocks.workspace).not.toHaveBeenCalled();
+      expect(mocks.panel).not.toHaveBeenCalled();
     },
   );
   it("requires trusted proof configuration", async () => {
     mocks.pins = undefined;
     render(<InheritancePage />);
     expect((await screen.findByRole("alert")).textContent).toBe("shielded.configurationMissing");
-    expect(mocks.workspace).not.toHaveBeenCalled();
+    expect(mocks.panel).not.toHaveBeenCalled();
   });
-  it("requires a verified pool for the selected asset", async () => {
+  it("offers to create the pool an asset does not have yet", async () => {
     mocks.resolve.mockResolvedValue(null);
     render(<InheritancePage />);
-    expect((await screen.findByRole("alert")).textContent).toBe("shielded.assets.noPool");
-    expect(mocks.workspace).not.toHaveBeenCalled();
+    expect(await screen.findByText("shielded.assets.noPool")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "shielded.assets.create" })).toBeTruthy();
+    expect(mocks.panel).not.toHaveBeenCalled();
   });
-  it("disables transactions from a wallet on another network", async () => {
+  it("keeps a wallet on another network out of the panel and offers to switch", async () => {
     mocks.wallet.chainId = 1;
     render(<InheritancePage />);
-    await screen.findByTestId("workspace");
-    expect(mocks.workspace).toHaveBeenLastCalledWith(expect.objectContaining({ signer: null }));
+    const alert = await screen.findByText("shielded.wrongNetwork");
+    expect(alert).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "inheritance.gate.switchNetwork" }));
+    expect(mocks.wallet.switchOrAddChain).toHaveBeenCalledWith(31337);
+    expect(mocks.panel).not.toHaveBeenCalled();
   });
-  it("disposes the private workspace when the RPC scope changes", async () => {
+  it("disposes the private panel when the RPC scope changes", async () => {
     const view = render(<InheritancePage />);
-    await screen.findByTestId("workspace");
+    await screen.findByTestId("panel");
     mocks.config.rpcUrl = "http://localhost:9545";
     view.rerender(<InheritancePage />);
     await waitFor(() => expect(mocks.unmount).toHaveBeenCalledOnce());
-    await screen.findByTestId("workspace");
+    await screen.findByTestId("panel");
   });
 });
