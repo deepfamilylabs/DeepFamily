@@ -125,7 +125,7 @@ describe("integrated local ZK artifact preparation", function () {
       expect(failure).to.be.instanceOf(Error);
       expect(failure.cause).to.equal(verificationError);
       expect(failure.message).to.contain(verificationError.message);
-      expect(failure.message).to.contain("npm run zk:dev");
+      expect(failure.message).to.contain("npm run zk:setup");
       expect(failure.message).to.contain("npm run zk:assets:fetch");
       expect(failure.message).to.contain("npm run zk:assets:publish");
       expect(calls).to.deep.equal(["build", "check", "fetch", "check"]);
@@ -158,7 +158,7 @@ describe("integrated local ZK artifact preparation", function () {
     expect(failure).to.be.instanceOf(Error);
     expect(failure.cause).to.equal(downloadError);
     expect(failure.message).to.contain(downloadError.message);
-    expect(failure.message).to.contain("npm run zk:dev");
+    expect(failure.message).to.contain("npm run zk:setup");
     expect(failure.message).to.contain("npm run zk:assets:publish");
     expect(calls).to.deep.equal(["build", "check", "fetch"]);
     expectPinnedArtifactsUnchanged(root, files);

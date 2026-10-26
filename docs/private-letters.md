@@ -28,6 +28,10 @@ The wallet exports an authenticated encrypted backup containing its root, code i
 
 The single deployment uses 13 relations: two identity/disclosure, three asset boundaries and eight receiving/qualification/budget relations, using direct role-index status checks. Each submitted Groth16 ABC proof is 256 bytes; a transaction may include several proofs. Public signals and ciphertext are separate transaction data.
 
-Run `npm run zk:dev` for local development keys, `npm run zk:dev:check` to check them, and `npm run test:proof` / `npm run test:evm` for real-proof checks. `npm run zk:frontend -- <chainId> <registry>` exports trusted frontend artifacts and a local build configuration. A scanned code cannot choose proof keys or replace that configuration.
+Run `npm run zk:setup` for local development keys, `npm run zk:check -- --artifacts-only` to check
+them, and `npm run zk:check -- --circuit protocol` / `npm test -- test/protocol-real-evm.test.mjs`
+for real-proof checks. `npm run zk:frontend -- <chainId> <registry>` exports trusted frontend
+artifacts and a local build configuration. A scanned code cannot choose proof keys or replace that
+configuration.
 
 Development keys are not a reviewed production ceremony. Public deployment and release remain blocked until all 13 relations have reviewed production evidence. Budget qualification checks use three direct current-status reads, independent of revocation history. There are no preparation proofs or preparation transactions. A target revocation remains effective immediately, including when committed after business-proof generation. See [revocation checks and capacity](receive-revocation-capacity.md) for the measured scope and limitations.

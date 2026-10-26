@@ -4,11 +4,12 @@ import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import hre from "hardhat";
-import { parseRevocationGasArguments } from "../scripts/benchmark-revocation-gas.mjs";
-import { createReceiveRevocationGasFixture } from "./fixtures/receive-revocation-gas.mjs";
+import {
+  createReceiveRevocationGasFixture,
+  readReceiveRevocationGasOptions,
+} from "./fixtures/receive-revocation-gas.mjs";
 
 const ROOT = path.resolve(import.meta.dirname, "..");
-const benchmark = process.env.RECEIVE_REVOCATION_GAS_BENCHMARK === "1";
 function failureData(error) {
   for (const value of [error.data, error.error?.data, error.info?.error?.data]) {
     if (typeof value === "string") return value;
@@ -30,7 +31,6 @@ function sourceHashes() {
       "packages/protocol-core/receive-code.js",
       "test/fixtures/receive-revocation-gas.mjs",
       "test/receive-revocation-gas.test.mjs",
-      "scripts/benchmark-revocation-gas.mjs",
     ].map((file) => [
       file,
       createHash("sha256")
@@ -48,11 +48,10 @@ describe("Receive direct role-index gas and latest-state regression", function (
   });
 
   it("reads role-index state directly for native/ERC20 transactions and immediately rejects new revocations", async function () {
-    const counts = benchmark
-      ? process.env.RECEIVE_REVOCATION_GAS_COUNTS.split(",").map(Number)
-      : [0, 9];
-    const gasLimit = BigInt(benchmark ? process.env.RECEIVE_REVOCATION_GAS_LIMIT : 15_000_000);
-    const headroomBps = BigInt(benchmark ? process.env.RECEIVE_REVOCATION_GAS_HEADROOM_BPS : 2000);
+    const options = readReceiveRevocationGasOptions();
+    const { counts } = options;
+    const gasLimit = BigInt(options.gasLimit);
+    const headroomBps = BigInt(options.headroomBps);
     const connection = await hre.network.create({
       network: "default",
       override: { throwOnTransactionFailures: false, allowUnlimitedContractSize: false },
@@ -248,7 +247,7 @@ describe("Receive direct role-index gas and latest-state regression", function (
         await measureAll("target-revoked-after-business-proof", "qualification-revoked", role);
       }
       await snapshot.restore();
-      if (benchmark)
+      if (options.output)
         console.log(
           `[revocation-gas] ${count}/role; zero preparation proofs or transactions; one status SLOAD per role`,
         );
@@ -278,8 +277,8 @@ describe("Receive direct role-index gas and latest-state regression", function (
           spread: String(max - min),
         });
       }
-    if (benchmark) {
-      const output = process.env.RECEIVE_REVOCATION_GAS_REPORT;
+    if (options.output) {
+      const output = path.resolve(ROOT, options.output);
       fs.mkdirSync(path.dirname(output), { recursive: true });
       fs.writeFileSync(output, `${JSON.stringify(report, null, 2)}\n`);
       console.table(
@@ -313,19 +312,39 @@ describe("Receive direct role-index gas and latest-state regression", function (
     await connection.close();
   });
 
-  it("rejects ambiguous benchmark scales and excessive local gas limits", () => {
-    assert.deepEqual(parseRevocationGasArguments(["--counts", "0,8,32"]).counts, [0, 8, 32]);
-    for (const args of [
-      ["--counts", "1,2"],
-      ["--counts", "0,2,2"],
-      ["--counts", "0,32,8"],
-      ["--counts", "0,10001"],
-      ["--counts", "0,1.5"],
-      ["--gas-limit", "16000000"],
-      ["--headroom-bps", "10001"],
-      ["--output"],
-      ["--counts", "0", "--counts", "0,2"],
+  it("uses lightweight default histories and validates scale, gas and report overrides", () => {
+    assert.deepEqual(readReceiveRevocationGasOptions({}), {
+      counts: [0, 9],
+      gasLimit: 15_000_000,
+      headroomBps: 2000,
+      output: undefined,
+    });
+    assert.deepEqual(
+      readReceiveRevocationGasOptions({
+        RECEIVE_REVOCATION_GAS_COUNTS: "0,8,32",
+        RECEIVE_REVOCATION_GAS_LIMIT: "10000000",
+        RECEIVE_REVOCATION_GAS_HEADROOM_BPS: "1000",
+        RECEIVE_REVOCATION_GAS_REPORT: "tmp/revocation-gas.json",
+      }),
+      {
+        counts: [0, 8, 32],
+        gasLimit: 10_000_000,
+        headroomBps: 1000,
+        output: "tmp/revocation-gas.json",
+      },
+    );
+    for (const counts of ["", "1,2", "0,2,2", "0,32,8", "0,10001", "0,1.5", "0,-1"])
+      assert.throws(() =>
+        readReceiveRevocationGasOptions({ RECEIVE_REVOCATION_GAS_COUNTS: counts }),
+      );
+    for (const overrides of [
+      { RECEIVE_REVOCATION_GAS_LIMIT: "16000000" },
+      { RECEIVE_REVOCATION_GAS_LIMIT: "99999" },
+      { RECEIVE_REVOCATION_GAS_LIMIT: "1.5" },
+      { RECEIVE_REVOCATION_GAS_HEADROOM_BPS: "10001" },
+      { RECEIVE_REVOCATION_GAS_HEADROOM_BPS: "0" },
+      { RECEIVE_REVOCATION_GAS_REPORT: "" },
     ])
-      assert.throws(() => parseRevocationGasArguments(args));
+      assert.throws(() => readReceiveRevocationGasOptions(overrides));
   });
 });

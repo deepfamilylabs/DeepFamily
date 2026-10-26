@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import path from "node:path";
-import { main, parseDevelopmentArguments, runDevelopment } from "../scripts/zk-development.mjs";
+import { main, parseArguments, runZkSetup } from "../scripts/zk-setup.mjs";
 import {
   CANONICAL_CIRCUIT_NAMES,
   PROTOCOL_CIRCUIT_NAMES,
@@ -30,21 +30,23 @@ function fixture(failingOperation) {
   return { options, calls, artifacts, failure };
 }
 
-describe("complete local development artifact workflow", function () {
+describe("complete artifact setup workflow", function () {
   it("parses current catalogue selectors and an explicit shared Powers of Tau path", function () {
-    assert.deepEqual(parseDevelopmentArguments([]), {
+    assert.deepEqual(parseArguments([]), {
       help: false,
       circuit: "all",
       ptauPath: undefined,
     });
-    assert.deepEqual(
-      parseDevelopmentArguments(["--ptau", "local.ptau", "--circuit=shielded:unshield4"]),
-      { help: false, circuit: "shielded:unshield4", ptauPath: "local.ptau" },
-    );
-    assert.deepEqual(
-      parseDevelopmentArguments(["--circuit", "protocol:claim", "--ptau=local.ptau"]),
-      { help: false, circuit: "protocol:claim", ptauPath: "local.ptau" },
-    );
+    assert.deepEqual(parseArguments(["--ptau", "local.ptau", "--circuit=shielded:unshield4"]), {
+      help: false,
+      circuit: "shielded:unshield4",
+      ptauPath: "local.ptau",
+    });
+    assert.deepEqual(parseArguments(["--circuit", "protocol:claim", "--ptau=local.ptau"]), {
+      help: false,
+      circuit: "protocol:claim",
+      ptauPath: "local.ptau",
+    });
     for (const args of [
       ["--production"],
       ["--circuit"],
@@ -56,12 +58,12 @@ describe("complete local development artifact workflow", function () {
       ["--ptau=a", "--ptau", "b"],
       ["--help", "--circuit", "core"],
     ])
-      assert.throws(() => parseDevelopmentArguments(args), undefined, JSON.stringify(args));
+      assert.throws(() => parseArguments(args), undefined, JSON.stringify(args));
   });
 
-  it("compiles all 13, checks existing identity keys first, rotates only the 11 development sets and checks the full result", async function () {
+  it("compiles all 13, checks existing identity keys first, rotates only the 11 receiving and boundary sets and checks the full result", async function () {
     const { options, calls, artifacts } = fixture();
-    const result = await runDevelopment({ ...options, ptauPath: "local.ptau" });
+    const result = await runZkSetup({ ...options, ptauPath: "local.ptau" });
     const protocol = PROTOCOL_CIRCUIT_NAMES.map((name) => name.slice("protocol:".length));
     const boundaries = BOUNDARY_CIRCUIT_NAMES.map((name) => name.slice("shielded:".length));
     assert.deepEqual(calls, [
@@ -91,7 +93,7 @@ describe("complete local development artifact workflow", function () {
   ])
     it(`limits ${circuit} regeneration while retaining the complete final check`, async function () {
       const { options, calls } = fixture();
-      const result = await runDevelopment({ ...options, circuit });
+      const result = await runZkSetup({ ...options, circuit });
       assert.deepEqual(
         calls.map(([name]) => name),
         expected,
@@ -131,15 +133,12 @@ describe("complete local development artifact workflow", function () {
     await main(["--help"], { ...options, log: (message) => messages.push(message) });
     assert.deepEqual(calls, []);
     assert.match(messages[0], /all 13/u);
-    assert.match(messages[0], /does not create production keys/u);
+    assert.match(messages[0], /ceremony/u);
   });
 
   it("rejects retired selectors before touching any artifacts", async function () {
     const { options, calls } = fixture();
-    await assert.rejects(
-      runDevelopment({ ...options, circuit: "shielded:fund" }),
-      /expected one of/u,
-    );
+    await assert.rejects(runZkSetup({ ...options, circuit: "shielded:fund" }), /expected one of/u);
     assert.deepEqual(calls, []);
   });
 

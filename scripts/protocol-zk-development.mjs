@@ -153,7 +153,7 @@ function readManifest(root) {
   if (!fs.existsSync(file))
     throw new Error(
       `Receive protocol manifest missing; restore ${PROTOCOL_DEVELOPMENT_MANIFEST}. ` +
-        "Creating replacement development keys requires an explicit npm run zk:dev.",
+        "Creating replacement keys requires an explicit npm run zk:setup.",
     );
   const manifest = JSON.parse(fs.readFileSync(file, "utf8"));
   assertDevelopment(manifest);

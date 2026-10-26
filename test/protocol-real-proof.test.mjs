@@ -104,7 +104,7 @@ test(
   {
     skip:
       !available && !required
-        ? "Development artifacts absent; npm run test:proof requires all real artifacts"
+        ? "Artifacts absent; npm run zk:check requires all real artifacts"
         : false,
     timeout: 600_000,
   },

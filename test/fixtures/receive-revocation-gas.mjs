@@ -5,6 +5,44 @@ import {
   computeRoleStatusIndex,
 } from "@deepfamily/protocol-core";
 
+export function readReceiveRevocationGasOptions(env = process.env) {
+  const countsText = env.RECEIVE_REVOCATION_GAS_COUNTS ?? "0,9";
+  if (
+    typeof countsText !== "string" ||
+    !/^(?:0|[1-9][0-9]*)(?:,(?:0|[1-9][0-9]*))*$/u.test(countsText)
+  )
+    throw new Error("RECEIVE_REVOCATION_GAS_COUNTS must be comma-separated non-negative integers");
+  const counts = countsText.split(",").map(Number);
+  if (
+    counts[0] !== 0 ||
+    counts.some(
+      (count, index) =>
+        !Number.isSafeInteger(count) || count > 10_000 || (index > 0 && count <= counts[index - 1]),
+    )
+  )
+    throw new Error(
+      "RECEIVE_REVOCATION_GAS_COUNTS must start at zero, increase and stay below 10001",
+    );
+  const integer = (name, fallback, min, max) => {
+    if (env[name] === undefined) return fallback;
+    if (typeof env[name] !== "string" || !/^[1-9][0-9]*$/u.test(env[name]))
+      throw new Error(`${name} must be a positive integer`);
+    const value = Number(env[name]);
+    if (!Number.isSafeInteger(value) || value < min || value > max)
+      throw new Error(`${name} must be between ${min} and ${max}`);
+    return value;
+  };
+  const output = env.RECEIVE_REVOCATION_GAS_REPORT;
+  if (output !== undefined && (typeof output !== "string" || output.trim() === ""))
+    throw new Error("RECEIVE_REVOCATION_GAS_REPORT must be a non-empty path");
+  return {
+    counts,
+    gasLimit: integer("RECEIVE_REVOCATION_GAS_LIMIT", 15_000_000, 100_000, 15_000_000),
+    headroomBps: integer("RECEIVE_REVOCATION_GAS_HEADROOM_BPS", 2000, 1, 10_000),
+    output,
+  };
+}
+
 // Gas/state fixture only: the source, registry and pools are the actual contracts.
 // Family/lineage authentication and money proofs are explicit mocks. Role status
 // is the actual production Source mapping; no history proofs or preparation exist.

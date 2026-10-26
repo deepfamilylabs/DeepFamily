@@ -2,23 +2,24 @@
 
 React/Vite SPA for exploring family-tree data, generating ZK proofs, submitting protocol transactions, and managing encrypted metadata.
 
-For a complete local stack, run `npm run dev:all` from the repository root with the
-manifest-pinned proving files available. The development bundle has been regenerated and passes
-`zk:dev:check` for all 13 relations. Local deployment compiles missing outputs and tries to fetch
+For a complete local stack, run `npm run dev:all` from the repository root with the manifest-pinned
+proving files available. The development bundle has been regenerated and passes `zk:check --
+--artifacts-only` for all 13 relations. Local deployment compiles missing outputs and tries to fetch
 pinned files; it never regenerates keys. `npm run frontend:config` writes local contract addresses
 and deployment blocks from the integrated deployment records.
 
-The current graph has 13 relations: two identity/disclosure, three asset boundaries, and nine
+The current graph has 13 relations: two identity/disclosure, three asset boundaries, and eight
 receiving/qualification/budget relations. `npm run zk:build` compiles them; `npm run zk:check`
 rebuilds and verifies their pinned artifacts and real proofs. Checks reuse existing keys.
-`npm run zk:dev` explicitly compiles all 13 relations, reuses matching identity/disclosure keys,
+`npm run zk:setup` explicitly compiles all 13 relations, reuses matching identity/disclosure keys,
 and regenerates the eight receiving plus three boundary development key sets. Rotation updates
 their manifests, vkeys and Solidity verifiers; local contracts and frontend pins must then be
-updated together. `npm run zk:dev:check` verifies the complete 13-relation bundle without changing
-keys. `zk:setup` and `release:preflight` currently refuse production use because a reviewed
-ceremony covering all 13 relations is unavailable.
+updated together. `npm run zk:check -- --artifacts-only` verifies the complete 13-relation bundle
+without changing keys. Setup uses this single entry point and does not approve a production
+ceremony. Public deployment and `release:preflight` remain blocked because reviewed ceremony
+evidence covering all 13 relations is unavailable.
 
-After local deployment, `npm run zk:frontend -- <chainId> <registry>` synchronizes the nine
+After local deployment, `npm run zk:frontend -- <chainId> <registry>` synchronizes the eight
 receiving and three boundary artifact sets, including boundary aliases, into `public/zk/protocol/`
 and writes trusted pins to `src/proof-artifacts.local.json`.
 Identity/disclosure files remain under `public/zk/`. Browser verification-key JSON is committed;
@@ -64,7 +65,7 @@ revocation scans, preparation proofs or preparation transactions. Codes using th
 qualification can be linked through the shared indices; owner and viewing keys remain independently
 derived. A later revocation rejects an already-prepared business proof at execution.
 
-With `npm run dev:all` running, `npm run test:qualifications` (from the repository root) exercises
+With `npm run dev:all` running, `npm run acceptance -- --browser` (from the repository root) exercises
 three isolated browser wallets, actual identity/Source/Q proofs and the complete qualification,
 offline-budget, revocation and reissue flow. This runner accepts localhost development chains only;
 its synthetic private inputs and encrypted backups remain beneath `tmp/`.

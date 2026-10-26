@@ -19,17 +19,7 @@ const compilerInspector = async () => ({ path: path.join(root, "bin/circom") });
 describe("current proving command surface", function () {
   it("exposes one business-named command for every local workflow", function () {
     const { scripts } = JSON.parse(fs.readFileSync("package.json", "utf8"));
-    for (const name of [
-      "zk:build",
-      "zk:setup",
-      "zk:check",
-      "zk:dev",
-      "zk:dev:check",
-      "zk:frontend",
-      "test:proof",
-      "test:evm",
-      "test:contracts",
-    ])
+    for (const name of ["zk:build", "zk:setup", "zk:check", "zk:frontend"])
       assert.equal(typeof scripts[name], "string", name);
     assert.equal(
       Object.keys(scripts).some((name) => /anon|v2/iu.test(name)),
@@ -59,8 +49,54 @@ describe("current proving command surface", function () {
         assert.throws(() => parser(["--circuit", value]), /expected one of/u);
       assert.throws(() => parser(["--circuit"]), /Usage/u);
     }
-    assert.deepEqual(parseSetup([]), { help: false });
+    assert.deepEqual(parseSetup([]), { help: false, circuit: "all", ptauPath: undefined });
     assert.throws(() => parseSetup(["--rotate"]), /Usage/u);
+  });
+  it("checks the complete pinned bundle without compiling or generating proofs when artifacts-only is selected", function () {
+    assert.deepEqual(parseCheck(["--artifacts-only"]), {
+      help: false,
+      circuit: "all",
+      artifactsOnly: true,
+    });
+    for (const args of [
+      ["--artifacts-only", "--circuit", "protocol:claim"],
+      ["--circuit=protocol:claim", "--artifacts-only"],
+    ])
+      assert.deepEqual(parseCheck(args), {
+        help: false,
+        circuit: "protocol:claim",
+        artifactsOnly: true,
+      });
+    for (const args of [
+      ["--artifacts-only", "--artifacts-only"],
+      ["--artifacts-only=true"],
+      ["--artifacts-only", "--circuit", "unknown"],
+    ])
+      assert.throws(() => parseCheck(args));
+
+    const seen = [];
+    const commands = runZkCheck({
+      root,
+      circuit: "protocol:claim",
+      artifactsOnly: true,
+      runner: (command) => seen.push(command),
+    });
+    assert.equal(commands.length, 1);
+    assert.deepEqual(seen, commands);
+    assert.equal(commands[0].check, "artifact-hashes");
+    assert.deepEqual(commands[0].args, [path.join(root, "scripts/check-zk-artifacts.mjs")]);
+    const failure = new Error("artifact pin mismatch");
+    assert.throws(
+      () =>
+        runZkCheck({
+          root,
+          artifactsOnly: true,
+          runner: () => {
+            throw failure;
+          },
+        }),
+      (error) => error === failure,
+    );
   });
   it("builds the fixed relation graph using the inspected compiler and distinct output directories", async function () {
     const events = [];
@@ -133,8 +169,8 @@ describe("current proving command surface", function () {
     const commands = buildZkCheckCommands({ root });
     assert.equal(commands[0].check, "build");
     assert.equal(commands.filter((command) => command.check === "proof").length, 2);
-    assert.equal(commands.at(-2).check, "development-artifact-hashes");
-    assert.match(commands.at(-2).args[0], /check-protocol-artifacts\.mjs$/u);
+    assert.equal(commands.at(-2).check, "artifact-hashes");
+    assert.match(commands.at(-2).args[0], /check-zk-artifacts\.mjs$/u);
     assert.equal(commands.at(-1).check, "real-proofs-and-public-binding");
     assert.ok(
       commands.every(
@@ -143,7 +179,7 @@ describe("current proving command surface", function () {
     );
     const scoped = buildZkCheckCommands({ root, circuit: "shielded:unshield" });
     assert.equal(scoped.length, 1);
-    assert.equal(scoped[0].check, "development-artifact-hashes");
+    assert.equal(scoped[0].check, "artifact-hashes");
   });
   it("stops on the first failed check and runs focused identity checks independently", function () {
     const seen = [];

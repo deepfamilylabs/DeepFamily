@@ -147,37 +147,43 @@ npm run frontend:check # Run frontend lint + typecheck + tests
 npm run check          # Run circuit constraints, frontend checks and contract lint/build/test
 ```
 
-The development artifacts have been regenerated and pass `zk:dev:check` for all 13 relations.
-Real-proof and EVM checks are separate; they require the matching manifest-pinned files and
-reject missing or mismatched artifacts. See [ZK proofs](docs/zk-proofs.md#development-and-release).
+Run revocation status and gas regressions with `npm test -- test/receive-revocation-gas.test.mjs`.
+The default histories contain 0 and 9 revocations per role. Set
+`RECEIVE_REVOCATION_GAS_COUNTS=0,32,64,128,256` to measure larger histories and
+`RECEIVE_REVOCATION_GAS_REPORT=tmp/receive-revocation-direct-status-gas.json` to save a report.
+
+The development artifacts have been regenerated and pass `zk:check -- --artifacts-only` for all 13
+relations. Real-proof and EVM checks are separate; they require the matching manifest-pinned files
+and reject missing or mismatched artifacts. See [ZK
+proofs](docs/zk-proofs.md#development-and-release).
 
 ### ZK Artifact Workflow
 
 The protocol uses 13 Circom relations: two identity/disclosure, three money boundaries and eight receiving/qualification/budget relations. `dfreceive` is the sole receiving-code format. A payer can use the code for letters, transfers and future budget contributions while the recipient remains offline. See [receiving codes and letters](docs/private-letters.md).
 
-| Command                                       | Purpose                                                                                                            |
-| --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| `npm run zk:fetch`                            | Install the pinned Circom toolchain                                                                                |
-| `npm run zk:build`                            | Compile the 13 canonical relations                                                                                 |
-| `npm run zk:assets:fetch`                     | Download and verify the manifest-pinned proving files                                                              |
-| `npm run zk:dev`                              | Compile all 13 relations, regenerate 11 receiving/boundary development key sets and reuse identity/disclosure keys |
-| `npm run zk:dev:check`                        | Verify the complete 13-relation artifact bundle without replacing keys                                             |
-| `npm run zk:check`                            | Rebuild all 13 relations and check pinned artifacts and real proofs                                                |
-| `npm run zk:frontend -- <chainId> <registry>` | Export trusted frontend receiving artifacts                                                                        |
-| `npm run test:circuits`                       | Check current circuit constraints without proving keys                                                             |
-| `npm run test:proof`                          | Verify eight real receiving proofs and public-signal binding                                                       |
-| `npm run test:qualifications`                 | Run localhost browser acceptance with three isolated wallets and actual qualification/funding proofs               |
-| `npm run test:evm`                            | Exercise the complete real-proof money and eligibility flow                                                        |
+| Command                                       | Purpose                                                                          |
+| --------------------------------------------- | -------------------------------------------------------------------------------- |
+| `npm run zk:fetch`                            | Install the pinned Circom toolchain                                              |
+| `npm run zk:build`                            | Compile the 13 canonical relations                                               |
+| `npm run zk:assets:fetch`                     | Download and verify manifest-pinned proving files                                |
+| `npm run zk:setup`                            | Compile all relations, regenerate 11 key sets and reuse identity/disclosure keys |
+| `npm run zk:check -- --artifacts-only`        | Verify all 13 artifact sets without replacing keys                               |
+| `npm run zk:check`                            | Rebuild all relations and check pinned artifacts and real proofs                 |
+| `npm run zk:frontend -- <chainId> <registry>` | Export trusted frontend receiving artifacts                                      |
+| `npm run test:circuits`                       | Check current circuit constraints without proving keys                           |
+| `npm run zk:check -- --circuit protocol`      | Verify eight receiving proofs and public-signal binding                          |
+| `npm run acceptance -- --browser`             | Run browser acceptance with three wallets and real qualification/funding proofs  |
+| `npm test -- test/protocol-real-evm.test.mjs` | Exercise the real-proof money and eligibility flow                               |
 
-Local development keys are not approved production keys. Production setup and release remain blocked until all 13 relations have reviewed ceremony evidence. Browser WASM/zkey files are generated/downloaded artifacts; proof keys cannot be selected by a scanned receiving code. The project has one protocol and no compatibility entry points for previous receiving designs.
+Local development keys are not approved production keys. Public deployment and release remain blocked until all 13 relations have reviewed ceremony evidence. Browser WASM/zkey files are generated/downloaded artifacts; proof keys cannot be selected by a scanned receiving code. The project has one protocol and no compatibility entry points for previous receiving designs.
 
-`zk:setup` currently refuses production setup because that reviewed ceremony is unavailable;
-it does not generate final keys or promote development artifacts. `zk:dev` is explicit local
-development rotation: it compiles all 13 relations, verifies and reuses existing matching
-identity/disclosure keys, and generates new keys for the eight receiving and three boundary
-relations. It updates their development manifests, vkeys and Solidity verifiers; redeploy local
-contracts and run `zk:frontend` to synchronize pins and boundary aliases after rotation.
-`zk:dev:check` checks all 13 sets without regeneration. Use `--circuit protocol:code` or `--circuit shielded:unshield4` to rotate a selected
+`zk:setup` is the single key-generation entry point: it compiles all 13 relations, verifies and
+reuses existing matching identity/disclosure keys, and generates new keys for the eight receiving
+and three boundary relations. It updates their development manifests, vkeys and Solidity verifiers;
+redeploy local contracts and run `zk:frontend` to synchronize pins and boundary aliases after
+rotation. Generation does not approve a production ceremony or promote its artifacts.
+`zk:check -- --artifacts-only` checks all 13 sets without regeneration. Use
+`npm run zk:setup -- --circuit protocol:code` or `--circuit shielded:unshield4` to rotate a selected
 current relation, or `--ptau <path>` to choose the local Phase 1 file; focused runs still require
 all 13 artifact sets to pass the final check.
 
@@ -223,8 +229,8 @@ it never generates replacement keys.
 
 `npm run zk:ptau:fetch` downloads the pinned power-17 Phase 1 file for explicit local development
 setup. A reviewed production ceremony for the current 13-relation graph is still required;
-`zk:setup` and `release:preflight` remain closed. Previous ceremony/runbook procedures do not
-provide production approval for this graph.
+`zk:setup` does not approve that ceremony, and `release:preflight` remains closed. Previous
+ceremony/runbook procedures do not provide production approval for this graph.
 
 ## Deployment Guide
 
@@ -263,16 +269,16 @@ evidence, or authorization digest. Do not invoke a lower-level script with an ar
 
 ### Recommended eSpace Mainnet release
 
-Production release is blocked: the current 13-relation graph has no reviewed production
-ceremony, and `zk:setup` refuses to create or approve production keys. The release flow below
-remains gated on reviewed production artifacts, a passing `release:preflight` from their clean
-commit, and an exact eSpace Testnet `release-rehearsal` report with `releaseReady=true`. A prior
-ceremony for a different circuit graph does not satisfy these requirements.
-A successful, self-validated rehearsal automatically publishes the exact schema-v1 evidence to the
-Git-ignored, eSpace-specific path `tmp/release-evidence/espace-release-rehearsal.json`. Diagnostic,
-failed, and recovery runs never overwrite that file. The eSpace Mainnet release commands read it
-automatically and reject a missing file, an older release commit, or mismatched artifact digest,
-production delay, ZK status, verification, finality, or terminal state.
+Production release is blocked: the current 13-relation graph has no reviewed production ceremony,
+and `zk:setup` generates local keys without approving that ceremony. The release flow below remains
+gated on reviewed production artifacts, a passing `release:preflight` from their clean commit, and
+an exact eSpace Testnet `release-rehearsal` report with `releaseReady=true`. A prior ceremony for a
+different circuit graph does not satisfy these requirements. A successful, self-validated rehearsal
+automatically publishes the exact schema-v1 evidence to the Git-ignored, eSpace-specific path
+`tmp/release-evidence/espace-release-rehearsal.json`. Diagnostic, failed, and recovery runs never
+overwrite that file. The eSpace Mainnet release commands read it automatically and reject a missing
+file, an older release commit, or mismatched artifact digest, production delay, ZK status,
+verification, finality, or terminal state.
 
 For a new production governance wallet, first configure three reviewed EOA/hardware-wallet owner
 addresses in their final order, a fixed decimal salt nonce, the approved deployer, the Safe-only

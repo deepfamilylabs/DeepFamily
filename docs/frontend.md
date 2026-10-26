@@ -412,15 +412,16 @@ serves `Content-Encoding: br`, and the browser validates the decoded bytes again
 hash. Remote builds omit local WASM/zkey files, so exact pinned files must be published before
 deploying the frontend. Empty-host local development uses same-origin artifact files.
 
-`zk:build` compiles all 13 relations without changing keys. Explicit `zk:dev` compiles the same
+`zk:build` compiles all 13 relations without changing keys. Explicit `zk:setup` compiles the same
 graph, checks and reuses matching identity/disclosure keys, then regenerates the eight receiving
 and three boundary development key sets with updated manifests, vkeys and Solidity verifiers.
 Redeploy local contracts and rerun `zk:frontend` for the matching registry after rotation;
 the export also synchronizes boundary aliases under `/zk/protocol/`. The regenerated development
-bundle passes `zk:dev:check` for all 13 sets. `zk:check`, `test:proof` and `test:evm` separately
-validate real proofs and EVM execution. `zk:setup` and `release:preflight` remain closed pending a
-reviewed production ceremony for this complete graph. Development generation and deployment are
-for local use and do not provide production ceremony approval.
+bundle passes `zk:check -- --artifacts-only` for all 13 sets. `zk:check` validates real proofs;
+`npm test -- test/protocol-real-evm.test.mjs` validates EVM execution. `zk:setup` is the single
+local generation entry point and does not approve a production ceremony. `release:preflight`
+and public deployment/release remain closed pending reviewed ceremony evidence for this complete
+graph.
 
 ## Encrypted Version Metadata
 

@@ -611,17 +611,17 @@ finality timeout, and testnet evidence:
 npm run mainnet:release -- --chain espace --plan
 ```
 
-The current 13-relation graph has no reviewed production ceremony: `zk:setup` refuses production
-setup, and the release planner remains blocked. Before this command can plan a release, reviewed
-production artifacts for that complete graph must have been committed together,
-`npm run release:preflight` must pass from
-that clean commit, and a successful eSpace `release-rehearsal` must have automatically published the
-exact schema-v1 `releaseReady=true` evidence to the chain-specific, Git-ignored
-`tmp/release-evidence/espace-release-rehearsal.json`. The Mainnet release reads that fixed file
-automatically and rejects a missing file or evidence from an older commit, a different artifact
-input, or a different production `MIN_DELAY >= 604800`. Diagnostic, failed, and recovery acceptance
-runs never overwrite the published evidence. The earlier setup procedure does not approve this
-graph; its proving-key trust model is separate from the three-owner, 2/3 governance Safe.
+The current 13-relation graph has no reviewed production ceremony: `zk:setup` generates local keys
+without ceremony approval, and the release planner remains blocked. Before this command can plan a
+release, reviewed production artifacts for that complete graph must have been committed together,
+`npm run release:preflight` must pass from that clean commit, and a successful eSpace
+`release-rehearsal` must have automatically published the exact schema-v1 `releaseReady=true`
+evidence to the chain-specific, Git-ignored `tmp/release-evidence/espace-release-rehearsal.json`.
+The Mainnet release reads that fixed file automatically and rejects a missing file or evidence from
+an older commit, a different artifact input, or a different production `MIN_DELAY >= 604800`.
+Diagnostic, failed, and recovery acceptance runs never overwrite the published evidence. The earlier
+setup procedure does not approve this graph; its proving-key trust model is separate from the
+three-owner, 2/3 governance Safe.
 
 Acceptance modes deliberately prove different things:
 
@@ -1282,15 +1282,15 @@ targeted contract paths (`chain`) for Source and Q membership. Both validate pat
 an anchored block; funds-note recovery and paths continue to replay the public ledger locally.
 Neither strategy replaces the current role status check performed by the contract.
 
-Explicit `zk:dev` compiles all 13 relations, reuses matching identity/disclosure keys and rotates
+Explicit `zk:setup` compiles all 13 relations, reuses matching identity/disclosure keys and rotates
 the eight receiving plus three boundary development key sets. Their manifests, vkeys, generated
 verifiers, local deployments and frontend pins must be updated together. After local deployment,
 `zk:frontend` synchronizes the frontend pins and boundary aliases. The regenerated development
-bundle passes `zk:dev:check` for all 13 relations; real-proof/EVM execution is checked separately
-with `zk:check`, `test:proof` and `test:evm`.
+bundle passes `zk:check -- --artifacts-only` for all 13 relations. `zk:check` validates real proofs;
+`npm test -- test/protocol-real-evm.test.mjs` validates EVM execution.
 
-Development generation and deployment are for local use. Public setup/deployment/release remain
-blocked pending reviewed production ceremony evidence for all 13 relations.
+`zk:setup` is the single generation entry point and does not approve a production ceremony.
+Public deployment and release remain blocked pending reviewed ceremony evidence for all 13 relations.
 
 `EligibilitySource` is constructed with the lineage index and fixed SourceFact/SourceTrust
 verifiers. It links only PoseidonT3. For role `r`, a qualification publishes the shared status

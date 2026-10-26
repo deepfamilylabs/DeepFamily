@@ -76,9 +76,9 @@ wallet, CI job, or replacement-transaction tool. Maintain an external production
 ## Prerequisites
 
 1. Complete a reviewed production ceremony for the current 13-relation graph, as described in
-   [zk-ceremony.md](./zk-ceremony.md). This prerequisite is currently blocked: `zk:setup` refuses
-   production setup, and development keys cannot authorize a release. Once that reviewed workflow
-   exists, freeze its manifests, transcripts, verifiers and artifact pins together with the exact
+   [zk-ceremony.md](./zk-ceremony.md). This prerequisite is currently blocked: `zk:setup` generates
+   local keys without ceremony approval, and those keys cannot authorize a release. Once that
+   reviewed workflow exists, freeze its manifests, transcripts, verifiers and artifact pins together with the exact
    chain-specific deployment projection before final `release:preflight`.
 2. Use a clean, isolated checkout with exact dependencies and complete the
    contract, frontend, ZK artifact, and storage-layout checks.

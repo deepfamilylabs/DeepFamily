@@ -360,27 +360,32 @@ their local pinned URLs. A supplied code cannot override the host, hashes or ver
 
 ## Development and release
 
-`npm run zk:build` compiles the canonical 13 relations without replacing keys. Explicit
-`npm run zk:dev` compiles the full graph, verifies and reuses matching identity/disclosure keys,
-and regenerates development keys for the eight receiving and three boundary relations. It updates
-their development manifests, vkeys and Solidity verifiers; local contracts and frontend pins must
-be synchronized with that bundle. `npm run zk:dev:check` checks all 13 artifact sets without
-regeneration. After local deployment, `npm run zk:frontend -- <chainId> <registry>` synchronizes
-boundary aliases and exports a chain/registry-bound frontend bundle.
-`zk:dev -- --circuit protocol:code` or `--circuit shielded:unshield4` selects a current relation, and `--ptau <path>` selects the local Phase 1 file. Focused generation
-still ends with a check of the complete 13-relation bundle.
+`npm run zk:build` compiles the canonical 13 relations without replacing keys. Explicit `npm run
+zk:setup` compiles the full graph, verifies and reuses matching identity/disclosure keys, and
+regenerates development keys for the eight receiving and three boundary relations. It updates their
+development manifests, vkeys and Solidity verifiers; local contracts and frontend pins must be
+synchronized with that bundle. `npm run zk:check -- --artifacts-only` checks all 13 artifact sets
+without regeneration. After local deployment, `npm run zk:frontend -- <chainId> <registry>`
+synchronizes boundary aliases and exports a chain/registry-bound frontend bundle. `zk:setup --
+--circuit protocol:code` or `--circuit shielded:unshield4` selects a current relation, and `--ptau
+<path>` selects the local Phase 1 file. Focused generation still ends with a check of the complete
+13-relation bundle.
 
-`npm run test:circuits` checks current constraints. `npm run test:proof` generates all eight receiving proofs and rejects changes to every public coordinate. `npm run test:evm` combines real proofs with actual lineage state, native/ERC20 money, offline-payer proof generation, HPKE recovery, deposits, contributions, claims, withdrawals, letters and revocation.
+`npm run test:circuits` checks current constraints. `npm run zk:check -- --circuit protocol`
+generates all eight receiving proofs and rejects changes to every public coordinate. `npm test --
+test/protocol-real-evm.test.mjs` combines real proofs with actual lineage state, native/ERC20 money,
+offline-payer proof generation, HPKE recovery, deposits, contributions, claims, withdrawals, letters
+and revocation.
 
-The development bundle has been regenerated and passes `zk:dev:check` for all 13 relations.
-This verifies artifact integrity; `zk:check`, `test:proof` and `test:evm` separately validate real
-proofs and EVM execution. Development key rotation requires coordinated manifest, verifier,
-local deployment and frontend updates.
+The development bundle has been regenerated and passes `zk:check -- --artifacts-only` for all 13
+relations. This verifies artifact integrity; `zk:check` validates real proofs, and `npm test --
+test/protocol-real-evm.test.mjs` validates EVM execution. Development key rotation requires
+coordinated manifest, verifier, local deployment and frontend updates.
 
 Current keys are development-only. A reviewed production ceremony covering all 13 relations is
-not yet available. `zk:setup` currently fails closed rather than generating production keys;
-`release:preflight` and public deployment/release gates are also closed. `zk:dev` is an explicit
-local development setup, and no development command implicitly promotes its artifacts.
+not yet available. `zk:setup` is the single entry point for local key generation, without
+ceremony approval. `release:preflight` and public deployment/release gates remain closed;
+key generation does not implicitly promote its artifacts.
 
 ## Privacy and operational limits
 

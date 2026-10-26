@@ -25,6 +25,58 @@ describe("eSpace Mainnet Safe command wiring", function () {
     }
   });
 
+  it("runs browser acceptance without selecting or invoking a live-chain runner", async function () {
+    const expected = { completed: true };
+    let calls = 0;
+    const result = await runEvmCommand(["acceptance", "--browser"], {
+      browserAcceptance: async () => {
+        calls++;
+        return expected;
+      },
+      acceptance: async () => {
+        throw new Error("live acceptance must not run");
+      },
+      safe: async () => {
+        throw new Error("Safe operation must not run");
+      },
+      release: async () => {
+        throw new Error("release must not run");
+      },
+    });
+    expect(calls).to.equal(1);
+    expect(result).to.equal(expected);
+  });
+
+  it("rejects browser arguments mixed with live-chain operations before running either path", async function () {
+    const invalid = [
+      ["acceptance", "--browser", "--chain", "espace"],
+      ["acceptance", "--chain", "ethereum", "--browser"],
+      ["acceptance", "--browser", "--browser"],
+      ["acceptance", "--browser", "--execute"],
+      ["safe", "--chain", "espace", "--browser"],
+      ["release", "--chain", "ethereum", "--browser"],
+    ];
+    for (const args of invalid) {
+      let calls = 0;
+      const runner = async () => {
+        calls++;
+      };
+      let failure;
+      try {
+        await runEvmCommand(args, {
+          browserAcceptance: runner,
+          acceptance: runner,
+          safe: runner,
+          release: runner,
+        });
+      } catch (error) {
+        failure = error;
+      }
+      expect(failure, args.join(" ")).to.be.instanceOf(Error);
+      expect(calls, args.join(" ")).to.equal(0);
+    }
+  });
+
   it("rejects missing, unsupported or ambiguous chain selection before execution", async function () {
     for (const argv of [
       [],

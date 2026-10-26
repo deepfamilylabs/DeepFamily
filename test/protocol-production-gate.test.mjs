@@ -3,7 +3,6 @@ import {
   inspectProtocolProductionArtifacts,
   PRODUCTION_CIRCUITS,
 } from "../scripts/lib/protocolProductionArtifacts.mjs";
-import { main as setup } from "../scripts/zk-setup.mjs";
 import { verifyProductionCeremony } from "../scripts/zk-ceremony-verify.mjs";
 import { checkProtocolReleaseEvidence } from "../scripts/check-protocol-release.mjs";
 import { runReleaseChecks, runReleasePreflight } from "../scripts/release-preflight.mjs";
@@ -17,9 +16,8 @@ describe("current production proof gate", function () {
       /13-relation.*no reviewed production ceremony/u,
     );
   });
-  it("cannot promote local proof keys through setup, ceremony or release entry points", async function () {
+  it("cannot promote local proof keys through ceremony or release entry points", async function () {
     for (const operation of [
-      () => setup([]),
       verifyProductionCeremony,
       checkProtocolReleaseEvidence,
       runReleaseChecks,

@@ -1,9 +1,9 @@
 # ZK artifacts and production setup
 
 The current protocol has 13 Circom relations. Its keys are development-only, and no reviewed
-production ceremony is available for this complete graph. `npm run zk:setup`, ceremony
-verification and protocol release preflight currently fail closed. Local development generation
-does not approve keys for a public deployment.
+production ceremony is available for this complete graph. `npm run zk:setup` is the single
+key-generation entry point; it does not approve keys for a public deployment. Ceremony
+verification and protocol release preflight currently fail closed.
 
 ## Current relation graph
 
@@ -26,20 +26,20 @@ See [proof relations and public signals](zk-proofs.md#receiving-and-budget-circu
 npm run zk:fetch
 npm run zk:ptau:fetch
 npm run zk:build
-npm run zk:dev:check
+npm run zk:check -- --artifacts-only
 npm run test:circuits
-npm run test:proof
-npm run test:evm
+npm run zk:check -- --circuit protocol
+npm test -- test/protocol-real-evm.test.mjs
 ```
 
-`zk:build` compiles the current relations without replacing keys. `zk:dev:check` authenticates
-source and artifact pins for the complete bundle. Missing or mismatched proving files can be
-restored with `zk:assets:fetch` after the exact pinned files have been published.
+`zk:build` compiles the current relations without replacing keys. `zk:check -- --artifacts-only`
+authenticates source and artifact pins for the complete bundle. Missing or mismatched proving files
+can be restored with `zk:assets:fetch` after the exact pinned files have been published.
 
-Explicit `npm run zk:dev` compiles all 13 relations, verifies and reuses the existing matching
+Explicit `npm run zk:setup` compiles all 13 relations, verifies and reuses the existing matching
 identity/disclosure keys, and regenerates the eight receiving plus three boundary development key
 sets. It updates their development manifests, vkeys and generated Solidity verifiers. A focused
-command such as `npm run zk:dev -- --circuit protocol:capability` regenerates only that
+command such as `npm run zk:setup -- --circuit protocol:capability` regenerates only that
 selected development set; its final check still requires the complete bundle. `--ptau <path>`
 selects an explicit local Phase 1 file for development generation.
 
@@ -82,9 +82,9 @@ reviewed circuit-specific Phase 2 keys or complete production approval.
 ## Production status
 
 [`protocolProductionArtifacts.mjs`](../scripts/lib/protocolProductionArtifacts.mjs) explicitly
-rejects production setup and release for the current graph. `zk:setup -- --help` explains that
-status; the command does not currently generate production transcripts or final keys. Editing a
-development manifest's status cannot satisfy this gate.
+rejects public deployment and release for the current graph. `zk:setup -- --help` describes the
+single local generation workflow; generation does not supply reviewed production transcripts or
+ceremony approval. Editing a development manifest's status cannot satisfy this gate.
 
 Production work must provide a reviewed ceremony and verifier/evidence workflow for the same
 13 relations, then satisfy the existing clean-build, proof, deployment, capacity and release

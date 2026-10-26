@@ -63,9 +63,21 @@ const defaultRunner = ({ executable, args, cwd }) =>
     stdio: "inherit",
   });
 
-export const parseArguments = parseCircuitArguments;
+export const parseArguments = (argv) => {
+  if (!Array.isArray(argv)) throw new TypeError("argv must be an array");
+  const artifactFlags = argv.filter((argument) => argument === "--artifacts-only");
+  if (artifactFlags.length === 0) return parseCircuitArguments(argv);
+  if (artifactFlags.length > 1) throw new Error("Duplicate --artifacts-only option");
+  const parsed = parseCircuitArguments(argv.filter((argument) => argument !== "--artifacts-only"));
+  if (parsed.help) throw new Error("Use --help without other options");
+  return Object.freeze({ ...parsed, artifactsOnly: true });
+};
 
-export const buildZkCheckCommands = ({ root = process.cwd(), circuit = "all" } = {}) => {
+export const buildZkCheckCommands = ({
+  root = process.cwd(),
+  circuit = "all",
+  artifactsOnly = false,
+} = {}) => {
   const resolvedRoot = path.resolve(root);
   const selected = selectCircuitNames(circuit);
   const core = selected.filter((name) => Object.hasOwn(CHECKS, name));
@@ -79,6 +91,8 @@ export const buildZkCheckCommands = ({ root = process.cwd(), circuit = "all" } =
       args: Object.freeze([path.join(resolvedRoot, "scripts", filename), ...extra]),
       cwd: resolvedRoot,
     });
+  const artifacts = script("artifact-hashes", "check-zk-artifacts.mjs");
+  if (artifactsOnly) return Object.freeze([artifacts]);
   return Object.freeze([
     ...(circuit === "all" ? [script("build", "zk-build.mjs")] : []),
     ...core.flatMap((name) =>
@@ -92,9 +106,7 @@ export const buildZkCheckCommands = ({ root = process.cwd(), circuit = "all" } =
         }),
       ),
     ),
-    ...(boundaries.length || protocol.length
-      ? [script("development-artifact-hashes", "check-protocol-artifacts.mjs")]
-      : []),
+    ...(boundaries.length || protocol.length ? [artifacts] : []),
     ...(protocol.length
       ? [
           Object.freeze({
@@ -115,13 +127,14 @@ export const buildZkCheckCommands = ({ root = process.cwd(), circuit = "all" } =
 export const runZkCheck = ({
   root = process.cwd(),
   circuit = "all",
+  artifactsOnly = false,
   runner = defaultRunner,
 } = {}) => {
   if (typeof runner !== "function") {
     throw new TypeError("runner must be a function");
   }
 
-  const commands = buildZkCheckCommands({ root, circuit });
+  const commands = buildZkCheckCommands({ root, circuit, artifactsOnly });
   for (const command of commands) {
     runner(command);
   }
@@ -130,12 +143,13 @@ export const runZkCheck = ({
 
 const printUsage = () => {
   console.log(`Usage:
-  node scripts/zk-check.mjs [--circuit <all|core|person|disclosure|shielded|shielded:action|protocol|protocol:action>]
+  npm run zk:check -- [--circuit <all|core|person|disclosure|shielded|shielded:action|protocol|protocol:action>] [--artifacts-only]
 
 The default check rebuilds the canonical relations, checks identity proofs/constraints,
 validates local artifact hashes and checks all eight protocol Groth16 statements.
 Development artifact verification is not production ceremony approval.
 Every step reuses the current keys; no check generates replacement keys.
+Use --artifacts-only to verify all 13 pinned artifact sets without compiling or proving.
 Use --circuit to select checks without rebuilding. Receiving and boundary checks authenticate
 the complete pinned bundle and its prior local compilation; run zk:build after source changes.`);
 };
@@ -146,7 +160,7 @@ export const main = (argv = process.argv.slice(2)) => {
     printUsage();
     return [];
   }
-  return runZkCheck({ circuit: parsed.circuit });
+  return runZkCheck({ circuit: parsed.circuit, artifactsOnly: parsed.artifactsOnly });
 };
 
 const isMain =
