@@ -19,7 +19,7 @@ without changing keys. Setup uses this single entry point and does not approve a
 ceremony. Public deployment and `release:preflight` remain blocked because reviewed ceremony
 evidence covering all 13 relations is unavailable.
 
-After local deployment, `npm run zk:frontend -- <chainId> <registry>` synchronizes the eight
+After local deployment, `npm run frontend:config` synchronizes the eight
 receiving and three boundary artifact sets, including boundary aliases, into `public/zk/protocol/`
 and writes trusted pins to `src/proof-artifacts.local.json`.
 Identity/disclosure files remain under `public/zk/`. Browser verification-key JSON is committed;

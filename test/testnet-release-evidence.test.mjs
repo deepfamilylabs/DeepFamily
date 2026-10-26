@@ -1,5 +1,6 @@
-import { keccak256, toBeHex } from "ethers";
+import { keccak256, toBeHex, Interface } from "ethers";
 import { createHash } from "node:crypto";
+import { computeRoleStatusIndex } from "@deepfamily/protocol-core";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { expect } from "chai";
@@ -22,7 +23,7 @@ import {
   shieldedDeploymentBindings,
   shieldedDeploymentEvidence,
 } from "../scripts/lib/shieldedDeploymentEvidence.mjs";
-import { FUND_SELECTOR } from "../scripts/lib/shieldedReceipts.mjs";
+import { RECEIVE_POOL_INTERFACE, RECEIVE_PROTOCOL_CHECKS } from "../scripts/lib/receiveProtocolEvidence.mjs";
 import {
   INTEGRATED_DEPLOYMENT_RECORDS,
   SHIELDED_DEPLOYMENT_CIRCUITS,
@@ -45,7 +46,7 @@ const ACCEPTANCE_CIRCUITS = {
   ...Object.fromEntries(
     Object.entries(PROTOCOL_DEPLOYMENT_CIRCUITS).map(([action, spec]) => [
       action,
-      { ...spec, verifierLabel: spec.generatedLabel },
+      { ...spec, verifierLabel: spec.adapterLabel },
     ]),
   ),
 };
@@ -93,20 +94,40 @@ const SHIELDED_SOURCE_SHA256 = "44".repeat(32);
 const SHIELDED_WASM_SHA256 = "45".repeat(32);
 const SHIELDED_ZKEY_SHA256 = "46".repeat(32);
 const SHIELDED_VERIFICATION_KEY_SHA256 = "47".repeat(32);
-const SHIELDED_PROOF_SHA256 = "48".repeat(32);
-const SHIELDED_ACTION_TRANSACTION_LABELS = ["shield", "fund", "transfer", "unshield"].map(
-  (action) => `shielded-action-${action}`,
-);
-const SHIELDED_TRANSACTION_RECEIPTS = Object.fromEntries(
-  SHIELDED_ACTION_TRANSACTION_LABELS.map((label, index) => [
-    label,
-    {
-      hash: `0x${(index + 1).toString(16).padStart(64, "0")}`,
-      blockNumber: 100,
-      blockHash: FINALIZED_BLOCK_HASH,
-      status: 1,
-    },
+const SHIELDED_PROOF_SHA256 = createHash("sha256").update(Buffer.from("1234", "hex")).digest("hex");
+const RECEIVE_TRANSACTION_SPECS = [
+  ["receive-source-fact", "sourceFact"],
+  ["receive-source-trust", "sourceTrust"],
+  ["receive-issue", "issue"],
+  ["receive-native-shield", "shield", "native"],
+  ["receive-native-fund", "fund", "native"],
+  ["receive-native-append", "append", "native"],
+  ["receive-native-fund-second", "fund", "native"],
+  ["receive-native-append-second", "append", "native"],
+  ["receive-erc20-shield", "shield", "erc20"],
+  ["receive-erc20-fund", "fund", "erc20"],
+  ["receive-erc20-append", "append", "erc20"],
+  ["receive-erc20-claim", "claim", "erc20"],
+  ...[0,1,2].flatMap((role) => [
+    [`receive-revoke-${role}`, "revokeRole"],
+    [`receive-native-other-append-${role}`, "append", "native"],
+    [`receive-reissue-fact-${role}`, "sourceFact"],
+    [`receive-reissue-trust-${role}`, "sourceTrust"],
+    [`receive-reissue-${role}`, "issue"],
   ]),
+  ["receive-native-transfer", "transfer", "native"],
+  ["receive-letter", "letter"],
+  ["receive-native-unshield", "unshield", "native"],
+  ["receive-native-unshield4", "unshield4", "native"],
+  ["receive-native-claim", "claim", "native"],
+];
+const RECEIVE_TRANSACTION_RECEIPTS = Object.fromEntries(
+  RECEIVE_TRANSACTION_SPECS.map(([label], index) => [label, {
+    hash: `0x${(index + 1).toString(16).padStart(64, "0")}`,
+    blockNumber: 100 + index,
+    blockHash: `0x${(100 + index).toString(16).padStart(64, "0")}`,
+    status: 1,
+  }]),
 );
 const REPORT_TRANSACTIONS = {
   "critical-transaction": {
@@ -115,7 +136,7 @@ const REPORT_TRANSACTIONS = {
     blockHash: FINALIZED_BLOCK_HASH,
     status: 1,
   },
-  ...SHIELDED_TRANSACTION_RECEIPTS,
+  ...RECEIVE_TRANSACTION_RECEIPTS,
 };
 const SHIELDED_ADDRESSES = Object.fromEntries(
   INTEGRATED_DEPLOYMENT_RECORDS.filter(
@@ -217,7 +238,7 @@ const EXPECTED_INITIAL_RELEASE_STEPS = [
   "production-build-manifest-preflight",
   "protocol-release-manifest-preflight",
   "real-zk-endorsement-nft-story",
-  "real-zk-shielded-business",
+  "real-zk-receive-business",
   "release-rehearsal-clean-source-preflight",
   "source-verified-initial-deployment",
   "terminal-governance-state-verified",
@@ -353,32 +374,108 @@ const SCOPES = {
   code: [3, 4, "receiveRegistry"],
   capability: [5, 6, "receiveRegistry"],
 };
-const shieldedProofs = (chainId) =>
-  Object.fromEntries(
-    Object.entries(ACCEPTANCE_CIRCUITS).map(([action, spec]) => {
-      const signals = Array(spec.publicSignals).fill("0");
-      const [chainIndex, scopeIndex, scope] = SCOPES[action] ?? [0, 1, "shieldedErc20Pool"];
-      signals[chainIndex] = String(chainId);
-      signals[scopeIndex] = BigInt(SHIELDED_ADDRESSES[scope]).toString();
-      const executed = ["shield", "fund", "transfer", "unshield"].includes(action);
-      return [
-        action,
-        {
-          source: spec.source,
-          verified: true,
-          verifierAddress: SHIELDED_ADDRESSES[spec.verifierLabel],
-          wasmSha256: SHIELDED_WASM_SHA256,
-          zkeySha256: SHIELDED_ZKEY_SHA256,
-          verificationKeySha256: SHIELDED_VERIFICATION_KEY_SHA256,
-          proofSha256: SHIELDED_PROOF_SHA256,
-          publicSignals: signals,
-          publicSignalsSha256: createHash("sha256").update(JSON.stringify(signals)).digest("hex"),
-          execution: executed ? "transaction" : "verifier-call",
-          ...(executed ? { transactionLabel: `shielded-action-${action}` } : {}),
-        },
-      ];
-    }),
-  );
+const receiveProofs = (chainId) => Object.fromEntries(
+  Object.entries(ACCEPTANCE_CIRCUITS).map(([action, spec]) => {
+    const signals = Array(spec.publicSignals).fill("0");
+    const [chainIndex, scopeIndex, scope] = SCOPES[action] ?? [0,1,"shieldedErc20Pool"];
+    signals[chainIndex] = String(chainId);
+    signals[scopeIndex] = BigInt(SHIELDED_ADDRESSES[scope]).toString();
+    return [action, [{
+      source: spec.source,
+      verified: true,
+      verifierAddress: SHIELDED_ADDRESSES[spec.verifierLabel],
+      wasmSha256: SHIELDED_WASM_SHA256,
+      zkeySha256: SHIELDED_ZKEY_SHA256,
+      verificationKeySha256: SHIELDED_VERIFICATION_KEY_SHA256,
+      proofSha256: SHIELDED_PROOF_SHA256,
+      publicSignals: signals,
+      publicSignalsSha256: createHash("sha256").update(JSON.stringify(signals)).digest("hex"),
+      execution: "verifier-call",
+      ...(SCOPES[action] ? {} : {asset:"erc20",poolAddress:SHIELDED_ADDRESSES.shieldedErc20Pool}),
+    }]];
+  }),
+);
+const RECEIVE_SCOPE = {
+  sourceFact: "eligibilitySource", sourceTrust:"eligibilitySource", issue:"receiveRegistry",
+  revokeRole:"deepFamily", letter:"letterArchive",
+};
+const RECEIVE_METHODS = {
+  sourceFact:"publishFact(uint256,uint256,address,uint256,uint256,uint256,uint256,bytes)",
+  sourceTrust:"publishTrust(uint256,address,uint256,uint256,uint256,bytes)",
+  issue:"registerCredential(uint256,uint256,uint256,bytes)",
+  revokeRole:"revokeEligibilityRoles(uint8[],uint256[])",
+  letter:"registerLetter(uint128,(uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint64),bytes,bytes)",
+};
+const sampleRoleIndices = (generation) => [0,1,2].map((role) => String(computeRoleStatusIndex({role:["child","endorsement","trusted"][role],roleSecret:BigInt(generation * 100 + role)})));
+const receiveReceipts = () => Object.fromEntries(RECEIVE_TRANSACTION_SPECS.map(([label,action,asset]) => {
+  const record = RECEIVE_TRANSACTION_RECEIPTS[label];
+  const key = RECEIVE_SCOPE[action] ?? (asset === "native" ? "shieldedNativePool" : "shieldedErc20Pool");
+  const targetAddress = key === "deepFamily" ? DEEP_FAMILY : SHIELDED_ADDRESSES[key];
+  const role = Number(label.at(-1));
+  const second = label.endsWith("second"), other = label.includes("other-append");
+  const binding = other ? "99" : second ? "62" : "61";
+  const roles = other ? sampleRoleIndices(9) : action === "claim" && asset === "native" ? sampleRoleIndices(4) : sampleRoleIndices(1);
+  const budgetKey = other ? "7999" : asset === "erc20" ? "8000" : second ? "7001" : "7000";
+  const code = ["31",binding,"2","3","4","5","6","1000000"];
+  const capability = ["100","1","2","3",...roles];
+  const inputCount = action === "shield" ? 0 : action === "unshield4" ? 4 : 1;
+  const data = [Array(inputCount).fill("0"),Array(inputCount).fill("22"),Array.from({length:inputCount},(_,index)=>String(33+index)),["44","55"],["0x12","0x34"]];
+  const proofHashes = {}, publicInput = {};
+  const method = action === "fund" || action === "append" ? "depositBudget" : action === "claim" ? "claimBudget" : action === "unshield4" ? "unshield" : action;
+  let calldata;
+  if (["shield","fund","append","claim","transfer","unshield","unshield4"].includes(action)) {
+    Object.assign(publicInput,{inputNullifiers:data[2],outputCommitments:data[3],ciphertextHashes:data[4].map(keccak256)});
+    if (action === "shield") { calldata = RECEIVE_POOL_INTERFACE.encodeFunctionData(method,[1000,data,"0x1234"]); publicInput.amount="1000"; }
+    if (["fund","append"].includes(action)) {
+      calldata = RECEIVE_POOL_INTERFACE.encodeFunctionData(method,[code,capability,"0x1234","0x1234",["71",budgetKey,"1000"],data,"0x1234"]);
+      Object.assign(publicInput,{commonBinding:binding,budgetKey,eligibleFrom:"1000",policyCommitment:"71",issuanceRoot:"100",roleIndices:roles,created:action === "fund"});
+    }
+    if (action === "claim") {
+      calldata = RECEIVE_POOL_INTERFACE.encodeFunctionData(method,[[budgetKey,"500","99","100",...roles],data,"0x1234"]);
+      Object.assign(publicInput,{commonBinding:binding,budgetKey,eligibleFrom:"1000",policyCommitment:"71",issuanceRoot:"100",periodNullifier:"99",roleIndices:roles});
+    }
+    if (action === "transfer") { calldata=RECEIVE_POOL_INTERFACE.encodeFunctionData(method,[code,"0x1234",data,"0x1234"]); publicInput.commonBinding=binding; }
+    if (["unshield","unshield4"].includes(action)) { calldata=RECEIVE_POOL_INTERFACE.encodeFunctionData(method,[address(99),2,data,"0x1234"]); Object.assign(publicInput,{amount:"2",recipient:address(99)}); }
+    proofHashes[action === "append" ? "fund" : action] = SHIELDED_PROOF_SHA256;
+    if (["fund","append","transfer"].includes(action)) proofHashes.code=SHIELDED_PROOF_SHA256;
+    if (["fund","append"].includes(action)) proofHashes.capability=SHIELDED_PROOF_SHA256;
+  } else {
+    const iface = new Interface([`function ${RECEIVE_METHODS[action]}`]);
+    let args;
+    if (action === "sourceFact") { args=[201,202,address(90),1,41,42,43,"0x1234"]; Object.assign(publicInput,{treeId:0,leafIndex:"0",leaf:"41",root:"52",roleCommitments:["42","43"]}); }
+    if (action === "sourceTrust") { args=[202,address(90),1,51,52,"0x1234"]; Object.assign(publicInput,{treeId:1,leafIndex:"0",leaf:"51",root:"53",roleCommitments:["52"]}); }
+    if (action === "issue") { const credential=label.includes("reissue") ? String(302+role) : "301"; args=[credential,52,53,"0x1234"]; Object.assign(publicInput,{credential,sourceRoot:"52",trustedRoot:"53",issuanceRoot:"100"}); }
+    if (action === "revokeRole") { args=[[role],[(role+1)*100+role]]; Object.assign(publicInput,{roles:[role],roleIndices:[sampleRoleIndices(role+1)[role]]}); }
+    if (action === "letter") { args=[1,code,"0x1234","0x1234"]; Object.assign(publicInput,{messageId:"1",commonBinding:binding,ciphertextHash:keccak256("0x1234")}); }
+    calldata=iface.encodeFunctionData(iface.fragments[0],args);
+    if (["sourceFact","sourceTrust","issue"].includes(action)) proofHashes[action]=SHIELDED_PROOF_SHA256;
+    if (action === "letter") proofHashes.code=SHIELDED_PROOF_SHA256;
+  }
+  return [label,{action,...(asset ? {asset} : {}),targetAddress,txHash:record.hash,blockNumber:record.blockNumber,blockHash:record.blockHash,selector:calldata.slice(0,10),gasUsed:"200000",transactionGasLimit:"300000",blockGasLimit:"30000000",data:calldata,calldataHash:keccak256(calldata),proofHashes,publicInput}];
+}));
+const receiveRoleRevocations = () => [0,1,2].map((role) => {
+  const oldIndices = sampleRoleIndices(role+1), otherIndices = sampleRoleIndices(9);
+  const rejections = [];
+  for (const codeIndex of [0,1]) for (const operation of ["first","append","claim"]) for (const kind of ["revoked","index-substitution","credential-substitution"]) {
+    const indices = kind === "credential-substitution" ? [...otherIndices] : [...oldIndices];
+    if (kind === "index-substitution") indices[role] = otherIndices[role];
+    const code = ["1",String(61+codeIndex),"2","3","4","5","6","1000000"];
+    const capability = ["100","1","2","3",...indices];
+    const budgetKey = String((operation === "first" ? 9000 : 7000) + codeIndex);
+    const data = [["0"],["22"],["33"],["44","55"],["0x12","0x34"]];
+    const callData = operation === "claim" ? RECEIVE_POOL_INTERFACE.encodeFunctionData("claimBudget",[[budgetKey,"500","99","100",...indices],data,"0x1234"]) : RECEIVE_POOL_INTERFACE.encodeFunctionData("depositBudget",[code,capability,"0x1234","0x5678",["71",budgetKey,"1000"],data,"0x1234"]);
+    const recorded = RECEIVE_TRANSACTION_RECEIPTS[`receive-revoke-${role}`];
+    rejections.push({operation,kind,errorName:kind === "revoked" ? "QualificationRevoked" : operation === "claim" ? "InvalidZKProof" : "InvalidProof",errorArgs:kind === "revoked" ? [String(role)] : [],blockNumber:recorded.blockNumber,blockHash:recorded.blockHash,to:SHIELDED_ADDRESSES.shieldedNativePool,from:address(987),data:callData,calldataHash:keccak256(callData),rpcChecks:"passed",publicInput:{commonBinding:String(61+codeIndex),budgetKey,roleIndices:indices,inputNullifiers:["33"],outputCommitments:["44","55"],ciphertextHashes:[keccak256("0x12"),keccak256("0x34")],budgetExists:operation !== "first"}});
+  }
+  return {role,roleIndex:oldIndices[role],otherRoleIndex:otherIndices[role],transactionLabel:`receive-revoke-${role}`,rejections};
+});
+const receiveEvidence = (chainId) => ({
+  schemaVersion:1,status:"passed",chainId,manifestSha256:SHIELDED_MANIFEST_SHA256,
+  proofs:receiveProofs(chainId),checks:Object.fromEntries(RECEIVE_PROTOCOL_CHECKS.map((name)=>[name,true])),
+  receipts:{schema:"deepfamily/receive-protocol-receipts@1",chainId,rpcChecks:"passed",transactions:receiveReceipts()},
+  roleRevocations:receiveRoleRevocations(),
+  reissues:[0,1,2].map((role)=>({role,oldCredential:String(301+role),newCredential:String(302+role),oldRoleIndices:sampleRoleIndices(role+1),newRoleIndices:sampleRoleIndices(role+2),originalBudgetKey:"7000",depositTransactionLabel:"receive-native-fund",claimTransactionLabel:"receive-native-claim"})),
+});
 
 const validReportTemplate = () => ({
   schemaVersion: TESTNET_RELEASE_REPORT_SCHEMA_VERSION,
@@ -416,8 +513,8 @@ const validReportTemplate = () => ({
     finality: {
       required: true,
       status: "passed",
-      lastCriticalBlock: 100,
-      finalizedBlockNumber: 105,
+      lastCriticalBlock: Math.max(...Object.values(REPORT_TRANSACTIONS).map((record) => record.blockNumber)),
+      finalizedBlockNumber: 200,
       finalizedBlockHash: FINALIZED_BLOCK_HASH,
       revalidatedTransactionCount: Object.keys(REPORT_TRANSACTIONS).length,
       revalidatedTransactions: Object.entries(REPORT_TRANSACTIONS).map(([label, receipt]) => ({
@@ -507,37 +604,7 @@ const validReportTemplate = () => ({
     manifestSha256: SHIELDED_MANIFEST_SHA256,
     circuits: structuredClone(SHIELDED_MANIFEST_CIRCUITS),
   },
-  shielded: {
-    status: "passed",
-    manifestSha256: SHIELDED_MANIFEST_SHA256,
-    proofs: shieldedProofs(CHAIN_ID),
-    scenario: {
-      offlinePayer: true,
-      latestRoleChecks: true,
-      appendRechecksEligibility: true,
-      claimsRecheckEligibility: true,
-      sameCodeAppends: true,
-      crossCodeIndependent: true,
-      notesRecovered: true,
-      nativeAndToken: true,
-    },
-    receipts: {
-      rpcChecks: "passed",
-      chainId: CHAIN_ID,
-      poolAddress: SHIELDED_ADDRESSES.shieldedErc20Pool,
-      transactions: {
-        fund: {
-          txHash: SHIELDED_TRANSACTION_RECEIPTS["shielded-action-fund"].hash,
-          blockNumber: 100,
-          blockHash: FINALIZED_BLOCK_HASH,
-          selector: FUND_SELECTOR,
-          gasUsed: "200000",
-          transactionGasLimit: "300000",
-          blockGasLimit: "30000000",
-        },
-      },
-    },
-  },
+  receiveProtocol: receiveEvidence(CHAIN_ID),
   productionParity: {
     canonicalSafeImplementationMatched: true,
     sameSafeManifestOnTestnetAndMainnet: true,
@@ -572,7 +639,7 @@ const validReportTemplate = () => ({
   terminalGovernanceState: {
     status: "passed",
     observedAfterFinality: true,
-    observedAtBlock: 106,
+    observedAtBlock: 201,
     safe: terminalSafe(GOVERNANCE_SAFE, SAFE_OWNERS, 8),
     timelock: terminalTimelock(TIMELOCK, MIN_DELAY),
     deepFamily: {
@@ -775,20 +842,14 @@ describe("schema v1 initial-mainnet-release rehearsal evidence", function () {
     expect(result.publicSummary.finality.revalidatedTransactionCount).to.equal(
       Object.keys(REPORT_TRANSACTIONS).length,
     );
-    expect(result.publicSummary.shielded).to.deep.include({
+    expect(result.publicSummary.receiveProtocol).to.deep.include({
       manifestSha256: SHIELDED_MANIFEST_SHA256,
       proofCount: Object.keys(ACCEPTANCE_CIRCUITS).length,
     });
-    expect(result.publicSummary.shielded.verifierCallActions).to.deep.equal([
-      "unshield4",
-      "sourceFact",
-      "sourceTrust",
-      "issue",
-      "code",
-      "capability",
-      "claim",
-    ]);
-    expect(result.publicSummary.shielded.transactionActions).to.have.length(4);
+    expect(result.publicSummary.receiveProtocol.verifierCallActions).to.deep.equal(Object.keys(ACCEPTANCE_CIRCUITS));
+    expect(result.publicSummary.receiveProtocol.transactionCount).to.equal(RECEIVE_TRANSACTION_SPECS.length);
+    expect(result.publicSummary.receiveProtocol.rejectionCount).to.equal(54);
+    expect(result.publicSummary.receiveProtocol.reissueCount).to.equal(3);
     expect(result.publicSummary.refund.transactionHash).to.equal(REFUND_TRANSACTION_HASH);
     expect(Object.isFrozen(result)).to.equal(true);
     expect(Object.isFrozen(result.publicSummary)).to.equal(true);
@@ -917,8 +978,9 @@ describe("schema v1 initial-mainnet-release rehearsal evidence", function () {
     report.network.name = "sepolia";
     report.network.chainId = String(sepoliaChainId);
     report.terminalGovernanceState.safe.chainId = String(sepoliaChainId);
-    report.shielded.receipts.chainId = sepoliaChainId;
-    for (const [action, proof] of Object.entries(report.shielded.proofs)) {
+    report.receiveProtocol.receipts.chainId = sepoliaChainId;
+    report.receiveProtocol.chainId = sepoliaChainId;
+    for (const [action, samples] of Object.entries(report.receiveProtocol.proofs)) for (const proof of samples) {
       proof.publicSignals[SCOPES[action]?.[0] ?? 0] = String(sepoliaChainId);
       proof.publicSignalsSha256 = createHash("sha256")
         .update(JSON.stringify(proof.publicSignals))
@@ -1529,30 +1591,30 @@ describe("schema v1 initial-mainnet-release rehearsal evidence", function () {
         (report) => (report.zkCeremonyVerification.shielded.circuitCount = 3),
         /zkCeremonyVerification.shielded.circuitCount/u,
       ],
-      [(report) => delete report.shielded.proofs.claim, /shielded.proofs/u],
+      [(report) => delete report.receiveProtocol.proofs.claim, /receiveProtocol.proofs/u],
       [
-        (report) => (report.shielded.proofs.fund.verified = false),
-        /shielded.proofs.fund.verified/u,
+        (report) => (report.receiveProtocol.proofs.fund[0].verified = false),
+        /receiveProtocol.proofs.fund.*verified/u,
       ],
       [
-        (report) => (report.shielded.proofs.shield.verifierAddress = address(999)),
-        /shielded.proofs.shield.verifierAddress/u,
+        (report) => (report.receiveProtocol.proofs.shield[0].verifierAddress = address(999)),
+        /receiveProtocol.proofs.shield.*verifierAddress/u,
       ],
       [
-        (report) => (report.shielded.proofs.sourceFact.publicSignals[3] = "11155111"),
-        /shielded.proofs.sourceFact.publicSignalsSha256/u,
+        (report) => (report.receiveProtocol.proofs.sourceFact[0].publicSignals[3] = "11155111"),
+        /receiveProtocol.proofs.sourceFact.*publicSignalsSha256/u,
       ],
       [
-        (report) => (report.shielded.proofs.claim.execution = "transaction"),
-        /shielded.proofs.claim.execution/u,
+        (report) => (report.receiveProtocol.proofs.claim[0].execution = "transaction"),
+        /transactionLabel is required/u,
       ],
       [
-        (report) => (report.shielded.scenario.appendRechecksEligibility = false),
-        /shielded.scenario.appendRechecksEligibility/u,
+        (report) => (report.receiveProtocol.checks.sameCodeAppends = false),
+        /receiveProtocol.checks.sameCodeAppends/u,
       ],
       [
-        (report) => (report.shielded.scenario.offlinePayer = false),
-        /shielded.scenario.offlinePayer/u,
+        (report) => (report.receiveProtocol.checks.offlinePayer = false),
+        /receiveProtocol.checks.offlinePayer/u,
       ],
     ];
     for (const [mutate, pattern] of cases) {
@@ -1564,14 +1626,14 @@ describe("schema v1 initial-mainnet-release rehearsal evidence", function () {
   });
   it("rejects receiving receipt and canonical immutable binding tampering", async function () {
     const cases = [
-      [(report) => (report.shielded.receipts.chainId = 11155111), /shielded.receipts.chainId/u],
+      [(report) => (report.receiveProtocol.receipts.chainId = 11155111), /receiveProtocol.receipts.chainId/u],
       [
-        (report) => (report.shielded.receipts.transactions.fund.selector = "0x12345678"),
-        /shielded fund selector/u,
+        (report) => (report.receiveProtocol.receipts.transactions["receive-native-fund"].selector = "0x12345678"),
+        /receiveProtocol receipt selector/u,
       ],
       [
-        (report) => (report.shielded.receipts.transactions.fund.gasUsed = "300001"),
-        /shielded fund exceeds/u,
+        (report) => { report.receiveProtocol.receipts.transactions["receive-native-fund"].gasUsed = "300001"; report.receiveProtocol.receipts.transactions["receive-native-fund"].transactionGasLimit = "400000"; },
+        /receiveProtocol deposit exceeds/u,
       ],
       [
         (report) =>

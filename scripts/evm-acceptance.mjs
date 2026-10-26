@@ -92,6 +92,7 @@ import { inspectProtocolProductionArtifacts } from "./lib/protocolProductionArti
 import {
   INTEGRATED_DEPLOYMENT_RECORDS,
   SHIELDED_DEPLOYMENT_CIRCUITS,
+  PROTOCOL_DEPLOYMENT_CIRCUITS,
   RECEIVE_DEPLOYMENT_CONTRACTS,
   receiveDeploymentConstructorArgs,
   receiveDeploymentLibraries,
@@ -102,7 +103,10 @@ import {
   shieldedArtifactEntries,
   shieldedDeploymentEvidence,
 } from "./lib/shieldedDeploymentEvidence.mjs";
-import { verifyShieldedReceipts } from "./lib/shieldedReceipts.mjs";
+import { prepareReceiveAcceptanceSubjects } from "./lib/receiveAcceptanceSubjects.mjs";
+import { createReceiveAcceptanceProver } from "./lib/receiveAcceptanceProver.mjs";
+import { runReceiveProtocolAcceptance } from "./lib/receiveProtocolAcceptance.mjs";
+import { requireReceiveProtocolExecutionEvidence } from "./lib/receiveProtocolEvidence.mjs";
 
 const { addPersonVersion, mintPersonVersionNFT } = seedHelpers;
 
@@ -1100,7 +1104,7 @@ export const main = async (chainProfile) => {
   const shieldedArtifacts = {
     status: "passed",
     productionReady: shieldedCandidate.manifest.productionReady,
-    manifestSha256: shieldedCandidate.candidateManifestSha256,
+    manifestSha256: shieldedCandidate.manifestSha256,
     circuits: Object.fromEntries(
       Object.entries(shieldedCandidate.manifest.circuits).map(([action, item]) => [
         action,
@@ -2510,9 +2514,80 @@ export const main = async (chainProfile) => {
         expectedSelectors: [STORY_ALREADY_SEALED_SELECTOR],
       },
     );
-    // Full protocol acceptance remains closed until current proof keys have a production ceremony.
-    inspectProtocolProductionArtifacts({ root: process.cwd() });
+    currentStep = "real-zk-receive-business";
+    const receiveSubjects = await withTimeout(
+      prepareReceiveAcceptanceSubjects({
+        deepFamily,
+        token,
+        signer: runDeployer,
+        runId: config.runId,
+        proofArtifacts: personProofArtifactPaths,
+        recordTx,
+        primary: { personData: person, result: addResult },
+        parents: { parent: father, mother },
+      }),
+      PROOF_TIMEOUT_MS * 4,
+      "Receiving family identity proofs and endorsements",
+    );
+    try {
+      const artifacts = shieldedCandidate.manifest.circuits;
+      const prover = createReceiveAcceptanceProver({ root: process.cwd(), artifacts });
+      report.receiveProtocol = await runReceiveProtocolAcceptance({
+        root: process.cwd(),
+        ethers,
+        deployed,
+        actors: {
+          manager: runDeployer,
+          endorser: runDeployer,
+          payer: runDeployer,
+          recipient: funder.address,
+        },
+        subjects: receiveSubjects.subjects,
+        artifacts,
+        prove: prover.prove,
+        recordTx,
+        waitUntil: async (timestamp) => {
+          const latest = await provider.getBlock("latest");
+          const seconds = timestamp - BigInt(latest.timestamp);
+          if (seconds <= 0n) return;
+          assertCondition(
+            seconds <= BigInt(Math.floor(Number.MAX_SAFE_INTEGER / 1_000)),
+            "Receiving maturity wait exceeds the supported duration",
+          );
+          console.log(
+            `[${CHAIN_PROFILE.id}-acceptance] waiting for chain timestamp ${timestamp} to claim the original budget`,
+          );
+          await pollUntil(
+            async () => {
+              const block = await retryBounded(() => provider.getBlock("latest"), {
+                attempts: 1,
+                timeoutMs: 30_000,
+                label: "Receiving budget maturity block",
+              });
+              return block && BigInt(block.timestamp) >= timestamp;
+            },
+            {
+              timeoutMs: Number(seconds) * 1_000 + READY_GRACE_MS,
+              intervalMs: 30_000,
+              label: `Receiving budget maturity at ${timestamp}`,
+            },
+          );
+        },
+      });
+      report.receiveProtocol.manifestSha256 = shieldedArtifacts.manifestSha256;
+      const receiveSummary = requireReceiveProtocolExecutionEvidence({
+        evidence: report.receiveProtocol,
+        addresses: report.addresses,
+        transactions: report.transactions,
+        expectedChainId: EXPECTED_CHAIN_ID,
+        fundMaxGas: shieldedCandidate.manifest.releaseCriteria.fundMaxGas,
+      });
+      await addStep("real-zk-receive-business", receiveSummary);
+    } finally {
+      receiveSubjects.dispose();
+    }
 
+    currentStep = "real-zk-business";
     await recordTx(
       "cancel-endorsement",
       await deepFamily.connect(runDeployer).cancelEndorsement(personHash),
@@ -3904,12 +3979,15 @@ export const main = async (chainProfile) => {
         report.shieldedArtifacts.productionReady === true &&
         report.protocolManifestEvidence.releaseStatus === "production",
       onchainChecksPassed: report.onchain.status === "passed",
-      shieldedCoveragePassed:
-        report.shielded?.status === "passed" &&
-        report.shielded?.receipts?.rpcChecks === "passed" &&
-        Object.keys(report.shielded?.proofs ?? {}).length ===
-          Object.keys(SHIELDED_DEPLOYMENT_CIRCUITS).length &&
-        Object.values(report.shielded?.proofs ?? {}).every((proof) => proof.verified === true),
+      receiveProtocolCoveragePassed:
+        report.receiveProtocol?.status === "passed" &&
+        report.receiveProtocol?.receipts?.rpcChecks === "passed" &&
+        Object.keys(report.receiveProtocol?.proofs ?? {}).length ===
+          Object.keys(SHIELDED_DEPLOYMENT_CIRCUITS).length +
+            Object.keys(PROTOCOL_DEPLOYMENT_CIRCUITS).length &&
+        Object.values(report.receiveProtocol?.proofs ?? {}).every(
+          (samples) => samples.length > 0 && samples.every((proof) => proof.verified === true),
+        ),
       terminalGovernanceStateMatched: report.terminalGovernanceState.status === "passed",
       deploymentDirectoryUnchanged: report.deploymentsDirectory.unchanged === true,
       allRecordedStepsPassed: report.steps.every((step) => step.status === "passed"),

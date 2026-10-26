@@ -36,7 +36,7 @@ import {
   shieldedArtifactEntries,
 } from "./shieldedDeploymentEvidence.mjs";
 import { inspectProtocolProductionArtifacts } from "./protocolProductionArtifacts.mjs";
-import { FUND_SELECTOR } from "./shieldedReceipts.mjs";
+import { requireReceiveProtocolExecutionEvidence } from "./receiveProtocolEvidence.mjs";
 
 export const TESTNET_RELEASE_REPORT_SCHEMA_VERSION = 1;
 export const TESTNET_RELEASE_EVIDENCE_TYPE = "initial-mainnet-release";
@@ -51,8 +51,8 @@ export const TESTNET_RELEASE_READINESS_GATES = Object.freeze([
   "onchainChecksPassed",
   "productionConfigurationMatched",
   "productionDeploymentPathsMatched",
+  "receiveProtocolCoveragePassed",
   "refundCompleted",
-  "shieldedCoveragePassed",
   "sourceInputsUnchanged",
   "terminalGovernanceStateMatched",
 ]);
@@ -68,7 +68,7 @@ export const TESTNET_RELEASE_REQUIRED_STEPS = Object.freeze([
   "production-build-manifest-preflight",
   "protocol-release-manifest-preflight",
   "real-zk-endorsement-nft-story",
-  "real-zk-shielded-business",
+  "real-zk-receive-business",
   "release-rehearsal-clean-source-preflight",
   "source-verified-initial-deployment",
   "terminal-governance-state-verified",
@@ -1253,7 +1253,7 @@ const requireProductionZkEvidence = (report) => {
   return zkArtifactTrust;
 };
 
-const requireShieldedAcceptanceEvidence = (report, repositoryRoot, expectedChainId, inspector) => {
+const requireReceiveProtocolAcceptanceEvidence = (report, repositoryRoot, expectedChainId, inspector) => {
   if (typeof inspector !== "function")
     throw new Error("shieldedArtifactInspector must be a function");
   const inspected = inspector({ root: repositoryRoot });
@@ -1262,7 +1262,7 @@ const requireShieldedAcceptanceEvidence = (report, repositoryRoot, expectedChain
     ...Object.fromEntries(
       Object.entries(PROTOCOL_DEPLOYMENT_CIRCUITS).map(([action, spec]) => [
         action,
-        { ...spec, verifierLabel: spec.generatedLabel },
+        { ...spec, verifierLabel: spec.adapterLabel },
       ]),
     ),
   };
@@ -1323,11 +1323,18 @@ const requireShieldedAcceptanceEvidence = (report, repositoryRoot, expectedChain
       ceremony.ptau[field],
       `zkCeremonyVerification.shielded.ptau.${field}`,
     );
-  const evidence = requireRecord(report.shielded, "shielded");
-  requireExact(evidence.status, "passed", "shielded.status");
-  requireExact(evidence.manifestSha256, inspected.manifestSha256, "shielded.manifestSha256");
-  const proofs = requireExactRecordKeys(evidence.proofs, "shielded.proofs", actions);
-  const transactions = requireRecord(report.transactions, "transactions");
+  if (Object.hasOwn(report, "shielded"))
+    throw new Error("The removed shielded business report cannot substitute for receiveProtocol evidence");
+  const evidence = requireRecord(report.receiveProtocol, "receiveProtocol");
+  requireExact(evidence.manifestSha256, inspected.manifestSha256, "receiveProtocol.manifestSha256");
+  const proofs = requireExactRecordKeys(evidence.proofs, "receiveProtocol.proofs", actions);
+  const execution = requireReceiveProtocolExecutionEvidence({
+    evidence,
+    addresses: report.addresses,
+    transactions: requireRecord(report.transactions, "transactions"),
+    expectedChainId,
+    fundMaxGas: criteria.fundMaxGas,
+  });
   const contractInputs = {
     sourceFact: [3, 4, "eligibilitySource"],
     sourceTrust: [2, 3, "eligibilitySource"],
@@ -1335,119 +1342,56 @@ const requireShieldedAcceptanceEvidence = (report, repositoryRoot, expectedChain
     code: [3, 4, "receiveRegistry"],
     capability: [5, 6, "receiveRegistry"],
   };
-  for (const [action, proof] of Object.entries(proofs)) {
-    const spec = specs[action],
-      item = inspected.manifest.circuits[action],
-      label = `shielded.proofs.${action}`;
-    requireExact(proof.source, spec.source, `${label}.source`);
-    requireExact(proof.verified, true, `${label}.verified`);
-    requireSameAddress(
-      proof.verifierAddress,
-      report.addresses[spec.verifierLabel],
-      `${label}.verifierAddress`,
-    );
-    for (const field of ["wasmSha256", "zkeySha256", "verificationKeySha256"])
-      requireExact(
-        requireSha256(proof[field], `${label}.${field}`),
-        item[field],
-        `${label}.${field}`,
-      );
-    requireSha256(proof.proofSha256, `${label}.proofSha256`);
-    const signals = proof.publicSignals;
-    if (
-      !Array.isArray(signals) ||
-      signals.length !== spec.publicSignals ||
-      signals.some((x) => typeof x !== "string" || !/^(?:0|[1-9][0-9]*)$/u.test(x))
-    )
-      throw new Error(`${label}.publicSignals must contain canonical decimal signals`);
-    requireExact(
-      proof.publicSignalsSha256,
-      createHash("sha256").update(JSON.stringify(signals)).digest("hex"),
-      `${label}.publicSignalsSha256`,
-    );
-    const [chainIndex, scopeIndex, scope] = contractInputs[action] ?? [0, 1, "shieldedErc20Pool"];
-    requireExact(signals[chainIndex], String(expectedChainId), `${label} chain ID`);
-    requireSameAddress(
-      `0x${BigInt(signals[scopeIndex]).toString(16).padStart(40, "0")}`,
-      report.addresses[scope],
-      `${label} contract`,
-    );
-    const executed = ["shield", "fund", "transfer", "unshield"].includes(action);
-    requireExact(proof.execution, executed ? "transaction" : "verifier-call", `${label}.execution`);
-    if (executed) {
-      requireExact(
-        proof.transactionLabel,
-        `shielded-action-${action}`,
-        `${label}.transactionLabel`,
-      );
-      requireExact(
-        requireRecord(
-          transactions[proof.transactionLabel],
-          `transactions.${proof.transactionLabel}`,
-        ).status,
-        1,
-        `transactions.${proof.transactionLabel}.status`,
-      );
-    } else if (Object.hasOwn(proof, "transactionLabel"))
-      throw new Error(`${label} verifier-call must not claim a pool transaction`);
+  let proofSampleCount = 0;
+  const verifierCallActions = [];
+  for (const [action, samples] of Object.entries(proofs)) {
+    if (!Array.isArray(samples) || samples.length === 0)
+      throw new Error(`receiveProtocol.proofs.${action} must contain actual verified proof samples`);
+    const spec = specs[action], item = inspected.manifest.circuits[action];
+    const executedHashes = Object.values(evidence.receipts.transactions)
+      .flatMap((observation) => observation.proofHashes?.[action] ?? []);
+    let usedInTransaction = false;
+    for (const [index, proof] of samples.entries()) {
+      proofSampleCount++;
+      const label = `receiveProtocol.proofs.${action}[${index}]`;
+      requireExact(proof.source, spec.source, `${label}.source`);
+      requireExact(proof.verified, true, `${label}.verified`);
+      requireSameAddress(proof.verifierAddress, report.addresses[spec.verifierLabel], `${label}.verifierAddress`);
+      for (const field of ["wasmSha256", "zkeySha256", "verificationKeySha256"])
+        requireExact(requireSha256(proof[field], `${label}.${field}`), item[field], `${label}.${field}`);
+      requireSha256(proof.proofSha256, `${label}.proofSha256`);
+      const signals = proof.publicSignals;
+      if (!Array.isArray(signals) || signals.length !== spec.publicSignals ||
+          signals.some((value) => typeof value !== "string" || !/^(?:0|[1-9][0-9]*)$/u.test(value)))
+        throw new Error(`${label}.publicSignals must contain canonical decimal signals`);
+      requireExact(proof.publicSignalsSha256, createHash("sha256").update(JSON.stringify(signals)).digest("hex"), `${label}.publicSignalsSha256`);
+      const [chainIndex, scopeIndex, scope] = contractInputs[action] ?? [0, 1, null];
+      requireExact(signals[chainIndex], String(expectedChainId), `${label} chain ID`);
+      const poolAddress = proof.asset === "native" ? report.addresses.shieldedNativePool : report.addresses.shieldedErc20Pool;
+      if (scope === null) {
+        if (!["native", "erc20"].includes(proof.asset)) throw new Error(`${label}.asset must select native or erc20`);
+        requireSameAddress(proof.poolAddress, poolAddress, `${label}.poolAddress`);
+      }
+      requireSameAddress(`0x${BigInt(signals[scopeIndex]).toString(16).padStart(40, "0")}`, scope === null ? poolAddress : report.addresses[scope], `${label} contract`);
+      if (!["transaction", "verifier-call"].includes(proof.execution)) throw new Error(`${label}.execution must be an actual transaction or verifier-call`);
+      if (proof.execution === "verifier-call" && !verifierCallActions.includes(action)) verifierCallActions.push(action);
+      const transactionLabel = proof.transactionLabel ?? proof.usedInTransactionLabel;
+      if (proof.execution === "transaction" && transactionLabel === undefined) throw new Error(`${label}.transactionLabel is required`);
+      if (transactionLabel !== undefined) {
+        const observation = evidence.receipts.transactions[transactionLabel];
+        if (observation?.proofHashes?.[action] !== proof.proofSha256) throw new Error(`${label} is not bound to its executed transaction proof`);
+      }
+      if (executedHashes.includes(proof.proofSha256)) usedInTransaction = true;
+    }
+    if (!usedInTransaction) throw new Error(`receiveProtocol.proofs.${action} has no matching executed transaction proof`);
   }
-  const scenario = requireExactRecordKeys(evidence.scenario, "shielded.scenario", [
-    "offlinePayer",
-    "latestRoleChecks",
-    "appendRechecksEligibility",
-    "claimsRecheckEligibility",
-    "sameCodeAppends",
-    "crossCodeIndependent",
-    "notesRecovered",
-    "nativeAndToken",
-  ]);
-  for (const [field, value] of Object.entries(scenario))
-    requireExact(value, true, `shielded.scenario.${field}`);
-  const receipts = requireRecord(evidence.receipts, "shielded.receipts");
-  requireExact(receipts.rpcChecks, "passed", "shielded.receipts.rpcChecks");
-  requireExact(receipts.chainId, expectedChainId, "shielded.receipts.chainId");
-  requireSameAddress(
-    receipts.poolAddress,
-    report.addresses.shieldedErc20Pool,
-    "shielded.receipts.poolAddress",
-  );
-  const observation = requireExactRecordKeys(
-    receipts.transactions,
-    "shielded.receipts.transactions",
-    ["fund"],
-  ).fund;
-  const recorded = transactions["shielded-action-fund"];
-  requireExact(
-    requireHash32(observation.txHash, "shielded fund transaction hash"),
-    recorded.hash,
-    "shielded fund transaction hash",
-  );
-  requireExact(observation.blockNumber, recorded.blockNumber, "shielded fund block number");
-  requireExact(observation.blockHash, recorded.blockHash, "shielded fund block hash");
-  requireExact(observation.selector, FUND_SELECTOR, "shielded fund selector");
-  const gas = requireSafeInteger(observation.gasUsed, "shielded fund gasUsed", 1);
-  if (gas > criteria.fundMaxGas) {
-    throw new Error("shielded fund exceeds the committed production gas threshold");
-  }
-  const limit = requireSafeInteger(
-    observation.transactionGasLimit,
-    "shielded fund transactionGasLimit",
-    1,
-  );
-  const blockLimit = requireSafeInteger(
-    observation.blockGasLimit,
-    "shielded fund blockGasLimit",
-    1,
-  );
-  if (gas > limit || limit > blockLimit)
-    throw new Error("shielded fund gas exceeds transaction or block limit");
-  if (recorded.gasUsed !== undefined)
-    requireExact(String(observation.gasUsed), String(recorded.gasUsed), "shielded fund gasUsed");
   return {
     manifestSha256: inspected.manifestSha256,
     proofCount: actions.length,
-    transactionActions: actions.filter((action) => proofs[action].execution === "transaction"),
-    verifierCallActions: actions.filter((action) => proofs[action].execution === "verifier-call"),
+    proofSampleCount,
+    transactionActions: [...new Set(Object.values(evidence.receipts.transactions).map((item) => item.action))],
+    verifierCallActions,
+    ...execution,
   };
 };
 
@@ -1575,7 +1519,7 @@ export const validateTestnetReleaseEvidence = async ({
     protocolManifestInspector,
   );
   const zkArtifactTrust = requireProductionZkEvidence(report);
-  const shielded = requireShieldedAcceptanceEvidence(
+  const receiveProtocol = requireReceiveProtocolAcceptanceEvidence(
     report,
     repositoryRoot,
     expectedChainId,
@@ -1669,7 +1613,7 @@ export const validateTestnetReleaseEvidence = async ({
       minimumContributors: zkArtifactTrust.minimumContributors,
       productionReady: zkArtifactTrust.productionReady,
     },
-    shielded,
+    receiveProtocol,
     protocolManifest: {
       sha256: protocolManifest.evidence.sha256,
       protocol: protocolManifest.evidence.protocol,

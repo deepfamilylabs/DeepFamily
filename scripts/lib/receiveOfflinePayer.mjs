@@ -6,7 +6,8 @@ import { fileURLToPath } from "node:url";
 import assert from "node:assert/strict";
 import { AbiCoder, hexlify } from "ethers";
 import { prepareBudgetDeposit, prepareTransfer } from "../../packages/protocol-core/budget.js";
-import { proveProtocol, verifyProtocol } from "../../scripts/protocol-zk-development.mjs";
+import { createReceiveAcceptanceProver } from "./receiveAcceptanceProver.mjs";
+import { localReceiveAcceptanceArtifacts } from "./receiveProtocolAcceptance.mjs";
 
 const serialize = (value) =>
   JSON.stringify(value, (_, item) =>
@@ -36,6 +37,9 @@ async function main() {
       "familySalt",
     ])
       assert.equal(Object.hasOwn(input, forbidden), false, `Payer received ${forbidden}`);
+    const artifacts = input.artifacts ?? localReceiveAcceptanceArtifacts();
+    const { prove, verify } = createReceiveAcceptanceProver({ artifacts });
+    delete input.artifacts;
     const circuit = input.operation === "transfer" ? "transfer" : "fund";
     let witnessFields;
     const provePayment = async (witness) => {
@@ -51,14 +55,14 @@ async function main() {
         "familySalt",
       ])
         assert.equal(Object.hasOwn(witness, forbidden), false, `Payer proof needs ${forbidden}`);
-      return proveProtocol({ circuit, witness });
+      return prove({ circuit, witness });
     };
     const shared = {
       ...input,
       verifyAuthorization: (proof, publicSignals) =>
-        verifyProtocol({ circuit: "code", proof, publicSignals }),
+        verify({ circuit: "code", proof, publicSignals: publicSignals.map(String) }),
       verifyCapability: (proof, publicSignals) =>
-        verifyProtocol({ circuit: "capability", proof, publicSignals }),
+        verify({ circuit: "capability", proof, publicSignals: publicSignals.map(String) }),
     };
     const result =
       input.operation === "transfer"

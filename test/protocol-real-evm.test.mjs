@@ -46,6 +46,9 @@ import {
   sourceTrustFixture,
 } from "../circuits/test/eligibility_source_fixture.mjs";
 import { deployIntegratedFixture } from "./fixtures/integrated.mjs";
+import { runReceiveProtocolAcceptance } from "../scripts/lib/receiveProtocolAcceptance.mjs";
+import { prepareReceiveAcceptanceSubjects } from "../scripts/lib/receiveAcceptanceSubjects.mjs";
+import { requireReceiveProtocolExecutionEvidence } from "../scripts/lib/receiveProtocolEvidence.mjs";
 import {
   addPerson,
   buildPersonCommitmentCircuitInput,
@@ -126,7 +129,7 @@ async function noteMembership(pool, leafIndex, depth = 32) {
 }
 function offlinePayer(input) {
   return JSON.parse(
-    execFileSync(process.execPath, [path.join(ROOT, "test/helpers/offline-payer.mjs")], {
+    execFileSync(process.execPath, [path.join(ROOT, "scripts/lib/receiveOfflinePayer.mjs")], {
       cwd: ROOT,
       input: serialize(input),
       encoding: "utf8",
@@ -142,6 +145,56 @@ describe("Receive protocol actual Groth16 / EVM / HPKE acceptance", function () 
   after(async () => {
     await globalThis.curve_bn128?.terminate?.();
     delete globalThis.curve_bn128;
+  });
+
+  realTest("runs the shared acceptance on real identities, current roles and canonical native/ERC20 pools", async function () {
+    const deployed = await hre.networkHelpers.loadFixture(deployIntegratedFixture);
+    const [signer, recipient] = await hre.ethers.getSigners();
+    const transactions = {};
+    const recordTx = async (label, tx) => {
+      const receipt = await tx.wait();
+      transactions[label] = { hash: receipt.hash, status: receipt.status, blockNumber: receipt.blockNumber, blockHash: receipt.blockHash, gasUsed: String(receipt.gasUsed) };
+      console.log(`[receive-acceptance] ${label}`);
+      return receipt;
+    };
+    const prepared = await prepareReceiveAcceptanceSubjects({
+      deepFamily: deployed.deepFamily,
+      token: deployed.token,
+      signer,
+      runId: "shared-real-evm-acceptance",
+      recordTx,
+    });
+    try {
+      const report = await runReceiveProtocolAcceptance({
+        ethers: hre.ethers,
+        deployed,
+        actors: { manager: signer, endorser: signer, payer: signer, recipient },
+        subjects: prepared.subjects,
+        recordTx,
+        waitUntil: async (timestamp) => {
+          const current = BigInt((await hre.ethers.provider.getBlock("latest")).timestamp);
+          if (timestamp > current) await hre.networkHelpers.time.increaseTo(timestamp);
+        },
+      });
+      const execution = requireReceiveProtocolExecutionEvidence({
+        evidence: report,
+        addresses: report.addresses,
+        transactions,
+        expectedChainId: (await hre.ethers.provider.getNetwork()).chainId,
+        fundMaxGas: 15_000_000n,
+      });
+      assert.equal(execution.rejectionCount, 54);
+      assert.equal(report.status, "passed");
+      assert.equal(Object.keys(report.proofs).length, 11);
+      assert.equal(report.roleRevocations.length, 3);
+      assert.ok(report.roleRevocations.every((entry) => entry.rejections.length === 18));
+      assert.equal(report.reissues.length, 3);
+      assert.equal(report.receipts.rpcChecks, "passed");
+      fs.mkdirSync(path.join(ROOT, "tmp"), { recursive: true });
+      fs.writeFileSync(path.join(ROOT, "tmp/receive-shared-acceptance.json"), JSON.stringify(report, null, 2));
+    } finally {
+      prepared.dispose();
+    }
   });
 
   realTest(

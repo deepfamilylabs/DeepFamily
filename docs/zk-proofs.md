@@ -365,7 +365,7 @@ zk:setup` compiles the full graph, verifies and reuses matching identity/disclos
 regenerates development keys for the eight receiving and three boundary relations. It updates their
 development manifests, vkeys and Solidity verifiers; local contracts and frontend pins must be
 synchronized with that bundle. `npm run zk:check -- --artifacts-only` checks all 13 artifact sets
-without regeneration. After local deployment, `npm run zk:frontend -- <chainId> <registry>`
+without regeneration. After local deployment, `npm run frontend:config`
 synchronizes boundary aliases and exports a chain/registry-bound frontend bundle. `zk:setup --
 --circuit protocol:code` or `--circuit shielded:unshield4` selects a current relation, and `--ptau
 <path>` selects the local Phase 1 file. Focused generation still ends with a check of the complete
@@ -376,6 +376,14 @@ generates all eight receiving proofs and rejects changes to every public coordin
 test/protocol-real-evm.test.mjs` combines real proofs with actual lineage state, native/ERC20 money,
 offline-payer proof generation, HPKE recovery, deposits, contributions, claims, withdrawals, letters
 and revocation.
+
+The EVM suite and chain acceptance execute the same `runReceiveProtocolAcceptance` function.
+Its subjects are registered with actual PersonRelation proofs, its asset pools use the deployed
+native asset and DEEP token, and its three-role revocation/reissuance sequence never restores a
+snapshot. After reissuance, a current qualification claims the original budget with its original
+eligibility clock. The report records all 11 receiving/boundary proof types and independently
+checks canonical transactions, emitted effects and the two-code rejection matrix at recorded
+blocks. The suite also retains the existing local snapshot-based attack regressions.
 
 The development bundle has been regenerated and passes `zk:check -- --artifacts-only` for all 13
 relations. This verifies artifact integrity; `zk:check` validates real proofs, and `npm test --

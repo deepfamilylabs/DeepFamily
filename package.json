@@ -61,8 +61,7 @@
     "zk:assets:publish": "node scripts/publish-zk-assets.mjs",
     "zk:build": "node scripts/zk-build.mjs",
     "zk:setup": "node scripts/zk-setup.mjs",
-    "zk:check": "node scripts/zk-check.mjs",
-    "zk:frontend": "node scripts/export-protocol-frontend.mjs"
+    "zk:check": "node scripts/zk-check.mjs"
   },
   "keywords": [
     "blockchain",

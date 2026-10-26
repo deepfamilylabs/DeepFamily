@@ -1,6 +1,5 @@
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import {
   PROTOCOL_CIRCUITS,
   protocolArtifactPaths,
@@ -60,15 +59,4 @@ export function exportProtocolFrontendArtifacts({
   const configFile = path.join(root, "frontend/src/proof-artifacts.local.json");
   if (writeConfig) fs.writeFileSync(configFile, `${JSON.stringify(manifest, null, 2)}\n`);
   return { manifest, configFile: writeConfig ? configFile : null };
-}
-
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  const [chainId, registryAddress] = process.argv.slice(2);
-  try {
-    const result = exportProtocolFrontendArtifacts({ chainId, registryAddress });
-    console.log(`[proof-artifacts] Trusted configuration written: ${result.configFile}`);
-  } catch (error) {
-    console.error(error.message);
-    process.exitCode = 1;
-  }
 }

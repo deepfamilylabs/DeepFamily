@@ -1285,7 +1285,7 @@ Neither strategy replaces the current role status check performed by the contrac
 Explicit `zk:setup` compiles all 13 relations, reuses matching identity/disclosure keys and rotates
 the eight receiving plus three boundary development key sets. Their manifests, vkeys, generated
 verifiers, local deployments and frontend pins must be updated together. After local deployment,
-`zk:frontend` synchronizes the frontend pins and boundary aliases. The regenerated development
+`frontend:config` synchronizes the frontend pins and boundary aliases. The regenerated development
 bundle passes `zk:check -- --artifacts-only` for all 13 relations. `zk:check` validates real proofs;
 `npm test -- test/protocol-real-evm.test.mjs` validates EVM execution.
 

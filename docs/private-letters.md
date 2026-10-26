@@ -30,7 +30,7 @@ The single deployment uses 13 relations: two identity/disclosure, three asset bo
 
 Run `npm run zk:setup` for local development keys, `npm run zk:check -- --artifacts-only` to check
 them, and `npm run zk:check -- --circuit protocol` / `npm test -- test/protocol-real-evm.test.mjs`
-for real-proof checks. `npm run zk:frontend -- <chainId> <registry>` exports trusted frontend
+for real-proof checks. `npm run frontend:config` exports trusted frontend
 artifacts and a local build configuration. A scanned code cannot choose proof keys or replace that
 configuration.
 

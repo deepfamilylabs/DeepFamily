@@ -44,7 +44,7 @@ selected development set; its final check still requires the complete bundle. `-
 selects an explicit local Phase 1 file for development generation.
 
 After key rotation, redeploy local contracts and synchronize trusted frontend pins for that
-registry with `npm run zk:frontend -- <chainId> <registry>`. The export includes the three boundary
+registry with `npm run frontend:config`. The export includes the three boundary
 aliases under `/zk/protocol/`. The development export accepts only local chain IDs. Codes cannot
 select their own verifier, key or artifact host.
 

@@ -147,6 +147,12 @@ npm run frontend:check # Run frontend lint + typecheck + tests
 npm run check          # Run circuit constraints, frontend checks and contract lint/build/test
 ```
 
+The real EVM suite and chain acceptance share `scripts/lib/receiveProtocolAcceptance.mjs`.
+It executes Source/Q issuance, native/ERC20 budgets, all three role revocations and same-family
+reissuance without reverting chain state. The `receiveProtocol` report binds proofs to actual
+transaction calldata, canonical receipts and replayed rejection calls. Claims use the chain's
+maturity clock: local tests advance their node, while chain acceptance waits for the timestamp.
+
 Run revocation status and gas regressions with `npm test -- test/receive-revocation-gas.test.mjs`.
 The default histories contain 0 and 9 revocations per role. Set
 `RECEIVE_REVOCATION_GAS_COUNTS=0,32,64,128,256` to measure larger histories and
@@ -169,7 +175,6 @@ The protocol uses 13 Circom relations: two identity/disclosure, three money boun
 | `npm run zk:setup`                            | Compile all relations, regenerate 11 key sets and reuse identity/disclosure keys |
 | `npm run zk:check -- --artifacts-only`        | Verify all 13 artifact sets without replacing keys                               |
 | `npm run zk:check`                            | Rebuild all relations and check pinned artifacts and real proofs                 |
-| `npm run zk:frontend -- <chainId> <registry>` | Export trusted frontend receiving artifacts                                      |
 | `npm run test:circuits`                       | Check current circuit constraints without proving keys                           |
 | `npm run zk:check -- --circuit protocol`      | Verify eight receiving proofs and public-signal binding                          |
 | `npm run acceptance -- --browser`             | Run browser acceptance with three wallets and real qualification/funding proofs  |
@@ -180,7 +185,7 @@ Local development keys are not approved production keys. Public deployment and r
 `zk:setup` is the single key-generation entry point: it compiles all 13 relations, verifies and
 reuses existing matching identity/disclosure keys, and generates new keys for the eight receiving
 and three boundary relations. It updates their development manifests, vkeys and Solidity verifiers;
-redeploy local contracts and run `zk:frontend` to synchronize pins and boundary aliases after
+redeploy local contracts and run `frontend:config` to synchronize pins and boundary aliases after
 rotation. Generation does not approve a production ceremony or promote its artifacts.
 `zk:check -- --artifacts-only` checks all 13 sets without regeneration. Use
 `npm run zk:setup -- --circuit protocol:code` or `--circuit shielded:unshield4` to rotate a selected
@@ -217,7 +222,7 @@ three asset boundaries into `zk-artifacts/shielded`, and the eight receiving rel
 `zk-artifacts/protocol`. Compilation does not replace proving keys.
 
 The receiving development manifest is `circuits/receive-development-manifest.json`.
-`zk:frontend` exports its verified browser files and the three boundary artifact sets into
+`frontend:config` exports its verified browser files and the three boundary artifact sets into
 `frontend/public/zk/protocol`, with trusted chain/registry pins in
 `frontend/src/proof-artifacts.local.json`. Identity/disclosure files remain under
 `frontend/public/zk/`. Remote builds fetch WASM/zkey from the configured

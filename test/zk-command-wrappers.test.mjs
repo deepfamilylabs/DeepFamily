@@ -19,7 +19,7 @@ const compilerInspector = async () => ({ path: path.join(root, "bin/circom") });
 describe("current proving command surface", function () {
   it("exposes one business-named command for every local workflow", function () {
     const { scripts } = JSON.parse(fs.readFileSync("package.json", "utf8"));
-    for (const name of ["zk:build", "zk:setup", "zk:check", "zk:frontend"])
+    for (const name of ["zk:build", "zk:setup", "zk:check"])
       assert.equal(typeof scripts[name], "string", name);
     assert.equal(
       Object.keys(scripts).some((name) => /anon|v2/iu.test(name)),

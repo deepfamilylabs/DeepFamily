@@ -291,7 +291,8 @@ function issueCommitment(w: Record<string, bigint>) {
 const readBackup = (backup: Uint8Array) => decryptWalletBackup({ backup, rawPassphrase: password });
 
 describe("qualification wallet lifecycle and secret ownership", () => {
-  it("persists controller drafts before publication and restores source/Q confirmations from canonical state without rebroadcast", async () => {
+  // This lifecycle performs repeated real Argon2id backup/restore operations across two wallets.
+  it("persists controller drafts before publication and restores source/Q confirmations from canonical state without rebroadcast", { timeout: 30_000 }, async () => {
     const { call, publishSource, publishIssue, roles } = setup();
     let controller = new WalletSession(),
       recipient = new WalletSession();

@@ -402,7 +402,7 @@ Translations live under `frontend/src/locales/`.
 
 ## ZK Artifacts
 
-The application uses 13 canonical Circom relations. Receiving artifacts are exported into `frontend/public/zk/protocol`; the build trusts the digest-bound `frontend/src/proof-artifacts.local.json` configuration. Local export is `npm run zk:frontend -- <chainId> <registry>`. Browser proof generation uses WASM, zkey and verification-key JSON, never a code-supplied key or R1CS download.
+The application uses 13 canonical Circom relations. Receiving artifacts are exported into `frontend/public/zk/protocol`; the build trusts the digest-bound `frontend/src/proof-artifacts.local.json` configuration. Local export runs as part of `npm run frontend:config`. Browser proof generation uses WASM, zkey and verification-key JSON, never a code-supplied key or R1CS download.
 
 Identity/disclosure assets retain their manifest-pinned `/zk/` loading flow. Boundary relations use Shield, Unshield and four-input Unshield; other funds operations use the fixed receiving relations. There are no presentation-link keys or alternative receive-code issuers. Development artifacts are local-only; production proof-ceremony evidence is still required before public release.
 
@@ -415,7 +415,7 @@ deploying the frontend. Empty-host local development uses same-origin artifact f
 `zk:build` compiles all 13 relations without changing keys. Explicit `zk:setup` compiles the same
 graph, checks and reuses matching identity/disclosure keys, then regenerates the eight receiving
 and three boundary development key sets with updated manifests, vkeys and Solidity verifiers.
-Redeploy local contracts and rerun `zk:frontend` for the matching registry after rotation;
+Redeploy local contracts and rerun `frontend:config` for the matching registry after rotation;
 the export also synchronizes boundary aliases under `/zk/protocol/`. The regenerated development
 bundle passes `zk:check -- --artifacts-only` for all 13 sets. `zk:check` validates real proofs;
 `npm test -- test/protocol-real-evm.test.mjs` validates EVM execution. `zk:setup` is the single
