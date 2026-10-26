@@ -275,12 +275,9 @@ export async function discoverShieldedFactoryPools(
       try {
         const kind = item.assetAddress === ZeroAddress ? "native" : "erc20";
         const resolved = await bounded(
-          resolveShieldedAssetPool(
-            factory,
-            { address: item.assetAddress, kind },
-            provider,
-            { blockTag: toBlock },
-          ),
+          resolveShieldedAssetPool(factory, { address: item.assetAddress, kind }, provider, {
+            blockTag: toBlock,
+          }),
         );
         if (
           !resolved ||

@@ -12,7 +12,8 @@ const dialogFocusableSelector = [
 function getDialogFocusableElements(container: HTMLElement | null): HTMLElement[] {
   if (!container) return [];
   return Array.from(container.querySelectorAll<HTMLElement>(dialogFocusableSelector)).filter(
-    (element) => !element.hasAttribute("disabled") && element.getAttribute("aria-hidden") !== "true",
+    (element) =>
+      !element.hasAttribute("disabled") && element.getAttribute("aria-hidden") !== "true",
   );
 }
 
@@ -109,14 +110,7 @@ export function useDialogA11y<T extends HTMLElement = HTMLDivElement>({
       }
       previousFocusRef.current = null;
     };
-  }, [
-    focusOnOpen,
-    open,
-    preventDefaultOnEscape,
-    restoreFocus,
-    stopPropagationOnEscape,
-    trapFocus,
-  ]);
+  }, [focusOnOpen, open, preventDefaultOnEscape, restoreFocus, stopPropagationOnEscape, trapFocus]);
 
   return dialogRef;
 }

@@ -117,19 +117,19 @@ export function ParentIdentitySection({
           "addVersion.parentVersionNeedsIdentity",
           "Enter the parent's name to look up their on-chain versions. Leave the identity passphrase empty if there is none.",
         )
-        : versionLookup.status === "loading"
-          ? t("addVersion.parentVersionLoading", "Looking up on-chain versions...")
-          : versionLookup.status === "error"
+      : versionLookup.status === "loading"
+        ? t("addVersion.parentVersionLoading", "Looking up on-chain versions...")
+        : versionLookup.status === "error"
+          ? t(
+              "addVersion.parentVersionLookupFailed",
+              "Version lookup failed. You can still submit with the version left unknown (0).",
+            )
+          : versionLookup.totalVersions === 0
             ? t(
-                "addVersion.parentVersionLookupFailed",
-                "Version lookup failed. You can still submit with the version left unknown (0).",
+                "addVersion.parentVersionNone",
+                "This hash has no on-chain version yet, so it will be submitted as unknown (0). If you expected a match, check the identity passphrase.",
               )
-            : versionLookup.totalVersions === 0
-              ? t(
-                  "addVersion.parentVersionNone",
-                  "This hash has no on-chain version yet, so it will be submitted as unknown (0). If you expected a match, check the identity passphrase.",
-                )
-              : undefined;
+            : undefined;
 
   return (
     <div className="space-y-2">

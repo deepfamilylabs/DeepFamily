@@ -87,10 +87,7 @@ export async function exportPaperGenealogyPdf(
   if (!spreads.length) throw new NoPaperSpreadsError();
 
   // Lazy-load the heavy export libs so they are code-split out of the main bundle.
-  const [{ toPng }, { jsPDF }] = await Promise.all([
-    import("html-to-image"),
-    import("jspdf"),
-  ]);
+  const [{ toPng }, { jsPDF }] = await Promise.all([import("html-to-image"), import("jspdf")]);
 
   const capture = async () => {
     const firstSize = getSpreadPageSize(spreads[0]);

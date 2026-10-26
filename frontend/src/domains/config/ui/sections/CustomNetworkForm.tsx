@@ -77,7 +77,10 @@ export default function CustomNetworkForm({
       </div>
 
       {error ? (
-        <p role="alert" className="rounded-lg border border-danger/30 bg-danger/10 px-2.5 py-1.5 text-[11px] font-medium text-danger">
+        <p
+          role="alert"
+          className="rounded-lg border border-danger/30 bg-danger/10 px-2.5 py-1.5 text-[11px] font-medium text-danger"
+        >
           {error}
         </p>
       ) : null}

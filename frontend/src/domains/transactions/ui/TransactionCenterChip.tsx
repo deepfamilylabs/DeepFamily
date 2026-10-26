@@ -154,7 +154,8 @@ function TransactionRow({ record }: { record: TransactionRecord }) {
             </div>
           ) : null}
           {/* A failure that reached the chain still has to be readable here. */}
-          {record.phase === "failed" && record.error?.details &&
+          {record.phase === "failed" &&
+          record.error?.details &&
           record.error.details !== record.error.message ? (
             <details className="mt-1">
               <summary className="cursor-pointer text-[11px] text-ink-muted">

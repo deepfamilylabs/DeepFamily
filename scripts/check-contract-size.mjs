@@ -1,6 +1,9 @@
 import fs from "node:fs/promises";
 import path from "node:path";
-import { SHIELDED_DEPLOYMENT_CIRCUITS, RECEIVE_DEPLOYMENT_CONTRACTS } from "./lib/zkDeploymentCatalog.mjs";
+import {
+  SHIELDED_DEPLOYMENT_CIRCUITS,
+  RECEIVE_DEPLOYMENT_CONTRACTS,
+} from "./lib/zkDeploymentCatalog.mjs";
 import { PROTOCOL_CIRCUITS } from "./lib/protocolCircuitCatalog.mjs";
 
 // Keep the stricter Ethereum EIP-170 ceiling so one artifact remains deployable on every
@@ -9,10 +12,19 @@ const CROSS_CHAIN_MAX_DEPLOYED_BYTES = 24_576;
 const MAX_SEGMENT_RUNTIME_BYTES = 16_385;
 const MAX_MANIFEST_RUNTIME_BYTES = 20_566;
 const ARTIFACTS = [
-  ...["FixedGroth16Verifier"].map(name => [name, `artifacts/contracts/${name}.sol/${name}.json`]),
-  ["ShieldedBoundaryVerifierAdapter", "artifacts/contracts/adapters/ShieldedBoundaryVerifierAdapter.sol/ShieldedBoundaryVerifierAdapter.json"],
-  ...Object.values(PROTOCOL_CIRCUITS).map(({contract}) => [contract, `artifacts/contracts/generated/protocol/${contract}.sol/${contract}.json`]),
-  ...RECEIVE_DEPLOYMENT_CONTRACTS.map(({contractName}) => [contractName, `artifacts/contracts/${contractName}.sol/${contractName}.json`]),
+  ...["FixedGroth16Verifier"].map((name) => [name, `artifacts/contracts/${name}.sol/${name}.json`]),
+  [
+    "ShieldedBoundaryVerifierAdapter",
+    "artifacts/contracts/adapters/ShieldedBoundaryVerifierAdapter.sol/ShieldedBoundaryVerifierAdapter.json",
+  ],
+  ...Object.values(PROTOCOL_CIRCUITS).map(({ contract }) => [
+    contract,
+    `artifacts/contracts/generated/protocol/${contract}.sol/${contract}.json`,
+  ]),
+  ...RECEIVE_DEPLOYMENT_CONTRACTS.map(({ contractName }) => [
+    contractName,
+    `artifacts/contracts/${contractName}.sol/${contractName}.json`,
+  ]),
   ...Object.values(SHIELDED_DEPLOYMENT_CIRCUITS).map(({ verifierContractName }) => [
     verifierContractName,
     `artifacts/contracts/${verifierContractName}.sol/${verifierContractName}.json`,

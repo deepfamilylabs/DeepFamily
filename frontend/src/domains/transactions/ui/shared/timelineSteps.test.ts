@@ -22,13 +22,23 @@ describe("timeline step derivation", () => {
   it.each([
     ["mint", mintTimelineStep],
     ["addVersion", addVersionTimelineStep],
-  ])("only lets %s reach the final step once the flow says the transaction is away", (_name, derive) => {
-    // Every signal short of the flow's own `confirming` must stop short of it.
-    for (const proofStep of ["", "preparing", "generating", "verifying", "encrypting", "handoff"]) {
-      expect(derive({ ...idle, proofStep, isBusy: true })).not.toBe("confirm");
-    }
-    expect(derive({ ...idle, isBusy: true, status: "confirming" })).toBe("confirm");
-  });
+  ])(
+    "only lets %s reach the final step once the flow says the transaction is away",
+    (_name, derive) => {
+      // Every signal short of the flow's own `confirming` must stop short of it.
+      for (const proofStep of [
+        "",
+        "preparing",
+        "generating",
+        "verifying",
+        "encrypting",
+        "handoff",
+      ]) {
+        expect(derive({ ...idle, proofStep, isBusy: true })).not.toBe("confirm");
+      }
+      expect(derive({ ...idle, isBusy: true, status: "confirming" })).toBe("confirm");
+    },
+  );
 
   it("holds adding a version at the review step while the package is handed off", () => {
     // The handoff precedes the gas estimate and the preview; reading it as

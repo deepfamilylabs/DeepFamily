@@ -39,7 +39,10 @@ export function PersonRecordCard({ person }: { person: PersonPageController }) {
       <dl className="flex flex-col gap-2">
         <RecordRow label={t("person.tokenId", "Token ID")} value={`#${data.tokenId}`} />
         {data.versionIndex !== undefined && data.versionIndex > 0 && (
-          <RecordRow label={t("person.versionLabel", "Version Index")} value={`${data.versionIndex}`} />
+          <RecordRow
+            label={t("person.versionLabel", "Version Index")}
+            value={`${data.versionIndex}`}
+          />
         )}
         {meta && (
           <>
@@ -53,7 +56,9 @@ export function PersonRecordCard({ person }: { person: PersonPageController }) {
             />
             <RecordRow
               label={t("person.lastUpdate", "Last Update")}
-              value={meta.lastUpdateTime ? formatUnixSeconds(meta.lastUpdateTime) : t("common.na", "N/A")}
+              value={
+                meta.lastUpdateTime ? formatUnixSeconds(meta.lastUpdateTime) : t("common.na", "N/A")
+              }
             />
           </>
         )}
@@ -167,7 +172,8 @@ export function PersonMobileRecord({ person }: { person: PersonPageController })
         <span className="grow" />
         <span className="truncate font-mono text-[11.5px] text-ink-subtle">
           #{data.tokenId}
-          {records !== null && ` · ${t("person.recordsCount", "{{count}} records", { count: records })}`}
+          {records !== null &&
+            ` · ${t("person.recordsCount", "{{count}} records", { count: records })}`}
         </span>
         <ChevronDown
           size={16}
@@ -202,7 +208,9 @@ function ActionRow({
       onClick={onClick}
       className="group flex h-12 w-full items-center gap-3 rounded-xl pl-2 pr-3 text-left transition-colors hover:bg-surface-alt focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary/30"
     >
-      <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] ${tileClass}`}>
+      <span
+        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] ${tileClass}`}
+      >
         {icon}
       </span>
       <span className="min-w-0 flex-1 truncate text-sm font-semibold text-ink">{label}</span>
@@ -240,7 +248,9 @@ function HashBlock({
 }) {
   return (
     <div className="flex flex-col gap-1">
-      <span className="text-[10.5px] font-bold uppercase tracking-[0.1em] text-ink-subtle">{label}</span>
+      <span className="text-[10.5px] font-bold uppercase tracking-[0.1em] text-ink-subtle">
+        {label}
+      </span>
       <div className="flex items-start gap-1">
         <code className="min-w-0 flex-1 select-all break-all rounded-md bg-surface-alt px-1.5 py-1 font-mono text-[11px] leading-snug text-ink-muted">
           {value}

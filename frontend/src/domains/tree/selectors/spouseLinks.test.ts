@@ -67,7 +67,9 @@ describe("buildSpouseLinks", () => {
       [husbandId]: { id: husbandId, personHash: husbandHash, versionIndex: 1 },
       [childAId]: childNode(childAId, childAHash, 1),
     };
-    expect(buildSpouseLinks({ graph, nodesData }).get(husbandId)).toEqual([makeNodeId(wifeHash, 1)]);
+    expect(buildSpouseLinks({ graph, nodesData }).get(husbandId)).toEqual([
+      makeNodeId(wifeHash, 1),
+    ]);
   });
 
   it("trusts a single concrete version agreed across children", () => {
@@ -77,7 +79,9 @@ describe("buildSpouseLinks", () => {
       [childAId]: childNode(childAId, childAHash, 2),
       [childBId]: childNode(childBId, childBHash, 2),
     };
-    expect(buildSpouseLinks({ graph, nodesData }).get(husbandId)).toEqual([makeNodeId(wifeHash, 2)]);
+    expect(buildSpouseLinks({ graph, nodesData }).get(husbandId)).toEqual([
+      makeNodeId(wifeHash, 2),
+    ]);
   });
 
   it("upgrades a first-seen v0 co-parent to a concrete version pinned by a later child", () => {
@@ -90,7 +94,9 @@ describe("buildSpouseLinks", () => {
       [childBId]: childNode(childBId, childBHash, 4),
     };
     // resolveVersion would only fire for a leftover v0; here it must not be needed.
-    expect(buildSpouseLinks({ graph, nodesData }).get(husbandId)).toEqual([makeNodeId(wifeHash, 4)]);
+    expect(buildSpouseLinks({ graph, nodesData }).get(husbandId)).toEqual([
+      makeNodeId(wifeHash, 4),
+    ]);
   });
 
   it("resolves a concrete-vs-concrete conflict to the most-endorsed version", () => {
@@ -114,7 +120,9 @@ describe("buildSpouseLinks", () => {
         endorsementCount: 4,
       },
     };
-    expect(buildSpouseLinks({ graph, nodesData }).get(husbandId)).toEqual([makeNodeId(wifeHash, 5)]);
+    expect(buildSpouseLinks({ graph, nodesData }).get(husbandId)).toEqual([
+      makeNodeId(wifeHash, 5),
+    ]);
   });
 
   it("falls back to the smallest conflicting version when endorsements have not loaded yet", () => {
@@ -126,7 +134,9 @@ describe("buildSpouseLinks", () => {
       [childAId]: childNode(childAId, childAHash, 5),
       [childBId]: childNode(childBId, childBHash, 2),
     };
-    expect(buildSpouseLinks({ graph, nodesData }).get(husbandId)).toEqual([makeNodeId(wifeHash, 2)]);
+    expect(buildSpouseLinks({ graph, nodesData }).get(husbandId)).toEqual([
+      makeNodeId(wifeHash, 2),
+    ]);
   });
 
   it("maps an unversioned (v0) co-parent through resolveVersion", () => {

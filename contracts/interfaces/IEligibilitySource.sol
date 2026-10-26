@@ -17,5 +17,9 @@ interface IEligibilitySource {
 
   /// @notice DeepFamily guards: a source fact cannot change while an old role remains active.
   function beforeEndorsementChange(uint256 childIdentity, address endorser) external view;
-  function beforeTrustedChange(uint256 parentIdentity, uint256 parentVersion, address endorser) external view;
+  function beforeTrustedChange(
+    uint256 parentIdentity,
+    uint256 parentVersion,
+    address endorser
+  ) external view;
 }

@@ -7,8 +7,12 @@ const CODE_SIGNATURE = "(uint256,uint256,uint256,uint256,uint256,uint256,uint256
 const CAPABILITY_SIGNATURE = "(uint256,uint256,uint256,uint256,uint256,uint256,uint256)";
 const DEPOSIT_SIGNATURE = "(uint256,uint256,uint64)";
 const CLAIM_SIGNATURE = "(uint256,uint64,uint256,uint256,uint256,uint256,uint256)";
-export const FUND_SELECTOR = id(`depositBudget(${CODE_SIGNATURE},${CAPABILITY_SIGNATURE},bytes,bytes,${DEPOSIT_SIGNATURE},${ACTION_DATA_SIGNATURE},bytes)`).slice(0,10);
-export const CLAIM_SELECTOR = id(`claimBudget(${CLAIM_SIGNATURE},${ACTION_DATA_SIGNATURE},bytes)`).slice(0,10);
+export const FUND_SELECTOR = id(
+  `depositBudget(${CODE_SIGNATURE},${CAPABILITY_SIGNATURE},bytes,bytes,${DEPOSIT_SIGNATURE},${ACTION_DATA_SIGNATURE},bytes)`,
+).slice(0, 10);
+export const CLAIM_SELECTOR = id(
+  `claimBudget(${CLAIM_SIGNATURE},${ACTION_DATA_SIGNATURE},bytes)`,
+).slice(0, 10);
 
 function requireTxHash(value, label) {
   if (typeof value !== "string" || !TX_HASH.test(value)) {

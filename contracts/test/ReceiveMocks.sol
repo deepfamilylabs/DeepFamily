@@ -7,7 +7,10 @@ import {IEligibilitySource} from "../interfaces/IEligibilitySource.sol";
 
 /// @dev TEST ONLY: exact public-input binding, not a cryptographic proof verifier.
 contract FixedProofVerifierMock is IFixedProofVerifier {
-  function verifyProof(bytes calldata proof, uint256[] calldata signals) external pure returns (bool) {
+  function verifyProof(
+    bytes calldata proof,
+    uint256[] calldata signals
+  ) external pure returns (bool) {
     return keccak256(proof) == keccak256(abi.encode(signals));
   }
 }
@@ -37,7 +40,9 @@ contract EligibilitySourceMock is IEligibilitySource {
     require(roles.length == secrets.length);
     for (uint256 index; index < roles.length; ++index) {
       require(roles[index] < 3);
-      _revoked[roles[index]][PoseidonT3.hash([uint256(74321) + roles[index], secrets[index]])] = true;
+      _revoked[roles[index]][
+        PoseidonT3.hash([uint256(74321) + roles[index], secrets[index]])
+      ] = true;
     }
   }
 

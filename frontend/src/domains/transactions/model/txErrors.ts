@@ -34,11 +34,7 @@ export function isUserRejection(error: unknown): boolean {
  * Build a TxFlowError from a raw error, using `classify` for type detection
  * and `message` for a human-readable summary.
  */
-export function toTxFlowError(
-  error: unknown,
-  message: string,
-  type?: string,
-): TxFlowError {
+export function toTxFlowError(error: unknown, message: string, type?: string): TxFlowError {
   const friendly = normalizeFriendlyError(error, defaultErrorTranslator as any, {
     fallbackMessage: message,
     fallbackType: type,

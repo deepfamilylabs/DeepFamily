@@ -11,9 +11,7 @@ export interface UseNFTDetailsResult {
   refetch: () => void;
 }
 
-export function useNFTDetails(
-  tokenId: string | null | undefined,
-): UseNFTDetailsResult {
+export function useNFTDetails(tokenId: string | null | undefined): UseNFTDetailsResult {
   const gateway = usePersonGateway();
   const [data, setData] = useState<ParsedNftDetails | null>(null);
   const [loading, setLoading] = useState(false);

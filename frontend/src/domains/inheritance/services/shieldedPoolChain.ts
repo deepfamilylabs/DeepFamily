@@ -223,9 +223,7 @@ export async function loadShieldedPoolSnapshot<T>(
         throw new Error(`Shielded pool shard ${shardId} does not match chain state`);
       }
     }
-    if (
-      BigInt(await pool.nullifierCount({ blockTag: toBlock })) !== BigInt(spentNullifiers.size)
-    )
+    if (BigInt(await pool.nullifierCount({ blockTag: toBlock })) !== BigInt(spentNullifiers.size))
       throw new Error("Shielded pool nullifier history is incomplete");
     const block = await provider.getBlock(toBlock);
     if (!block?.hash || block.hash !== anchor.hash)

@@ -34,7 +34,6 @@ type ZkWorkerMethods = {
     params: { proof: Groth16Proof; publicSignals: string[] };
     result: { ok: boolean };
   };
-
 };
 
 type ZkWorkerRequest = { id: number; method: keyof ZkWorkerMethods; params: any };
@@ -67,7 +66,6 @@ const handlers: {
     assertDescriptorPurpose("DisclosureBinding");
     return { ok: await verifyDisclosureBindingProof(proof, publicSignals) };
   },
-
 };
 
 self.addEventListener("message", async (event: MessageEvent<ZkWorkerRequest>) => {

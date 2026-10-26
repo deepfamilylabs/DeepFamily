@@ -78,16 +78,65 @@ export function AppRouter() {
           <Routes>
             <Route path="/" element={<Layout />}>
               <Route index element={<Home />} />
-              <Route path="family" element={<DomainErrorBoundary domain="tree"><TreePage /></DomainErrorBoundary>} />
-              <Route path="genealogyBook" element={<DomainErrorBoundary domain="genealogy"><GenealogyBookPage /></DomainErrorBoundary>} />
-              <Route path="search" element={<DomainErrorBoundary domain="search"><SearchPage /></DomainErrorBoundary>} />
-              <Route path="people" element={<DomainErrorBoundary domain="people"><PeoplePage /></DomainErrorBoundary>} />
+              <Route
+                path="family"
+                element={
+                  <DomainErrorBoundary domain="tree">
+                    <TreePage />
+                  </DomainErrorBoundary>
+                }
+              />
+              <Route
+                path="genealogyBook"
+                element={
+                  <DomainErrorBoundary domain="genealogy">
+                    <GenealogyBookPage />
+                  </DomainErrorBoundary>
+                }
+              />
+              <Route
+                path="search"
+                element={
+                  <DomainErrorBoundary domain="search">
+                    <SearchPage />
+                  </DomainErrorBoundary>
+                }
+              />
+              <Route
+                path="people"
+                element={
+                  <DomainErrorBoundary domain="people">
+                    <PeoplePage />
+                  </DomainErrorBoundary>
+                }
+              />
               <Route path="create" element={<CreatePage />} />
-              <Route path="inheritance" element={<DomainErrorBoundary domain="inheritance"><InheritancePage /></DomainErrorBoundary>} />
+              <Route
+                path="inheritance"
+                element={
+                  <DomainErrorBoundary domain="inheritance">
+                    <InheritancePage />
+                  </DomainErrorBoundary>
+                }
+              />
               <Route path="terms" element={<TermsPage />} />
               <Route path="privacy" element={<PrivacyPage />} />
-              <Route path="person/:tokenId" element={<DomainErrorBoundary domain="person"><PersonPage /></DomainErrorBoundary>} />
-              <Route path="editor/:tokenId" element={<DomainErrorBoundary domain="story"><StoryEditorPage /></DomainErrorBoundary>} />
+              <Route
+                path="person/:tokenId"
+                element={
+                  <DomainErrorBoundary domain="person">
+                    <PersonPage />
+                  </DomainErrorBoundary>
+                }
+              />
+              <Route
+                path="editor/:tokenId"
+                element={
+                  <DomainErrorBoundary domain="story">
+                    <StoryEditorPage />
+                  </DomainErrorBoundary>
+                }
+              />
             </Route>
           </Routes>
         </Suspense>

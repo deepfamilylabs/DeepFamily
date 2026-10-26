@@ -19,12 +19,7 @@ afterEach(() => {
 describe("RootHashHistory", () => {
   it("renders nothing when the history is empty", () => {
     const { container } = render(
-      <RootHashHistory
-        items={[]}
-        onSelect={vi.fn()}
-        onRemove={vi.fn()}
-        onClearAll={vi.fn()}
-      />,
+      <RootHashHistory items={[]} onSelect={vi.fn()} onRemove={vi.fn()} onClearAll={vi.fn()} />,
     );
 
     expect(container.innerHTML).toBe("");

@@ -7,11 +7,11 @@ does not approve keys for a public deployment.
 
 ## Current relation graph
 
-| Group | Count | Relations |
-| --- | ---: | --- |
-| Identity and disclosure | 2 | PersonRelation, DisclosureBinding |
-| Asset boundaries | 3 | Shield, Unshield, four-input Unshield |
-| Eligibility and receiving | 8 | SourceFact, SourceTrust, Issue, Code, Capability, Deposit, Claim, Transfer |
+| Group                     | Count | Relations                                                                  |
+| ------------------------- | ----: | -------------------------------------------------------------------------- |
+| Identity and disclosure   |     2 | PersonRelation, DisclosureBinding                                          |
+| Asset boundaries          |     3 | Shield, Unshield, four-input Unshield                                      |
+| Eligibility and receiving |     8 | SourceFact, SourceTrust, Issue, Code, Capability, Deposit, Claim, Transfer |
 
 The data-only [circuit catalogue](../scripts/lib/protocolCircuitCatalog.mjs) and
 [canonical selection](../scripts/lib/zkCircuitSelection.mjs) define the graph consumed by builds,
@@ -50,13 +50,13 @@ select their own verifier, key or artifact host.
 
 ## Artifact records
 
-| Record | Purpose |
-| --- | --- |
-| `circuits/zk-artifacts-manifest.json` | Identity/disclosure source and artifact pins |
-| `circuits/shielded-development-manifest.json` | Three development boundary key sets |
-| `circuits/receive-development-manifest.json` | Eight development receiving/eligibility key sets |
-| `protocol-release-manifest.json` | Protocol interfaces, pending deployment bindings and release evidence |
-| `frontend/src/proof-artifacts.local.json` | Exported, trusted chain/registry-bound frontend pins |
+| Record                                        | Purpose                                                               |
+| --------------------------------------------- | --------------------------------------------------------------------- |
+| `circuits/zk-artifacts-manifest.json`         | Identity/disclosure source and artifact pins                          |
+| `circuits/shielded-development-manifest.json` | Three development boundary key sets                                   |
+| `circuits/receive-development-manifest.json`  | Eight development receiving/eligibility key sets                      |
+| `protocol-release-manifest.json`              | Protocol interfaces, pending deployment bindings and release evidence |
+| `frontend/src/proof-artifacts.local.json`     | Exported, trusted chain/registry-bound frontend pins                  |
 
 R1CS and witness WASM are compiled with the pinned Circom toolchain and explicit
 `--O2 --sanity_check 2` flags. Generated verifier contracts, vkeys, WASM and zkeys must belong to

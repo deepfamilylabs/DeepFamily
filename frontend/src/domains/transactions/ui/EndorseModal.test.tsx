@@ -180,9 +180,7 @@ function renderConfigurableEndorseModal(props: {
 /** The submit button unlocks only once the target resolves on chain. */
 async function waitForResolvedTarget() {
   await waitFor(() =>
-    expect(
-      screen.getByRole("button", { name: /^Endorse$/i }).hasAttribute("disabled"),
-    ).toBe(false),
+    expect(screen.getByRole("button", { name: /^Endorse$/i }).hasAttribute("disabled")).toBe(false),
   );
 }
 
@@ -290,9 +288,7 @@ describe("EndorseModal", () => {
 
     render(renderConfigurableEndorseModal({ isOpen: true, initialPersonHash: personHash }));
 
-    expect(
-      await screen.findByRole("button", { name: /Version 2 · 6 endorsements/ }),
-    ).toBeTruthy();
+    expect(await screen.findByRole("button", { name: /Version 2 · 6 endorsements/ })).toBeTruthy();
   });
 
   it("drops the chosen version when the hash is cleared", async () => {
@@ -362,9 +358,7 @@ describe("EndorseModal", () => {
     await act(async () => {
       fireEvent.change(input, { target: { value: personHash } });
     });
-    expect(
-      await screen.findByRole("button", { name: /Version 2 · 6 endorsements/ }),
-    ).toBeTruthy();
+    expect(await screen.findByRole("button", { name: /Version 2 · 6 endorsements/ })).toBeTruthy();
   });
 
   it("carries each version's submitter and date inside the picker", async () => {

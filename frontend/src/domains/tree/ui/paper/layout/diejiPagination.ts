@@ -5,7 +5,11 @@ import {
   type PaperPerson,
   type TranslateFn,
 } from "../paperData";
-import { getPaperGenerationMark, getPaperRelationLabel, splitTextByVisualUnits } from "../paperText";
+import {
+  getPaperGenerationMark,
+  getPaperRelationLabel,
+  splitTextByVisualUnits,
+} from "../paperText";
 
 export type DiejiPageSide = "left" | "right";
 
@@ -58,7 +62,8 @@ export const DIEJI_GENERATIONS_PER_CHART = 5;
 export const DIEJI_CHART_STEP = DIEJI_GENERATIONS_PER_CHART - 1;
 export const DIEJI_RIGHT_PAGE_LANE_CAPACITY = 14;
 export const DIEJI_LEFT_PAGE_LANE_CAPACITY = 14;
-export const DIEJI_SPREAD_LANE_CAPACITY = DIEJI_RIGHT_PAGE_LANE_CAPACITY + DIEJI_LEFT_PAGE_LANE_CAPACITY;
+export const DIEJI_SPREAD_LANE_CAPACITY =
+  DIEJI_RIGHT_PAGE_LANE_CAPACITY + DIEJI_LEFT_PAGE_LANE_CAPACITY;
 // Each lane's biography column is ~696px tall (page 872 − 64 relation − 96 name − 16 py-2 padding),
 // holding ~53 full-width CJK glyphs ≈ 106 half-em units of vertical text at 13px. Budget just
 // under that so a record fills the column before spilling into the next lane, and never wraps to
@@ -242,10 +247,9 @@ function splitChartLanesIntoSpreads(params: {
     const needsLeadingMark = spreadIndex > 1 && firstLane?.kind !== "generation";
     const capacity = needsLeadingMark ? DIEJI_SPREAD_LANE_CAPACITY - 1 : DIEJI_SPREAD_LANE_CAPACITY;
     const raw = lanes.slice(start, start + capacity);
-    const withLeadingMark =
-      !needsLeadingMark
-        ? raw
-        : ensureLeadingGenerationLane({ lanes: raw, generationsByDepth, repeatedDepth, t });
+    const withLeadingMark = !needsLeadingMark
+      ? raw
+      : ensureLeadingGenerationLane({ lanes: raw, generationsByDepth, repeatedDepth, t });
 
     spreads.push({
       index: spreadIndex,
@@ -278,7 +282,9 @@ export function buildDiejiPaperBook(params: {
   const t = params.t || fallbackTranslate;
   if (!generations.length) return { charts: [] };
 
-  const generationsByDepth = new Map(generations.map((generation) => [generation.depth, generation]));
+  const generationsByDepth = new Map(
+    generations.map((generation) => [generation.depth, generation]),
+  );
   const maxDepth = generations[generations.length - 1]?.depth || 0;
   const charts: DiejiChartWindow[] = [];
 
@@ -328,8 +334,9 @@ export function buildDiejiPaperBook(params: {
 export function getDiejiPersonLaneKeys(spreads: DiejiPageSpread[], personId: NodeId): string[] {
   return spreads
     .flatMap((spread) => spread.lanes)
-    .filter((lane): lane is Extract<DiejiTableLane, { kind: "person" }> =>
-      lane.kind === "person" && lane.person.id === personId,
+    .filter(
+      (lane): lane is Extract<DiejiTableLane, { kind: "person" }> =>
+        lane.kind === "person" && lane.person.id === personId,
     )
     .map((lane) => lane.key);
 }

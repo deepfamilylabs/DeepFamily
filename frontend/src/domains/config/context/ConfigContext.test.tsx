@@ -150,5 +150,4 @@ describe("ConfigContext module address resolution", () => {
     expect(result.current.contractAddress).toBe("");
     expect(result.current.tokenAddress).toBe("");
   });
-
 });

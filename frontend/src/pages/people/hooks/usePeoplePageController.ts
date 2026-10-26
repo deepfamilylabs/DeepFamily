@@ -1,11 +1,4 @@
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type KeyboardEvent,
-} from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useActivePath } from "../../../app/context";
@@ -134,10 +127,7 @@ export function usePeoplePageController() {
   const clearPersonQuery = useCallback(() => {
     const searchParams = new URLSearchParams(location.search);
     searchParams.delete("person");
-    navigate(
-      { pathname: location.pathname, search: searchParams.toString() },
-      { replace: true },
-    );
+    navigate({ pathname: location.pathname, search: searchParams.toString() }, { replace: true });
     setPersonQueryError(null);
   }, [location.pathname, location.search, navigate]);
 
@@ -200,10 +190,7 @@ export function usePeoplePageController() {
       openedViaClickRef.current = false;
       navigate(-1);
     } else {
-      navigate(
-        { pathname: location.pathname, search: searchParams.toString() },
-        { replace: true },
-      );
+      navigate({ pathname: location.pathname, search: searchParams.toString() }, { replace: true });
     }
     setSelectedPerson(null);
   }, [location.pathname, location.search, navigate]);

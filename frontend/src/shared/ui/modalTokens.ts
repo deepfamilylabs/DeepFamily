@@ -27,14 +27,12 @@ export const MODAL_PANEL =
  */
 export const MODAL_TITLE = "modal-title text-lg text-ink truncate";
 
-export const MODAL_HEADER =
-  "flex items-center gap-3 px-5 py-4 border-b border-hairline bg-surface";
+export const MODAL_HEADER = "flex items-center gap-3 px-5 py-4 border-b border-hairline bg-surface";
 
 /** The scrolling region between header and footer sits one step below them. */
 export const MODAL_BODY = "bg-surface-body";
 
-export const MODAL_FOOTER =
-  "flex gap-2.5 px-5 py-3.5 border-t border-hairline bg-surface";
+export const MODAL_FOOTER = "flex gap-2.5 px-5 py-3.5 border-t border-hairline bg-surface";
 
 /** Content block inside MODAL_BODY. One step of depth — never a nested shadow. */
 export const MODAL_CARD = "bg-surface border border-hairline rounded-xl";
@@ -91,8 +89,7 @@ export const MODAL_ACCENT_TILE: Record<ModalAccent, string> = {
   danger: "bg-danger/12 text-danger",
 };
 
-export const MODAL_TILE_BASE =
-  "w-9 h-9 rounded-[10px] flex items-center justify-center shrink-0";
+export const MODAL_TILE_BASE = "w-9 h-9 rounded-[10px] flex items-center justify-center shrink-0";
 
 export const MODAL_CLOSE_BUTTON =
   "flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-lg bg-surface-muted text-ink-muted transition-colors hover:bg-hairline-strong/40 hover:text-ink";

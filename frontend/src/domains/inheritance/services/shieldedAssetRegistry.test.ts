@@ -207,9 +207,7 @@ describe("complete recovery discovery and hostile token isolation", () => {
       balanceOf: async () => "0",
       allowance: async () => 0n,
     });
-    expect(
-      await readShieldedAsset(ASSET, provider, "ETH", { blockTag: 10 }),
-    ).toMatchObject({
+    expect(await readShieldedAsset(ASSET, provider, "ETH", { blockTag: 10 })).toMatchObject({
       decimals: null,
       metadataAvailable: false,
       interoperabilityAvailable: false,
@@ -288,19 +286,22 @@ describe("canonical multi-asset discovery", () => {
       interoperabilityAvailable: true,
     });
   });
-  it.each([-1n, 37n, 6, "6"])("does not infer precision from invalid metadata %s", async (decimals) => {
-    mocks.token.mockReturnValue({
-      decimals: async () => decimals,
-      symbol: async () => "USD",
-      balanceOf: async () => 0n,
-      allowance: async () => 0n,
-    });
-    expect(await readShieldedAsset(ASSET, provider, "CFX", { blockTag: 10 })).toMatchObject({
-      decimals: null,
-      metadataAvailable: false,
-      interoperabilityAvailable: true,
-    });
-  });
+  it.each([-1n, 37n, 6, "6"])(
+    "does not infer precision from invalid metadata %s",
+    async (decimals) => {
+      mocks.token.mockReturnValue({
+        decimals: async () => decimals,
+        symbol: async () => "USD",
+        balanceOf: async () => 0n,
+        allowance: async () => 0n,
+      });
+      expect(await readShieldedAsset(ASSET, provider, "CFX", { blockTag: 10 })).toMatchObject({
+        decimals: null,
+        metadataAvailable: false,
+        interoperabilityAvailable: true,
+      });
+    },
+  );
   it("preserves a recoverable asset with unknown precision instead of assuming 18", async () => {
     mocks.token.mockReturnValue({
       decimals: async () => {

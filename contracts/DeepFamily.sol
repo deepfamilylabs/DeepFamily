@@ -595,7 +595,8 @@ contract DeepFamily is
 
   /// @notice Activate the immutable eligibility bridge on this lineage index.
   function setEligibilitySource(address source) external onlyProxy onlyOwner {
-    if (eligibilitySource != address(0) || source.code.length == 0) revert InvalidEligibilityMutation();
+    if (eligibilitySource != address(0) || source.code.length == 0)
+      revert InvalidEligibilityMutation();
     (bool ok, bytes memory result) = source.staticcall(abi.encodeWithSignature("LINEAGE_INDEX()"));
     if (!ok || result.length != 32 || abi.decode(result, (address)) != address(_lineage())) {
       revert InvalidEligibilityMutation();
@@ -621,7 +622,9 @@ contract DeepFamily is
     _revokeEligibilityRoles(roles, secrets);
     (bool ok, bytes memory result) = address(this).delegatecall(mutation);
     if (!ok) {
-      assembly ("memory-safe") { revert(add(result, 32), mload(result)) }
+      assembly ("memory-safe") {
+        revert(add(result, 32), mload(result))
+      }
     }
   }
 
@@ -642,7 +645,8 @@ contract DeepFamily is
     address source = eligibilitySource;
     if (source != address(0)) {
       IEligibilitySource(source).beforeEndorsementChange(
-        _lineage().identityCommitmentOf(personHash), endorser
+        _lineage().identityCommitmentOf(personHash),
+        endorser
       );
     }
   }
@@ -656,16 +660,22 @@ contract DeepFamily is
     return _isTrustedEndorserManager(personHash, versionIndex, account);
   }
 
-  function _isTrustedEndorserManager(bytes32 personHash, uint256 versionIndex, address account) private view returns (bool) {
+  function _isTrustedEndorserManager(
+    bytes32 personHash,
+    uint256 versionIndex,
+    address account
+  ) private view returns (bool) {
     if (versionIndex == 0 || versionIndex > personVersions[personHash].length) return false;
     uint256 tokenId = versionToTokenId[personHash][versionIndex];
-    return tokenId == 0
-      ? personVersions[personHash][versionIndex - 1].addedBy == account
-      : _ownerOf(tokenId) == account;
+    return
+      tokenId == 0
+        ? personVersions[personHash][versionIndex - 1].addedBy == account
+        : _ownerOf(tokenId) == account;
   }
 
   function _requireTrustedEndorserManager(bytes32 personHash, uint256 versionIndex) internal view {
-    if (!_isTrustedEndorserManager(personHash, versionIndex, msg.sender)) revert MustBeTrustedEndorserManager();
+    if (!_isTrustedEndorserManager(personHash, versionIndex, msg.sender))
+      revert MustBeTrustedEndorserManager();
   }
 
   function _addTrustedEndorserInternal(
@@ -700,7 +710,9 @@ contract DeepFamily is
     address source = eligibilitySource;
     if (source != address(0)) {
       IEligibilitySource(source).beforeTrustedChange(
-        _lineage().identityCommitmentOf(personHash), versionIndex, account
+        _lineage().identityCommitmentOf(personHash),
+        versionIndex,
+        account
       );
     }
 

@@ -1,9 +1,6 @@
 import type { NodeId, NodeData } from "../../../shared/model";
 import type { EdgeStoreStrict, EdgeStoreUnion } from "../model/treeStore";
-import {
-  getProjectedChildIds,
-  type TreeGraphData,
-} from "./buildViewGraph";
+import { getProjectedChildIds, type TreeGraphData } from "./buildViewGraph";
 
 export type TreeRow = {
   nodeId: NodeId;

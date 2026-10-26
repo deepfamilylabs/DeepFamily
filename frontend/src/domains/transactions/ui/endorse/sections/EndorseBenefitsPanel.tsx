@@ -4,7 +4,10 @@ import type { EndorseT } from "../model/endorseTypes";
 
 export function EndorseBenefitsPanel({ t }: { t: EndorseT }) {
   const benefits = [
-    { Icon: ShieldCheck, text: t("endorse.benefitQuality", "Help verify and improve data quality") },
+    {
+      Icon: ShieldCheck,
+      text: t("endorse.benefitQuality", "Help verify and improve data quality"),
+    },
     {
       Icon: Search,
       text: t("endorse.benefitPriority", "Endorsed versions get higher priority in searches"),

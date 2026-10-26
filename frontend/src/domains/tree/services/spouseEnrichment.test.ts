@@ -22,7 +22,13 @@ describe("collectParentRefs", () => {
         motherHash: "0xmom",
         motherVersionIndex: 0,
       },
-      b: { id: "b", personHash: "0xb", versionIndex: 1, fatherHash: "0xdad", fatherVersionIndex: 2 },
+      b: {
+        id: "b",
+        personHash: "0xb",
+        versionIndex: 1,
+        fatherHash: "0xdad",
+        fatherVersionIndex: 2,
+      },
     };
     expect(collectParentRefs(nodesData, ["a", "b"])).toEqual([
       { personHash: "0xdad", versionIndex: 2 },
@@ -32,7 +38,13 @@ describe("collectParentRefs", () => {
 
   it("only scans the given nodeIds, so a spouse's own parents are not collected (no recursion)", () => {
     const nodesData: Record<string, NodeData> = {
-      a: { id: "a", personHash: "0xa", versionIndex: 1, motherHash: "0xmom", motherVersionIndex: 1 },
+      a: {
+        id: "a",
+        personHash: "0xa",
+        versionIndex: 1,
+        motherHash: "0xmom",
+        motherVersionIndex: 1,
+      },
       spouseNode: {
         id: "spouseNode",
         personHash: "0xmom",

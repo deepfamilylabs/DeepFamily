@@ -114,7 +114,12 @@ export function usePersonVersionOptions(personHash: string | null): PersonVersio
         applyLookup({ personHash: normalizedHash, status: "ready", versions, totalVersions });
       } catch {
         if (cancelled) return;
-        applyLookup({ personHash: normalizedHash, status: "error", versions: [], totalVersions: 0 });
+        applyLookup({
+          personHash: normalizedHash,
+          status: "error",
+          versions: [],
+          totalVersions: 0,
+        });
       }
     })();
 

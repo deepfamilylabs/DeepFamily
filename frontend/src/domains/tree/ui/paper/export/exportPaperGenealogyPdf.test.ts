@@ -80,7 +80,12 @@ describe("exportPaperGenealogyPdf", () => {
     const root = buildRoot(1);
 
     // jsdom reports 0 offset dimensions, so the page is just the margin band on both axes.
-    await exportPaperGenealogyPdf({ root, fileName: "su.pdf", marginPx: 48, marginColor: "#f7efd8" });
+    await exportPaperGenealogyPdf({
+      root,
+      fileName: "su.pdf",
+      marginPx: 48,
+      marginColor: "#f7efd8",
+    });
 
     expect(setFillColor).toHaveBeenCalledWith("#f7efd8");
     expect(rect).toHaveBeenCalledWith(0, 0, 96, 96, "F");
@@ -143,9 +148,9 @@ describe("exportPaperGenealogyPdf", () => {
   it("throws NoPaperSpreadsError when there are no spreads", async () => {
     const root = buildRoot(0);
 
-    await expect(
-      exportPaperGenealogyPdf({ root, fileName: "empty.pdf" }),
-    ).rejects.toBeInstanceOf(NoPaperSpreadsError);
+    await expect(exportPaperGenealogyPdf({ root, fileName: "empty.pdf" })).rejects.toBeInstanceOf(
+      NoPaperSpreadsError,
+    );
 
     expect(jsPDF).not.toHaveBeenCalled();
     expect(toPng).not.toHaveBeenCalled();

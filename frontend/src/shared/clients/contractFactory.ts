@@ -4,7 +4,15 @@ import DeepFamilyArchive from "../../abi/DeepFamilyArchive.json";
 import DeepFamilyReader from "../../abi/DeepFamilyReader.json";
 import DeepFamilyLineageIndex from "../../abi/DeepFamilyLineageIndex.json";
 import { POOL_ABI } from "./receiveChain";
-export const SHIELDED_FACTORY_ABI = ["function poolFor(address) view returns(address)", "function DEEP_TOKEN() view returns(address)", "function VERIFIER() view returns(address)", "function RECEIVE_REGISTRY() view returns(address)", "function NATIVE_POOL() view returns(address)", "function createPool(address) returns(address pool,bool created)", "event PoolCreated(address indexed asset,address indexed pool)"] as const;
+export const SHIELDED_FACTORY_ABI = [
+  "function poolFor(address) view returns(address)",
+  "function DEEP_TOKEN() view returns(address)",
+  "function VERIFIER() view returns(address)",
+  "function RECEIVE_REGISTRY() view returns(address)",
+  "function NATIVE_POOL() view returns(address)",
+  "function createPool(address) returns(address pool,bool created)",
+  "event PoolCreated(address indexed asset,address indexed pool)",
+] as const;
 
 export const DEEP_TOKEN_ABI = [
   "function recentReward() view returns (uint256)",

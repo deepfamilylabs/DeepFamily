@@ -2,8 +2,11 @@ import assert from "node:assert/strict";
 import { performance } from "node:perf_hooks";
 import { keccak256, toBeHex, zeroPadValue } from "ethers";
 import {
-  SNARK_SCALAR_FIELD, createShieldedIdentityAuthorizationTree, createLineageTree,
-  verifyShieldedIdentityAuthorizationWitness, buildLineageMerkleProofFromPath,
+  SNARK_SCALAR_FIELD,
+  createShieldedIdentityAuthorizationTree,
+  createLineageTree,
+  verifyShieldedIdentityAuthorizationWitness,
+  buildLineageMerkleProofFromPath,
 } from "@deepfamily/protocol-core";
 
 // Pure Node CPU observations, not a browser/RPC/disk/one-hundred-million-record test.
@@ -15,13 +18,24 @@ const time = (operation) => {
   const value = operation();
   return { milliseconds: performance.now() - start, value };
 };
-console.log(JSON.stringify({ kind: "environment", node: process.version, sizes,
-  excluded: ["alias generation", "RPC", "IndexedDB", "KDF", "proof generation", "browser/mobile"],
-  interpretation: "clone samples retain shared roots; timings are observations, not guarantees" }));
+console.log(
+  JSON.stringify({
+    kind: "environment",
+    node: process.version,
+    sizes,
+    excluded: ["alias generation", "RPC", "IndexedDB", "KDF", "proof generation", "browser/mobile"],
+    interpretation: "clone samples retain shared roots; timings are observations, not guarantees",
+  }),
+);
 for (const size of sizes) {
-  const aliases = Array.from({ length: size }, (_, index) =>
-    BigInt(keccak256(zeroPadValue(toBeHex(index + 1), 32))) % (SNARK_SCALAR_FIELD - 1n) + 1n);
-  const built = time(() => createShieldedIdentityAuthorizationTree(aliases.map((alias) => [alias, 1n])));
+  const aliases = Array.from(
+    { length: size },
+    (_, index) =>
+      (BigInt(keccak256(zeroPadValue(toBeHex(index + 1), 32))) % (SNARK_SCALAR_FIELD - 1n)) + 1n,
+  );
+  const built = time(() =>
+    createShieldedIdentityAuthorizationTree(aliases.map((alias) => [alias, 1n])),
+  );
   const authorization = built.value;
   const lineageBuilt = time(() => createLineageTree(aliases));
   const lineage = lineageBuilt.value;
@@ -35,35 +49,51 @@ for (const size of sizes) {
   const samples = Math.min(1000, size);
   const authPaths = time(() => {
     for (let i = 0; i < samples; i++) {
-      const alias = aliases[Math.floor(i * size / samples)];
+      const alias = aliases[Math.floor((i * size) / samples)];
       const path = authorization.getWitness(alias);
       assert.equal(path.authorizationCounter, 1n);
     }
   });
   const lineageLookup = time(() => {
     for (let i = 0; i < samples; i++) {
-      const index = Math.floor(i * size / samples);
+      const index = Math.floor((i * size) / samples);
       assert.equal(BigInt(lineage.indexOf(aliases[index])), BigInt(index));
     }
   });
   const lineagePaths = time(() => {
-    for (let i = 0; i < samples; i++) lineage.generateProof(Math.floor(i * size / samples));
+    for (let i = 0; i < samples; i++) lineage.generateProof(Math.floor((i * size) / samples));
   });
-  const oldAuthorization = authorization.clone(), oldLineage = lineage.clone();
+  const oldAuthorization = authorization.clone(),
+    oldLineage = lineage.clone();
   authorization.increment(aliases[0], 1n, 2n);
   lineage.update(0, 0n);
   assert.equal(oldAuthorization.getCounter(aliases[0]), 1n);
   assert.equal(oldLineage.indexOf(aliases[0]), 0);
-  verifyShieldedIdentityAuthorizationWitness(authorization.getWitness(aliases[0]), authorization.root, aliases[0]);
+  verifyShieldedIdentityAuthorizationWitness(
+    authorization.getWitness(aliases[0]),
+    authorization.root,
+    aliases[0],
+  );
   buildLineageMerkleProofFromPath(lineage.generateProof(0));
   const authDirtyNodes = [...authorization.exportNodes(oldAuthorization)].length;
   const lineageDirtyNodes = [...lineage.exportNodes(oldLineage)].length;
   assert(authDirtyNodes <= 65 && lineageDirtyNodes <= 65);
-  console.log(JSON.stringify({ kind: "result", records: size, buildMilliseconds: built.milliseconds,
-    lineageBuildMilliseconds: lineageBuilt.milliseconds, cloneRepetitions: repetitions,
-    authorizationCloneTotalMilliseconds: authClone.milliseconds, lineageCloneTotalMilliseconds: lineageClone.milliseconds,
-    samples, authorizationPathsMilliseconds: authPaths.milliseconds,
-    lineageIndexedLookupsMilliseconds: lineageLookup.milliseconds, lineagePathsMilliseconds: lineagePaths.milliseconds,
-    authorizationDirtyNodes: authDirtyNodes, lineageDirtyNodes,
-    rssBytes: process.memoryUsage().rss }));
+  console.log(
+    JSON.stringify({
+      kind: "result",
+      records: size,
+      buildMilliseconds: built.milliseconds,
+      lineageBuildMilliseconds: lineageBuilt.milliseconds,
+      cloneRepetitions: repetitions,
+      authorizationCloneTotalMilliseconds: authClone.milliseconds,
+      lineageCloneTotalMilliseconds: lineageClone.milliseconds,
+      samples,
+      authorizationPathsMilliseconds: authPaths.milliseconds,
+      lineageIndexedLookupsMilliseconds: lineageLookup.milliseconds,
+      lineagePathsMilliseconds: lineagePaths.milliseconds,
+      authorizationDirtyNodes: authDirtyNodes,
+      lineageDirtyNodes,
+      rssBytes: process.memoryUsage().rss,
+    }),
+  );
 }

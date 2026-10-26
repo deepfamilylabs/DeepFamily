@@ -12,4 +12,7 @@ export async function main(argv = process.argv.slice(2)) {
   return verifyProductionCeremony();
 }
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url))
-  main().catch(error => { console.error(`[zk-ceremony] ${error.message}`); process.exitCode = 1; });
+  main().catch((error) => {
+    console.error(`[zk-ceremony] ${error.message}`);
+    process.exitCode = 1;
+  });

@@ -646,9 +646,14 @@ export function computeShieldedPoolDomain(scope: ShieldedScope): bigint;
 export function computeShieldedScopedPurpose(purpose: BigNumberish, scope: ShieldedScope): bigint;
 /** Pool commitment and nullifier domains. */
 export const SHIELDED_INHERITANCE_DOMAINS: Readonly<{
-  ownerCommitment: bigint; valueNote: bigint; spendNullifier: bigint;
-  periodNullifier: bigint; dummyInputNullifier: bigint; allocationKeyCommitment: bigint;
-  poolScope: bigint; scopedPurpose: bigint;
+  ownerCommitment: bigint;
+  valueNote: bigint;
+  spendNullifier: bigint;
+  periodNullifier: bigint;
+  dummyInputNullifier: bigint;
+  allocationKeyCommitment: bigint;
+  poolScope: bigint;
+  scopedPurpose: bigint;
 }>;
 export const SHIELDED_CIPHERTEXT_BYTES: 512;
 export function generateShieldedRandomField(): bigint;
@@ -714,14 +719,22 @@ export interface DecodedShieldedNotePayload {
   amount: bigint;
   nonce: bigint;
 }
-export function encodeShieldedValueNotePayload(note: ShieldedValueNotePayload, scope: ShieldedScope): Uint8Array;
-export function decodeShieldedNotePayload(payload: BytesLike, scope: ShieldedScope): DecodedShieldedNotePayload;
+export function encodeShieldedValueNotePayload(
+  note: ShieldedValueNotePayload,
+  scope: ShieldedScope,
+): Uint8Array;
+export function decodeShieldedNotePayload(
+  payload: BytesLike,
+  scope: ShieldedScope,
+): DecodedShieldedNotePayload;
 export function computeShieldedNoteCommitmentFromPayload(
-  input: {payload: BytesLike; ciphertextHashField: BigNumberish}, scope: ShieldedScope,
-): {note: DecodedShieldedNotePayload; noteCommitment: bigint};
+  input: { payload: BytesLike; ciphertextHashField: BigNumberish },
+  scope: ShieldedScope,
+): { note: DecodedShieldedNotePayload; noteCommitment: bigint };
 export function verifyShieldedNotePayload(
-  input: {payload: BytesLike; ciphertext: BytesLike; noteCommitment: BigNumberish}, scope: ShieldedScope,
-): {note: DecodedShieldedNotePayload; noteCommitment: bigint};
+  input: { payload: BytesLike; ciphertext: BytesLike; noteCommitment: BigNumberish },
+  scope: ShieldedScope,
+): { note: DecodedShieldedNotePayload; noteCommitment: bigint };
 
 export function computeShieldedDummyInputNullifierForSlot(
   ownerSecret: BigNumberish,

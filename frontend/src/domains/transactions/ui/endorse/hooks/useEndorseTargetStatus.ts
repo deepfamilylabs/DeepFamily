@@ -55,7 +55,8 @@ export function useEndorseTargetStatus({
     reset();
 
     const loadTargetStatus = async () => {
-      if (!address || !contract || !contract.runner || !getVersionDetails || !targetPersonHash) return;
+      if (!address || !contract || !contract.runner || !getVersionDetails || !targetPersonHash)
+        return;
 
       try {
         const details = await getVersionDetails(targetPersonHash, targetVersionIndex);

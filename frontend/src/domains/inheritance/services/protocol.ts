@@ -1,7 +1,10 @@
 import { JsonRpcProvider, type Signer } from "ethers";
 import { ReceiveChain, type ReceiveDeployment } from "../../../shared/clients/receiveChain";
-import { ReceiveWorkerClient, type ReceiveWorkerContext,
-  type ReceiveWorkerCalls } from "../../../shared/workers/receiveWorkerClient";
+import {
+  ReceiveWorkerClient,
+  type ReceiveWorkerContext,
+  type ReceiveWorkerCalls,
+} from "../../../shared/workers/receiveWorkerClient";
 import type { PinnedManifest } from "../../../shared/zk/receiveProtocol";
 
 /** One application entry for the new protocol; codes never select a deployment or verification key. */
@@ -12,8 +15,10 @@ export class ReceiveProtocol {
   private readonly context: ReceiveWorkerContext;
   private transactionEpoch = 0;
   constructor(rpcUrl: string, deployment: ReceiveDeployment, manifest: PinnedManifest) {
-    if (BigInt(deployment.chainId) !== BigInt(manifest.chainId) ||
-        deployment.registryAddress.toLowerCase() !== manifest.registryAddress.toLowerCase()) {
+    if (
+      BigInt(deployment.chainId) !== BigInt(manifest.chainId) ||
+      deployment.registryAddress.toLowerCase() !== manifest.registryAddress.toLowerCase()
+    ) {
       throw new Error(" deployment and trusted proof configuration differ");
     }
     this.context = { rpcUrl, deployment: { ...deployment }, manifest: structuredClone(manifest) };
@@ -39,20 +44,29 @@ export class ReceiveProtocol {
   prepareLetter(input: ReceiveWorkerCalls["prepareLetter"]["input"]) {
     return this.worker.call("prepareLetter", input, this.context);
   }
-  readBudgetRecord(key: bigint) { return this.reader.readBudgetRecord(key); }
+  readBudgetRecord(key: bigint) {
+    return this.reader.readBudgetRecord(key);
+  }
   readSourcePaths(factLeafIndex: string | bigint, trustedLeafIndex: string | bigint) {
     return this.reader.readSourcePaths(factLeafIndex, trustedLeafIndex);
   }
   transactions(signer: Signer) {
     const epoch = this.transactionEpoch;
     const assertActive = () => {
-      if (this.transactionEpoch !== epoch) throw new Error("Receive transaction preparation cancelled");
+      if (this.transactionEpoch !== epoch)
+        throw new Error("Receive transaction preparation cancelled");
     };
     return new ReceiveChain(this.context.deployment, signer, {
       beforeTransaction: assertActive,
-
     });
   }
-  cancel() { ++this.transactionEpoch; this.worker.cancel(); }
-  close() { ++this.transactionEpoch; this.worker.close(); this.provider.destroy(); }
+  cancel() {
+    ++this.transactionEpoch;
+    this.worker.cancel();
+  }
+  close() {
+    ++this.transactionEpoch;
+    this.worker.close();
+    this.provider.destroy();
+  }
 }

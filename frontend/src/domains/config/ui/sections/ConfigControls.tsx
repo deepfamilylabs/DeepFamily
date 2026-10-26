@@ -77,7 +77,11 @@ export function SegmentedControl<T extends string>({
   label,
 }: SegmentedControlProps<T>) {
   return (
-    <div role="radiogroup" aria-label={label} className="flex gap-0.5 rounded-lg bg-surface-muted p-0.5">
+    <div
+      role="radiogroup"
+      aria-label={label}
+      className="flex gap-0.5 rounded-lg bg-surface-muted p-0.5"
+    >
       {options.map((option) => {
         const active = option.value === value;
         return (

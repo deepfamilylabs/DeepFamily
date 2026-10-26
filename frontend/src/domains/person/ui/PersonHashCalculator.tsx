@@ -41,7 +41,6 @@ import {
 import { safeCanonicalizeFullName } from "../../../shared/identity/fullName";
 import { cryptoWorkerCall } from "../../../shared/workers/cryptoWorkerClient";
 
-
 const MAX_FULL_NAME_BYTES = 256;
 
 const getByteLength = (str: string): number => {
@@ -342,10 +341,7 @@ export const PersonHashCalculator = forwardRef<
           .refine(
             (data) => {
               // If AD (Anno Domini), the year must not exceed the current year
-              if (
-                !data.isBirthBC &&
-                data.birthYear > new Date().getFullYear()
-              ) {
+              if (!data.isBirthBC && data.birthYear > new Date().getFullYear()) {
                 return false;
               }
               return true;
@@ -539,12 +535,7 @@ export const PersonHashCalculator = forwardRef<
         },
         clearSecretInputs,
       }),
-      [
-        getValues,
-        passphraseRevision,
-        requirePassphraseConfirmation,
-        clearSecretInputs,
-      ],
+      [getValues, passphraseRevision, requirePassphraseConfirmation, clearSecretInputs],
     );
 
     useEffect(() => {
@@ -700,15 +691,10 @@ export const PersonHashCalculator = forwardRef<
                   type="number"
                   min="0"
                   max={isBirthBC ? 9999 : new Date().getFullYear()}
-                  placeholder={
-                    isBirthBC
-                        ? "<10000"
-                        : "<=" + new Date().getFullYear()
-                  }
+                  placeholder={isBirthBC ? "<10000" : "<=" + new Date().getFullYear()}
                   className={MODAL_FIELD_SM}
                   {...register("birthYear", {
-                    setValueAs: (v) =>
-                      v === "" ? "" : parseInt(v, 10),
+                    setValueAs: (v) => (v === "" ? "" : parseInt(v, 10)),
                   })}
                 />
                 <FieldError message={errors.birthYear?.message} />
@@ -726,8 +712,7 @@ export const PersonHashCalculator = forwardRef<
                 placeholder={t("search.hashCalculator.birthMonth")}
                 className={MODAL_FIELD_SM}
                 {...register("birthMonth", {
-                  setValueAs: (v) =>
-                    v === "" ? "" : parseInt(v, 10),
+                  setValueAs: (v) => (v === "" ? "" : parseInt(v, 10)),
                 })}
               />
               <FieldError message={errors.birthMonth?.message} />
@@ -744,8 +729,7 @@ export const PersonHashCalculator = forwardRef<
                 placeholder={t("search.hashCalculator.birthDay")}
                 className={MODAL_FIELD_SM}
                 {...register("birthDay", {
-                  setValueAs: (v) =>
-                    v === "" ? "" : parseInt(v, 10),
+                  setValueAs: (v) => (v === "" ? "" : parseInt(v, 10)),
                 })}
               />
               <FieldError message={errors.birthDay?.message} />

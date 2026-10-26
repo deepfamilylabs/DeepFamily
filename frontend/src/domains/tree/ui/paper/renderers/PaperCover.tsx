@@ -44,13 +44,7 @@ function CoverPage({ children, testId }: { children: ReactNode; testId: string }
 
 // The bound spine needs enough information to identify the book when it is shelved. Keep it much
 // quieter than a body-page 版心: title in the optical center and hall at the foot.
-function CoverSpine({
-  title,
-  hallText,
-}: {
-  title: string;
-  hallText: string;
-}) {
+function CoverSpine({ title, hallText }: { title: string; hallText: string }) {
   return (
     <aside
       className="relative border-x"
@@ -444,9 +438,7 @@ function BackCoverColophon({
   return (
     <div
       className={`absolute bottom-36 flex flex-row-reverse items-center justify-center gap-4 px-5 py-7 ${
-        isArchive
-          ? "min-h-[184px] min-w-[120px] border-2"
-          : "min-h-[168px] min-w-[104px]"
+        isArchive ? "min-h-[184px] min-w-[120px] border-2" : "min-h-[168px] min-w-[104px]"
       } ${framed && !isArchive ? "border" : ""}`}
       style={{
         borderColor: framed ? COVER_SLIP_BORDER : undefined,
@@ -614,9 +606,7 @@ export function PaperCover({
   }
   // Keep the back cover in the printable cover spread. The publication colophon is intentionally
   // quieter than the front title slip. 谱终 belongs to body text.
-  const backPage = (
-    <CoverPage testId="paper-back-cover">{backCoverContent}</CoverPage>
-  );
+  const backPage = <CoverPage testId="paper-back-cover">{backCoverContent}</CoverPage>;
   // RTL (traditional) reads the right page first, so the cover sits on the right and the back cover
   // on the left; LTR mirrors it.
   const [leftPage, rightPage] = pageOrder === "rtl" ? [backPage, coverPage] : [coverPage, backPage];
@@ -624,11 +614,7 @@ export function PaperCover({
   return (
     <SpreadShell testId="paper-cover-spread">
       {leftPage}
-      {showCoverSpine ? (
-        <CoverSpine title={title} hallText={hallText} />
-      ) : (
-        <BlankCoverSpine />
-      )}
+      {showCoverSpine ? <CoverSpine title={title} hallText={hallText} /> : <BlankCoverSpine />}
       {rightPage}
     </SpreadShell>
   );

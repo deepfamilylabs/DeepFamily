@@ -66,14 +66,30 @@ const compactNumber = (value) => (value <= BigInt(Number.MAX_SAFE_INTEGER) ? Num
 // nodes change per write; clones retain the entire index without copying it.
 const mapHeight = (node) => node?.height ?? 0;
 const mapNode = (key, value, left, right) =>
-  Object.freeze({ key, value, left, right, height: 1 + Math.max(mapHeight(left), mapHeight(right)) });
+  Object.freeze({
+    key,
+    value,
+    left,
+    right,
+    height: 1 + Math.max(mapHeight(left), mapHeight(right)),
+  });
 const rotateLeft = (node) => {
   const pivot = node.right;
-  return mapNode(pivot.key, pivot.value, mapNode(node.key, node.value, node.left, pivot.left), pivot.right);
+  return mapNode(
+    pivot.key,
+    pivot.value,
+    mapNode(node.key, node.value, node.left, pivot.left),
+    pivot.right,
+  );
 };
 const rotateRight = (node) => {
   const pivot = node.left;
-  return mapNode(pivot.key, pivot.value, pivot.left, mapNode(node.key, node.value, pivot.right, node.right));
+  return mapNode(
+    pivot.key,
+    pivot.value,
+    pivot.left,
+    mapNode(node.key, node.value, pivot.right, node.right),
+  );
 };
 function balanceMap(node) {
   const difference = mapHeight(node.left) - mapHeight(node.right);
@@ -95,10 +111,13 @@ function mapGet(node, key) {
 }
 function mapSet(node, key, value) {
   if (!node) return mapNode(key, value);
-  if (key === node.key) return value === node.value ? node : mapNode(key, value, node.left, node.right);
-  return balanceMap(key < node.key
-    ? mapNode(node.key, node.value, mapSet(node.left, key, value), node.right)
-    : mapNode(node.key, node.value, node.left, mapSet(node.right, key, value)));
+  if (key === node.key)
+    return value === node.value ? node : mapNode(key, value, node.left, node.right);
+  return balanceMap(
+    key < node.key
+      ? mapNode(node.key, node.value, mapSet(node.left, key, value), node.right)
+      : mapNode(node.key, node.value, node.left, mapSet(node.right, key, value)),
+  );
 }
 function mapFirst(node) {
   while (node?.left) node = node.left;
@@ -106,8 +125,10 @@ function mapFirst(node) {
 }
 function mapDelete(node, key) {
   if (!node) return undefined;
-  if (key < node.key) return balanceMap(mapNode(node.key, node.value, mapDelete(node.left, key), node.right));
-  if (key > node.key) return balanceMap(mapNode(node.key, node.value, node.left, mapDelete(node.right, key)));
+  if (key < node.key)
+    return balanceMap(mapNode(node.key, node.value, mapDelete(node.left, key), node.right));
+  if (key > node.key)
+    return balanceMap(mapNode(node.key, node.value, node.left, mapDelete(node.right, key)));
   if (!node.left) return node.right;
   if (!node.right) return node.left;
   const next = mapFirst(node.right);
@@ -122,10 +143,12 @@ function removeLeafIndex(indices, leaf, index) {
 }
 
 const lineageLeaf = (value) => Object.freeze({ value });
-const lineageBranch = (left, right) => Object.freeze({
-  value: right ? hashLineageNodes(left.value, right.value) : left.value,
-  left, right,
-});
+const lineageBranch = (left, right) =>
+  Object.freeze({
+    value: right ? hashLineageNodes(left.value, right.value) : left.value,
+    left,
+    right,
+  });
 function writeLineageNode(node, level, index, value) {
   if (level === 0) return node?.value === value ? node : lineageLeaf(value);
   const right = (index >> BigInt(level - 1)) & 1n;
@@ -156,10 +179,18 @@ class LineageTree {
   #size = 0n;
   #depth = 0;
 
-  get root() { return this.#node?.value ?? 0n; }
-  get depth() { return this.#depth; }
-  get size() { return compactNumber(this.#size); }
-  get sizeBigInt() { return this.#size; }
+  get root() {
+    return this.#node?.value ?? 0n;
+  }
+  get depth() {
+    return this.#depth;
+  }
+  get size() {
+    return compactNumber(this.#size);
+  }
+  get sizeBigInt() {
+    return this.#size;
+  }
   get leaves() {
     const leaves = [];
     const visit = (node, level) => {
@@ -192,20 +223,26 @@ class LineageTree {
   getNode(level, index) {
     const height = Number(bigintFrom(level, "node.level", BigInt(LINEAGE_TREE_MAX_DEPTH)));
     const position = bigintFrom(index, "node.index", MAX_UINT64);
-    if ((position << BigInt(height)) >= this.#size) return undefined;
+    if (position << BigInt(height) >= this.#size) return undefined;
     return readLineageNode(this.#node, this.#depth, height, position)?.value;
   }
 
   exportNodes(previous) {
-    protocolAssert(previous === undefined || previous instanceof LineageTree,
-      "INVALID_LINEAGE_NODE", "Previous lineage tree must be a tree instance");
+    protocolAssert(
+      previous === undefined || previous instanceof LineageTree,
+      "INVALID_LINEAGE_NODE",
+      "Previous lineage tree must be a tree instance",
+    );
     return exportLineageNodes(this.#node, this.#depth, 0n, previous?.#node, previous?.#depth ?? -1);
   }
 
   insert(leaf) {
     const value = field(leaf, "leaf");
-    protocolAssert(this.#size < MAX_LINEAGE_LEAVES, "LINEAGE_TREE_FULL",
-      `Lineage tree cannot exceed ${MAX_LINEAGE_LEAVES} leaf slots`);
+    protocolAssert(
+      this.#size < MAX_LINEAGE_LEAVES,
+      "LINEAGE_TREE_FULL",
+      `Lineage tree cannot exceed ${MAX_LINEAGE_LEAVES} leaf slots`,
+    );
     const index = this.#size;
     const nextSize = index + 1n;
     const nextDepth = 1n << BigInt(this.#depth) < nextSize ? this.#depth + 1 : this.#depth;
@@ -224,15 +261,22 @@ class LineageTree {
     const oldValue = readLineageNode(this.#node, this.#depth, 0, position).value;
     if (oldValue === value) return;
     const next = writeLineageNode(this.#node, this.#depth, position, value);
-    const indices = addLeafIndex(removeLeafIndex(this.#indices, oldValue, position), value, position);
+    const indices = addLeafIndex(
+      removeLeafIndex(this.#indices, oldValue, position),
+      value,
+      position,
+    );
     this.#node = next;
     this.#indices = indices;
   }
 
   #checkedPosition(index) {
     const position = bigintFrom(index, "leafIndex", MAX_UINT64);
-    protocolAssert(position < this.#size, "LINEAGE_LEAF_INDEX_OUT_OF_RANGE",
-      `Lineage leaf index ${position} is outside tree size ${this.#size}`);
+    protocolAssert(
+      position < this.#size,
+      "LINEAGE_LEAF_INDEX_OUT_OF_RANGE",
+      `Lineage leaf index ${position} is outside tree size ${this.#size}`,
+    );
     return position;
   }
 
@@ -250,7 +294,12 @@ class LineageTree {
     let proofIndex = 0n;
     for (let level = 0; level < path.length; level++)
       if (path[level].right) proofIndex |= 1n << BigInt(level);
-    return { root: this.root, leaf: node.value, index: compactNumber(proofIndex), siblings: path.map((entry) => entry.value) };
+    return {
+      root: this.root,
+      leaf: node.value,
+      index: compactNumber(proofIndex),
+      siblings: path.map((entry) => entry.value),
+    };
   }
 
   static fromNodes(input, records) {
@@ -262,14 +311,17 @@ class LineageTree {
     for (const record of records) {
       const node = verifyLineageTreeNode(record);
       const key = `${node.level}:${node.index}`;
-      protocolAssert(node.level <= depth && (node.index << BigInt(node.level)) < size && !nodes.has(key),
-        "INVALID_LINEAGE_NODE", "Duplicate or out-of-range lineage node");
+      protocolAssert(
+        node.level <= depth && node.index << BigInt(node.level) < size && !nodes.has(key),
+        "INVALID_LINEAGE_NODE",
+        "Duplicate or out-of-range lineage node",
+      );
       nodes.set(key, node.value);
     }
     const tree = new LineageTree();
     let consumed = 0;
     const read = (level, index) => {
-      if ((index << BigInt(level)) >= size) return undefined;
+      if (index << BigInt(level) >= size) return undefined;
       const key = `${level}:${index}`;
       protocolAssert(nodes.has(key), "INVALID_LINEAGE_NODE", "Missing lineage node");
       const value = nodes.get(key);
@@ -279,21 +331,32 @@ class LineageTree {
         return lineageLeaf(value);
       }
       const node = lineageBranch(read(level - 1, index * 2n), read(level - 1, index * 2n + 1n));
-      protocolAssert(node.value === value, "INVALID_LINEAGE_NODE", "Lineage parent does not match its children");
+      protocolAssert(
+        node.value === value,
+        "INVALID_LINEAGE_NODE",
+        "Lineage parent does not match its children",
+      );
       return node;
     };
     tree.#node = read(depth, 0n);
     tree.#size = size;
     tree.#depth = depth;
-    protocolAssert(tree.root === root && consumed === nodes.size,
-      "INVALID_LINEAGE_NODE", "Lineage nodes do not match the expected root");
+    protocolAssert(
+      tree.root === root && consumed === nodes.size,
+      "INVALID_LINEAGE_NODE",
+      "Lineage nodes do not match the expected root",
+    );
     return tree;
   }
 }
 
 /** Check one slot record's canonical types/ranges, not its Merkle authentication. */
 export function verifyLineageTreeNode(input) {
-  protocolAssert(input && typeof input === "object", "INVALID_LINEAGE_NODE", "Lineage node is required");
+  protocolAssert(
+    input && typeof input === "object",
+    "INVALID_LINEAGE_NODE",
+    "Lineage node is required",
+  );
   return Object.freeze({
     level: Number(bigintFrom(input.level, "node.level", BigInt(LINEAGE_TREE_MAX_DEPTH))),
     index: bigintFrom(input.index, "node.index", MAX_UINT64),

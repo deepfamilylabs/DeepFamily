@@ -20,7 +20,8 @@ import {
   INTEGRATED_DEPLOYMENT_RECORDS,
   SHIELDED_DEPLOYMENT_CIRCUITS,
   RECEIVE_DEPLOYMENT_CONTRACTS,
-  receiveDeploymentConstructorArgs, receiveDeploymentLibraries,
+  receiveDeploymentConstructorArgs,
+  receiveDeploymentLibraries,
   integratedDeploymentAddresses,
 } from "./lib/zkDeploymentCatalog.mjs";
 import { assertImplementationMatchesArtifact } from "../tasks/lib/timelockUpgrade.mjs";
@@ -1517,10 +1518,7 @@ export const main = async (chainProfile) => {
         hre.artifacts,
         "Groth16VerifierAdapter",
         addresses.groth16VerifierAdapter,
-        [
-          addresses.personCommitmentVerifier,
-          addresses.disclosureBindingVerifier,
-        ],
+        [addresses.personCommitmentVerifier, addresses.disclosureBindingVerifier],
       ),
       await verificationEntry(hre.artifacts, "DeepFamily", addresses.deepFamilyImplementation, [], {
         PoseidonT5: addresses.poseidonT5,
@@ -1553,7 +1551,7 @@ export const main = async (chainProfile) => {
           PoseidonT6: addresses.poseidonT6,
         },
       ),
-      ...await receivingVerificationEntries(hre.artifacts,addresses,verificationEntry),
+      ...(await receivingVerificationEntries(hre.artifacts, addresses, verificationEntry)),
     ];
     await verifyContracts({ entries: verificationEntries, checkpoint, saveCheckpoint });
 

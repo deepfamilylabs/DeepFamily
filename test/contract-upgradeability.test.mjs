@@ -35,7 +35,9 @@ describe("UUPS upgradeability", function () {
     const nameBefore = await deepFamily.name();
 
     const upgradeImplementation = await deployUpgradeImplementation(poseidonT5, adultAgeGate);
-    await (await deepFamily.upgradeToAndCall(await upgradeImplementation.getAddress(), "0x")).wait();
+    await (
+      await deepFamily.upgradeToAndCall(await upgradeImplementation.getAddress(), "0x")
+    ).wait();
 
     const upgraded = await hre.ethers.getContractAt("DeepFamilyUpgradeMock", proxyAddress);
 
@@ -107,7 +109,10 @@ describe("UUPS upgradeability", function () {
       deepFamily.connect(deployer).upgradeToAndCall(upgradeImplementationAddress, "0x"),
     ).to.be.revertedWithCustomError(deepFamily, "OwnableUnauthorizedAccount");
 
-    const data = deepFamily.interface.encodeFunctionData("upgradeToAndCall", [upgradeImplementationAddress, "0x"]);
+    const data = deepFamily.interface.encodeFunctionData("upgradeToAndCall", [
+      upgradeImplementationAddress,
+      "0x",
+    ]);
     const salt = hre.ethers.id("upgrade-main");
 
     // Schedule the upgrade through the timelock.

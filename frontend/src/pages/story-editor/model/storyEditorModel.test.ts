@@ -48,9 +48,9 @@ describe("storyEditorModel", () => {
     expect(isRecordFormDirty({ title: "", content: "", recordType: 2, attachmentURI: "" })).toBe(
       true,
     );
-    expect(isRecordFormDirty({ title: "", content: "", recordType: 1, attachmentURI: "ipfs://cid" })).toBe(
-      true,
-    );
+    expect(
+      isRecordFormDirty({ title: "", content: "", recordType: 1, attachmentURI: "ipfs://cid" }),
+    ).toBe(true);
   });
 
   it("counts bytes and resolves ipfs attachment URLs", () => {

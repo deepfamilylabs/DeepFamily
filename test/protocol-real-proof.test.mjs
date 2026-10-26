@@ -19,12 +19,7 @@ import {
   sourceFactFixture,
   sourceTrustFixture,
 } from "../circuits/test/eligibility_source_fixture.mjs";
-import {
-  fundFixture,
-  claimFixture,
-  poolTag,
-} from "../circuits/test/budget_fixture.mjs";
-
+import { fundFixture, claimFixture, poolTag } from "../circuits/test/budget_fixture.mjs";
 
 const root = path.resolve(import.meta.dirname, "..");
 const required = process.env.REQUIRE_PROTOCOL_REAL_PROOFS === "1";
@@ -162,7 +157,10 @@ test(
         });
       }
       assert.equal(summary.generatedProofs, Object.keys(PROTOCOL_CIRCUITS).length);
-      assert.equal(summary.rejectedPublicMutations, Object.values(PROTOCOL_CIRCUITS).reduce((total, spec) => total + spec.publicSignals, 0));
+      assert.equal(
+        summary.rejectedPublicMutations,
+        Object.values(PROTOCOL_CIRCUITS).reduce((total, spec) => total + spec.publicSignals, 0),
+      );
       fs.writeFileSync(
         path.join(directory, "summary.json"),
         `${JSON.stringify(summary, null, 2)}\n`,

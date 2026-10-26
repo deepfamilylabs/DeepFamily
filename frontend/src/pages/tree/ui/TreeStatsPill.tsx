@@ -11,7 +11,12 @@ export interface TreeStatsPillProps {
  * The counts, for widths where the page bar has room only for the volume tabs. Rides the same
  * floating-card language as the palette it sits next to.
  */
-export function TreeStatsPill({ t, peopleCount, generationCount, className = "" }: TreeStatsPillProps) {
+export function TreeStatsPill({
+  t,
+  peopleCount,
+  generationCount,
+  className = "",
+}: TreeStatsPillProps) {
   return (
     <span
       className={`inline-flex h-[34px] items-center gap-2 rounded-xl border border-hairline bg-surface/95 px-3 text-xs text-ink-muted shadow-sm backdrop-blur-sm ${className}`}

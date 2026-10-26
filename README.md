@@ -84,10 +84,10 @@ DeepFamily creates the decentralized family tree infrastructure, using zero-know
 | **PersonCommitmentVerifier.sol**  | ZK verifier for person identity and parent commitment proofs                                                        |
 | **DisclosureBindingVerifier.sol** | ZK verifier for NFT mint disclosure-binding proofs                                                                  |
 | **DeepFamilyLineageIndex.sol**    | Immutable Poseidon Merkle mirror of endorsements and recommended sources, written by the DeepFamily proxy           |
-| **EligibilitySource.sol**        | Authenticated lineage facts, trusted sources and current role revocations                                          |
-| **ReceiveRegistry.sol**          | Qualification issuance, generic receiving authorization and family budget capabilities                             |
-| **LetterArchive.sol**            | Encrypted letters authorized by the same receiving code                                                            |
-| **ShieldedPoolCore.sol**          | Common multi-asset ledger with budget contributions, claims, transfers and exits                                   |
+| **EligibilitySource.sol**         | Authenticated lineage facts, trusted sources and current role revocations                                           |
+| **ReceiveRegistry.sol**           | Qualification issuance, generic receiving authorization and family budget capabilities                              |
+| **LetterArchive.sol**             | Encrypted letters authorized by the same receiving code                                                             |
+| **ShieldedPoolCore.sol**          | Common multi-asset ledger with budget contributions, claims, transfers and exits                                    |
 | **ShieldedErc20Pool.sol**         | One immutable ERC-20 pool with exact sender/recipient transfer checks                                               |
 | **ShieldedNativePool.sol**        | Direct native-currency pool with exact deposit value and reverting payouts                                          |
 | **ShieldedPoolFactory.sol**       | Permissionless canonical pool creation for gas only, with no administrator                                          |
@@ -155,19 +155,19 @@ reject missing or mismatched artifacts. See [ZK proofs](docs/zk-proofs.md#develo
 
 The protocol uses 13 Circom relations: two identity/disclosure, three money boundaries and eight receiving/qualification/budget relations. `dfreceive` is the sole receiving-code format. A payer can use the code for letters, transfers and future budget contributions while the recipient remains offline. See [receiving codes and letters](docs/private-letters.md).
 
-| Command | Purpose |
-| --- | --- |
-| `npm run zk:fetch` | Install the pinned Circom toolchain |
-| `npm run zk:build` | Compile the 13 canonical relations |
-| `npm run zk:assets:fetch` | Download and verify the manifest-pinned proving files |
-| `npm run zk:dev` | Compile all 13 relations, regenerate 11 receiving/boundary development key sets and reuse identity/disclosure keys |
-| `npm run zk:dev:check` | Verify the complete 13-relation artifact bundle without replacing keys |
-| `npm run zk:check` | Rebuild all 13 relations and check pinned artifacts and real proofs |
-| `npm run zk:frontend -- <chainId> <registry>` | Export trusted frontend receiving artifacts |
-| `npm run test:circuits` | Check current circuit constraints without proving keys |
-| `npm run test:proof` | Verify eight real receiving proofs and public-signal binding |
-| `npm run test:qualifications` | Run localhost browser acceptance with three isolated wallets and actual qualification/funding proofs |
-| `npm run test:evm` | Exercise the complete real-proof money and eligibility flow |
+| Command                                       | Purpose                                                                                                            |
+| --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `npm run zk:fetch`                            | Install the pinned Circom toolchain                                                                                |
+| `npm run zk:build`                            | Compile the 13 canonical relations                                                                                 |
+| `npm run zk:assets:fetch`                     | Download and verify the manifest-pinned proving files                                                              |
+| `npm run zk:dev`                              | Compile all 13 relations, regenerate 11 receiving/boundary development key sets and reuse identity/disclosure keys |
+| `npm run zk:dev:check`                        | Verify the complete 13-relation artifact bundle without replacing keys                                             |
+| `npm run zk:check`                            | Rebuild all 13 relations and check pinned artifacts and real proofs                                                |
+| `npm run zk:frontend -- <chainId> <registry>` | Export trusted frontend receiving artifacts                                                                        |
+| `npm run test:circuits`                       | Check current circuit constraints without proving keys                                                             |
+| `npm run test:proof`                          | Verify eight real receiving proofs and public-signal binding                                                       |
+| `npm run test:qualifications`                 | Run localhost browser acceptance with three isolated wallets and actual qualification/funding proofs               |
+| `npm run test:evm`                            | Exercise the complete real-proof money and eligibility flow                                                        |
 
 Local development keys are not approved production keys. Production setup and release remain blocked until all 13 relations have reviewed ceremony evidence. Browser WASM/zkey files are generated/downloaded artifacts; proof keys cannot be selected by a scanned receiving code. The project has one protocol and no compatibility entry points for previous receiving designs.
 

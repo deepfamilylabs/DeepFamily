@@ -14,13 +14,26 @@ import { compressZkAssets } from "../scripts/compress-zk-assets.mjs";
 const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
 const CORE = ["person_commitment", "disclosure_binding"];
 const BOUNDARIES = ["shielded_shield", "shielded_unshield", "shielded_unshield_4"];
-const PROTOCOL = ["eligibility_source_fact", "eligibility_source_trust", "eligibility_issue", "receive_code", "budget_capability", "budget_deposit", "budget_claim", "value_transfer"];
-const BYTES = Object.fromEntries([
-  ...CORE.map(name => ["", name]), ...BOUNDARIES.map(name => ["shielded/", name]), ...PROTOCOL.map(name => ["protocol/", name]),
-].flatMap(([directory, name]) => [
-  [`frontend/public/zk/${directory}${name}.wasm`, Buffer.from(`${name}-wasm`)],
-  [`frontend/public/zk/${directory}${name}_final.zkey`, Buffer.from(`${name}-zkey`)],
-]));
+const PROTOCOL = [
+  "eligibility_source_fact",
+  "eligibility_source_trust",
+  "eligibility_issue",
+  "receive_code",
+  "budget_capability",
+  "budget_deposit",
+  "budget_claim",
+  "value_transfer",
+];
+const BYTES = Object.fromEntries(
+  [
+    ...CORE.map((name) => ["", name]),
+    ...BOUNDARIES.map((name) => ["shielded/", name]),
+    ...PROTOCOL.map((name) => ["protocol/", name]),
+  ].flatMap(([directory, name]) => [
+    [`frontend/public/zk/${directory}${name}.wasm`, Buffer.from(`${name}-wasm`)],
+    [`frontend/public/zk/${directory}${name}_final.zkey`, Buffer.from(`${name}-zkey`)],
+  ]),
+);
 const ASSET_COUNT = 26;
 const digest = (file) => sha256(BYTES[`frontend/public/zk/${file}`]);
 const CREDENTIALS = {
@@ -35,18 +48,60 @@ describe("ZK public proving assets", function () {
   beforeEach(function () {
     root = fs.mkdtempSync(path.join(os.tmpdir(), "deepfamily-zk-assets-"));
     fs.mkdirSync(path.join(root, "circuits"));
-    fs.writeFileSync(path.join(root, "circuits/zk-artifacts-manifest.json"), JSON.stringify({ circuits: Object.fromEntries(CORE.map(name => [name, {
-      wasmSha256: digest(`${name}.wasm`), zkeySha256: digest(`${name}_final.zkey`),
-    }])) }));
-    fs.writeFileSync(path.join(root, "circuits/shielded-development-manifest.json"), JSON.stringify({ circuits: Object.fromEntries(["shield", "unshield", "unshield4"].map((action, index) => [action, {
-      source: BOUNDARIES[index], wasmSha256: digest(`shielded/${BOUNDARIES[index]}.wasm`), zkeySha256: digest(`shielded/${BOUNDARIES[index]}_final.zkey`),
-    }])) }));
-    fs.writeFileSync(path.join(root, "circuits/receive-development-manifest.json"), JSON.stringify({ protocol: "deepfamily.receive", production:false,
-      circuits: Object.fromEntries(PROTOCOL.map(source => [source, { source,
-        compiled: { [`frontend/public/zk/protocol/${source}.wasm`]:digest(`protocol/${source}.wasm`) },
-        setup: { artifacts: { [`frontend/public/zk/protocol/${source}_final.zkey`]:digest(`protocol/${source}_final.zkey`) } },
-      }])),
-    }));
+    fs.writeFileSync(
+      path.join(root, "circuits/zk-artifacts-manifest.json"),
+      JSON.stringify({
+        circuits: Object.fromEntries(
+          CORE.map((name) => [
+            name,
+            {
+              wasmSha256: digest(`${name}.wasm`),
+              zkeySha256: digest(`${name}_final.zkey`),
+            },
+          ]),
+        ),
+      }),
+    );
+    fs.writeFileSync(
+      path.join(root, "circuits/shielded-development-manifest.json"),
+      JSON.stringify({
+        circuits: Object.fromEntries(
+          ["shield", "unshield", "unshield4"].map((action, index) => [
+            action,
+            {
+              source: BOUNDARIES[index],
+              wasmSha256: digest(`shielded/${BOUNDARIES[index]}.wasm`),
+              zkeySha256: digest(`shielded/${BOUNDARIES[index]}_final.zkey`),
+            },
+          ]),
+        ),
+      }),
+    );
+    fs.writeFileSync(
+      path.join(root, "circuits/receive-development-manifest.json"),
+      JSON.stringify({
+        protocol: "deepfamily.receive",
+        production: false,
+        circuits: Object.fromEntries(
+          PROTOCOL.map((source) => [
+            source,
+            {
+              source,
+              compiled: {
+                [`frontend/public/zk/protocol/${source}.wasm`]: digest(`protocol/${source}.wasm`),
+              },
+              setup: {
+                artifacts: {
+                  [`frontend/public/zk/protocol/${source}_final.zkey`]: digest(
+                    `protocol/${source}_final.zkey`,
+                  ),
+                },
+              },
+            },
+          ]),
+        ),
+      }),
+    );
   });
   afterEach(function () {
     fs.rmSync(root, { recursive: true, force: true });
@@ -67,21 +122,25 @@ describe("ZK public proving assets", function () {
   it("lists exactly the current 13 public relation pairs by pinned digest", function () {
     const assets = listZkPublicAssets(root);
     expect(assets).to.have.length(ASSET_COUNT);
-    expect(new Set(assets.map(asset => asset.path)).size).to.equal(ASSET_COUNT);
+    expect(new Set(assets.map((asset) => asset.path)).size).to.equal(ASSET_COUNT);
     for (const asset of assets) {
       expect(asset.sha256).to.equal(sha256(BYTES[asset.file]));
       expect(asset.key).to.equal(`${asset.sha256}/${path.basename(asset.file)}.br`);
     }
-    expect(assets.filter(asset => asset.path.includes("/protocol/"))).to.have.length(16);
-    expect(fs.existsSync(path.join(root, "zk-artifacts"))).to.equal(false,
-      "a fresh checkout can enumerate and fetch artifacts using only committed manifests");
+    expect(assets.filter((asset) => asset.path.includes("/protocol/"))).to.have.length(16);
+    expect(fs.existsSync(path.join(root, "zk-artifacts"))).to.equal(
+      false,
+      "a fresh checkout can enumerate and fetch artifacts using only committed manifests",
+    );
   });
   it("rejects an incomplete receiving relation graph", function () {
     const file = path.join(root, "circuits/receive-development-manifest.json");
-    const manifest = JSON.parse(fs.readFileSync(file,"utf8"));
+    const manifest = JSON.parse(fs.readFileSync(file, "utf8"));
     delete manifest.circuits.receive_code;
     fs.writeFileSync(file, JSON.stringify(manifest));
-    expect(()=>listZkPublicAssets(root)).to.throw("All eight receiving proof statements are required");
+    expect(() => listZkPublicAssets(root)).to.throw(
+      "All eight receiving proof statements are required",
+    );
   });
 
   it("rejects substituted or duplicated statement sources even when the relation count matches", function () {
@@ -91,7 +150,9 @@ describe("ZK public proving assets", function () {
       const manifest = structuredClone(original);
       manifest.circuits.eligibility_source_trust.source = source;
       fs.writeFileSync(file, JSON.stringify(manifest));
-      expect(() => listZkPublicAssets(root)).to.throw("All eight receiving proof statements are required");
+      expect(() => listZkPublicAssets(root)).to.throw(
+        "All eight receiving proof statements are required",
+      );
     }
   });
 
@@ -106,7 +167,11 @@ describe("ZK public proving assets", function () {
       log: () => {},
     });
     expect(result).to.deep.equal({ assetCount: ASSET_COUNT, downloaded: ASSET_COUNT - 1 });
-    expect(requests).to.deep.equal(listZkPublicAssets(root).filter(asset => asset.file !== "frontend/public/zk/person_commitment.wasm").map(asset => `https://assets.example/${asset.key}`));
+    expect(requests).to.deep.equal(
+      listZkPublicAssets(root)
+        .filter((asset) => asset.file !== "frontend/public/zk/person_commitment.wasm")
+        .map((asset) => `https://assets.example/${asset.key}`),
+    );
     for (const [file, bytes] of Object.entries(BYTES)) {
       expect(fs.readFileSync(path.join(root, file))).to.deep.equal(bytes);
     }
@@ -218,8 +283,13 @@ describe("ZK public proving assets", function () {
         /^AWS4-HMAC-SHA256 Credential=key-id\/\d{8}\/auto\/s3\/aws4_request, SignedHeaders=cache-control;content-encoding;content-type;host;x-amz-content-sha256;x-amz-date, Signature=[0-9a-f]{64}$/,
       );
     }
-    expect(puts.map(put => put.headers["content-type"])).to.deep.equal(
-      listZkPublicAssets(root).filter(asset => asset.key !== existingKey).map(asset => asset.file.endsWith(".wasm") ? "application/wasm" : "application/octet-stream"));
+    expect(puts.map((put) => put.headers["content-type"])).to.deep.equal(
+      listZkPublicAssets(root)
+        .filter((asset) => asset.key !== existingKey)
+        .map((asset) =>
+          asset.file.endsWith(".wasm") ? "application/wasm" : "application/octet-stream",
+        ),
+    );
   });
 
   it("compresses, reuses valid sidecars and repairs corrupt or stale copies", async function () {
@@ -316,10 +386,7 @@ describe("ZK public proving assets", function () {
 
   it("refuses to publish local files that differ from the manifest", async function () {
     for (const file of Object.keys(BYTES)) writeLocal(file);
-    writeLocal(
-      "frontend/public/zk/protocol/budget_deposit_final.zkey",
-      Buffer.from("regenerated"),
-    );
+    writeLocal("frontend/public/zk/protocol/budget_deposit_final.zkey", Buffer.from("regenerated"));
     let error;
     try {
       await publishZkAssets({

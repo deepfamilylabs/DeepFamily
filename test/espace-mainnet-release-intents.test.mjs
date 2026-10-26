@@ -28,9 +28,20 @@ const MIN_DELAY = 604_800;
 
 const artifactPaths = {
   FixedGroth16Verifier: "artifacts/contracts/FixedGroth16Verifier.sol/FixedGroth16Verifier.json",
-  ShieldedBoundaryVerifierAdapter: "artifacts/contracts/adapters/ShieldedBoundaryVerifierAdapter.sol/ShieldedBoundaryVerifierAdapter.json",
-  ...Object.fromEntries(Object.values(PROTOCOL_DEPLOYMENT_CIRCUITS).map(spec => [spec.contract, `artifacts/contracts/generated/protocol/${spec.contract}.sol/${spec.contract}.json`])),
-  ...Object.fromEntries(RECEIVE_DEPLOYMENT_CONTRACTS.map(({contractName}) => [contractName, `artifacts/contracts/${contractName}.sol/${contractName}.json`])),
+  ShieldedBoundaryVerifierAdapter:
+    "artifacts/contracts/adapters/ShieldedBoundaryVerifierAdapter.sol/ShieldedBoundaryVerifierAdapter.json",
+  ...Object.fromEntries(
+    Object.values(PROTOCOL_DEPLOYMENT_CIRCUITS).map((spec) => [
+      spec.contract,
+      `artifacts/contracts/generated/protocol/${spec.contract}.sol/${spec.contract}.json`,
+    ]),
+  ),
+  ...Object.fromEntries(
+    RECEIVE_DEPLOYMENT_CONTRACTS.map(({ contractName }) => [
+      contractName,
+      `artifacts/contracts/${contractName}.sol/${contractName}.json`,
+    ]),
+  ),
   ...Object.fromEntries(
     Object.values(SHIELDED_DEPLOYMENT_CIRCUITS).map((spec) => [
       spec.verifierContractName,
@@ -135,7 +146,9 @@ describe("eSpace Mainnet release transaction intents", function () {
     const intents = await build();
     expect(intents.map(({ label }) => label)).to.deep.equal(MAINNET_TRANSACTION_LABELS);
     expect(intents).to.have.length(MAINNET_TRANSACTION_LABELS.length);
-    expect(intents.filter(({ kind }) => kind === "deployment")).to.have.length(INTEGRATED_DEPLOYMENT_RECORDS.length + 1);
+    expect(intents.filter(({ kind }) => kind === "deployment")).to.have.length(
+      INTEGRATED_DEPLOYMENT_RECORDS.length + 1,
+    );
     for (const [index, intent] of intents.entries()) {
       expect(intent.nonce).to.equal(STARTING_NONCE + index);
       expect(intent.from).to.equal(ethers.getAddress(DEPLOYER));
@@ -182,23 +195,85 @@ describe("eSpace Mainnet release transaction intents", function () {
     ]);
     expect(adapterArgs[0]).to.equal(byLabel.personCommitmentVerifier.predictedAddress);
     expect(adapterArgs[1]).to.equal(byLabel.disclosureBindingVerifier.predictedAddress);
-    const boundaryArgs = decodeConstructor("shieldedBoundaryVerifierAdapter", "ShieldedBoundaryVerifierAdapter", Array(3).fill("address"));
-    expect([...boundaryArgs]).to.deep.equal(["shieldedShieldVerifier","shieldedUnshieldVerifier","shieldedUnshield4Verifier"].map(label=>byLabel[label].predictedAddress));
+    const boundaryArgs = decodeConstructor(
+      "shieldedBoundaryVerifierAdapter",
+      "ShieldedBoundaryVerifierAdapter",
+      Array(3).fill("address"),
+    );
+    expect([...boundaryArgs]).to.deep.equal(
+      ["shieldedShieldVerifier", "shieldedUnshieldVerifier", "shieldedUnshield4Verifier"].map(
+        (label) => byLabel[label].predictedAddress,
+      ),
+    );
     for (const spec of Object.values(PROTOCOL_DEPLOYMENT_CIRCUITS)) {
-      const args = decodeConstructor(spec.adapterLabel, "FixedGroth16Verifier", ["address", "uint256"]);
+      const args = decodeConstructor(spec.adapterLabel, "FixedGroth16Verifier", [
+        "address",
+        "uint256",
+      ]);
       expect(args[0]).to.equal(byLabel[spec.generatedLabel].predictedAddress);
       expect(args[1]).to.equal(BigInt(spec.publicSignals));
     }
-    const poolArgs = decodeConstructor("shieldedPoolFactory", "ShieldedPoolFactory", Array(7).fill("address"));
-    expect([...poolArgs]).to.deep.equal(["deepFamilyToken","shieldedBoundaryVerifierAdapter","shieldedNativePool","receiveRegistry","protocolFundVerifier","protocolClaimVerifier","protocolTransferVerifier"].map(label=>byLabel[label].predictedAddress));
-    const nativeArgs = decodeConstructor("shieldedNativePool", "ShieldedNativePool", Array(5).fill("address"));
-    expect([...nativeArgs]).to.deep.equal(["shieldedBoundaryVerifierAdapter","receiveRegistry","protocolFundVerifier","protocolClaimVerifier","protocolTransferVerifier"].map(label=>byLabel[label].predictedAddress));
-    const sourceArgs = decodeConstructor("eligibilitySource", "EligibilitySource", Array(3).fill("address"));
-    expect([...sourceArgs]).to.deep.equal(["deepFamilyLineageIndex","protocolSourceFactVerifier","protocolSourceTrustVerifier"].map(label=>byLabel[label].predictedAddress));
-    const registryArgs = decodeConstructor("receiveRegistry", "ReceiveRegistry", Array(4).fill("address"));
-    expect([...registryArgs]).to.deep.equal(["eligibilitySource","protocolIssueVerifier","protocolCodeVerifier","protocolCapabilityVerifier"].map(label=>byLabel[label].predictedAddress));
-    const letterArgs = decodeConstructor("letterArchive", "LetterArchive", Array(2).fill("address"));
-    expect([...letterArgs]).to.deep.equal(["deepFamilyProxy","receiveRegistry"].map(label=>byLabel[label].predictedAddress));
+    const poolArgs = decodeConstructor(
+      "shieldedPoolFactory",
+      "ShieldedPoolFactory",
+      Array(7).fill("address"),
+    );
+    expect([...poolArgs]).to.deep.equal(
+      [
+        "deepFamilyToken",
+        "shieldedBoundaryVerifierAdapter",
+        "shieldedNativePool",
+        "receiveRegistry",
+        "protocolFundVerifier",
+        "protocolClaimVerifier",
+        "protocolTransferVerifier",
+      ].map((label) => byLabel[label].predictedAddress),
+    );
+    const nativeArgs = decodeConstructor(
+      "shieldedNativePool",
+      "ShieldedNativePool",
+      Array(5).fill("address"),
+    );
+    expect([...nativeArgs]).to.deep.equal(
+      [
+        "shieldedBoundaryVerifierAdapter",
+        "receiveRegistry",
+        "protocolFundVerifier",
+        "protocolClaimVerifier",
+        "protocolTransferVerifier",
+      ].map((label) => byLabel[label].predictedAddress),
+    );
+    const sourceArgs = decodeConstructor(
+      "eligibilitySource",
+      "EligibilitySource",
+      Array(3).fill("address"),
+    );
+    expect([...sourceArgs]).to.deep.equal(
+      ["deepFamilyLineageIndex", "protocolSourceFactVerifier", "protocolSourceTrustVerifier"].map(
+        (label) => byLabel[label].predictedAddress,
+      ),
+    );
+    const registryArgs = decodeConstructor(
+      "receiveRegistry",
+      "ReceiveRegistry",
+      Array(4).fill("address"),
+    );
+    expect([...registryArgs]).to.deep.equal(
+      [
+        "eligibilitySource",
+        "protocolIssueVerifier",
+        "protocolCodeVerifier",
+        "protocolCapabilityVerifier",
+      ].map((label) => byLabel[label].predictedAddress),
+    );
+    const letterArgs = decodeConstructor(
+      "letterArchive",
+      "LetterArchive",
+      Array(2).fill("address"),
+    );
+    expect([...letterArgs]).to.deep.equal(
+      ["deepFamilyProxy", "receiveRegistry"].map((label) => byLabel[label].predictedAddress),
+    );
 
     const deepData = byLabel.deepFamilyImplementation.data.slice(2);
     for (const [sourceName, libraries] of Object.entries(loaded.DeepFamily.linkReferences)) {
@@ -250,10 +325,15 @@ describe("eSpace Mainnet release transaction intents", function () {
       expect(args[1]).to.equal(1n);
       expect(args[2]).to.equal(byLabel.groth16VerifierAdapter.predictedAddress);
     }
-    const setSource = deepInterface.decodeFunctionData("setEligibilitySource", byLabel.setEligibilitySource.data);
+    const setSource = deepInterface.decodeFunctionData(
+      "setEligibilitySource",
+      byLabel.setEligibilitySource.data,
+    );
     expect(byLabel.setEligibilitySource.to).to.equal(byLabel.deepFamilyProxy.predictedAddress);
     expect(setSource[0]).to.equal(byLabel.eligibilitySource.predictedAddress);
-    expect(byLabel.setEligibilitySource.nonce).to.be.lessThan(byLabel.transferDeepFamilyOwnership.nonce);
+    expect(byLabel.setEligibilitySource.nonce).to.be.lessThan(
+      byLabel.transferDeepFamilyOwnership.nonce,
+    );
     const ownership = deepInterface.decodeFunctionData(
       "transferOwnership",
       byLabel.transferDeepFamilyOwnership.data,

@@ -16,12 +16,10 @@ export class QueryCache {
   private scopePrefix: string;
 
   constructor(store?: QueryCacheStore, scopePrefix: string = "") {
-    this.store =
-      store ??
-      {
-        cache: new Map<string, CacheEntry<any>>(),
-        inflight: new Map<string, Promise<any>>(),
-      };
+    this.store = store ?? {
+      cache: new Map<string, CacheEntry<any>>(),
+      inflight: new Map<string, Promise<any>>(),
+    };
     this.scopePrefix = scopePrefix;
   }
 

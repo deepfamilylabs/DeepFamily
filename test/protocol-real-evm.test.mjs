@@ -644,21 +644,19 @@ describe("Receive protocol actual Groth16 / EVM / HPKE acceptance", function () 
         });
       };
       const submitDeposit = (pool, recipient, result) =>
-        pool
-          .connect(payer)
-          .depositBudget(
-            recipient.tuple,
-            recipient.capability,
-            recipient.codeProof,
-            recipient.capabilityProof,
-            {
-              policyCommitment: result.policyCommitment,
-              budgetKey: result.budgetKey,
-              eligibleFrom: result.eligibleFrom,
-            },
-            dataOf(result),
-            result.proofBytes,
-          );
+        pool.connect(payer).depositBudget(
+          recipient.tuple,
+          recipient.capability,
+          recipient.codeProof,
+          recipient.capabilityProof,
+          {
+            policyCommitment: result.policyCommitment,
+            budgetKey: result.budgetKey,
+            eligibleFrom: result.eligibleFrom,
+          },
+          dataOf(result),
+          result.proofBytes,
+        );
       await assert.rejects(
         () =>
           prepared(native, first, nativeDonor.donor, 0n, "deposit", {

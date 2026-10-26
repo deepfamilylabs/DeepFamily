@@ -46,7 +46,12 @@ describe("AddVersionSuccessResult", () => {
   });
 
   it("omits a parent that was never linked", () => {
-    renderResult({ fatherHash: ethers.ZeroHash, fatherVersionIndex: 0, motherHash, motherVersionIndex: 0 });
+    renderResult({
+      fatherHash: ethers.ZeroHash,
+      fatherVersionIndex: 0,
+      motherHash,
+      motherVersionIndex: 0,
+    });
 
     expect(labels()).toEqual(["Hash", "Version", "Mother", "Transaction"]);
   });
@@ -62,7 +67,10 @@ describe("AddVersionSuccessResult", () => {
   });
 
   it("shows a reward only when something was mined", () => {
-    renderResult({ fatherHash: ethers.ZeroHash, motherHash: ethers.ZeroHash }, 1_000_000_000_000_000_000n);
+    renderResult(
+      { fatherHash: ethers.ZeroHash, motherHash: ethers.ZeroHash },
+      1_000_000_000_000_000_000n,
+    );
 
     expect(labels()).toEqual(["Hash", "Version", "Reward", "Transaction"]);
     expect(screen.getByText("1 DEEP")).toBeTruthy();

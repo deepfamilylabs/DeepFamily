@@ -36,12 +36,10 @@ describe("accountReadGateway", () => {
   it("falls back to walking the on-chain index when no reader is available", async () => {
     const contract = {
       userEndorsedPersonsCount: vi.fn(async () => 3n),
-      userEndorsedPersonAt: vi.fn(async (_account: string, index: number) =>
-        [personA, personB, "0xcccc"][Number(index)],
+      userEndorsedPersonAt: vi.fn(
+        async (_account: string, index: number) => [personA, personB, "0xcccc"][Number(index)],
       ),
-      endorsedVersionIndex: vi.fn(async (personHash: string) =>
-        personHash === personA ? 1n : 2n,
-      ),
+      endorsedVersionIndex: vi.fn(async (personHash: string) => (personHash === personA ? 1n : 2n)),
     };
     const gateway = createAccountReadGateway(contract, null, new QueryCache());
 
@@ -60,8 +58,8 @@ describe("accountReadGateway", () => {
   it("stops at the balance when paging NFTs held by an account", async () => {
     const contract = {
       balanceOf: vi.fn(async () => 2n),
-      tokenOfOwnerByIndex: vi.fn(async (_account: string, index: number) =>
-        [101n, 202n][Number(index)],
+      tokenOfOwnerByIndex: vi.fn(
+        async (_account: string, index: number) => [101n, 202n][Number(index)],
       ),
       tokenIdToPerson: vi.fn(async (tokenId: number) => (tokenId === 101 ? personA : personB)),
       tokenIdToVersionIndex: vi.fn(async () => 3n),

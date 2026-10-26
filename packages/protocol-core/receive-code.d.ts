@@ -115,7 +115,10 @@ export function encodeReceiveCode(input: ReceiveCodeInput): string;
 export function decodeReceiveCode(code: string): ReceiveCode;
 /** Prefix detection only. */
 export function isReceiveCode(code: unknown): boolean;
-export type ProtocolProofVerifier = (proof: ProtocolProof, publicSignals: bigint[]) => Promise<boolean> | boolean;
+export type ProtocolProofVerifier = (
+  proof: ProtocolProof,
+  publicSignals: bigint[],
+) => Promise<boolean> | boolean;
 export function verifyReceiveCode(input: {
   code: string;
   verifyAuthorization: ProtocolProofVerifier;

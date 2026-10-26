@@ -93,7 +93,8 @@ import {
   INTEGRATED_DEPLOYMENT_RECORDS,
   SHIELDED_DEPLOYMENT_CIRCUITS,
   RECEIVE_DEPLOYMENT_CONTRACTS,
-  receiveDeploymentConstructorArgs, receiveDeploymentLibraries,
+  receiveDeploymentConstructorArgs,
+  receiveDeploymentLibraries,
   integratedDeploymentAddresses,
 } from "./lib/zkDeploymentCatalog.mjs";
 import {
@@ -102,7 +103,6 @@ import {
   shieldedDeploymentEvidence,
 } from "./lib/shieldedDeploymentEvidence.mjs";
 import { verifyShieldedReceipts } from "./lib/shieldedReceipts.mjs";
-
 
 const { addPersonVersion, mintPersonVersionNFT } = seedHelpers;
 
@@ -1927,10 +1927,7 @@ export const main = async (chainProfile) => {
         hre.artifacts,
         "Groth16VerifierAdapter",
         addresses.groth16VerifierAdapter,
-        [
-          addresses.personCommitmentVerifier,
-          addresses.disclosureBindingVerifier,
-        ],
+        [addresses.personCommitmentVerifier, addresses.disclosureBindingVerifier],
       ),
       await verificationEntry(hre.artifacts, "DeepFamily", addresses.deepFamilyImplementation, [], {
         PoseidonT5: addresses.poseidonT5,
@@ -1967,17 +1964,16 @@ export const main = async (chainProfile) => {
         },
       ),
     );
-    initialVerificationEntries.push(...await receivingVerificationEntries(hre.artifacts,addresses,verificationEntry));
+    initialVerificationEntries.push(
+      ...(await receivingVerificationEntries(hre.artifacts, addresses, verificationEntry)),
+    );
     if (config.runGovernanceLifecycle) {
       initialVerificationEntries.push({
         ...(await verificationEntry(
           hre.artifacts,
           "Groth16VerifierAdapter",
           addresses.governedVerifierCandidate,
-          [
-            addresses.personCommitmentVerifier,
-            addresses.disclosureBindingVerifier,
-          ],
+          [addresses.personCommitmentVerifier, addresses.disclosureBindingVerifier],
         )),
         label: "GovernedVerifierCandidate",
       });
@@ -2678,7 +2674,10 @@ export const main = async (chainProfile) => {
         addresses.deepFamily,
         runDeployer,
       );
-      assertCondition((await deepFamilyUpgraded.version()) === "upgraded", "Upgraded proxy does not expose upgraded");
+      assertCondition(
+        (await deepFamilyUpgraded.version()) === "upgraded",
+        "Upgraded proxy does not expose upgraded",
+      );
       assertCondition(
         (await deepFamilyUpgraded.owner()) === timelockAddress,
         "Upgrade changed DeepFamily owner",
@@ -3476,7 +3475,10 @@ export const main = async (chainProfile) => {
         () => implementationAddress(ethers, provider, addresses.deepFamily),
       );
       const terminalPersonVerifier = await terminalRead("terminal person verifier", () =>
-        deepFamilyUpgraded.verifierRegistry(PERSON_RELATION_PURPOSE, RELEASE_PERSON_RELATION_CIRCUIT_ID),
+        deepFamilyUpgraded.verifierRegistry(
+          PERSON_RELATION_PURPOSE,
+          RELEASE_PERSON_RELATION_CIRCUIT_ID,
+        ),
       );
       const terminalGovernedPersonVerifier = await terminalRead(
         "terminal governed person verifier",

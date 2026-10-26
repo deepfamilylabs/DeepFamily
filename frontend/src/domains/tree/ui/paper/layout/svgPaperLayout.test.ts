@@ -4,9 +4,7 @@ import { buildPaperGenerations, PAPER_GENEALOGY_STYLE, type TranslateFn } from "
 import { buildSvgPaperLayout } from "./svgPaperLayout";
 
 const translate: TranslateFn = (key, fallback, options) =>
-  (fallback || key).replace(/{{\s*(\w+)\s*}}/g, (_match, name) =>
-    String(options?.[name] ?? ""),
-  );
+  (fallback || key).replace(/{{\s*(\w+)\s*}}/g, (_match, name) => String(options?.[name] ?? ""));
 
 function makeGraph() {
   const rootHash = "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";

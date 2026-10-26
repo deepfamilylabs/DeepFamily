@@ -112,7 +112,10 @@ function RecordBody({ record }: { record: StoryRecord }) {
     const { label, url, displayUrl } = splitReferenceLink(record.content);
     return (
       <>
-        <p className="whitespace-pre-wrap break-words text-[15.5px] leading-[1.8] text-ink" style={PRETTY}>
+        <p
+          className="whitespace-pre-wrap break-words text-[15.5px] leading-[1.8] text-ink"
+          style={PRETTY}
+        >
           {label}
         </p>
         {url && (
@@ -131,7 +134,10 @@ function RecordBody({ record }: { record: StoryRecord }) {
   }
 
   return (
-    <p className="whitespace-pre-wrap break-words text-[15.5px] leading-[1.8] text-ink" style={PRETTY}>
+    <p
+      className="whitespace-pre-wrap break-words text-[15.5px] leading-[1.8] text-ink"
+      style={PRETTY}
+    >
       {record.content}
     </p>
   );

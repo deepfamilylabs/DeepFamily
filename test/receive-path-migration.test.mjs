@@ -20,26 +20,48 @@ describe("Receiving path migration against actual contracts", function () {
       const output = path.join(directory, "receiveChain.mjs");
       await build({
         entryPoints: [path.join(root, "frontend/src/shared/clients/receiveChain.ts")],
-        outfile: output, bundle: true, platform: "node", format: "esm",
+        outfile: output,
+        bundle: true,
+        platform: "node",
+        format: "esm",
         external: ["ethers", "@deepfamily/protocol-core"],
-        define: { "import.meta.env": "{}" }, logLevel: "silent",
+        define: { "import.meta.env": "{}" },
+        logLevel: "silent",
       });
       const { ReceiveChain } = await import(pathToFileURL(output).href);
       const fixture = await createReceiveRevocationGasFixture(hre);
       await fixture.seedTo(3);
       const registryAddress = await fixture.registry.getAddress();
       const abi = hre.ethers.AbiCoder.defaultAbiCoder();
-      const issue = async credential => {
-        const factRoot = await fixture.source.sourceRoot(), trustRoot = await fixture.source.trustedRoot();
-        await (await fixture.registry.registerCredential(credential, factRoot, trustRoot,
-          abi.encode(["uint256[]"], [[credential, fixture.chainId, BigInt(registryAddress), factRoot, trustRoot]]))).wait();
+      const issue = async (credential) => {
+        const factRoot = await fixture.source.sourceRoot(),
+          trustRoot = await fixture.source.trustedRoot();
+        await (
+          await fixture.registry.registerCredential(
+            credential,
+            factRoot,
+            trustRoot,
+            abi.encode(
+              ["uint256[]"],
+              [[credential, fixture.chainId, BigInt(registryAddress), factRoot, trustRoot]],
+            ),
+          )
+        ).wait();
       };
       await issue(302n);
       await issue(303n);
-      const deployment = { chainId: fixture.chainId, registryAddress,
-        poolAddress: await fixture.pools[0].pool.getAddress() };
-      const expected = value => ({ leaf: value.leaf, root: value.root, index: value.index,
-        depth: value.depth, siblings: Array.from(value.siblings) });
+      const deployment = {
+        chainId: fixture.chainId,
+        registryAddress,
+        poolAddress: await fixture.pools[0].pool.getAddress(),
+      };
+      const expected = (value) => ({
+        leaf: value.leaf,
+        root: value.root,
+        index: value.index,
+        depth: value.depth,
+        siblings: Array.from(value.siblings),
+      });
       const local = new ReceiveChain(deployment, fixture.endorser, { stateReadMode: "rebuild" });
       const direct = new ReceiveChain(deployment, fixture.endorser, { stateReadMode: "chain" });
       const q = expected(await fixture.registry.getCredentialProof(2n));
@@ -53,7 +75,10 @@ describe("Receiving path migration against actual contracts", function () {
         assert.deepEqual(paths.trustedPath, trust);
         assert.equal(paths.sourceRoot, fact.root);
         assert.equal(paths.trustedRoot, trust.root);
-        assert.equal(paths.sourceAddress.toLowerCase(), (await fixture.source.getAddress()).toLowerCase());
+        assert.equal(
+          paths.sourceAddress.toLowerCase(),
+          (await fixture.source.getAddress()).toLowerCase(),
+        );
       }
       await issue(304n);
       const refreshed = expected(await fixture.registry.getCredentialProof(3n));

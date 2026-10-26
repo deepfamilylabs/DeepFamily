@@ -395,8 +395,7 @@ export const PAPER_BACK_COVER_MODE = {
   BLANK: "blank",
 } as const;
 
-export type PaperBackCoverMode =
-  (typeof PAPER_BACK_COVER_MODE)[keyof typeof PAPER_BACK_COVER_MODE];
+export type PaperBackCoverMode = (typeof PAPER_BACK_COVER_MODE)[keyof typeof PAPER_BACK_COVER_MODE];
 export const PAPER_BACK_COVER_MODES = Object.values(PAPER_BACK_COVER_MODE) as PaperBackCoverMode[];
 
 // ---- Appearance value + variable composition --------------------------------------------------

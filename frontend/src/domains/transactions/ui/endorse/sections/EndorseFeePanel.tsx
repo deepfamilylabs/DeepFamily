@@ -69,9 +69,7 @@ export function EndorseFeePanel({
           <span className="font-mono text-[13px] font-semibold text-ink">{recipientPercent}%</span>
         </div>
         <div className="flex items-center justify-between gap-3 px-4 py-3">
-          <span className="text-xs text-ink-muted">
-            {t("endorse.protocolFee", "Protocol fee")}
-          </span>
+          <span className="text-xs text-ink-muted">{t("endorse.protocolFee", "Protocol fee")}</span>
           <span className="font-mono text-[13px] font-semibold text-ink">{protocolPercent}%</span>
         </div>
       </div>

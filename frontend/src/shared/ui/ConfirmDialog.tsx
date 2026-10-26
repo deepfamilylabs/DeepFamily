@@ -103,7 +103,10 @@ export default function ConfirmDialog({
             </div>
             <div className="flex-1 min-w-0 space-y-1.5">
               {title ? (
-                <h3 id={titleId} className="modal-heading font-body text-base font-semibold text-ink">
+                <h3
+                  id={titleId}
+                  className="modal-heading font-body text-base font-semibold text-ink"
+                >
                   {title}
                 </h3>
               ) : null}

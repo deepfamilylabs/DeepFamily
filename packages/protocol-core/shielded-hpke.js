@@ -18,7 +18,9 @@ export const SHIELDED_HPKE_PLAINTEXT_BYTES = 464;
 export const SHIELDED_HPKE_MAX_PAYLOAD_BYTES = SHIELDED_HPKE_PLAINTEXT_BYTES - 3;
 export const SHIELDED_HPKE_ENVELOPE_VERSION = 1;
 
-const AAD_DOMAIN = keccak256(toUtf8Bytes(`DeepFamily:ShieldedNoteHPKE:v${SHIELDED_HPKE_ENVELOPE_VERSION}`));
+const AAD_DOMAIN = keccak256(
+  toUtf8Bytes(`DeepFamily:ShieldedNoteHPKE:v${SHIELDED_HPKE_ENVELOPE_VERSION}`),
+);
 const suite = new CipherSuite({
   kem: new DhkemX25519HkdfSha256(),
   kdf: new HkdfSha256(),

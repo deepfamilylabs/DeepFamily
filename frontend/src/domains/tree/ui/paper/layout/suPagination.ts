@@ -2,11 +2,7 @@ import type { NodeId } from "../../../../../shared/model";
 import type { TreeGraphData } from "../../../selectors";
 import type { PaperGeneration, PaperPerson, TranslateFn } from "../paperData";
 import { PAPER_RECORD_INLINE_PADDING } from "../paperStyles";
-import {
-  clipText,
-  getPaperGenerationMark,
-  splitTextByVisualUnits,
-} from "../paperText";
+import { clipText, getPaperGenerationMark, splitTextByVisualUnits } from "../paperText";
 import {
   OU_CHART_STEP,
   OU_GENERATIONS_PER_CHART,
@@ -170,11 +166,7 @@ function getSuVisibleName(person: PaperPerson): string {
   );
 }
 
-function getSuParentStemStartY(
-  person: PaperPerson,
-  rowY: number,
-  rowHeight: number,
-): number {
+function getSuParentStemStartY(person: PaperPerson, rowY: number, rowHeight: number): number {
   const femaleMarkLength = person.ui.gender === 2 ? 2 : 0;
   const nameLength = Array.from(getSuVisibleName(person)).length + femaleMarkLength;
   return Math.min(
@@ -188,10 +180,7 @@ export function getSuGenerationMark(depth: number, t: TranslateFn): string {
 }
 
 export function getSuFullRecordText(person: PaperPerson): string {
-  return (
-    person.classicalLines.map(formatSuRecordLine).join("，") ||
-    person.ui.shortHashText
-  );
+  return person.classicalLines.map(formatSuRecordLine).join("，") || person.ui.shortHashText;
 }
 
 export function getSuPageMetrics(
@@ -213,10 +202,7 @@ export function getSuPageWidth(side: SuPageSide, metrics: SuPageMetrics): number
     : metrics.leftBodyWidth;
 }
 
-export function splitSuRowEntries(
-  row: SuGenerationRow,
-  side: SuPageSide,
-): SuPersonEntry[] {
+export function splitSuRowEntries(row: SuGenerationRow, side: SuPageSide): SuPersonEntry[] {
   return row.entries.filter((entry) => entry.side === side);
 }
 
@@ -234,10 +220,7 @@ function getSideSpineContentGap(side: SuPageSide): number {
 
 function getSideSlotWidth(side: SuPageSide, metrics: SuPageMetrics): number {
   const capacity = getSideSlotCapacity(side, metrics);
-  return Math.max(
-    1,
-    (getSideBodyWidth(side, metrics) - getSideSpineContentGap(side)) / capacity,
-  );
+  return Math.max(1, (getSideBodyWidth(side, metrics) - getSideSpineContentGap(side)) / capacity);
 }
 
 function getSpreadSlotCapacity(metrics: SuPageMetrics): number {
@@ -297,10 +280,7 @@ export function splitSuRecordText(
       SU_BODY_COLUMN_WIDTH,
       groupSlotCount * position.slotWidth - nameLane - SU_BODY_PADDING_X,
     );
-    const columnCount = Math.max(
-      1,
-      Math.floor(availableBodyWidth / SU_BODY_COLUMN_WIDTH),
-    );
+    const columnCount = Math.max(1, Math.floor(availableBodyWidth / SU_BODY_COLUMN_WIDTH));
     const addedColumns = Math.max(1, columnCount - previousColumnCount);
     const budget = addedColumns * SU_COLUMN_UNIT_CAPACITY;
     const [chunk, ...rest] = splitTextByVisualUnits(remaining, budget);
@@ -487,10 +467,7 @@ function getConnectorHorizontalY(parent: SuPersonEntry, children: SuPersonEntry[
   return parent.branchY + (childTopY - parent.branchY) / 2;
 }
 
-function buildLocalConnector(
-  parent: SuPersonEntry,
-  children: SuPersonEntry[],
-): SuConnector {
+function buildLocalConnector(parent: SuPersonEntry, children: SuPersonEntry[]): SuConnector {
   const childCenters = children.map((child) => child.centerX);
   return {
     key: `local:${parent.side}:${parent.person.id}:${children
@@ -570,9 +547,7 @@ function buildSpreadBridgeConnector(params: {
 }): SuConnector {
   const { parent, children, metrics } = params;
   return {
-    key: `bridge:right:${parent.person.id}:${children
-      .map((child) => child.person.id)
-      .join(":")}`,
+    key: `bridge:right:${parent.person.id}:${children.map((child) => child.person.id).join(":")}`,
     kind: "bridge",
     side: "right",
     parentId: parent.person.id,
@@ -663,15 +638,11 @@ function buildConnectors(params: {
               side: childSide,
               metrics,
               boundaryX:
-                parent.side === "right" &&
-                childSide === "left" &&
-                continuesAfterParentSpread
+                parent.side === "right" && childSide === "left" && continuesAfterParentSpread
                   ? 0
                   : undefined,
               includeSpineBoundary:
-                parent.side === "right" &&
-                childSide === "left" &&
-                continuesAfterParentSpread,
+                parent.side === "right" && childSide === "left" && continuesAfterParentSpread,
             }),
           );
         }
@@ -698,9 +669,7 @@ function buildConnectors(params: {
         );
       }
       for (const [childSide, sideChildren] of groupBySide(spreadChildren)) {
-        const continuesAfterChildSpread = children.some(
-          (child) => child.spreadIndex > spreadIndex,
-        );
+        const continuesAfterChildSpread = children.some((child) => child.spreadIndex > spreadIndex);
         if (childSide === "left") {
           connectorsBySpread[spreadIndex].push(
             buildSpreadBridgeConnector({
@@ -767,39 +736,33 @@ export function buildSuPaperBook(params: {
       generationsByDepth,
       metrics,
     });
-    const spreadCount = Math.max(
-      1,
-      Math.ceil(spreadSlotCount / getSpreadSlotCapacity(metrics)),
-    );
-    const spreads: SuPageSpread[] = Array.from(
-      { length: spreadCount },
-      (_value, spreadIndex) => {
-        const rows = generationDepths.map((depth, rowIndex) => {
-          const generation = generationsByDepth.get(depth);
-          const entries = placements
-            .filter((placement) => placement.person.depth === depth)
-            .flatMap((placement) =>
-              placement.chunks.map((_chunk, partIndex) =>
-                buildEntry({ placement, partIndex, rowIndex, metrics }),
-              ),
-            )
-            .filter((entry) => entry.spreadIndex === spreadIndex)
-            .sort((a, b) => a.slotIndex - b.slotIndex);
-          return {
-            depth,
-            label: getGenerationLabel(generation, depth, t),
-            repeated: repeatedDepth === depth,
-            entries,
-          };
-        });
+    const spreadCount = Math.max(1, Math.ceil(spreadSlotCount / getSpreadSlotCapacity(metrics)));
+    const spreads: SuPageSpread[] = Array.from({ length: spreadCount }, (_value, spreadIndex) => {
+      const rows = generationDepths.map((depth, rowIndex) => {
+        const generation = generationsByDepth.get(depth);
+        const entries = placements
+          .filter((placement) => placement.person.depth === depth)
+          .flatMap((placement) =>
+            placement.chunks.map((_chunk, partIndex) =>
+              buildEntry({ placement, partIndex, rowIndex, metrics }),
+            ),
+          )
+          .filter((entry) => entry.spreadIndex === spreadIndex)
+          .sort((a, b) => a.slotIndex - b.slotIndex);
         return {
-          index: spreadIndex + 1,
-          kind: spreadIndex === 0 ? "main" : "continuation",
-          rows,
-          connectors: [],
+          depth,
+          label: getGenerationLabel(generation, depth, t),
+          repeated: repeatedDepth === depth,
+          entries,
         };
-      },
-    );
+      });
+      return {
+        index: spreadIndex + 1,
+        kind: spreadIndex === 0 ? "main" : "continuation",
+        rows,
+        connectors: [],
+      };
+    });
     const connectorsBySpread = buildConnectors({ graph, spreads, metrics });
 
     charts.push({

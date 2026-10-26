@@ -82,9 +82,7 @@ function contextJAllowed(codePoints, index) {
   const codePoint = codePoints[index];
   if (codePoint === ZERO_WIDTH_JOINER) {
     // RFC 5892 Appendix A.2.
-    return (
-      index > 0 && canonicalCombiningClass(codePoints[index - 1]) === VIRAMA_COMBINING_CLASS
-    );
+    return index > 0 && canonicalCombiningClass(codePoints[index - 1]) === VIRAMA_COMBINING_CLASS;
   }
   if (codePoint === ZERO_WIDTH_NON_JOINER) return zeroWidthNonJoinerAllowed(codePoints, index);
   return false;
@@ -103,8 +101,7 @@ function contextOAllowed(codePoints, index) {
   }
   if (codePoint === GREEK_LOWER_NUMERAL_SIGN) {
     return (
-      index + 1 < codePoints.length &&
-      inRanges(UNICODE_SCRIPT_GREEK_RANGES, codePoints[index + 1])
+      index + 1 < codePoints.length && inRanges(UNICODE_SCRIPT_GREEK_RANGES, codePoints[index + 1])
     );
   }
   if (codePoint === HEBREW_GERESH || codePoint === HEBREW_GERSHAYIM) {

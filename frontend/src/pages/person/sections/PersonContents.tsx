@@ -18,7 +18,10 @@ function useTypeLabel() {
   const { t } = useTranslation();
   const options = useMemo(() => getRecordTypeOptions(t), [t]);
   return (type: number) =>
-    t(getRecordTypeI18nKey(type), getRecordTypeLabel(type, options, t("recordTypes.unknown", "Unknown")));
+    t(
+      getRecordTypeI18nKey(type),
+      getRecordTypeLabel(type, options, t("recordTypes.unknown", "Unknown")),
+    );
 }
 
 /**
@@ -60,8 +63,7 @@ export function PersonContents({ person }: { person: PersonPageController }) {
     if (pointerInside.current || navRef.current?.contains(document.activeElement)) return;
     setHolding(false);
   };
-  const isOpen = (type: number) =>
-    holding ? heldOpen.has(type) : person.activeSection === type;
+  const isOpen = (type: number) => (holding ? heldOpen.has(type) : person.activeSection === type);
   // A pointer click leaves focus on the row, which would hold Contents long
   // after the pointer has gone; keyboard activation (detail 0) keeps its focus.
   const dropPointerFocus = (event: MouseEvent<HTMLButtonElement>) => {
@@ -158,7 +160,9 @@ export function PersonContents({ person }: { person: PersonPageController }) {
                 >
                   {typeLabel(item.type)}
                 </span>
-                <span className="font-mono text-[10.5px] text-ink-subtle">{item.records.length}</span>
+                <span className="font-mono text-[10.5px] text-ink-subtle">
+                  {item.records.length}
+                </span>
               </button>
 
               {isOpen(item.type) && (
@@ -228,7 +232,8 @@ export function PersonSectionChips({ person }: { person: PersonPageController })
   // Keep the chip of the section being read in view without moving the page.
   useEffect(() => {
     const row = rowRef.current;
-    const chip = typeof person.activeSection === "number" ? chipRefs.current.get(person.activeSection) : null;
+    const chip =
+      typeof person.activeSection === "number" ? chipRefs.current.get(person.activeSection) : null;
     if (!row || !chip) return;
     const left = chip.offsetLeft - row.offsetLeft;
     if (left < row.scrollLeft || left + chip.offsetWidth > row.scrollLeft + row.clientWidth) {
@@ -238,7 +243,10 @@ export function PersonSectionChips({ person }: { person: PersonPageController })
 
   return (
     <div className="sticky top-[var(--app-header-h)] z-20 -mx-4 mt-3 border-b border-hairline bg-surface-body/95 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8 xl:hidden">
-      <div ref={rowRef} className="flex gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div
+        ref={rowRef}
+        className="flex gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      >
         {person.groupedRecords.map((group) => {
           const active = person.activeSection === group.type;
           return (
@@ -252,7 +260,9 @@ export function PersonSectionChips({ person }: { person: PersonPageController })
               onClick={() => person.scrollToSection(group.type)}
               aria-current={active ? "location" : undefined}
               className={`inline-flex h-[34px] shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-3 text-[12.5px] text-ink transition-colors focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary/30 ${
-                active ? "border-primary/40 bg-primary/8 font-semibold" : "border-hairline bg-surface"
+                active
+                  ? "border-primary/40 bg-primary/8 font-semibold"
+                  : "border-hairline bg-surface"
               }`}
             >
               <span

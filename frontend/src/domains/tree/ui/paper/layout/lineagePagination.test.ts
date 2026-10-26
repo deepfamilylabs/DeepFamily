@@ -11,9 +11,7 @@ import {
 } from "./lineagePagination";
 
 const translate: TranslateFn = (key, fallback, options) =>
-  (fallback || key).replace(/{{\s*(\w+)\s*}}/g, (_match, name) =>
-    String(options?.[name] ?? ""),
-  );
+  (fallback || key).replace(/{{\s*(\w+)\s*}}/g, (_match, name) => String(options?.[name] ?? ""));
 
 function makeHash(index: number) {
   return `0x${index.toString(16).padStart(64, "0")}`;
@@ -180,9 +178,7 @@ describe("buildLineagePaperBook", () => {
     expect(book.charts[0].generationDepths).toEqual([0, 1, 2, 3, 4]);
     expect(book.charts[1].generationDepths).toEqual([4, 5, 6, 7, 8]);
     expect(book.charts[1].repeatedDepth).toBe(4);
-    expect(book.charts[1].spreads[0].rows[0].entries[0].person.id).toBe(
-      linear.graph.nodes[4].id,
-    );
+    expect(book.charts[1].spreads[0].rows[0].entries[0].person.id).toBe(linear.graph.nodes[4].id);
   });
 
   it("continues wide relationship rows from the right page to the left page and next spread", () => {
@@ -207,10 +203,12 @@ describe("buildLineagePaperBook", () => {
     expect(new Set(secondGenerationEntries.map((entry) => entry.person.id)).size).toBe(childCount);
     expect(firstSpreadSecondGeneration?.entries.some((entry) => entry.side === "right")).toBe(true);
     expect(firstSpreadSecondGeneration?.entries.some((entry) => entry.side === "left")).toBe(true);
-    expect(secondSpreadSecondGeneration?.entries.some((entry) => entry.side === "right")).toBe(true);
-    expect(secondGenerationEntries.every((entry) => entry.widthPx === LINEAGE_PERSON_SLOT_WIDTH)).toBe(
+    expect(secondSpreadSecondGeneration?.entries.some((entry) => entry.side === "right")).toBe(
       true,
     );
+    expect(
+      secondGenerationEntries.every((entry) => entry.widthPx === LINEAGE_PERSON_SLOT_WIDTH),
+    ).toBe(true);
 
     const rootConnectors = firstChart.spreads[0].connectors.filter(
       (connector) => connector.parentId === wide.rootId,
@@ -278,8 +276,7 @@ describe("buildLineagePaperBook", () => {
       t: translate,
     });
     const branchConnectors = book.charts[0].spreads[0].connectors.filter(
-      (connector) =>
-        graph.parentIds.includes(connector.parentId) && connector.kind === "local",
+      (connector) => graph.parentIds.includes(connector.parentId) && connector.kind === "local",
     );
 
     expect(branchConnectors).toHaveLength(2);

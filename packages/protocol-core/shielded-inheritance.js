@@ -1,11 +1,7 @@
 import { keccak256 } from "ethers";
 import { poseidon2, poseidon3, poseidon5 } from "poseidon-lite";
 import { asUint8Array, bigintFrom, bytesToHex } from "./bytes.js";
-import {
-  MAX_UINT64,
-  MAX_UINT128,
-  SNARK_SCALAR_FIELD,
-} from "./constants.js";
+import { MAX_UINT64, MAX_UINT128, SNARK_SCALAR_FIELD } from "./constants.js";
 import { protocolAssert } from "./errors.js";
 import { assertAddress } from "./identity.js";
 
@@ -133,4 +129,3 @@ export function computeShieldedSpendNullifier(input, scope) {
     nonzeroField(input.noteCommitment, "noteCommitment"),
   ]);
 }
-

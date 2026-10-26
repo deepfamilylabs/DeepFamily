@@ -108,7 +108,13 @@ function parseUnicodeData(source, fullCompositionExclusions) {
     }
   }
 
-  return { combiningClasses, decompositions, canonicalDecompositions, compositions, nonAsciiSpaces };
+  return {
+    combiningClasses,
+    decompositions,
+    canonicalDecompositions,
+    compositions,
+    nonAsciiSpaces,
+  };
 }
 
 const serializeRows = (rows) => rows.map((row) => `  ${JSON.stringify(row)},`).join("\n");

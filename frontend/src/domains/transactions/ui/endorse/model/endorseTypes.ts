@@ -16,11 +16,7 @@ export interface EndorseFlowArgs {
   onFeeQuoteChange?: (quote: EndorseFeeQuote) => void;
 }
 
-export type EndorseT = (
-  key: string,
-  fallback: string,
-  options?: Record<string, unknown>,
-) => string;
+export type EndorseT = (key: string, fallback: string, options?: Record<string, unknown>) => string;
 
 export interface EndorseSuccessResultView {
   personHash: string;
@@ -38,4 +34,3 @@ export interface EndorseErrorResultView {
   details: string;
   retryable?: boolean;
 }
-

@@ -91,8 +91,7 @@ export function getPaperRelationLabel(
 // in the paper body fonts; everything else (ASCII letters/digits/punctuation, spaces) ~0.5em.
 // Measuring record text in half-em "units" (full-width = 2, half-width = 1) lets a fixed budget
 // fill the same visual extent regardless of how digit-heavy the text is.
-const PAPER_FULL_WIDTH_PATTERN =
-  /[ᄀ-ᅟ⺀-〾ぁ-㏿㐀-䶿一-鿿ꀀ-꓏가-힣豈-﫿︰-﹏＀-｠￠-￦]/;
+const PAPER_FULL_WIDTH_PATTERN = /[ᄀ-ᅟ⺀-〾ぁ-㏿㐀-䶿一-鿿ꀀ-꓏가-힣豈-﫿︰-﹏＀-｠￠-￦]/;
 
 export function charVisualUnits(char: string): number {
   return PAPER_FULL_WIDTH_PATTERN.test(char) ? 2 : 1;

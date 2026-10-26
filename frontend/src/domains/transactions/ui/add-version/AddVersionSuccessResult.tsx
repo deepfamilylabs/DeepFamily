@@ -23,8 +23,18 @@ export function AddVersionSuccessResult({ t, successResult }: AddVersionSuccessR
     { label: t("transaction.rowVersion", "Version"), value: String(successResult.index) },
     // A version is a node and its two edges; the edges are what a genealogy is
     // made of, so they belong here — but only where a link actually exists.
-    ...parentRow(t, t("transaction.rowFather", "Father"), added?.fatherHash, added?.fatherVersionIndex),
-    ...parentRow(t, t("transaction.rowMother", "Mother"), added?.motherHash, added?.motherVersionIndex),
+    ...parentRow(
+      t,
+      t("transaction.rowFather", "Father"),
+      added?.fatherHash,
+      added?.fatherVersionIndex,
+    ),
+    ...parentRow(
+      t,
+      t("transaction.rowMother", "Mother"),
+      added?.motherHash,
+      added?.motherVersionIndex,
+    ),
     // Only when something was actually mined: a zero row is not a result.
     ...(reward ? [{ label: t("transaction.rowReward", "Reward"), value: `${reward} DEEP` }] : []),
     {
@@ -38,7 +48,10 @@ export function AddVersionSuccessResult({ t, successResult }: AddVersionSuccessR
     <TransactionSuccessSummary
       t={t}
       title={t("addVersion.successTitle", "Version Added Successfully")}
-      description={t("addVersion.successDesc", "The person version has been added to the blockchain")}
+      description={t(
+        "addVersion.successDesc",
+        "The person version has been added to the blockchain",
+      )}
       rows={rows}
     />
   );

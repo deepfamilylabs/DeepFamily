@@ -49,82 +49,72 @@ export function EndorseFooter({
         failed: { onClose, onBackToEdit },
         // The phase is derived from this result, so it is always present here.
         done: successResult ? (
-        <>
-          <TransactionButton
-            onClick={onClose}
-            className="flex-1"
-          >
-            {t("common.close", "Close")}
-          </TransactionButton>
-          <TransactionButton
-            variant="subtle"
-            onClick={onContinueEndorsing}
-            className="flex-1"
-          >
-            <Star className="w-4 h-4 fill-current/20" />
-            {t("endorse.continueEndorsing", "Continue Endorsing")}
-          </TransactionButton>
-          <TransactionButton
-            variant="primary"
-            onClick={() => {
-              if (onMintNFT && successResult.personHash && successResult.versionIndex) {
-                onMintNFT(successResult.personHash, successResult.versionIndex);
-              }
-            }}
-            className="flex-1"
-          >
-            <Image className="w-4 h-4 fill-current/20" />
-            {t("endorse.goToMintNFT", "Go to Mint NFT")}
-          </TransactionButton>
-        </>
+          <>
+            <TransactionButton onClick={onClose} className="flex-1">
+              {t("common.close", "Close")}
+            </TransactionButton>
+            <TransactionButton variant="subtle" onClick={onContinueEndorsing} className="flex-1">
+              <Star className="w-4 h-4 fill-current/20" />
+              {t("endorse.continueEndorsing", "Continue Endorsing")}
+            </TransactionButton>
+            <TransactionButton
+              variant="primary"
+              onClick={() => {
+                if (onMintNFT && successResult.personHash && successResult.versionIndex) {
+                  onMintNFT(successResult.personHash, successResult.versionIndex);
+                }
+              }}
+              className="flex-1"
+            >
+              <Image className="w-4 h-4 fill-current/20" />
+              {t("endorse.goToMintNFT", "Go to Mint NFT")}
+            </TransactionButton>
+          </>
         ) : null,
         // Nothing else about endorsing changes the actions: the button's own
         // disabled state already covers waiting, and a failure is retried here.
         active: (
-        <>
-          <TransactionButton
-            onClick={onClose}
-            className="flex-1"
-          >
-            {t("common.cancel", "Cancel")}
-          </TransactionButton>
-          <TransactionButton
-            variant="primary"
-            onClick={onEndorse}
-            disabled={
-              isSubmitting ||
-              isApproving ||
-              !canAffordEndorsement ||
-              hasEndorsed ||
-              !hasValidTarget ||
-              !isTargetValidOnChain ||
-              !isPersonHashFormatValid
-            }
-            className="flex-2"
-          >
-            {isApproving ? (
-              <div className="flex items-center justify-center gap-2">
-                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                {t("endorse.approving", "Approving...")}
-              </div>
-            ) : isSubmitting ? (
-              <div className="flex items-center justify-center gap-2">
-                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                {t("endorse.endorsing", "Endorsing...")}
-              </div>
-            ) : hasEndorsed ? (
-              <div className="flex items-center justify-center gap-2">
-                <Check className="w-4 h-4" />
-                {t("endorse.endorsed", "Endorsed!")}
-              </div>
-            ) : (
-              <div className="flex items-center justify-center gap-2">
-                <Star className="w-4 h-4 fill-current/20" />
-                {t("endorse.endorse", "Endorse")}
-              </div>
-            )}
-          </TransactionButton>
-        </>
+          <>
+            <TransactionButton onClick={onClose} className="flex-1">
+              {t("common.cancel", "Cancel")}
+            </TransactionButton>
+            <TransactionButton
+              variant="primary"
+              onClick={onEndorse}
+              disabled={
+                isSubmitting ||
+                isApproving ||
+                !canAffordEndorsement ||
+                hasEndorsed ||
+                !hasValidTarget ||
+                !isTargetValidOnChain ||
+                !isPersonHashFormatValid
+              }
+              className="flex-2"
+            >
+              {isApproving ? (
+                <div className="flex items-center justify-center gap-2">
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  {t("endorse.approving", "Approving...")}
+                </div>
+              ) : isSubmitting ? (
+                <div className="flex items-center justify-center gap-2">
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  {t("endorse.endorsing", "Endorsing...")}
+                </div>
+              ) : hasEndorsed ? (
+                <div className="flex items-center justify-center gap-2">
+                  <Check className="w-4 h-4" />
+                  {t("endorse.endorsed", "Endorsed!")}
+                </div>
+              ) : (
+                <div className="flex items-center justify-center gap-2">
+                  <Star className="w-4 h-4 fill-current/20" />
+                  {t("endorse.endorse", "Endorse")}
+                </div>
+              )}
+            </TransactionButton>
+          </>
         ),
       }}
     />

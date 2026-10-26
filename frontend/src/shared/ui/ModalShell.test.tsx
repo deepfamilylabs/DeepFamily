@@ -21,12 +21,7 @@ describe("ModalShell", () => {
     const renderShell = (isOpen: boolean) => (
       <>
         <button type="button">Before modal</button>
-        <ModalShell
-          isOpen={isOpen}
-          onClose={onClose}
-          ariaLabel="Example modal"
-          hideCloseButton
-        >
+        <ModalShell isOpen={isOpen} onClose={onClose} ariaLabel="Example modal" hideCloseButton>
           <button type="button">First action</button>
           <button type="button">Second action</button>
         </ModalShell>
@@ -87,7 +82,8 @@ describe("ModalShell", () => {
   });
 
   it("paints a single scrim when a dialog is stacked inside another", () => {
-    const scrimCount = () => document.body.querySelectorAll("[aria-hidden][data-modal-scrim]").length;
+    const scrimCount = () =>
+      document.body.querySelectorAll("[aria-hidden][data-modal-scrim]").length;
 
     // The real stack: MintNFT renders its bare ResponsiveModalFrame, and the
     // endorse-required dialog opens inside it. Two 40% layers would read as 64%

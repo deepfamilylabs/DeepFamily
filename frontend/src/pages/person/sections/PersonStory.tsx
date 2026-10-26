@@ -26,9 +26,27 @@ const VIEW_MODES: {
   titleKey: string;
   titleFallback: string;
 }[] = [
-  { id: "sections", key: "person.sections", fallback: "Sections", titleKey: "person.viewSections", titleFallback: "Sections Mode" },
-  { id: "paragraph", key: "person.paragraph", fallback: "Paragraph", titleKey: "person.viewParagraph", titleFallback: "Paragraph Mode" },
-  { id: "raw", key: "person.raw", fallback: "Raw", titleKey: "person.viewRaw", titleFallback: "Raw Mode" },
+  {
+    id: "sections",
+    key: "person.sections",
+    fallback: "Sections",
+    titleKey: "person.viewSections",
+    titleFallback: "Sections Mode",
+  },
+  {
+    id: "paragraph",
+    key: "person.paragraph",
+    fallback: "Paragraph",
+    titleKey: "person.viewParagraph",
+    titleFallback: "Paragraph Mode",
+  },
+  {
+    id: "raw",
+    key: "person.raw",
+    fallback: "Raw",
+    titleKey: "person.viewRaw",
+    titleFallback: "Raw Mode",
+  },
 ];
 
 /**
@@ -191,7 +209,8 @@ function StorySection({
   const recordTypeOptions = useMemo(() => getRecordTypeOptions(t), [t]);
   const expanded = person.expandedSections.has(group.type);
   const { visible, hidden } = splitSectionRecords(group.records, expanded);
-  const foldable = group.records.length !== splitSectionRecords(group.records, false).visible.length;
+  const foldable =
+    group.records.length !== splitSectionRecords(group.records, false).visible.length;
   const Icon = getRecordTypeIcon(group.type);
   const label = t(
     getRecordTypeI18nKey(group.type),
@@ -246,7 +265,8 @@ function StorySection({
             >
               <ChevronUp size={13} aria-hidden />
               {t("storyRecordEditor.collapseRun", "Collapse {{total}} records", {
-                total: group.records.length - splitSectionRecords(group.records, false).visible.length,
+                total:
+                  group.records.length - splitSectionRecords(group.records, false).visible.length,
               })}
             </button>
           </FoldMarker>

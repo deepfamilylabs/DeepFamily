@@ -239,7 +239,10 @@ export function useEndorseModalController({
     if (!address) {
       activeRunTargetRef.current = null;
       setErrorResult(
-        toEndorseErrorResult("WALLET_NOT_CONNECTED", t("wallet.notConnected", "Please connect your wallet")),
+        toEndorseErrorResult(
+          "WALLET_NOT_CONNECTED",
+          t("wallet.notConnected", "Please connect your wallet"),
+        ),
       );
       return;
     }
@@ -336,10 +339,7 @@ export function useEndorseModalController({
           {
             id: "approve",
             label: t("endorse.stepApprove", "Approve DEEP tokens"),
-            detail: t(
-              "endorse.approvingDesc",
-              "Please confirm the token approval in your wallet",
-            ),
+            detail: t("endorse.approvingDesc", "Please confirm the token approval in your wallet"),
           },
           { id: "submit", label: t("endorse.stepSubmit", "Submit the endorsement") },
           {

@@ -40,8 +40,7 @@ export function PaperZoomViewport({
       frame = window.requestAnimationFrame(measure);
     };
 
-    const observer =
-      typeof ResizeObserver !== "undefined" ? new ResizeObserver(schedule) : null;
+    const observer = typeof ResizeObserver !== "undefined" ? new ResizeObserver(schedule) : null;
     observer?.observe(el);
     return () => {
       window.cancelAnimationFrame(frame);
@@ -70,8 +69,7 @@ export function PaperZoomViewport({
 
   const baseWidth = Math.max(baseSize.width, PAPER_PREVIEW_MAX_WIDTH_PX);
   const scaledWidth = Math.ceil(baseWidth * scale);
-  const scaledHeight =
-    baseSize.height > 0 ? Math.ceil(baseSize.height * scale) : undefined;
+  const scaledHeight = baseSize.height > 0 ? Math.ceil(baseSize.height * scale) : undefined;
 
   return (
     <div

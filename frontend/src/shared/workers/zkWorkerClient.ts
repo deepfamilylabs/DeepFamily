@@ -1,6 +1,10 @@
 import type { Groth16Proof } from "../zk/zk";
 import { serializeWorkerError } from "./workerErrors";
-import { isPublicStateSyncProgress, publishPublicStateSyncProgress, type PublicStateSyncProgress } from "./publicStateSyncProgress";
+import {
+  isPublicStateSyncProgress,
+  publishPublicStateSyncProgress,
+  type PublicStateSyncProgress,
+} from "./publicStateSyncProgress";
 import type {
   DisclosureBindingProofParameters,
   PersonRelationProofParameters,
@@ -23,7 +27,6 @@ type ZkWorkerCallMap = {
     params: { proof: Groth16Proof; publicSignals: string[] };
     result: { ok: boolean };
   };
-
 };
 
 type ZkWorkerRequest = { id: number; method: keyof ZkWorkerCallMap; params: any };
@@ -64,9 +67,12 @@ function publishProgress(progress: PublicStateSyncProgress) {
   const key = `${progress.domain}:${progress.phase}`;
   const previous = progressWatermarks.get(key);
   const finished = progress.completed === progress.total || progress.phase === "complete";
-  const advanced = progress.completed > (previous?.completed ?? 0) || (finished && !previous?.finished);
-  progressWatermarks.set(key, { completed: Math.max(previous?.completed ?? 0, progress.completed),
-    finished: finished || !!previous?.finished });
+  const advanced =
+    progress.completed > (previous?.completed ?? 0) || (finished && !previous?.finished);
+  progressWatermarks.set(key, {
+    completed: Math.max(previous?.completed ?? 0, progress.completed),
+    finished: finished || !!previous?.finished,
+  });
   if (advanced) for (const entry of pending.values()) entry.renewTimeout?.();
   publishPublicStateSyncProgress(progress);
 }
@@ -97,7 +103,8 @@ const ensureWorker = (): Worker => {
     if (workerSingleton !== worker) return;
     const progressMessage = event.data as { type?: unknown; progress?: unknown } | null;
     if (progressMessage?.type === "publicStateSyncProgress") {
-      if (isPublicStateSyncProgress(progressMessage.progress)) publishProgress(progressMessage.progress);
+      if (isPublicStateSyncProgress(progressMessage.progress))
+        publishProgress(progressMessage.progress);
       return;
     }
     const msg = event.data;

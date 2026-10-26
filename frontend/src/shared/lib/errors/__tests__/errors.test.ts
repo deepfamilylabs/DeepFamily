@@ -201,20 +201,23 @@ describe("errors", () => {
     "keeps empty revert data readable with a cached reason of %s",
     (cachedReason) => {
       const calldata = `0xbbbe9818${"ab".repeat(1000)}`;
-      const error = Object.assign(ethers.makeError(
-        "execution reverted (no data present; likely require(false) occurred",
-        "CALL_EXCEPTION",
-        {
-          action: "estimateGas",
-          data: "0x",
-          reason: "require(false)",
-          transaction: { to: ethers.ZeroAddress, data: calldata },
-          invocation: null,
-          revert: null,
-        },
-      ), { __dfDecodedReason: cachedReason });
+      const error = Object.assign(
+        ethers.makeError(
+          "execution reverted (no data present; likely require(false) occurred",
+          "CALL_EXCEPTION",
+          {
+            action: "estimateGas",
+            data: "0x",
+            reason: "require(false)",
+            transaction: { to: ethers.ZeroAddress, data: calldata },
+            invocation: null,
+            revert: null,
+          },
+        ),
+        { __dfDecodedReason: cachedReason },
+      );
       const t = (key: string, fallback?: string) =>
-        key === "errors.contractError.CALL_EXCEPTION" ? "合约校验未通过。" : fallback ?? key;
+        key === "errors.contractError.CALL_EXCEPTION" ? "合约校验未通过。" : (fallback ?? key);
 
       expect(resolveErrorReason(error)).toBe("CALL_EXCEPTION");
       expect(getFriendlyErrorMessage(error, t as any, "操作失败")).toBe("合约校验未通过。");
@@ -372,42 +375,49 @@ describe("errors", () => {
     ["nested provider", { info: { error: { code: 4001 } } }],
     ["nested error", { error: { code: 4001 } }],
     ["nested cause", { cause: { code: 4001 } }],
-  ] as const)("shows a localized cancellation for a %s rejection despite its generic reason", (_label, fields) => {
-    const calldata = "0xf89a687a00000000000000000000000000000000000000000000000000000000";
-    const error = Object.assign(
-      new Error(`user rejected action (action="sendTransaction", reason="rejected", data="${calldata}")`),
-      fields,
-      {
-        action: "sendTransaction",
-        reason: "rejected",
-        info: {
-          ...("info" in fields ? fields.info : {}),
-          payload: {
-            method: "eth_sendTransaction",
-            params: [{ data: calldata }],
+  ] as const)(
+    "shows a localized cancellation for a %s rejection despite its generic reason",
+    (_label, fields) => {
+      const calldata = "0xf89a687a00000000000000000000000000000000000000000000000000000000";
+      const error = Object.assign(
+        new Error(
+          `user rejected action (action="sendTransaction", reason="rejected", data="${calldata}")`,
+        ),
+        fields,
+        {
+          action: "sendTransaction",
+          reason: "rejected",
+          info: {
+            ...("info" in fields ? fields.info : {}),
+            payload: {
+              method: "eth_sendTransaction",
+              params: [{ data: calldata }],
+            },
           },
         },
-      },
-    );
-    const localizedT = (key: string, fallback?: string) =>
-      key === "errors.contractError.USER_REJECTED" ? "交易已取消。" : fallback ?? key;
+      );
+      const localizedT = (key: string, fallback?: string) =>
+        key === "errors.contractError.USER_REJECTED" ? "交易已取消。" : (fallback ?? key);
 
-    expect(resolveErrorReason(error)).toBe("USER_REJECTED");
-    expect(getFriendlyError(error, localizedT as any)).toMatchObject({
-      type: "USER_REJECTED",
-      reason: "USER_REJECTED",
-      message: "交易已取消。",
-      details: "交易已取消。",
-    });
-    expect(getFriendlyErrorMessage(error, localizedT as any, "提交失败")).toBe("交易已取消。");
-  });
+      expect(resolveErrorReason(error)).toBe("USER_REJECTED");
+      expect(getFriendlyError(error, localizedT as any)).toMatchObject({
+        type: "USER_REJECTED",
+        reason: "USER_REJECTED",
+        message: "交易已取消。",
+        details: "交易已取消。",
+      });
+      expect(getFriendlyErrorMessage(error, localizedT as any, "提交失败")).toBe("交易已取消。");
+    },
+  );
 
   it("keeps explicit wallet rejection codes ahead of a cached generic decode", () => {
-    expect(resolveErrorReason({
-      code: "ACTION_REJECTED",
-      reason: "rejected",
-      __dfDecodedReason: "rejected",
-    })).toBe("USER_REJECTED");
+    expect(
+      resolveErrorReason({
+        code: "ACTION_REJECTED",
+        reason: "rejected",
+        __dfDecodedReason: "rejected",
+      }),
+    ).toBe("USER_REJECTED");
   });
 
   it("bounds deep object scanning so unrelated nested payloads do not drive classification", () => {

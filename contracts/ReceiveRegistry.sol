@@ -50,10 +50,17 @@ contract ReceiveRegistry is IReceiveRegistry {
   event CredentialIssued(uint256 indexed leafIndex, uint256 credential, uint256 root);
   event ReceiveCodeRevoked(uint256 indexed revocationTag);
 
-  constructor(address source, address issueVerifier, address codeVerifier, address capabilityVerifier) {
+  constructor(
+    address source,
+    address issueVerifier,
+    address codeVerifier,
+    address capabilityVerifier
+  ) {
     if (
-      source.code.length == 0 || issueVerifier.code.length == 0 ||
-      codeVerifier.code.length == 0 || capabilityVerifier.code.length == 0
+      source.code.length == 0 ||
+      issueVerifier.code.length == 0 ||
+      codeVerifier.code.length == 0 ||
+      capabilityVerifier.code.length == 0
     ) revert InvalidDependency();
     if (block.chainid >= SNARK_SCALAR_FIELD) revert InvalidField();
     SOURCE = IEligibilitySource(source);
@@ -89,7 +96,10 @@ contract ReceiveRegistry is IReceiveRegistry {
     emit CredentialIssued(leafIndex, credential, root);
   }
 
-  function verifyReceive(Code calldata code, bytes calldata codeProof) external view returns (bool) {
+  function verifyReceive(
+    Code calldata code,
+    bytes calldata codeProof
+  ) external view returns (bool) {
     _verifyReceive(code, codeProof);
     return true;
   }
@@ -144,10 +154,16 @@ contract ReceiveRegistry is IReceiveRegistry {
   /// @notice Latest status for qualification indices authenticated inside the fixed Claim proof.
   /// @dev This does not authenticate a credential by itself. Fund uses verifyBudgetCapability;
   ///      Claim additionally proves current-Q membership and the same subject/family itself.
-  function validateBudgetRoleStatus(uint256 root, uint256 childRoleIndex,
-    uint256 endorsementRoleIndex, uint256 trustedRoleIndex) external view returns (bool) {
+  function validateBudgetRoleStatus(
+    uint256 root,
+    uint256 childRoleIndex,
+    uint256 endorsementRoleIndex,
+    uint256 trustedRoleIndex
+  ) external view returns (bool) {
     if (!_knownIssuanceRoots[root]) revert UnknownIssuanceRoot();
-    _nonzeroField(childRoleIndex); _nonzeroField(endorsementRoleIndex); _nonzeroField(trustedRoleIndex);
+    _nonzeroField(childRoleIndex);
+    _nonzeroField(endorsementRoleIndex);
+    _nonzeroField(trustedRoleIndex);
     if (SOURCE.isRoleRevoked(0, childRoleIndex)) revert QualificationRevoked(0);
     if (SOURCE.isRoleRevoked(1, endorsementRoleIndex)) revert QualificationRevoked(1);
     if (SOURCE.isRoleRevoked(2, trustedRoleIndex)) revert QualificationRevoked(2);
@@ -158,7 +174,10 @@ contract ReceiveRegistry is IReceiveRegistry {
     return _knownIssuanceRoots[root];
   }
 
-  function getCredentialPage(uint256 start, uint256 limit) external view returns (uint256[] memory leaves) {
+  function getCredentialPage(
+    uint256 start,
+    uint256 limit
+  ) external view returns (uint256[] memory leaves) {
     if (start > credentialCount || limit == 0 || limit > MAX_PAGE_SIZE) revert InvalidPage();
     uint256 length = credentialCount - start;
     if (length > limit) length = limit;
@@ -167,9 +186,13 @@ contract ReceiveRegistry is IReceiveRegistry {
   }
 
   /// @notice A compact LeanIMT path, using only existing siblings (at most 32).
-  function getCredentialProof(uint256 leafIndex) external view returns (
-    uint256 leaf, uint256 root, uint256 index, uint256 depth, uint256[] memory siblings
-  ) {
+  function getCredentialProof(
+    uint256 leafIndex
+  )
+    external
+    view
+    returns (uint256 leaf, uint256 root, uint256 index, uint256 depth, uint256[] memory siblings)
+  {
     if (leafIndex >= credentialCount) revert InvalidLeafIndex();
     leaf = _nodes[0][leafIndex];
     root = issuanceRoot;
@@ -204,7 +227,8 @@ contract ReceiveRegistry is IReceiveRegistry {
     _nonzeroField(code.revocationTag);
     _nonzeroField(code.nonce);
     _nonzeroField(code.ownerCommitment);
-    if (code.viewKeyLo > type(uint128).max || code.viewKeyHi > type(uint128).max) revert InvalidField();
+    if (code.viewKeyLo > type(uint128).max || code.viewKeyHi > type(uint128).max)
+      revert InvalidField();
     if ((code.viewKeyLo | code.viewKeyHi) == 0) revert InvalidCode();
     if (code.expiresAt <= block.timestamp) revert CodeExpired();
     if (_revokedCodes[code.revocationTag]) revert CodeRevoked();

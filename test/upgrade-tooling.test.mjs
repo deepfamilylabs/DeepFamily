@@ -29,12 +29,24 @@ import {
 async function copyProtocolInputs(root, directory) {
   // These tests write and retire complete deployment workspaces. Copy all
   // hash-checked protocol inputs instead of aliasing the caller's artifact tree.
-  const manifest = JSON.parse(await fs.readFile(path.join(root, PROTOCOL_DEVELOPMENT_MANIFEST), "utf8"));
-  const boundaries = JSON.parse(await fs.readFile(path.join(root, BOUNDARY_DEVELOPMENT_MANIFEST), "utf8"));
-  const files = new Set([PROTOCOL_DEVELOPMENT_MANIFEST, BOUNDARY_DEVELOPMENT_MANIFEST, manifest.compiler.path]);
+  const manifest = JSON.parse(
+    await fs.readFile(path.join(root, PROTOCOL_DEVELOPMENT_MANIFEST), "utf8"),
+  );
+  const boundaries = JSON.parse(
+    await fs.readFile(path.join(root, BOUNDARY_DEVELOPMENT_MANIFEST), "utf8"),
+  );
+  const files = new Set([
+    PROTOCOL_DEVELOPMENT_MANIFEST,
+    BOUNDARY_DEVELOPMENT_MANIFEST,
+    manifest.compiler.path,
+  ]);
   for (const entry of Object.values(manifest.circuits)) {
     files.add(`zk-artifacts/protocol/${entry.source}_js/${entry.source}.wasm`);
-    for (const file of [...Object.keys(entry.sources), ...Object.keys(entry.compiled), ...Object.keys(entry.setup.artifacts)]) {
+    for (const file of [
+      ...Object.keys(entry.sources),
+      ...Object.keys(entry.compiled),
+      ...Object.keys(entry.setup.artifacts),
+    ]) {
       if (!file.startsWith("node_modules/")) files.add(file);
     }
   }
@@ -43,26 +55,37 @@ async function copyProtocolInputs(root, directory) {
     files.add(`circuits/${entry.source}.circom`);
     files.add(`zk-artifacts/shielded/${entry.source}.r1cs`);
     files.add(entry.verifierPath);
-    for (const suffix of [".wasm", "_final.zkey", ".vkey.json"]) files.add(`frontend/public/zk/shielded/${entry.source}${suffix}`);
+    for (const suffix of [".wasm", "_final.zkey", ".vkey.json"])
+      files.add(`frontend/public/zk/shielded/${entry.source}${suffix}`);
   }
   for (const file of files) {
     const target = path.join(directory, file);
     await fs.mkdir(path.dirname(target), { recursive: true });
     await fs.copyFile(path.join(root, file), target);
   }
-  await fs.mkdir(path.join(directory,"node_modules"));
-  for (const instance of inspectSnarkjsRuntime({root}).instances) {
-    await fs.cp(instance.sourcePath, path.join(directory,"node_modules",instance.relativePath), {recursive:true});
+  await fs.mkdir(path.join(directory, "node_modules"));
+  for (const instance of inspectSnarkjsRuntime({ root }).instances) {
+    await fs.cp(instance.sourcePath, path.join(directory, "node_modules", instance.relativePath), {
+      recursive: true,
+    });
   }
-  const includePackages = new Set(Object.values(manifest.circuits).flatMap(entry => Object.keys(entry.sources)).filter(file => file.startsWith("node_modules/")).map(file => {
-    const parts = file.split("/");
-    return parts.slice(1,parts[1].startsWith("@") ? 3 : 2).join("/");
-  }));
+  const includePackages = new Set(
+    Object.values(manifest.circuits)
+      .flatMap((entry) => Object.keys(entry.sources))
+      .filter((file) => file.startsWith("node_modules/"))
+      .map((file) => {
+        const parts = file.split("/");
+        return parts.slice(1, parts[1].startsWith("@") ? 3 : 2).join("/");
+      }),
+  );
   for (const name of includePackages) {
-    const destination=path.join(directory,"node_modules",name);
-    try { await fs.lstat(destination); continue; } catch {}
-    await fs.mkdir(path.dirname(destination),{recursive:true});
-    await fs.symlink(path.join(root,"node_modules",name),destination,"dir");
+    const destination = path.join(directory, "node_modules", name);
+    try {
+      await fs.lstat(destination);
+      continue;
+    } catch {}
+    await fs.mkdir(path.dirname(destination), { recursive: true });
+    await fs.symlink(path.join(root, "node_modules", name), destination, "dir");
   }
 }
 
@@ -111,8 +134,9 @@ describe("Upgrade tooling & governance deploy path", function () {
       });
 
       // The local graph omits creating governance and transferring ownership to it.
-      const expectedLabels = MAINNET_TRANSACTION_LABELS.filter(label =>
-        label !== "governanceTimelock" && label !== "transferDeepFamilyOwnership");
+      const expectedLabels = MAINNET_TRANSACTION_LABELS.filter(
+        (label) => label !== "governanceTimelock" && label !== "transferDeepFamilyOwnership",
+      );
       expect(Object.keys(deployed.transactionReceipts)).to.have.members(expectedLabels);
       expect(observed.size).to.equal(expectedLabels.length);
       for (const [label, receipt] of Object.entries(deployed.transactionReceipts)) {
@@ -132,7 +156,9 @@ describe("Upgrade tooling & governance deploy path", function () {
           deploymentDirectory,
         });
         const files = (await fs.readdir(deploymentDirectory)).sort();
-        expect(files).to.have.members(INTEGRATED_DEPLOYMENT_RECORDS.map(record => `${record.deploymentName}.json`));
+        expect(files).to.have.members(
+          INTEGRATED_DEPLOYMENT_RECORDS.map((record) => `${record.deploymentName}.json`),
+        );
         expect(files).to.include.members([
           "DeepFamilyArchive.json",
           "DeepFamilyReader.json",
@@ -143,8 +169,12 @@ describe("Upgrade tooling & governance deploy path", function () {
           "ShieldedErc20Pool.json",
           "ShieldedNativePool.json",
           "ShieldedPoolFactory.json",
-          "EligibilitySource.json", "ReceiveRegistry.json", "LetterArchive.json",
-          "BudgetDepositVerifier.json", "BudgetClaimVerifier.json", "ValueTransferVerifier.json",
+          "EligibilitySource.json",
+          "ReceiveRegistry.json",
+          "LetterArchive.json",
+          "BudgetDepositVerifier.json",
+          "BudgetClaimVerifier.json",
+          "ValueTransferVerifier.json",
           "ShieldedBoundaryVerifierAdapter.json",
           "ShieldedUnshieldVerifier.json",
           "ShieldedUnshield4Verifier.json",
@@ -469,11 +499,18 @@ describe("Upgrade tooling & governance deploy path", function () {
 
       process.env[TIMELOCK_ENV] = tlAddr;
       process.env[SAFE_ENV] = multisigAddr;
-      const deployed = await deployIntegratedSystem({ethers: hre.ethers, artifacts: hre.artifacts, networkConfig:{type:"edr-simulated",chainId:31337}}, {
-        writeDeployments: false,
-        signer: deployer,
-        governanceOwner: tlAddr,
-      });
+      const deployed = await deployIntegratedSystem(
+        {
+          ethers: hre.ethers,
+          artifacts: hre.artifacts,
+          networkConfig: { type: "edr-simulated", chainId: 31337 },
+        },
+        {
+          writeDeployments: false,
+          signer: deployer,
+          governanceOwner: tlAddr,
+        },
+      );
 
       expect(await deployed.deepFamily.owner()).to.equal(await deployer.getAddress());
       expect(await deployed.token.owner()).to.equal(hre.ethers.ZeroAddress);

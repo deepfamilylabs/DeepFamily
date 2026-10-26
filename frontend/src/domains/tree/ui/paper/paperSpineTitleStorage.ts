@@ -22,10 +22,7 @@ export function loadPaperSpineTitleOverride(rootId: NodeId | string | null): str
 
 // Persists the override for this root. A blank (whitespace-only) title clears the entry so the view
 // reverts to the auto-generated spine title instead of storing an empty override.
-export function savePaperSpineTitleOverride(
-  rootId: NodeId | string | null,
-  title: string,
-): void {
+export function savePaperSpineTitleOverride(rootId: NodeId | string | null, title: string): void {
   if (!rootId || typeof window === "undefined") return;
   try {
     const key = getPaperSpineTitleStorageKey(rootId);

@@ -1,4 +1,11 @@
-import { useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import {
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from "react";
 import {
   splitPaperRecordLines,
   type PaperGeneration,
@@ -128,7 +135,10 @@ function getModernTextMeasurer(fontFamily: string): ((text: string) => number) |
 }
 
 // Derive the per-row visual-unit budget from the measured spread width so cells fill ~2 lines.
-function computeModernRecordBudget(spreadWidth: number, bodyFontFamily: string): ModernRecordBudget {
+function computeModernRecordBudget(
+  spreadWidth: number,
+  bodyFontFamily: string,
+): ModernRecordBudget {
   if (spreadWidth <= 0) {
     return {
       unitsPerRow: MODERN_RECORD_UNITS_PER_ROW,

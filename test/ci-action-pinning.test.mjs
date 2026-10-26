@@ -58,9 +58,7 @@ describe("CI action supply-chain policy", function () {
     expect(workflow.match(/run: npm run test:circuits/g)).to.have.length(1);
 
     const manifest = JSON.parse(await readFile("package.json", "utf8"));
-    expect(manifest.scripts["test:circuits"]).to.equal(
-      "node --test circuits/test/*.test.mjs",
-    );
+    expect(manifest.scripts["test:circuits"]).to.equal("node --test circuits/test/*.test.mjs");
     expect(manifest.scripts.check).to.match(/^npm run test:circuits && /);
     expect(manifest.scripts.test).not.to.include("test:circuits");
   });

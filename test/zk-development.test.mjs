@@ -1,15 +1,28 @@
 import assert from "node:assert/strict";
 import path from "node:path";
 import { main, parseDevelopmentArguments, runDevelopment } from "../scripts/zk-development.mjs";
-import { CANONICAL_CIRCUIT_NAMES, PROTOCOL_CIRCUIT_NAMES, BOUNDARY_CIRCUIT_NAMES } from "../scripts/lib/zkCircuitSelection.mjs";
+import {
+  CANONICAL_CIRCUIT_NAMES,
+  PROTOCOL_CIRCUIT_NAMES,
+  BOUNDARY_CIRCUIT_NAMES,
+} from "../scripts/lib/zkCircuitSelection.mjs";
 
 const root = path.resolve("/fixture/deepfamily");
 function fixture(failingOperation) {
-  const calls = [], artifacts = { status: "development", circuitCount: 13 };
+  const calls = [],
+    artifacts = { status: "development", circuitCount: 13 };
   const failure = new Error("operation failed");
   const options = { root };
-  for (const name of ["buildCore", "inspectIdentity", "buildProtocol", "setupProtocol", "buildBoundary", "setupBoundary", "check"])
-    options[name] = async input => {
+  for (const name of [
+    "buildCore",
+    "inspectIdentity",
+    "buildProtocol",
+    "setupProtocol",
+    "buildBoundary",
+    "setupBoundary",
+    "check",
+  ])
+    options[name] = async (input) => {
       calls.push([name, input]);
       if (name === failingOperation) throw failure;
       return name === "check" ? artifacts : undefined;
@@ -19,22 +32,38 @@ function fixture(failingOperation) {
 
 describe("complete local development artifact workflow", function () {
   it("parses current catalogue selectors and an explicit shared Powers of Tau path", function () {
-    assert.deepEqual(parseDevelopmentArguments([]), { help: false, circuit: "all", ptauPath: undefined });
-    assert.deepEqual(parseDevelopmentArguments(["--ptau", "local.ptau", "--circuit=shielded:unshield4"]),
-      { help: false, circuit: "shielded:unshield4", ptauPath: "local.ptau" });
-    assert.deepEqual(parseDevelopmentArguments(["--circuit", "protocol:claim", "--ptau=local.ptau"]),
-      { help: false, circuit: "protocol:claim", ptauPath: "local.ptau" });
-    for (const args of [["--production"], ["--circuit"], ["--ptau="], ["--ptau", "--circuit", "core"],
-      ["--circuit", "shielded:claim"], ["--circuit", "code"], ["--circuit", "core", "--circuit=person"],
-      ["--ptau=a", "--ptau", "b"], ["--help", "--circuit", "core"]])
+    assert.deepEqual(parseDevelopmentArguments([]), {
+      help: false,
+      circuit: "all",
+      ptauPath: undefined,
+    });
+    assert.deepEqual(
+      parseDevelopmentArguments(["--ptau", "local.ptau", "--circuit=shielded:unshield4"]),
+      { help: false, circuit: "shielded:unshield4", ptauPath: "local.ptau" },
+    );
+    assert.deepEqual(
+      parseDevelopmentArguments(["--circuit", "protocol:claim", "--ptau=local.ptau"]),
+      { help: false, circuit: "protocol:claim", ptauPath: "local.ptau" },
+    );
+    for (const args of [
+      ["--production"],
+      ["--circuit"],
+      ["--ptau="],
+      ["--ptau", "--circuit", "core"],
+      ["--circuit", "shielded:claim"],
+      ["--circuit", "code"],
+      ["--circuit", "core", "--circuit=person"],
+      ["--ptau=a", "--ptau", "b"],
+      ["--help", "--circuit", "core"],
+    ])
       assert.throws(() => parseDevelopmentArguments(args), undefined, JSON.stringify(args));
   });
 
   it("compiles all 13, checks existing identity keys first, rotates only the 11 development sets and checks the full result", async function () {
     const { options, calls, artifacts } = fixture();
     const result = await runDevelopment({ ...options, ptauPath: "local.ptau" });
-    const protocol = PROTOCOL_CIRCUIT_NAMES.map(name => name.slice("protocol:".length));
-    const boundaries = BOUNDARY_CIRCUIT_NAMES.map(name => name.slice("shielded:".length));
+    const protocol = PROTOCOL_CIRCUIT_NAMES.map((name) => name.slice("protocol:".length));
+    const boundaries = BOUNDARY_CIRCUIT_NAMES.map((name) => name.slice("shielded:".length));
     assert.deepEqual(calls, [
       ["buildCore", { root, circuit: "core" }],
       ["inspectIdentity", { root, requireBuiltR1cs: true }],
@@ -46,7 +75,11 @@ describe("complete local development artifact workflow", function () {
     ]);
     assert.deepEqual(result.circuits, CANONICAL_CIRCUIT_NAMES);
     assert.equal(result.regeneratedCircuits.length, 11);
-    assert.ok(result.regeneratedCircuits.every(name => name.startsWith("protocol:") || name.startsWith("shielded:")));
+    assert.ok(
+      result.regeneratedCircuits.every(
+        (name) => name.startsWith("protocol:") || name.startsWith("shielded:"),
+      ),
+    );
     assert.equal(result.artifacts, artifacts);
   });
 
@@ -55,31 +88,47 @@ describe("complete local development artifact workflow", function () {
     ["shielded:unshield4", ["inspectIdentity", "buildBoundary", "setupBoundary", "check"]],
     ["core", ["buildCore", "inspectIdentity", "check"]],
     ["person", ["buildCore", "inspectIdentity", "check"]],
-  ]) it(`limits ${circuit} regeneration while retaining the complete final check`, async function () {
-    const { options, calls } = fixture();
-    const result = await runDevelopment({ ...options, circuit });
-    assert.deepEqual(calls.map(([name]) => name), expected);
-    const selectedSetup = calls.find(([name]) => name.startsWith("setup"));
-    if (selectedSetup) assert.deepEqual(selectedSetup[1].circuits, [circuit.split(":")[1]]);
-    if (circuit === "person") assert.equal(calls[0][1].circuit, "person");
-    assert.deepEqual(result.regeneratedCircuits, circuit.includes(":") ? [circuit] : []);
-  });
+  ])
+    it(`limits ${circuit} regeneration while retaining the complete final check`, async function () {
+      const { options, calls } = fixture();
+      const result = await runDevelopment({ ...options, circuit });
+      assert.deepEqual(
+        calls.map(([name]) => name),
+        expected,
+      );
+      const selectedSetup = calls.find(([name]) => name.startsWith("setup"));
+      if (selectedSetup) assert.deepEqual(selectedSetup[1].circuits, [circuit.split(":")[1]]);
+      if (circuit === "person") assert.equal(calls[0][1].circuit, "person");
+      assert.deepEqual(result.regeneratedCircuits, circuit.includes(":") ? [circuit] : []);
+    });
 
-  for (const operation of ["buildCore", "inspectIdentity", "setupProtocol", "setupBoundary", "check"])
+  for (const operation of [
+    "buildCore",
+    "inspectIdentity",
+    "setupProtocol",
+    "setupBoundary",
+    "check",
+  ])
     it(`stops immediately after a failed ${operation} without reporting readiness`, async function () {
       const { options, calls, failure } = fixture(operation);
       const messages = [];
-      await assert.rejects(main([], { ...options, log: message => messages.push(message) }), error => error === failure);
+      await assert.rejects(
+        main([], { ...options, log: (message) => messages.push(message) }),
+        (error) => error === failure,
+      );
       assert.equal(calls.at(-1)[0], operation);
       assert.deepEqual(messages, []);
       if (["buildCore", "inspectIdentity"].includes(operation))
-        assert.equal(calls.some(([name]) => name.startsWith("setup")), false);
+        assert.equal(
+          calls.some(([name]) => name.startsWith("setup")),
+          false,
+        );
     });
 
   it("shows help without invoking compilation, checks or key setup", async function () {
     const { options, calls } = fixture();
     const messages = [];
-    await main(["--help"], { ...options, log: message => messages.push(message) });
+    await main(["--help"], { ...options, log: (message) => messages.push(message) });
     assert.deepEqual(calls, []);
     assert.match(messages[0], /all 13/u);
     assert.match(messages[0], /does not create production keys/u);
@@ -87,15 +136,28 @@ describe("complete local development artifact workflow", function () {
 
   it("rejects retired selectors before touching any artifacts", async function () {
     const { options, calls } = fixture();
-    await assert.rejects(runDevelopment({ ...options, circuit: "shielded:fund" }), /expected one of/u);
+    await assert.rejects(
+      runDevelopment({ ...options, circuit: "shielded:fund" }),
+      /expected one of/u,
+    );
     assert.deepEqual(calls, []);
   });
 
   it("honors npm-forwarded selectors instead of silently rotating the default graph", async function () {
     const { options, calls } = fixture();
-    const result = await main(["--circuit", "protocol:code", "--ptau", "specific.ptau"], { ...options, log: () => {} });
+    const result = await main(["--circuit", "protocol:code", "--ptau", "specific.ptau"], {
+      ...options,
+      log: () => {},
+    });
     assert.deepEqual(result.regeneratedCircuits, ["protocol:code"]);
-    assert.deepEqual(calls.find(([name]) => name === "setupProtocol")[1], { root, circuits: ["code"], ptauPath: "specific.ptau" });
-    assert.equal(calls.some(([name]) => name === "setupBoundary"), false);
+    assert.deepEqual(calls.find(([name]) => name === "setupProtocol")[1], {
+      root,
+      circuits: ["code"],
+      ptauPath: "specific.ptau",
+    });
+    assert.equal(
+      calls.some(([name]) => name === "setupBoundary"),
+      false,
+    );
   });
 });

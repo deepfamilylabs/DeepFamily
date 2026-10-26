@@ -153,7 +153,7 @@ function readManifest(root) {
   if (!fs.existsSync(file))
     throw new Error(
       `Receive protocol manifest missing; restore ${PROTOCOL_DEVELOPMENT_MANIFEST}. ` +
-      "Creating replacement development keys requires an explicit npm run zk:dev.",
+        "Creating replacement development keys requires an explicit npm run zk:dev.",
     );
   const manifest = JSON.parse(fs.readFileSync(file, "utf8"));
   assertDevelopment(manifest);
@@ -250,9 +250,17 @@ export function inspectProtocolArtifacts({
       JSON.stringify([relative(root, files.r1cs), relative(root, files.wasm)].sort())
     )
       throw new Error(`Protocol ${circuit} compiled artifact list is incomplete`);
-    verifyFiles(root, { [relative(root, files.wasm)]: entry.compiled[relative(root, files.wasm)] }, "Witness artifact");
+    verifyFiles(
+      root,
+      { [relative(root, files.wasm)]: entry.compiled[relative(root, files.wasm)] },
+      "Witness artifact",
+    );
     if (requireCompiled) {
-      verifyFiles(root, { [relative(root, files.r1cs)]: entry.compiled[relative(root, files.r1cs)] }, "R1CS artifact");
+      verifyFiles(
+        root,
+        { [relative(root, files.r1cs)]: entry.compiled[relative(root, files.r1cs)] },
+        "R1CS artifact",
+      );
       if (sha256(files.compiledWasm) !== entry.compiled[relative(root, files.wasm)])
         throw new Error(`Protocol ${circuit} local witness build differs from its pinned artifact`);
     }
@@ -292,7 +300,12 @@ export async function setupProtocolDevelopment({
   circuits = Object.keys(PROTOCOL_CIRCUITS),
   ptauPath,
 } = {}) {
-  const manifest = inspectProtocolArtifacts({ root, circuits, requireSetup: false, requireCompiled: true });
+  const manifest = inspectProtocolArtifacts({
+    root,
+    circuits,
+    requireSetup: false,
+    requireCompiled: true,
+  });
   const candidates = ptauPath
     ? [path.resolve(root, ptauPath)]
     : [

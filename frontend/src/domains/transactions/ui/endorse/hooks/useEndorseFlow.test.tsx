@@ -125,7 +125,7 @@ describe("useEndorseFlow", () => {
         versionIndex: 2,
         endorseVersion: expect.any(Function),
         deepTokenAddress: "0xtoken",
-              onStageChange: expect.any(Function),
+        onStageChange: expect.any(Function),
       }),
     );
     expect(result.current.status).toBe("success");

@@ -74,7 +74,8 @@ export default function EndorseCompactModal({
     phase: resolveTransactionPhase({
       successResult,
       errorResult: flowError,
-      isBusy: flowStatus === "validating" || flowStatus === "approving" || flowStatus === "submitting",
+      isBusy:
+        flowStatus === "validating" || flowStatus === "approving" || flowStatus === "submitting",
     }),
     transactionHash: successResult?.transactionHash,
     error: flowError,
@@ -251,18 +252,14 @@ export default function EndorseCompactModal({
                 <div className="text-xs font-medium text-ink-subtle uppercase tracking-wider mb-1">
                   {t("addVersion.versionIndex", "Version Index")}
                 </div>
-                <div className="font-mono text-lg font-semibold text-ink">
-                  {versionIndex}
-                </div>
+                <div className="font-mono text-lg font-semibold text-ink">{versionIndex}</div>
               </div>
               {endorsementCount !== null && (
                 <div className="text-right">
                   <div className="text-xs font-medium text-ink-subtle uppercase tracking-wider mb-1">
                     {t("search.endorsementQuery.endorsementCount", "Endorsements")}
                   </div>
-                  <div className="font-mono text-lg font-semibold text-ink">
-                    {endorsementCount}
-                  </div>
+                  <div className="font-mono text-lg font-semibold text-ink">{endorsementCount}</div>
                 </div>
               )}
             </div>
@@ -278,12 +275,8 @@ export default function EndorseCompactModal({
               <div className="grid grid-cols-2 gap-4">
                 {endorsementFee && (
                   <div>
-                    <div className="text-xs text-ink-muted mb-1">
-                      {t("endorse.fee", "Fee")}
-                    </div>
-                    <div className="font-mono font-medium text-ink">
-                      {endorsementFee} DEEP
-                    </div>
+                    <div className="text-xs text-ink-muted mb-1">{t("endorse.fee", "Fee")}</div>
+                    <div className="font-mono font-medium text-ink">{endorsementFee} DEEP</div>
                   </div>
                 )}
                 {userBalance && (
@@ -293,9 +286,7 @@ export default function EndorseCompactModal({
                     </div>
                     <div
                       className={`font-mono font-medium ${
-                        canAfford
-                          ? "text-emerald-600 dark:text-emerald-400"
-                          : "text-danger"
+                        canAfford ? "text-emerald-600 dark:text-emerald-400" : "text-danger"
                       }`}
                     >
                       {userBalance} DEEP
@@ -326,9 +317,7 @@ export default function EndorseCompactModal({
                 <div className="flex flex-col items-center gap-3 animate-pulse">
                   <Loader2 className="w-8 h-8 text-orange-500 animate-spin" />
                   <div className="space-y-1">
-                    <div className="font-medium text-ink">
-                      {getStatusMessage()}
-                    </div>
+                    <div className="font-medium text-ink">{getStatusMessage()}</div>
                     {state === "approving" && (
                       <div className="text-xs text-ink-muted flex items-center justify-center gap-1.5">
                         <ShieldCheck className="w-3.5 h-3.5" />

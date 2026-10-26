@@ -1,9 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { MAX_UINT128 } from "../constants.js";
-import {
-  computeShieldedOwnerCommitment,
-} from "../shielded-inheritance.js";
+import { computeShieldedOwnerCommitment } from "../shielded-inheritance.js";
 import {
   computeShieldedDummyInputNullifierForSlot,
   planShieldedValueSpend,
@@ -60,7 +58,14 @@ const assertConservation = (
 // to small fixtures. Compare the objective, leaving equivalent commitment ordering unspecified.
 const optimalDirectSpend = (source, amount) => {
   const singles = source.filter((note) => note.amount >= amount);
-  if (singles.length) return { total: singles.reduce((best, note) => note.amount < best ? note.amount : best, singles[0].amount), count: 1 };
+  if (singles.length)
+    return {
+      total: singles.reduce(
+        (best, note) => (note.amount < best ? note.amount : best),
+        singles[0].amount,
+      ),
+      count: 1,
+    };
   let best;
   for (let mask = 1; mask < 2 ** source.length; mask++) {
     const selected = source.filter((_, index) => mask & (1 << index));

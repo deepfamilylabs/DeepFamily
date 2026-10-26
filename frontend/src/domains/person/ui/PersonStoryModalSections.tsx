@@ -472,8 +472,7 @@ export function DetailedStorySection({
 
   if (!shouldRender) return null;
 
-  const showRecordOrder =
-    !storyData.loading && !storyData.error && storyData.records.length > 1;
+  const showRecordOrder = !storyData.loading && !storyData.error && storyData.records.length > 1;
 
   return (
     <div className="space-y-3">

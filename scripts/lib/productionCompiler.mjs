@@ -4,10 +4,11 @@ import path from "node:path";
 import { createHash } from "node:crypto";
 import { buildPinnedCircomFromSource } from "../fetch-circom.mjs";
 import { CIRCOM_VERSION, resolveLocalCircomTarget } from "./circomToolchain.mjs";
-const sha256File = file => createHash("sha256").update(fs.readFileSync(file)).digest("hex");
-async function requireRegularNonSymlink(file,label) {
-  const absolute = path.resolve(file), state = await fsp.lstat(absolute);
-  if(!state.isFile()||state.isSymbolicLink()||await fsp.realpath(absolute)!==absolute)
+const sha256File = (file) => createHash("sha256").update(fs.readFileSync(file)).digest("hex");
+async function requireRegularNonSymlink(file, label) {
+  const absolute = path.resolve(file),
+    state = await fsp.lstat(absolute);
+  if (!state.isFile() || state.isSymbolicLink() || (await fsp.realpath(absolute)) !== absolute)
     throw new Error(`${label} must be a regular non-symlink file`);
 }
 
@@ -168,4 +169,3 @@ export const preparePrivateProductionCompiler = async ({
     sourceBuild,
   });
 };
-

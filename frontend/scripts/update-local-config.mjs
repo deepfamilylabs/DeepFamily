@@ -125,7 +125,11 @@ async function updateLocalConfig() {
       console.log("DeepFamily reader module not deployed. Run `npm run dev:deploy` first.");
       process.exit(1);
     }
-    if (![poolPath, nativePoolPath, factoryPath, lettersPath, registryPath, sourcePath].every((file) => fs.existsSync(file))) {
+    if (
+      ![poolPath, nativePoolPath, factoryPath, lettersPath, registryPath, sourcePath].every(
+        (file) => fs.existsSync(file),
+      )
+    ) {
       console.log("Shielded pool not deployed. Run `npm run dev:deploy` first.");
       process.exit(1);
     }
@@ -144,7 +148,10 @@ async function updateLocalConfig() {
     const poolAddress = ethers.getAddress(poolDeployment.address);
     const factoryAddress = ethers.getAddress(factoryDeployment.address);
     const nativePoolAddress = ethers.getAddress(nativeDeployment.address);
-    if (!Number.isSafeInteger(factoryDeployment.deploymentBlock) || !Number.isSafeInteger(lettersDeployment.deploymentBlock)) {
+    if (
+      !Number.isSafeInteger(factoryDeployment.deploymentBlock) ||
+      !Number.isSafeInteger(lettersDeployment.deploymentBlock)
+    ) {
       throw new Error("Local integrated deployment metadata is incomplete");
     }
 
@@ -181,10 +188,26 @@ async function updateLocalConfig() {
     const nativePool = new ethers.Contract(nativePoolAddress, nativeDeployment.abi, provider);
     const letters = new ethers.Contract(lettersAddress, lettersDeployment.abi, provider);
     const factory = new ethers.Contract(factoryAddress, factoryDeployment.abi, provider);
-    const registry = new ethers.Contract(registryDeployment.address, registryDeployment.abi, provider);
+    const registry = new ethers.Contract(
+      registryDeployment.address,
+      registryDeployment.abi,
+      provider,
+    );
     const source = new ethers.Contract(sourceDeployment.address, sourceDeployment.abi, provider);
-    const { registryAddress } = await validateReceiveDeployment({ deepFamily, pool, nativePool, factory, letters, registry, source });
-    exportProtocolFrontendArtifacts({ root: PROJECT_ROOT, chainId: LOCAL_CHAIN_ID, registryAddress });
+    const { registryAddress } = await validateReceiveDeployment({
+      deepFamily,
+      pool,
+      nativePool,
+      factory,
+      letters,
+      registry,
+      source,
+    });
+    exportProtocolFrontendArtifacts({
+      root: PROJECT_ROOT,
+      chainId: LOCAL_CHAIN_ID,
+      registryAddress,
+    });
 
     try {
       const tokenCounter = await deepFamily.tokenCounter();

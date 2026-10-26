@@ -54,9 +54,9 @@ export function MintNftFooter({
         failed: { onClose, onBackToEdit },
         done: successResult ? (
           <>
-          <TransactionButton onClick={onClose} className="flex-1">
-            {t("common.close", "Close")}
-          </TransactionButton>
+            <TransactionButton onClick={onClose} className="flex-1">
+              {t("common.close", "Close")}
+            </TransactionButton>
             <TransactionButton variant="primary" onClick={onContinueMinting} className="flex-1">
               {t("mintNFT.continueMinting", "Continue Minting")}
             </TransactionButton>
@@ -64,18 +64,18 @@ export function MintNftFooter({
         ) : null,
         review: (
           <>
-          <TransactionButton
-            onClick={() => onTransactionPreviewDecision(false)}
-            className="flex-1"
-          >
-            {t("mintNFT.cancelSubmission", "Cancel Submission")}
-          </TransactionButton>
-          <TransactionButton
-            variant="primary"
-            onClick={() => onTransactionPreviewDecision(true)}
-            className="flex-[1.5]"
-          >
-            <span>{t("mintNFT.continueToWallet", "Continue to Wallet")}</span>
+            <TransactionButton
+              onClick={() => onTransactionPreviewDecision(false)}
+              className="flex-1"
+            >
+              {t("mintNFT.cancelSubmission", "Cancel Submission")}
+            </TransactionButton>
+            <TransactionButton
+              variant="primary"
+              onClick={() => onTransactionPreviewDecision(true)}
+              className="flex-[1.5]"
+            >
+              <span>{t("mintNFT.continueToWallet", "Continue to Wallet")}</span>
               <ChevronRight className="w-4 h-4 opacity-80" />
             </TransactionButton>
           </>

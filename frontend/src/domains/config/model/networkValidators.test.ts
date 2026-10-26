@@ -22,9 +22,7 @@ describe("networkValidators", () => {
 
   describe("isHash32", () => {
     it("accepts a valid 32-byte hex hash with 0x prefix", () => {
-      expect(
-        isHash32("0x" + "a".repeat(64)),
-      ).toBe(true);
+      expect(isHash32("0x" + "a".repeat(64))).toBe(true);
     });
     it("rejects a 31-byte hash", () => {
       expect(isHash32("0x" + "a".repeat(62))).toBe(false);

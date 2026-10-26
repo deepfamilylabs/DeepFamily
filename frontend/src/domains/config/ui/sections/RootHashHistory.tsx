@@ -27,7 +27,9 @@ export default function RootHashHistory({
   return (
     <details className="group/history">
       <summary className="flex cursor-pointer list-none items-center gap-2 rounded-md py-1 outline-none transition-colors hover:text-ink focus-visible:ring-2 focus-visible:ring-accent/50 [&::-webkit-details-marker]:hidden">
-        <span className={CONFIG_LABEL}>{t("familyTree.config.rootHistory", "Root hash history")}</span>
+        <span className={CONFIG_LABEL}>
+          {t("familyTree.config.rootHistory", "Root hash history")}
+        </span>
         <span className="ml-auto rounded-full bg-surface-alt px-1.5 py-0.5 text-[10px] leading-none text-ink-subtle">
           {items.length}
         </span>

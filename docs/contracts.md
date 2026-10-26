@@ -1177,11 +1177,17 @@ function depth(uint8 treeId) external view returns (uint256);
 function isKnownRoot(uint8 treeId, uint256 candidate) external view returns (bool);
 function CHECKPOINT_RETIREMENT_WINDOW() external view returns (uint256);
 function currentCheckpointId() external view returns (uint256);
-function getCheckpoint(uint256 checkpointId) external view returns (
-  uint256 endorsementRoot, uint256 trustedRoot, uint256 createdAt, uint256 retiredAt
-);
+function getCheckpoint(
+  uint256 checkpointId
+)
+  external
+  view
+  returns (uint256 endorsementRoot, uint256 trustedRoot, uint256 createdAt, uint256 retiredAt);
 function isKnownCheckpoint(
-  uint256 checkpointId, uint256 endorsementRoot, uint256 trustedRoot, uint256 asOf
+  uint256 checkpointId,
+  uint256 endorsementRoot,
+  uint256 trustedRoot,
+  uint256 asOf
 ) external view returns (bool);
 function identityCommitmentOf(bytes32 personHash) external view returns (uint256);
 function parentsDigestOf(bytes32 personHash, uint256 versionIndex) external view returns (uint256);

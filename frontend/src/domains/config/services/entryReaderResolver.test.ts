@@ -32,9 +32,7 @@ describe("resolveEntryReaderForChain", () => {
   });
 
   it("reads a custom network's own declaration when no list is handed in", () => {
-    saveCustom([
-      { chainId: 31338, name: "Mine", rpcUrl: "http://mine", readerAddress: DECLARED },
-    ]);
+    saveCustom([{ chainId: 31338, name: "Mine", rpcUrl: "http://mine", readerAddress: DECLARED }]);
     expect(resolveEntryReaderForChain(31338)).toBe(DECLARED);
   });
 
@@ -50,9 +48,7 @@ describe("resolveEntryReaderForChain", () => {
 
   it("lets a custom network's declaration win over the address book", () => {
     mocks.addressBook = { 31338: BOOK };
-    saveCustom([
-      { chainId: 31338, name: "Mine", rpcUrl: "http://mine", readerAddress: DECLARED },
-    ]);
+    saveCustom([{ chainId: 31338, name: "Mine", rpcUrl: "http://mine", readerAddress: DECLARED }]);
     expect(resolveEntryReaderForChain(31338)).toBe(DECLARED);
   });
 

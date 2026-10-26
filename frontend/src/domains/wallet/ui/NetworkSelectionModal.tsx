@@ -119,9 +119,7 @@ export default function NetworkSelectionModal({
               <Globe className="w-[18px] h-[18px]" aria-hidden />
             </div>
             <div className="flex-1 min-w-0">
-              <h2 className={MODAL_TITLE}>
-                {t("wallet.switchNetwork", "Switch Network")}
-              </h2>
+              <h2 className={MODAL_TITLE}>{t("wallet.switchNetwork", "Switch Network")}</h2>
               <p className="text-xs text-ink-muted">
                 {t("wallet.selectNetworkDesc", "Select a network to connect")}
               </p>
@@ -162,7 +160,8 @@ export default function NetworkSelectionModal({
                       {t(network.nameKey, network.defaultName)}
                     </div>
                     <div className="text-xs text-ink-muted">
-                      {t(network.tagKey, network.defaultTag)} · <span className="font-mono">chain {network.chainId}</span>
+                      {t(network.tagKey, network.defaultTag)} ·{" "}
+                      <span className="font-mono">chain {network.chainId}</span>
                     </div>
                   </div>
 

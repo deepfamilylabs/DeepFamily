@@ -11,9 +11,7 @@ import {
 
 describe("treeEdgeState", () => {
   it("collects reachable hashes", () => {
-    expect(collectReachableHashes(["0xabc-v-1", "0xdef-v-2"])).toEqual(
-      new Set(["0xabc", "0xdef"]),
-    );
+    expect(collectReachableHashes(["0xabc-v-1", "0xdef-v-2"])).toEqual(new Set(["0xabc", "0xdef"]));
   });
 
   it("collects strict parent ids from explicit keys and prefixes", () => {

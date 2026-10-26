@@ -29,7 +29,9 @@ describe("treeSessionStartup", () => {
   it("classifies provider failures", async () => {
     const error = new Error("provider failed");
     vi.spyOn(treeSessionPreflight, "ensureTreeProviderReady").mockRejectedValue(error);
-    vi.spyOn(treeSessionErrors, "classifyTreeSessionConnectionError").mockReturnValue("networkError");
+    vi.spyOn(treeSessionErrors, "classifyTreeSessionConnectionError").mockReturnValue(
+      "networkError",
+    );
 
     await expect(
       verifyTreeSessionStartup({

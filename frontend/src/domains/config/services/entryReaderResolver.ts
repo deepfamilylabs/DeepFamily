@@ -29,7 +29,10 @@ export type EntryReaderLookup = {
  * chain's in place — reading one chain through another chain's entrypoint is
  * how a plain misconfiguration turns into "no contract deployed here".
  */
-export function resolveEntryReaderForChain(chainId: number, lookup: EntryReaderLookup = {}): string {
+export function resolveEntryReaderForChain(
+  chainId: number,
+  lookup: EntryReaderLookup = {},
+): string {
   if (!Number.isSafeInteger(chainId) || chainId <= 0) return "";
 
   // A custom network is by definition absent from the build's address book, so

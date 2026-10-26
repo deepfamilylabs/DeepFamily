@@ -19,8 +19,7 @@ export const PAPER_NOTE_FONT_STACK =
 //      included — in a single consistent 隶书.
 //   2. Glyphs no system 隶书 covers fall back to the body serif (song): on a device with no 隶书 font
 //      the 隶书 preset simply reads as song — the accepted trade-off for not bundling a face.
-export const PAPER_LISHU_FONT_STACK =
-  `"Baoli SC", "Baoli TC", "STLiti", "华文隶书", "LiSu", "隶书", "隸書", "FZLiShu-S01", "FZLiShu II S", "方正隶书简体", "DFLiSong-W5", ${PAPER_BODY_FONT_STACK}`;
+export const PAPER_LISHU_FONT_STACK = `"Baoli SC", "Baoli TC", "STLiti", "华文隶书", "LiSu", "隶书", "隸書", "FZLiShu-S01", "FZLiShu II S", "方正隶书简体", "DFLiSong-W5", ${PAPER_BODY_FONT_STACK}`;
 // Ou records use Tailwind's px-2.5 spacing. Keep the numeric value shared so absolute-layout
 // renderers can reserve the same visual distance from the spine without changing pagination.
 export const PAPER_RECORD_INLINE_PADDING = 10;

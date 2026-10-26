@@ -86,20 +86,26 @@ export function useEndorseFeeQuote({ isOpen, address, contract }: UseEndorseFeeQ
     }));
   }, []);
 
-  const applySuccessResult = useCallback((result: Extract<ExecuteEndorseFlowResult, { alreadyEndorsed: false }>) => {
-    setQuote((current) => {
-      const nextBalance = result.balanceBefore - result.fee;
-      return {
-        ...current,
-        deepTokenFee: result.feeFormatted,
-        deepTokenFeeRaw: result.fee,
-        deepTokenDecimals: result.decimals,
-        deepTokenSymbol: result.symbol,
-        userDeepBalance: nextBalance >= 0n ? ethers.formatUnits(nextBalance, result.decimals) : current.userDeepBalance,
-        userDeepBalanceRaw: nextBalance >= 0n ? nextBalance : current.userDeepBalanceRaw,
-      };
-    });
-  }, []);
+  const applySuccessResult = useCallback(
+    (result: Extract<ExecuteEndorseFlowResult, { alreadyEndorsed: false }>) => {
+      setQuote((current) => {
+        const nextBalance = result.balanceBefore - result.fee;
+        return {
+          ...current,
+          deepTokenFee: result.feeFormatted,
+          deepTokenFeeRaw: result.fee,
+          deepTokenDecimals: result.decimals,
+          deepTokenSymbol: result.symbol,
+          userDeepBalance:
+            nextBalance >= 0n
+              ? ethers.formatUnits(nextBalance, result.decimals)
+              : current.userDeepBalance,
+          userDeepBalanceRaw: nextBalance >= 0n ? nextBalance : current.userDeepBalanceRaw,
+        };
+      });
+    },
+    [],
+  );
 
   return useMemo(
     () => ({

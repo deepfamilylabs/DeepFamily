@@ -369,7 +369,7 @@ describe("AddVersion secret-state boundary", () => {
         setSuccessResult: vi.fn(),
         setIsSubmitting: vi.fn(),
         submissionPackageRef,
-      settleTransaction: mocks.settleTransaction,
+        settleTransaction: mocks.settleTransaction,
       }),
     );
 
@@ -513,7 +513,7 @@ describe("AddVersion secret-state boundary", () => {
         setSuccessResult: vi.fn(),
         setIsSubmitting: vi.fn(),
         submissionPackageRef,
-      settleTransaction: mocks.settleTransaction,
+        settleTransaction: mocks.settleTransaction,
       }),
     );
 
@@ -636,7 +636,7 @@ describe("AddVersion secret-state boundary", () => {
         setSuccessResult,
         setIsSubmitting: vi.fn(),
         submissionPackageRef,
-      settleTransaction: mocks.settleTransaction,
+        settleTransaction: mocks.settleTransaction,
       }),
     );
 

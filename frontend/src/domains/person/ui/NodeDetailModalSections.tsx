@@ -204,7 +204,7 @@ export function NodeDetailHeaderActions({
             icon={Edit2}
             label={t("familyTree.nodeDetail.editStory", "Edit Story")}
             accessibleLabel={t("familyTree.nodeDetail.editStory", "Edit Story")}
-              onClick={onOpenEditor}
+            onClick={onOpenEditor}
           />
         )}
         {endorseButton}

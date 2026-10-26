@@ -37,13 +37,7 @@ export function PeoplePageHead({ t, stats, personNotice }: PeoplePageHeadProps) 
   );
 }
 
-function PeopleStatStrip({
-  t,
-  stats,
-}: {
-  t: PeoplePageT;
-  stats: PeoplePageController["stats"];
-}) {
+function PeopleStatStrip({ t, stats }: { t: PeoplePageT; stats: PeoplePageController["stats"] }) {
   return (
     <div className="flex items-end gap-5 sm:gap-6 shrink-0">
       <Metric

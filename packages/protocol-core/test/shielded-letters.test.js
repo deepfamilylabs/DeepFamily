@@ -22,7 +22,7 @@ import {
 } from "../shielded-letters.js";
 
 const LETTERS = "0x0000000000000000000000000000000000000001";
-const testKey = value => ({hpkeIkm: new Uint8Array(32).fill(Number(value))});
+const testKey = (value) => ({ hpkeIkm: new Uint8Array(32).fill(Number(value)) });
 const POOL = "0x0000000000000000000000000000000000000002";
 const OTHER_LETTERS = "0x0000000000000000000000000000000000000003";
 const context = { chainId: 1030n, lettersAddress: LETTERS, messageId: 44n };

@@ -101,15 +101,43 @@ export const buildPlannedProtocolDeploymentEvidence = ({
       runtimeSha256: artifact?.runtimeSha256,
     });
   const deployments = Object.freeze({
-    ...Object.fromEntries(RECEIVE_DEPLOYMENT_CONTRACTS.map(({property}) => [property, withHashes(deploymentBindings[property], artifacts?.[property])])),
+    ...Object.fromEntries(
+      RECEIVE_DEPLOYMENT_CONTRACTS.map(({ property }) => [
+        property,
+        withHashes(deploymentBindings[property], artifacts?.[property]),
+      ]),
+    ),
     token: deploymentBindings.token,
     poseidonT3: deploymentBindings.poseidonT3,
     poseidonT4: deploymentBindings.poseidonT4,
     poseidonT6: deploymentBindings.poseidonT6,
     deepFamilyLineageIndex: deploymentBindings.deepFamilyLineageIndex,
-    shieldedBoundaryVerifierAdapter: withHashes(deploymentBindings.shieldedBoundaryVerifierAdapter, artifacts?.shieldedBoundaryVerifierAdapter),
-    generatedVerifiers: Object.freeze(Object.fromEntries(Object.keys(PROTOCOL_DEPLOYMENT_CIRCUITS).map(action => [action, withHashes(deploymentBindings.generatedVerifiers[action], artifacts?.generatedVerifiers?.[action])]))),
-    protocolVerifiers: Object.freeze(Object.fromEntries(Object.keys(PROTOCOL_DEPLOYMENT_CIRCUITS).map(action => [action, withHashes(deploymentBindings.protocolVerifiers[action], artifacts?.protocolVerifiers?.[action])]))),
+    shieldedBoundaryVerifierAdapter: withHashes(
+      deploymentBindings.shieldedBoundaryVerifierAdapter,
+      artifacts?.shieldedBoundaryVerifierAdapter,
+    ),
+    generatedVerifiers: Object.freeze(
+      Object.fromEntries(
+        Object.keys(PROTOCOL_DEPLOYMENT_CIRCUITS).map((action) => [
+          action,
+          withHashes(
+            deploymentBindings.generatedVerifiers[action],
+            artifacts?.generatedVerifiers?.[action],
+          ),
+        ]),
+      ),
+    ),
+    protocolVerifiers: Object.freeze(
+      Object.fromEntries(
+        Object.keys(PROTOCOL_DEPLOYMENT_CIRCUITS).map((action) => [
+          action,
+          withHashes(
+            deploymentBindings.protocolVerifiers[action],
+            artifacts?.protocolVerifiers?.[action],
+          ),
+        ]),
+      ),
+    ),
     shieldedVerifiers: Object.freeze(
       Object.fromEntries(
         Object.keys(SHIELDED_DEPLOYMENT_CIRCUITS).map((action) => [
@@ -211,12 +239,28 @@ export const assertOnChainProtocolDeploymentRuntimes = async ({
       plannedAddresses?.[spec.verifierLabel],
       deploymentArtifacts?.shieldedVerifiers?.[action],
     ]),
-    ["ShieldedBoundaryVerifierAdapter", plannedAddresses?.shieldedBoundaryVerifierAdapter, deploymentArtifacts?.shieldedBoundaryVerifierAdapter],
-    ...Object.values(PROTOCOL_DEPLOYMENT_CIRCUITS).flatMap(spec => [
-      [spec.contract, plannedAddresses?.[spec.generatedLabel], deploymentArtifacts?.generatedVerifiers?.[spec.action]],
-      [`${spec.action} fixed verifier`, plannedAddresses?.[spec.adapterLabel], deploymentArtifacts?.protocolVerifiers?.[spec.action]],
+    [
+      "ShieldedBoundaryVerifierAdapter",
+      plannedAddresses?.shieldedBoundaryVerifierAdapter,
+      deploymentArtifacts?.shieldedBoundaryVerifierAdapter,
+    ],
+    ...Object.values(PROTOCOL_DEPLOYMENT_CIRCUITS).flatMap((spec) => [
+      [
+        spec.contract,
+        plannedAddresses?.[spec.generatedLabel],
+        deploymentArtifacts?.generatedVerifiers?.[spec.action],
+      ],
+      [
+        `${spec.action} fixed verifier`,
+        plannedAddresses?.[spec.adapterLabel],
+        deploymentArtifacts?.protocolVerifiers?.[spec.action],
+      ],
     ]),
-    ...RECEIVE_DEPLOYMENT_CONTRACTS.map(({contractName, property}) => [contractName, plannedAddresses?.[property], deploymentArtifacts?.[property]]),
+    ...RECEIVE_DEPLOYMENT_CONTRACTS.map(({ contractName, property }) => [
+      contractName,
+      plannedAddresses?.[property],
+      deploymentArtifacts?.[property],
+    ]),
     [
       "ShieldedErc20Pool",
       plannedAddresses?.shieldedErc20Pool,

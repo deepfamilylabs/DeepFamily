@@ -12,7 +12,7 @@ import {
   splitShieldedViewPublicKey,
 } from "../index.js";
 
-const testKey = value => ({hpkeIkm: new Uint8Array(32).fill(Number(value))});
+const testKey = (value) => ({ hpkeIkm: new Uint8Array(32).fill(Number(value)) });
 const POOL = "0x0000000000000000000000000000000000000001";
 const OTHER_POOL = "0x0000000000000000000000000000000000000002";
 const context = { chainId: 1030n, poolAddress: POOL };
@@ -29,10 +29,7 @@ test("fixed recipient IKM deterministically derives the expected X25519 key", as
     viewKeyHi: 116997348331654895106151299621983057875n,
     viewKeyLo: 100968460792833900495915938141066585164n,
   });
-  assert.notDeepEqual(
-    key,
-    await deriveShieldedViewPublicKey(testKey(14n).hpkeIkm),
-  );
+  assert.notDeepEqual(key, await deriveShieldedViewPublicKey(testKey(14n).hpkeIkm));
 });
 
 test("HPKE note round-trips with fixed length and randomized ciphertext", async () => {
@@ -94,10 +91,19 @@ test("wrong identity, AAD, ciphertext mutation and truncation fail closed", asyn
 });
 
 test("AAD is deployment-specific and validates chain/pool identity", () => {
-  assert.deepEqual(buildShieldedHpkeAad(context), getBytes(solidityPacked(
-    ["bytes32", "uint64", "address"],
-    [keccak256(toUtf8Bytes("DeepFamily:ShieldedNoteHPKE:v1")), context.chainId, context.poolAddress],
-  )));
+  assert.deepEqual(
+    buildShieldedHpkeAad(context),
+    getBytes(
+      solidityPacked(
+        ["bytes32", "uint64", "address"],
+        [
+          keccak256(toUtf8Bytes("DeepFamily:ShieldedNoteHPKE:v1")),
+          context.chainId,
+          context.poolAddress,
+        ],
+      ),
+    ),
+  );
   assert.notDeepEqual(
     buildShieldedHpkeAad(context),
     buildShieldedHpkeAad({ ...context, chainId: 1031n }),

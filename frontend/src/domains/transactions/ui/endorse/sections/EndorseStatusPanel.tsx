@@ -3,7 +3,11 @@ import { TransactionStatusView } from "../../shared/TransactionStatusView";
 import type { TransactionPhase } from "../../shared/transactionPhase";
 import type { TimelineStep } from "../../shared/TransactionTimeline";
 import { EndorseSuccessResult } from "../EndorseSuccessResult";
-import type { EndorseErrorResultView, EndorseSuccessResultView, EndorseT } from "../model/endorseTypes";
+import type {
+  EndorseErrorResultView,
+  EndorseSuccessResultView,
+  EndorseT,
+} from "../model/endorseTypes";
 
 export interface EndorseStatusPanelProps {
   t: EndorseT;

@@ -75,8 +75,14 @@ contract ShieldedPoolFactory is ReentrancyGuardTransient {
 
   function _createPool(address token) private returns (address pool) {
     pool = address(
-      new ShieldedErc20Pool(token, VERIFIER, RECEIVE_REGISTRY, FUND_VERIFIER,
-        CLAIM_VERIFIER, TRANSFER_VERIFIER)
+      new ShieldedErc20Pool(
+        token,
+        VERIFIER,
+        RECEIVE_REGISTRY,
+        FUND_VERIFIER,
+        CLAIM_VERIFIER,
+        TRANSFER_VERIFIER
+      )
     );
     poolFor[token] = pool;
     ++poolCount;

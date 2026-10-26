@@ -1,8 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import {
-  ensureTreeProviderReady,
-  ensureTreeRootExists,
-} from "./treeSessionPreflight";
+import { ensureTreeProviderReady, ensureTreeRootExists } from "./treeSessionPreflight";
 
 describe("treeSessionPreflight", () => {
   it("probes provider chain id", async () => {

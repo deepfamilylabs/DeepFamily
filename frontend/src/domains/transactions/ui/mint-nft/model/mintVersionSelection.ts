@@ -21,9 +21,7 @@ export function reconcileMintVersionSelection(
 ): MintVersionSelectionUpdate | null {
   if (!lookup.personHash || lookup.status !== "ready") return null;
   if (decidedForHash === lookup.personHash) return null;
-  const endorsed = lookup.versions.some(
-    (version) => version.versionIndex === endorsedVersionIndex,
-  );
+  const endorsed = lookup.versions.some((version) => version.versionIndex === endorsedVersionIndex);
   return {
     decidedForHash: lookup.personHash,
     versionIndex: endorsed ? endorsedVersionIndex : 0,

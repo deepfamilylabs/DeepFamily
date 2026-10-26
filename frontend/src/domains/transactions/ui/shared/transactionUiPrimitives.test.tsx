@@ -58,7 +58,11 @@ describe("transaction UI primitives", () => {
 
   it("marks everything before the current step done and everything after pending", () => {
     const steps = buildTimeline({
-      steps: [{ id: "a", label: "A" }, { id: "b", label: "B" }, { id: "c", label: "C" }],
+      steps: [
+        { id: "a", label: "A" },
+        { id: "b", label: "B" },
+        { id: "c", label: "C" },
+      ],
       currentId: "b",
     });
 
@@ -67,7 +71,10 @@ describe("transaction UI primitives", () => {
 
   it("marks the step a failed flow stopped on rather than still working it", () => {
     const steps = buildTimeline({
-      steps: [{ id: "a", label: "A" }, { id: "b", label: "B" }],
+      steps: [
+        { id: "a", label: "A" },
+        { id: "b", label: "B" },
+      ],
       currentId: "b",
       failed: true,
     });
@@ -246,9 +253,7 @@ describe("transaction UI primitives", () => {
     const alert = screen.getByRole("alert");
 
     expect(alert.getAttribute("aria-live")).toBe("assertive");
-    expect(alert.getAttribute("aria-labelledby")).toBe(
-      screen.getByText("Transaction failed").id,
-    );
+    expect(alert.getAttribute("aria-labelledby")).toBe(screen.getByText("Transaction failed").id);
     expect(screen.getByText("Execution reverted")).toBeTruthy();
     expect(screen.getByText("Execution reverted by contract")).toBeTruthy();
     expect(screen.getByText("CALL_EXCEPTION")).toBeTruthy();

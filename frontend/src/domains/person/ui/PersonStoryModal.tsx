@@ -347,11 +347,7 @@ export default function PersonStoryModal({
             label={t("familyTree.nodeDetail.encyclopedia", "Encyclopedia")}
             accessibleLabel={t("people.viewEncyclopedia", "View Encyclopedia")}
             onClick={() =>
-              window.open(
-                `/person/${person.tokenId || person.id}`,
-                "_blank",
-                "noopener,noreferrer",
-              )
+              window.open(`/person/${person.tokenId || person.id}`, "_blank", "noopener,noreferrer")
             }
           />
         )}

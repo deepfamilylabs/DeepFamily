@@ -191,7 +191,6 @@ export function MintTargetSection({
             )}
           </div>
         )}
-
       </div>
     </div>
   );

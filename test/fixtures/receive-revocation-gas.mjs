@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import { poseidon2 } from "poseidon-lite";
-import { computeShieldedCiphertextHashField, computeRoleStatusIndex } from "@deepfamily/protocol-core";
+import {
+  computeShieldedCiphertextHashField,
+  computeRoleStatusIndex,
+} from "@deepfamily/protocol-core";
 
 // Gas/state fixture only: the source, registry and pools are the actual contracts.
 // Family/lineage authentication and money proofs are explicit mocks. Role status

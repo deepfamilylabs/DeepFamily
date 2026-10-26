@@ -10,12 +10,10 @@ export interface AddVersionTransactionScope {
 }
 
 type ScopeSigner = Pick<ethers.Signer, "getAddress"> & {
-  provider?:
-    | {
-        send?: (method: string, params: unknown[]) => Promise<unknown>;
-        getNetwork?: () => Promise<{ chainId: bigint | number | string }>;
-      }
-    | null;
+  provider?: {
+    send?: (method: string, params: unknown[]) => Promise<unknown>;
+    getNetwork?: () => Promise<{ chainId: bigint | number | string }>;
+  } | null;
 };
 
 export function addVersionScopeChangedError(): Error {

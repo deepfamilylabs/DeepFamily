@@ -14,12 +14,12 @@ describe("treeSessionErrors", () => {
   });
 
   it("classifies invalid root errors separately", () => {
-    expect(
-      classifyTreeRootCheckError({ errorName: "InvalidPersonHash", message: "boom" }),
-    ).toEqual({
-      status: "rootNotFound",
-      isRootInvalid: true,
-    });
+    expect(classifyTreeRootCheckError({ errorName: "InvalidPersonHash", message: "boom" })).toEqual(
+      {
+        status: "rootNotFound",
+        isRootInvalid: true,
+      },
+    );
 
     expect(classifyTreeRootCheckError({ message: "network timeout" })).toEqual({
       status: "networkError",

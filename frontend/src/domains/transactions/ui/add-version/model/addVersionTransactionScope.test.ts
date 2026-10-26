@@ -60,13 +60,11 @@ describe("AddVersion transaction scope", () => {
       assertAddVersionTransactionScope({
         expected,
         chainId: "chainId" in changed ? Number(changed.chainId) : 71,
-        contractAddress:
-          "contractAddress" in changed ? String(changed.contractAddress) : CONTRACT,
+        contractAddress: "contractAddress" in changed ? String(changed.contractAddress) : CONTRACT,
         readerAddress: "readerAddress" in changed ? String(changed.readerAddress) : READER,
         signer: signer({
           address: "address" in changed ? String(changed.address) : undefined,
-          walletChainId:
-            "walletChainId" in changed ? String(changed.walletChainId) : undefined,
+          walletChainId: "walletChainId" in changed ? String(changed.walletChainId) : undefined,
         }),
       }),
     ).rejects.toMatchObject({ code: ADD_VERSION_SCOPE_CHANGED });

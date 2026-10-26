@@ -4,11 +4,7 @@ interface FieldErrorA11yArgs {
   describedByIds?: string[];
 }
 
-export function getFieldErrorA11y({
-  invalid,
-  errorId,
-  describedByIds = [],
-}: FieldErrorA11yArgs) {
+export function getFieldErrorA11y({ invalid, errorId, describedByIds = [] }: FieldErrorA11yArgs) {
   const describedBy = invalid ? [...describedByIds, errorId] : describedByIds;
 
   return {

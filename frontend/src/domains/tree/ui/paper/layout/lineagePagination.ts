@@ -147,10 +147,7 @@ export function getLineagePageMetrics(
   };
 }
 
-export function getLineagePageWidth(
-  side: LineagePageSide,
-  metrics: LineagePageMetrics,
-): number {
+export function getLineagePageWidth(side: LineagePageSide, metrics: LineagePageMetrics): number {
   return side === "right"
     ? metrics.rightBodyWidth + metrics.generationMarkWidth
     : metrics.leftBodyWidth;
@@ -446,10 +443,7 @@ function buildConnectors(params: {
   return connectorsBySpread;
 }
 
-function addRawEntry(
-  entriesByDepth: Map<number, RawLineageEntry[][]>,
-  entry: RawLineageEntry,
-) {
+function addRawEntry(entriesByDepth: Map<number, RawLineageEntry[][]>, entry: RawLineageEntry) {
   const depthEntries = entriesByDepth.get(entry.person.depth) || [];
   const spreadEntries = depthEntries[entry.spreadIndex] || [];
   spreadEntries.push(entry);
@@ -567,7 +561,9 @@ export function buildLineagePaperBook(params: {
   const metrics = getLineagePageMetrics(params.pageBodyWidths);
   if (!generations.length) return { charts: [] };
 
-  const generationsByDepth = new Map(generations.map((generation) => [generation.depth, generation]));
+  const generationsByDepth = new Map(
+    generations.map((generation) => [generation.depth, generation]),
+  );
   const maxDepth = generations[generations.length - 1]?.depth || 0;
   const charts: LineageChartWindow[] = [];
 
@@ -588,26 +584,29 @@ export function buildLineagePaperBook(params: {
       metrics,
     });
 
-    const spreads: LineagePageSpread[] = Array.from({ length: spreadCount }, (_value, spreadOffset) => {
-      const rows = generationDepths.map((depth, rowIndex) => {
-        const generation = generationsByDepth.get(depth);
+    const spreads: LineagePageSpread[] = Array.from(
+      { length: spreadCount },
+      (_value, spreadOffset) => {
+        const rows = generationDepths.map((depth, rowIndex) => {
+          const generation = generationsByDepth.get(depth);
+          return {
+            depth,
+            label: getGenerationLabel(generation, depth, t),
+            repeated: repeatedDepth === depth,
+            entries:
+              entriesByDepth
+                .get(depth)
+                ?.[spreadOffset]?.map((raw) => buildEntry({ raw, depth, rowIndex, metrics })) || [],
+          };
+        });
         return {
-          depth,
-          label: getGenerationLabel(generation, depth, t),
-          repeated: repeatedDepth === depth,
-          entries:
-            entriesByDepth
-              .get(depth)?.[spreadOffset]
-              ?.map((raw) => buildEntry({ raw, depth, rowIndex, metrics })) || [],
+          index: spreadOffset + 1,
+          kind: spreadOffset === 0 ? "main" : "continuation",
+          rows,
+          connectors: [],
         };
-      });
-      return {
-        index: spreadOffset + 1,
-        kind: spreadOffset === 0 ? "main" : "continuation",
-        rows,
-        connectors: [],
-      };
-    });
+      },
+    );
     const connectorsBySpread = buildConnectors({ graph, spreads, metrics });
 
     charts.push({

@@ -311,21 +311,21 @@ The source relations authenticate actual lineage roots and hidden revocation-rol
 
 Deposit and transfer witnesses contain the payer's spending material plus public code/rule data. They do not require the recipient's identity secret, code secret or qualification opening. A future policy can therefore be used while the recipient is offline. Qualification revocation and code expiry are checked against current on-chain state when funds are deposited or added. Claims authenticate current qualification and share their subject/policy/period nullifier across independently generated codes.
 
-| Relation | Circuit | Public signals |
-| --- | --- | ---: |
-| PersonRelation | `person_commitment` | 5 |
-| DisclosureBinding | `disclosure_binding` | 4 |
-| Source fact | `eligibility_source_fact` | 10 |
-| Source trust | `eligibility_source_trust` | 8 |
-| Issuance | `eligibility_issue` | 5 |
-| Code | `receive_code` | 10 |
-| Capability | `budget_capability` | 10 |
-| Deposit | `budget_deposit` | 20 |
-| Claim | `budget_claim` | 23 |
-| Transfer | `value_transfer` | 12 |
-| Shield | `shielded_shield` | 7 |
-| Unshield | `shielded_unshield` | 11 |
-| Four-input Unshield | `shielded_unshield_4` | 20 |
+| Relation            | Circuit                    | Public signals |
+| ------------------- | -------------------------- | -------------: |
+| PersonRelation      | `person_commitment`        |              5 |
+| DisclosureBinding   | `disclosure_binding`       |              4 |
+| Source fact         | `eligibility_source_fact`  |             10 |
+| Source trust        | `eligibility_source_trust` |              8 |
+| Issuance            | `eligibility_issue`        |              5 |
+| Code                | `receive_code`             |             10 |
+| Capability          | `budget_capability`        |             10 |
+| Deposit             | `budget_deposit`           |             20 |
+| Claim               | `budget_claim`             |             23 |
+| Transfer            | `value_transfer`           |             12 |
+| Shield              | `shielded_shield`          |              7 |
+| Unshield            | `shielded_unshield`        |             11 |
+| Four-input Unshield | `shielded_unshield_4`      |             20 |
 
 SourceFact and SourceTrust authenticate actual current lineage paths and publish salted source
 leaves. Issue proves membership in both source trees and registers a qualification Q. Capability

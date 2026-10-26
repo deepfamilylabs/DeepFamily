@@ -5,16 +5,28 @@ import {IProofVerifierAdapter} from "../interfaces/IProofVerifierAdapter.sol";
 import {ProofConstants} from "../libraries/ProofConstants.sol";
 
 interface IShieldedBoundaryVerifier7 {
-  function verifyProof(uint256[2] calldata a, uint256[2][2] calldata b,
-    uint256[2] calldata c, uint256[7] calldata publicSignals) external view returns (bool);
+  function verifyProof(
+    uint256[2] calldata a,
+    uint256[2][2] calldata b,
+    uint256[2] calldata c,
+    uint256[7] calldata publicSignals
+  ) external view returns (bool);
 }
 interface IShieldedBoundaryVerifier11 {
-  function verifyProof(uint256[2] calldata a, uint256[2][2] calldata b,
-    uint256[2] calldata c, uint256[11] calldata publicSignals) external view returns (bool);
+  function verifyProof(
+    uint256[2] calldata a,
+    uint256[2][2] calldata b,
+    uint256[2] calldata c,
+    uint256[11] calldata publicSignals
+  ) external view returns (bool);
 }
 interface IShieldedBoundaryVerifier20 {
-  function verifyProof(uint256[2] calldata a, uint256[2][2] calldata b,
-    uint256[2] calldata c, uint256[20] calldata publicSignals) external view returns (bool);
+  function verifyProof(
+    uint256[2] calldata a,
+    uint256[2][2] calldata b,
+    uint256[2] calldata c,
+    uint256[20] calldata publicSignals
+  ) external view returns (bool);
 }
 
 /// @notice Fixed VALUE deposit/withdrawal routes, independent of receive eligibility.
@@ -45,17 +57,31 @@ contract ShieldedBoundaryVerifierAdapter is IProofVerifierAdapter {
     revert UnsupportedPurpose();
   }
 
-  function verifyProof(uint8 purpose, uint8 encoding, bytes calldata proof,
-    uint256[] calldata publicSignals) external view returns (bool) {
-    if (encoding != ProofConstants.PROOF_ENCODING_ID_ABI_GROTH16_ABC) revert UnsupportedProofEncoding();
+  function verifyProof(
+    uint8 purpose,
+    uint8 encoding,
+    bytes calldata proof,
+    uint256[] calldata publicSignals
+  ) external view returns (bool) {
+    if (encoding != ProofConstants.PROOF_ENCODING_ID_ABI_GROTH16_ABC)
+      revert UnsupportedProofEncoding();
     bool isShield = purpose == ProofConstants.PROOF_PURPOSE_SHIELDED_SHIELD;
-    if (!isShield && purpose != ProofConstants.PROOF_PURPOSE_SHIELDED_UNSHIELD) revert UnsupportedPurpose();
+    if (!isShield && purpose != ProofConstants.PROOF_PURPOSE_SHIELDED_UNSHIELD)
+      revert UnsupportedPurpose();
     uint256 length = publicSignals.length;
-    if (proof.length != 256 || (isShield ? length != ProofConstants.SHIELDED_SHIELD_PUBLIC_SIGNALS_LEN
-      : (length != ProofConstants.SHIELDED_UNSHIELD_PUBLIC_SIGNALS_LEN &&
-        length != ProofConstants.SHIELDED_UNSHIELD_4_PUBLIC_SIGNALS_LEN))) revert MalformedProofData();
-    (uint256[2] memory a, uint256[2][2] memory b, uint256[2] memory c) =
-      abi.decode(proof, (uint256[2], uint256[2][2], uint256[2]));
+    if (
+      proof.length != 256 ||
+      (
+        isShield
+          ? length != ProofConstants.SHIELDED_SHIELD_PUBLIC_SIGNALS_LEN
+          : (length != ProofConstants.SHIELDED_UNSHIELD_PUBLIC_SIGNALS_LEN &&
+            length != ProofConstants.SHIELDED_UNSHIELD_4_PUBLIC_SIGNALS_LEN)
+      )
+    ) revert MalformedProofData();
+    (uint256[2] memory a, uint256[2][2] memory b, uint256[2] memory c) = abi.decode(
+      proof,
+      (uint256[2], uint256[2][2], uint256[2])
+    );
     if (isShield) {
       uint256[7] memory values7;
       for (uint256 i; i < values7.length; ++i) values7[i] = publicSignals[i];

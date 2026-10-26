@@ -283,14 +283,9 @@ async function fillRequiredFields() {
     fireEvent.change(screen.getByPlaceholderText("e.g. From the family register"), {
       target: { value: "verified" },
     });
-    fireEvent.change(
-      screen.getByPlaceholderText(
-        "Life story, deeds, family memories…",
-      ),
-      {
-        target: { value: "private biography" },
-      },
-    );
+    fireEvent.change(screen.getByPlaceholderText("Life story, deeds, family memories…"), {
+      target: { value: "private biography" },
+    });
   });
   await checkConsentBoxes();
 }
@@ -836,7 +831,11 @@ describe("AddVersionModal", () => {
       // A spinner here would claim the flow is working when it is the user's
       // turn, which reads as a step already under way.
       const marks = Array.from(document.querySelectorAll("ol li")).map(
-        (li) => li.querySelector("svg")?.getAttribute("class")?.match(/lucide-([a-z-]+)/)?.[1] ?? "dot",
+        (li) =>
+          li
+            .querySelector("svg")
+            ?.getAttribute("class")
+            ?.match(/lucide-([a-z-]+)/)?.[1] ?? "dot",
       );
       const confirmIndex = marks.length - 2;
       expect(marks[confirmIndex]).toBe("arrow-right");

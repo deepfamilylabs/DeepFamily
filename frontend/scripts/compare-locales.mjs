@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -12,32 +12,32 @@ const __dirname = path.dirname(__filename);
 // 2. Compare locale keys against frontend source usage (`--usage`).
 
 // Recursively get all key paths
-function getAllKeys(obj, prefix = '') {
+function getAllKeys(obj, prefix = "") {
   const keys = new Set();
-  
+
   for (const [key, value] of Object.entries(obj)) {
     const fullKey = prefix ? `${prefix}.${key}` : key;
     keys.add(fullKey);
-    
-    if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+
+    if (typeof value === "object" && value !== null && !Array.isArray(value)) {
       const nestedKeys = getAllKeys(value, fullKey);
-      nestedKeys.forEach(k => keys.add(k));
+      nestedKeys.forEach((k) => keys.add(k));
     }
   }
-  
+
   return keys;
 }
 
 // Recursively get leaf key paths only
-function getLeafKeys(obj, prefix = '') {
+function getLeafKeys(obj, prefix = "") {
   const keys = new Set();
 
   for (const [key, value] of Object.entries(obj)) {
     const fullKey = prefix ? `${prefix}.${key}` : key;
 
-    if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+    if (typeof value === "object" && value !== null && !Array.isArray(value)) {
       const nestedKeys = getLeafKeys(value, fullKey);
-      nestedKeys.forEach(k => keys.add(k));
+      nestedKeys.forEach((k) => keys.add(k));
     } else {
       keys.add(fullKey);
     }
@@ -48,12 +48,12 @@ function getLeafKeys(obj, prefix = '') {
 
 // Get nested object value by key path
 function getValueByPath(obj, path) {
-  return path.split('.').reduce((current, key) => current?.[key], obj);
+  return path.split(".").reduce((current, key) => current?.[key], obj);
 }
 
 // Set nested object value by key path
 function setValueByPath(obj, path, value) {
-  const keys = path.split('.');
+  const keys = path.split(".");
   const lastKey = keys.pop();
   const target = keys.reduce((current, key) => {
     if (!(key in current)) {
@@ -67,10 +67,10 @@ function setValueByPath(obj, path, value) {
 // Deep merge two objects, preserving original structure
 function deepMerge(target, source) {
   const result = { ...target };
-  
+
   for (const [key, value] of Object.entries(source)) {
-    if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
-      if (typeof result[key] === 'object' && result[key] !== null && !Array.isArray(result[key])) {
+    if (typeof value === "object" && value !== null && !Array.isArray(value)) {
+      if (typeof result[key] === "object" && result[key] !== null && !Array.isArray(result[key])) {
         result[key] = deepMerge(result[key], value);
       } else {
         result[key] = { ...value };
@@ -79,7 +79,7 @@ function deepMerge(target, source) {
       result[key] = value;
     }
   }
-  
+
   return result;
 }
 
@@ -87,7 +87,7 @@ function deepMerge(target, source) {
 function saveJsonFile(filePath, data) {
   try {
     const content = JSON.stringify(data, null, 2);
-    fs.writeFileSync(filePath, content, 'utf8');
+    fs.writeFileSync(filePath, content, "utf8");
     return true;
   } catch (error) {
     console.error(`Unable to save file ${filePath}:`, error.message);
@@ -98,7 +98,7 @@ function saveJsonFile(filePath, data) {
 // Load JSON file
 function loadJsonFile(filePath) {
   try {
-    const content = fs.readFileSync(filePath, 'utf8');
+    const content = fs.readFileSync(filePath, "utf8");
     return JSON.parse(content);
   } catch (error) {
     console.error(`Unable to read file ${filePath}:`, error.message);
@@ -135,11 +135,11 @@ function looksLikeTranslationKey(value) {
 }
 
 function escapeRegex(value) {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 function buildTemplateKeyRegex(templateContent) {
-  if (!templateContent.includes('${')) {
+  if (!templateContent.includes("${")) {
     return null;
   }
 
@@ -148,18 +148,14 @@ function buildTemplateKeyRegex(templateContent) {
     return null;
   }
 
-  const pattern = `^${parts.map(escapeRegex).join('[^.]+')}$`;
+  const pattern = `^${parts.map(escapeRegex).join("[^.]+")}$`;
   return new RegExp(pattern);
 }
 
 // Collect dotted-string candidates from source so config-held translation keys are not missed.
 function extractQuotedTranslationCandidates(content) {
   const candidates = new Set();
-  const regexes = [
-    /"((?:\\.|[^"\\\n])*)"/g,
-    /'((?:\\.|[^'\\\n])*)'/g,
-    /`((?:\\.|[^`\\\n$])*)`/g,
-  ];
+  const regexes = [/"((?:\\.|[^"\\\n])*)"/g, /'((?:\\.|[^'\\\n])*)'/g, /`((?:\\.|[^`\\\n$])*)`/g];
 
   for (const regex of regexes) {
     let match;
@@ -217,7 +213,7 @@ function summarizeByTopLevel(keys) {
   const counts = new Map();
 
   for (const key of keys) {
-    const namespace = key.split('.')[0];
+    const namespace = key.split(".")[0];
     counts.set(namespace, (counts.get(namespace) || 0) + 1);
   }
 
@@ -239,8 +235,8 @@ function analyzeLocaleUsage(localeFilePath, sourceDir) {
 
   const allLocaleKeys = getAllKeys(localeJson);
   const leafLocaleKeys = getLeafKeys(localeJson);
-  const localeNamespaces = new Set([...allLocaleKeys].map(key => key.split('.')[0]));
-  const sourceFiles = walkFiles(sourceDir, new Set(['.ts', '.tsx', '.js', '.jsx', '.mjs']));
+  const localeNamespaces = new Set([...allLocaleKeys].map((key) => key.split(".")[0]));
+  const sourceFiles = walkFiles(sourceDir, new Set([".ts", ".tsx", ".js", ".jsx", ".mjs"]));
 
   const staticUsedLeafKeys = new Set();
   const codeKeysMissingFromLocale = new Set();
@@ -248,7 +244,7 @@ function analyzeLocaleUsage(localeFilePath, sourceDir) {
   const dynamicPatternMatches = [];
 
   for (const filePath of sourceFiles) {
-    const content = fs.readFileSync(filePath, 'utf8');
+    const content = fs.readFileSync(filePath, "utf8");
 
     // Direct t(...) / i18n.t(...) references are the strongest signal and can be missing from locale.
     for (const candidate of extractTCallTranslationCandidates(content)) {
@@ -263,7 +259,7 @@ function analyzeLocaleUsage(localeFilePath, sourceDir) {
 
     // Also inspect quoted config strings, but only inside known locale namespaces to limit false positives.
     for (const candidate of extractQuotedTranslationCandidates(content)) {
-      const namespace = candidate.split('.')[0];
+      const namespace = candidate.split(".")[0];
       if (!localeNamespaces.has(namespace)) {
         continue;
       }
@@ -279,12 +275,12 @@ function analyzeLocaleUsage(localeFilePath, sourceDir) {
 
     // Template-literal matches are treated as dynamic coverage, not explicit single-key references.
     for (const { template, regex } of extractDynamicTemplatePatterns(content)) {
-      const matches = [...leafLocaleKeys].filter(key => regex.test(key));
+      const matches = [...leafLocaleKeys].filter((key) => regex.test(key));
       if (matches.length === 0) {
         continue;
       }
 
-      matches.forEach(key => dynamicCoveredLeafKeys.add(key));
+      matches.forEach((key) => dynamicCoveredLeafKeys.add(key));
       dynamicPatternMatches.push({
         filePath,
         template,
@@ -295,7 +291,7 @@ function analyzeLocaleUsage(localeFilePath, sourceDir) {
 
   // Unused keys remain candidates because dynamic/runtime-only references can still exist outside these patterns.
   const usedLeafKeys = new Set([...staticUsedLeafKeys, ...dynamicCoveredLeafKeys]);
-  const unusedLeafKeys = [...leafLocaleKeys].filter(key => !usedLeafKeys.has(key)).sort();
+  const unusedLeafKeys = [...leafLocaleKeys].filter((key) => !usedLeafKeys.has(key)).sort();
 
   return {
     localeFilePath,
@@ -326,19 +322,19 @@ function printUsageReport(localeName, report, verbose = false) {
 
   if (report.codeKeysMissingFromLocale.length > 0) {
     console.log(`\nKeys referenced in code but missing from ${localeName}:`);
-    report.codeKeysMissingFromLocale.forEach(key => console.log(`   - ${key}`));
+    report.codeKeysMissingFromLocale.forEach((key) => console.log(`   - ${key}`));
   }
 
   if (report.unusedLeafKeys.length > 0) {
     console.log(`\nUnused candidate leaf keys in ${localeName}:`);
     const previewLimit = verbose ? report.unusedLeafKeys.length : 80;
-    report.unusedLeafKeys.slice(0, previewLimit).forEach(key => console.log(`   - ${key}`));
+    report.unusedLeafKeys.slice(0, previewLimit).forEach((key) => console.log(`   - ${key}`));
     if (!verbose && report.unusedLeafKeys.length > previewLimit) {
       console.log(`   ... and ${report.unusedLeafKeys.length - previewLimit} more`);
     }
 
     if (report.unusedSummary.length > 0) {
-      console.log('\nUnused candidate summary by namespace:');
+      console.log("\nUnused candidate summary by namespace:");
       report.unusedSummary.forEach(([namespace, count]) => {
         console.log(`   - ${namespace}: ${count}`);
       });
@@ -348,9 +344,11 @@ function printUsageReport(localeName, report, verbose = false) {
   }
 
   if (verbose && report.dynamicPatternMatches.length > 0) {
-    console.log('\nDynamic template patterns that matched locale keys:');
+    console.log("\nDynamic template patterns that matched locale keys:");
     report.dynamicPatternMatches.forEach(({ filePath, template, matchCount }) => {
-      console.log(`   - ${path.relative(process.cwd(), filePath)} :: \`${template}\` (${matchCount} matches)`);
+      console.log(
+        `   - ${path.relative(process.cwd(), filePath)} :: \`${template}\` (${matchCount} matches)`,
+      );
     });
   }
 }
@@ -363,8 +361,14 @@ function reorderToMatchBase(baseObj, targetObj) {
   for (const [key, value] of Object.entries(baseObj)) {
     if (key in targetObj) {
       // Key exists in target, check if it's an object
-      if (typeof value === 'object' && value !== null && !Array.isArray(value) &&
-          typeof targetObj[key] === 'object' && targetObj[key] !== null && !Array.isArray(targetObj[key])) {
+      if (
+        typeof value === "object" &&
+        value !== null &&
+        !Array.isArray(value) &&
+        typeof targetObj[key] === "object" &&
+        targetObj[key] !== null &&
+        !Array.isArray(targetObj[key])
+      ) {
         // Recursively reorder nested objects
         result[key] = reorderToMatchBase(value, targetObj[key]);
       } else {
@@ -429,11 +433,11 @@ function alignWithBase(baseFilePath, targetFilePath) {
 
 // Delete a key from nested object by path
 function deleteKeyByPath(obj, path) {
-  const keys = path.split('.');
+  const keys = path.split(".");
   const lastKey = keys.pop();
 
   const target = keys.reduce((current, key) => {
-    if (!current || typeof current !== 'object') {
+    if (!current || typeof current !== "object") {
       return null;
     }
     return current[key];
@@ -472,14 +476,17 @@ function removeKeys(filePath, keysToRemove) {
 function removeKeysFromAll(keysToRemove, localesDir, languages = null) {
   const results = [];
 
-  const dirs = languages || fs.readdirSync(localesDir)
-    .filter(dir => fs.statSync(path.join(localesDir, dir)).isDirectory());
+  const dirs =
+    languages ||
+    fs
+      .readdirSync(localesDir)
+      .filter((dir) => fs.statSync(path.join(localesDir, dir)).isDirectory());
 
   console.log(`Removing keys from language files:\n`);
-  console.log(`Keys to remove: ${keysToRemove.join(', ')}\n`);
+  console.log(`Keys to remove: ${keysToRemove.join(", ")}\n`);
 
   for (const lang of dirs) {
-    const langPath = path.join(localesDir, lang, 'index.json');
+    const langPath = path.join(localesDir, lang, "index.json");
 
     if (!fs.existsSync(langPath)) {
       console.log(`Warning: ${lang}/index.json file does not exist`);
@@ -502,9 +509,11 @@ function removeKeysFromAll(keysToRemove, localesDir, languages = null) {
     }
   }
 
-  console.log('\nRemoval summary:');
+  console.log("\nRemoval summary:");
   const totalRemoved = results.reduce((sum, r) => sum + r.removed, 0);
-  console.log(`   Total: Removed ${totalRemoved} key(s) across ${results.filter(r => r.removed > 0).length} file(s)`);
+  console.log(
+    `   Total: Removed ${totalRemoved} key(s) across ${results.filter((r) => r.removed > 0).length} file(s)`,
+  );
 
   return results;
 }
@@ -513,17 +522,17 @@ function removeKeysFromAll(keysToRemove, localesDir, languages = null) {
 function compareKeys(file1Path, file2Path) {
   const json1 = loadJsonFile(file1Path);
   const json2 = loadJsonFile(file2Path);
-  
+
   if (!json1 || !json2) {
     return null;
   }
-  
+
   const keys1 = getAllKeys(json1);
   const keys2 = getAllKeys(json2);
-  
-  const onlyInFile1 = [...keys1].filter(key => !keys2.has(key));
-  const onlyInFile2 = [...keys2].filter(key => !keys1.has(key));
-  
+
+  const onlyInFile1 = [...keys1].filter((key) => !keys2.has(key));
+  const onlyInFile2 = [...keys2].filter((key) => !keys1.has(key));
+
   return {
     file1: path.basename(file1Path),
     file2: path.basename(file2Path),
@@ -532,7 +541,7 @@ function compareKeys(file1Path, file2Path) {
     totalKeys1: keys1.size,
     totalKeys2: keys2.size,
     file1Path,
-    file2Path
+    file2Path,
   };
 }
 
@@ -541,16 +550,17 @@ function compareKeys(file1Path, file2Path) {
 // - `--sync`: copy missing keys from base into target
 // - `--align`: reorder target keys to match base structure
 function compareAllWithBase(baseFile, localesDir, autoSync = false, alignKeys = false) {
-  const basePath = path.join(localesDir, baseFile, 'index.json');
+  const basePath = path.join(localesDir, baseFile, "index.json");
 
   if (!fs.existsSync(basePath)) {
     console.error(`Base file does not exist: ${basePath}`);
     return;
   }
 
-  const languages = fs.readdirSync(localesDir)
-    .filter(dir => fs.statSync(path.join(localesDir, dir)).isDirectory())
-    .filter(dir => dir !== baseFile);
+  const languages = fs
+    .readdirSync(localesDir)
+    .filter((dir) => fs.statSync(path.join(localesDir, dir)).isDirectory())
+    .filter((dir) => dir !== baseFile);
 
   console.log(`Comparing other language files with ${baseFile} as base:\n`);
 
@@ -558,7 +568,7 @@ function compareAllWithBase(baseFile, localesDir, autoSync = false, alignKeys = 
   let syncResults = [];
 
   for (const lang of languages) {
-    const langPath = path.join(localesDir, lang, 'index.json');
+    const langPath = path.join(localesDir, lang, "index.json");
 
     if (!fs.existsSync(langPath)) {
       console.log(`Warning: ${lang}/index.json file does not exist`);
@@ -577,14 +587,19 @@ function compareAllWithBase(baseFile, localesDir, autoSync = false, alignKeys = 
 
       if (result.onlyInFile1.length > 0) {
         console.log(`   Missing keys in ${lang} (${result.onlyInFile1.length}):`);
-        result.onlyInFile1.sort().forEach(key => console.log(`      - ${key}`));
+        result.onlyInFile1.sort().forEach((key) => console.log(`      - ${key}`));
 
         if (autoSync) {
           console.log(`   Syncing missing keys to ${lang}...`);
           const syncSuccess = syncMissingKeys(basePath, langPath, result.onlyInFile1);
           if (syncSuccess) {
             console.log(`   Successfully synced ${result.onlyInFile1.length} keys to ${lang}`);
-            syncResults.push({ lang, synced: result.onlyInFile1.length, aligned: false, success: true });
+            syncResults.push({
+              lang,
+              synced: result.onlyInFile1.length,
+              aligned: false,
+              success: true,
+            });
           } else {
             console.log(`   Sync failed: ${lang}`);
             syncResults.push({ lang, synced: 0, aligned: false, success: false });
@@ -594,9 +609,9 @@ function compareAllWithBase(baseFile, localesDir, autoSync = false, alignKeys = 
 
       if (result.onlyInFile2.length > 0) {
         console.log(`   Extra keys in ${lang} (${result.onlyInFile2.length}):`);
-        result.onlyInFile2.sort().forEach(key => console.log(`      - ${key}`));
+        result.onlyInFile2.sort().forEach((key) => console.log(`      - ${key}`));
       }
-      console.log('');
+      console.log("");
     } else {
       console.log(`${lang}: Fully consistent with base file (${result.totalKeys2} keys)`);
     }
@@ -607,7 +622,7 @@ function compareAllWithBase(baseFile, localesDir, autoSync = false, alignKeys = 
       const alignSuccess = alignWithBase(basePath, langPath);
       if (alignSuccess) {
         console.log(`   Successfully aligned ${lang} with base structure`);
-        const existingResult = syncResults.find(r => r.lang === lang);
+        const existingResult = syncResults.find((r) => r.lang === lang);
         if (existingResult) {
           existingResult.aligned = true;
         } else {
@@ -616,20 +631,20 @@ function compareAllWithBase(baseFile, localesDir, autoSync = false, alignKeys = 
       } else {
         console.log(`   Alignment failed: ${lang}`);
       }
-      console.log('');
+      console.log("");
     }
   }
 
   if (!hasAnyDifference && !alignKeys) {
-    console.log('All language files are consistent with the base file!');
+    console.log("All language files are consistent with the base file!");
   } else if ((autoSync || alignKeys) && syncResults.length > 0) {
-    console.log('\nOperation results summary:');
+    console.log("\nOperation results summary:");
     syncResults.forEach(({ lang, synced, aligned, success }) => {
       if (success) {
         const operations = [];
         if (synced > 0) operations.push(`synced ${synced} keys`);
-        if (aligned) operations.push('aligned structure');
-        console.log(`   ${lang}: ${operations.join(', ') || 'processed'}`);
+        if (aligned) operations.push("aligned structure");
+        console.log(`   ${lang}: ${operations.join(", ") || "processed"}`);
       } else {
         console.log(`   ${lang}: Operation failed`);
       }
@@ -639,9 +654,9 @@ function compareAllWithBase(baseFile, localesDir, autoSync = false, alignKeys = 
 
 // Compare two specified files
 function compareTwoFiles(file1, file2, localesDir) {
-  const file1Path = path.join(localesDir, file1, 'index.json');
-  const file2Path = path.join(localesDir, file2, 'index.json');
-  
+  const file1Path = path.join(localesDir, file1, "index.json");
+  const file2Path = path.join(localesDir, file2, "index.json");
+
   if (!fs.existsSync(file1Path)) {
     console.error(`File does not exist: ${file1Path}`);
     return;
@@ -651,28 +666,28 @@ function compareTwoFiles(file1, file2, localesDir) {
     console.error(`File does not exist: ${file2Path}`);
     return;
   }
-  
+
   const result = compareKeys(file1Path, file2Path);
   if (!result) return;
-  
+
   console.log(`Comparison result: ${file1} vs ${file2}\n`);
   console.log(`${file1}: ${result.totalKeys1} keys`);
   console.log(`${file2}: ${result.totalKeys2} keys\n`);
 
   if (result.onlyInFile1.length === 0 && result.onlyInFile2.length === 0) {
-    console.log('Both files have identical keys!');
+    console.log("Both files have identical keys!");
     return;
   }
 
   if (result.onlyInFile1.length > 0) {
     console.log(`Missing keys in ${file2} (${result.onlyInFile1.length}):`);
-    result.onlyInFile1.sort().forEach(key => console.log(`   - ${key}`));
-    console.log('');
+    result.onlyInFile1.sort().forEach((key) => console.log(`   - ${key}`));
+    console.log("");
   }
 
   if (result.onlyInFile2.length > 0) {
     console.log(`Extra keys in ${file2} (${result.onlyInFile2.length}):`);
-    result.onlyInFile2.sort().forEach(key => console.log(`   - ${key}`));
+    result.onlyInFile2.sort().forEach((key) => console.log(`   - ${key}`));
   }
 }
 
@@ -681,23 +696,23 @@ function compareTwoFiles(file1, file2, localesDir) {
 // - usage mode scans frontend source and compares it against one locale
 function main() {
   const args = process.argv.slice(2);
-  const localesDir = path.join(__dirname, '../src/locales');
-  const sourceDir = path.join(__dirname, '../src');
-  
+  const localesDir = path.join(__dirname, "../src/locales");
+  const sourceDir = path.join(__dirname, "../src");
+
   if (!fs.existsSync(localesDir)) {
     console.error(`Locales directory does not exist: ${localesDir}`);
     process.exit(1);
   }
 
   // Check for --remove parameter
-  const removeIndex = args.indexOf('--remove');
+  const removeIndex = args.indexOf("--remove");
   if (removeIndex !== -1) {
     args.splice(removeIndex, 1); // Remove --remove parameter
     if (args.length === 0) {
-      console.error('Error: --remove requires at least one key to remove');
-      console.log('\nUsage:');
-      console.log('  node compare-locales.mjs --remove key1 [key2 ...]');
-      console.log('  node compare-locales.mjs --remove settings.theme header.logo');
+      console.error("Error: --remove requires at least one key to remove");
+      console.log("\nUsage:");
+      console.log("  node compare-locales.mjs --remove key1 [key2 ...]");
+      console.log("  node compare-locales.mjs --remove settings.theme header.logo");
       process.exit(1);
     }
     // All remaining args are keys to remove
@@ -706,36 +721,37 @@ function main() {
   }
 
   // Check for --sync and --align parameters
-  const syncIndex = args.indexOf('--sync');
+  const syncIndex = args.indexOf("--sync");
   const autoSync = syncIndex !== -1;
   if (autoSync) {
     args.splice(syncIndex, 1); // Remove --sync parameter
   }
 
-  const alignIndex = args.indexOf('--align');
+  const alignIndex = args.indexOf("--align");
   const alignKeys = alignIndex !== -1;
   if (alignKeys) {
     args.splice(alignIndex, 1); // Remove --align parameter
   }
 
-  const checkIndex = args.indexOf('--check');
+  const checkIndex = args.indexOf("--check");
   if (checkIndex !== -1) {
     args.splice(checkIndex, 1);
-    if (args.length || autoSync || alignKeys) throw new Error('--check does not accept other options');
-    compareAllWithBase('en', localesDir, false, false);
-    const report = analyzeLocaleUsage(path.join(localesDir, 'en', 'index.json'), sourceDir);
+    if (args.length || autoSync || alignKeys)
+      throw new Error("--check does not accept other options");
+    compareAllWithBase("en", localesDir, false, false);
+    const report = analyzeLocaleUsage(path.join(localesDir, "en", "index.json"), sourceDir);
     if (!report) process.exit(1);
-    printUsageReport('en', report, false);
+    printUsageReport("en", report, false);
     return;
   }
 
-  const usageIndex = args.indexOf('--usage');
+  const usageIndex = args.indexOf("--usage");
   const checkUsage = usageIndex !== -1;
   if (checkUsage) {
     args.splice(usageIndex, 1);
   }
 
-  const verboseUsageIndex = args.indexOf('--verbose-usage');
+  const verboseUsageIndex = args.indexOf("--verbose-usage");
   const verboseUsage = verboseUsageIndex !== -1;
   if (verboseUsage) {
     args.splice(verboseUsageIndex, 1);
@@ -744,8 +760,8 @@ function main() {
   // Usage mode is intentionally separate from locale-vs-locale comparison:
   // it answers "does the code reference keys that this locale does not define?"
   if (checkUsage || verboseUsage) {
-    const localeName = args[0] || 'en';
-    const localeFilePath = path.join(localesDir, localeName, 'index.json');
+    const localeName = args[0] || "en";
+    const localeFilePath = path.join(localesDir, localeName, "index.json");
 
     if (!fs.existsSync(localeFilePath)) {
       console.error(`Locale file does not exist: ${localeFilePath}`);
@@ -763,7 +779,7 @@ function main() {
 
   if (args.length === 0) {
     // Default: compare all files with en as base
-    compareAllWithBase('en', localesDir, autoSync, alignKeys);
+    compareAllWithBase("en", localesDir, autoSync, alignKeys);
   } else if (args.length === 1) {
     // Compare all files with specified language as base
     compareAllWithBase(args[0], localesDir, autoSync, alignKeys);
@@ -771,18 +787,36 @@ function main() {
     // Compare two specified files
     compareTwoFiles(args[0], args[1], localesDir);
   } else {
-    console.log('Usage:');
-    console.log('  node compare-locales.mjs                    # Compare all files with en as base');
-    console.log('  node compare-locales.mjs --sync             # Compare with en and auto-sync missing keys');
-    console.log('  node compare-locales.mjs --align            # Align key order with en structure');
-    console.log('  node compare-locales.mjs --sync --align     # Sync missing keys and align structure');
-    console.log('  node compare-locales.mjs --usage            # Check en locale keys against frontend code usage');
-    console.log('  node compare-locales.mjs zh-CN --usage      # Check zh-CN locale keys against frontend code usage');
-    console.log('  node compare-locales.mjs --verbose-usage    # Usage check with dynamic pattern details');
-    console.log('  node compare-locales.mjs zh-CN              # Compare all files with zh-CN as base');
-    console.log('  node compare-locales.mjs zh-CN --sync       # Compare with zh-CN and auto-sync');
-    console.log('  node compare-locales.mjs ja ko              # Compare ja and ko files');
-    console.log('  node compare-locales.mjs --remove key1 key2 # Remove specified keys from all files');
+    console.log("Usage:");
+    console.log(
+      "  node compare-locales.mjs                    # Compare all files with en as base",
+    );
+    console.log(
+      "  node compare-locales.mjs --sync             # Compare with en and auto-sync missing keys",
+    );
+    console.log(
+      "  node compare-locales.mjs --align            # Align key order with en structure",
+    );
+    console.log(
+      "  node compare-locales.mjs --sync --align     # Sync missing keys and align structure",
+    );
+    console.log(
+      "  node compare-locales.mjs --usage            # Check en locale keys against frontend code usage",
+    );
+    console.log(
+      "  node compare-locales.mjs zh-CN --usage      # Check zh-CN locale keys against frontend code usage",
+    );
+    console.log(
+      "  node compare-locales.mjs --verbose-usage    # Usage check with dynamic pattern details",
+    );
+    console.log(
+      "  node compare-locales.mjs zh-CN              # Compare all files with zh-CN as base",
+    );
+    console.log("  node compare-locales.mjs zh-CN --sync       # Compare with zh-CN and auto-sync");
+    console.log("  node compare-locales.mjs ja ko              # Compare ja and ko files");
+    console.log(
+      "  node compare-locales.mjs --remove key1 key2 # Remove specified keys from all files",
+    );
     process.exit(1);
   }
 }

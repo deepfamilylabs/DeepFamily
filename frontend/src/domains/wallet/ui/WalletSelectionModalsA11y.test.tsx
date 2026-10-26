@@ -25,12 +25,7 @@ describe("wallet selection modals a11y", () => {
     render(
       <>
         <button type="button">Before modal</button>
-        <WalletSelectionModal
-          isOpen
-          wallets={[wallet]}
-          onSelect={vi.fn()}
-          onClose={onClose}
-        />
+        <WalletSelectionModal isOpen wallets={[wallet]} onSelect={vi.fn()} onClose={onClose} />
       </>,
     );
 

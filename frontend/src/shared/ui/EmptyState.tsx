@@ -16,9 +16,7 @@ export interface EmptyStateProps {
 export function EmptyState({ icon, title, description, action, size = "inline" }: EmptyStateProps) {
   const page = size === "page";
   return (
-    <div
-      className={`flex flex-col items-center text-center ${page ? "px-8 py-16" : "px-6 py-10"}`}
-    >
+    <div className={`flex flex-col items-center text-center ${page ? "px-8 py-16" : "px-6 py-10"}`}>
       <span
         className={`inline-flex items-center justify-center text-ink-subtle ${
           page
@@ -28,7 +26,11 @@ export function EmptyState({ icon, title, description, action, size = "inline" }
       >
         {icon}
       </span>
-      <div className={page ? "mt-4 text-[17px] font-bold text-ink" : "mb-1.5 text-sm font-semibold text-ink"}>
+      <div
+        className={
+          page ? "mt-4 text-[17px] font-bold text-ink" : "mb-1.5 text-sm font-semibold text-ink"
+        }
+      >
         {title}
       </div>
       {description ? (

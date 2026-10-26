@@ -173,7 +173,9 @@ describe("StoryComposer", () => {
 
   it("flags an over-long attachment URI at the field rather than at signing time", () => {
     const withinLimit = createEditor({
-      form: { data: { title: "", content: "Example story", recordType: 1, attachmentURI: "ipfs://bafy" } },
+      form: {
+        data: { title: "", content: "Example story", recordType: 1, attachmentURI: "ipfs://bafy" },
+      },
     });
     const { rerender } = render(<StoryComposer editor={withinLimit} />);
 

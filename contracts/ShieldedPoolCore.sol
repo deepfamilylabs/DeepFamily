@@ -30,7 +30,13 @@ abstract contract ShieldedPoolCore is ReentrancyGuardTransient {
   error InvalidReceiveProof();
   error InvalidBudget();
 
-  enum Action { Shield, Fund, Claim, Transfer, Unshield }
+  enum Action {
+    Shield,
+    Fund,
+    Claim,
+    Transfer,
+    Unshield
+  }
 
   /// @notice Shield has no inputs; actions use one, withdrawals one or four.
   /// @dev Qualification, budget terms and period nullifiers belong to their own
@@ -101,17 +107,31 @@ abstract contract ShieldedPoolCore is ReentrancyGuardTransient {
   mapping(uint256 commitment => bool exists) public commitmentExists;
   mapping(uint256 budgetKey => BudgetRecord record) public budgetRecords;
 
-  event NoteAppended(uint256 indexed shardId, uint256 indexed leafIndex,
-    uint256 commitment, uint256 root, bytes ciphertext);
+  event NoteAppended(
+    uint256 indexed shardId,
+    uint256 indexed leafIndex,
+    uint256 commitment,
+    uint256 root,
+    bytes ciphertext
+  );
   event NullifierSpent(uint256 nullifier);
   event ActionExecuted(uint8 action, uint256 inputShardId0, uint256 inputShardId1);
   event BudgetDeposited(uint256 indexed budgetKey, uint256 indexed codeBinding, bool created);
 
-  constructor(address boundaryVerifier, address registry, address fundVerifier,
-    address claimVerifier, address transferVerifier) {
-    if (boundaryVerifier.code.length == 0 || registry.code.length == 0 ||
-        fundVerifier.code.length == 0 || claimVerifier.code.length == 0 ||
-        transferVerifier.code.length == 0) revert InvalidConstructorAddress();
+  constructor(
+    address boundaryVerifier,
+    address registry,
+    address fundVerifier,
+    address claimVerifier,
+    address transferVerifier
+  ) {
+    if (
+      boundaryVerifier.code.length == 0 ||
+      registry.code.length == 0 ||
+      fundVerifier.code.length == 0 ||
+      claimVerifier.code.length == 0 ||
+      transferVerifier.code.length == 0
+    ) revert InvalidConstructorAddress();
     VERIFIER = IProofVerifierAdapter(boundaryVerifier);
     RECEIVE_REGISTRY = IReceiveRegistry(registry);
     FUND_VERIFIER = IFixedProofVerifier(fundVerifier);
@@ -121,7 +141,9 @@ abstract contract ShieldedPoolCore is ReentrancyGuardTransient {
   }
 
   function assetKind() external pure virtual returns (uint8);
-  function protocolVersion() external pure returns (uint256) { return 1; }
+  function protocolVersion() external pure returns (uint256) {
+    return 1;
+  }
   function _assetBalance() internal view virtual returns (uint256);
   function _pay(address recipient, uint256 amount) internal virtual;
 
@@ -133,9 +155,12 @@ abstract contract ShieldedPoolCore is ReentrancyGuardTransient {
   }
 
   /// @notice Spend private VALUE notes and pay an ordinary publicly visible address.
-  function unshield(address recipient, uint256 amount, ActionData calldata data, bytes calldata proof)
-    external nonReentrant
-  {
+  function unshield(
+    address recipient,
+    uint256 amount,
+    ActionData calldata data,
+    bytes calldata proof
+  ) external nonReentrant {
     if (recipient == address(0) || recipient == address(this)) revert InvalidRecipient();
     _validateAmount(amount);
     _verifyBoundary(Action.Unshield, data, proof, amount, recipient);
@@ -211,8 +236,11 @@ abstract contract ShieldedPoolCore is ReentrancyGuardTransient {
   function depositBudget(
     IReceiveRegistry.Code calldata code,
     IReceiveRegistry.Capability calldata capability,
-    bytes calldata codeProof, bytes calldata capabilityProof,
-    Deposit calldata deposit, ActionData calldata data, bytes calldata proof
+    bytes calldata codeProof,
+    bytes calldata capabilityProof,
+    Deposit calldata deposit,
+    ActionData calldata data,
+    bytes calldata proof
   ) external nonReentrant {
     _validateSingleInputAction(data);
     if (!RECEIVE_REGISTRY.verifyBudgetCapability(code, capability, codeProof, capabilityProof)) {
@@ -225,28 +253,49 @@ abstract contract ShieldedPoolCore is ReentrancyGuardTransient {
     if (created) {
       // Equivalent to eligibleFrom = asOf + the existing proof-lifetime grace,
       // with asOf in the last two hours. No future-dated qualification timestamp.
-      if (deposit.eligibleFrom <= block.timestamp ||
-          deposit.eligibleFrom > block.timestamp + ACTION_PROOF_LIFETIME) revert InvalidClaimTime();
+      if (
+        deposit.eligibleFrom <= block.timestamp ||
+        deposit.eligibleFrom > block.timestamp + ACTION_PROOF_LIFETIME
+      ) revert InvalidClaimTime();
     } else if (
-      record.commonBinding != code.commonBinding || record.policyCommitment != deposit.policyCommitment ||
-      record.eligibleFrom != deposit.eligibleFrom || record.codeAlias != code.codeAlias ||
-      record.nonce != code.nonce || record.ownerCommitment != code.ownerCommitment ||
-      record.viewKeyLo != code.viewKeyLo || record.viewKeyHi != code.viewKeyHi
+      record.commonBinding != code.commonBinding ||
+      record.policyCommitment != deposit.policyCommitment ||
+      record.eligibleFrom != deposit.eligibleFrom ||
+      record.codeAlias != code.codeAlias ||
+      record.nonce != code.nonce ||
+      record.ownerCommitment != code.ownerCommitment ||
+      record.viewKeyLo != code.viewKeyLo ||
+      record.viewKeyHi != code.viewKeyHi
     ) revert InvalidBudget();
 
     uint256[] memory signals = new uint256[](20);
-    signals[0] = block.chainid; signals[1] = uint256(uint160(address(this)));
-    signals[2] = code.commonBinding; signals[3] = code.codeAlias; signals[4] = code.nonce;
-    signals[5] = code.ownerCommitment; signals[6] = code.viewKeyLo; signals[7] = code.viewKeyHi;
-    signals[8] = capability.capabilityBinding; signals[9] = capability.familyTag;
-    signals[10] = capability.parentVersion; signals[11] = deposit.policyCommitment;
-    signals[12] = deposit.budgetKey; signals[13] = deposit.eligibleFrom;
+    signals[0] = block.chainid;
+    signals[1] = uint256(uint160(address(this)));
+    signals[2] = code.commonBinding;
+    signals[3] = code.codeAlias;
+    signals[4] = code.nonce;
+    signals[5] = code.ownerCommitment;
+    signals[6] = code.viewKeyLo;
+    signals[7] = code.viewKeyHi;
+    signals[8] = capability.capabilityBinding;
+    signals[9] = capability.familyTag;
+    signals[10] = capability.parentVersion;
+    signals[11] = deposit.policyCommitment;
+    signals[12] = deposit.budgetKey;
+    signals[13] = deposit.eligibleFrom;
     _actionSignals(signals, 14, data);
     if (!FUND_VERIFIER.verifyProof(proof, signals)) revert InvalidZKProof();
     if (created) {
       budgetRecords[deposit.budgetKey] = BudgetRecord(
-        true, code.commonBinding, deposit.policyCommitment, deposit.eligibleFrom,
-        code.codeAlias, code.nonce, code.ownerCommitment, code.viewKeyLo, code.viewKeyHi
+        true,
+        code.commonBinding,
+        deposit.policyCommitment,
+        deposit.eligibleFrom,
+        code.codeAlias,
+        code.nonce,
+        code.ownerCommitment,
+        code.viewKeyLo,
+        code.viewKeyHi
       );
     }
     _spendInputs(data);
@@ -257,29 +306,51 @@ abstract contract ShieldedPoolCore is ReentrancyGuardTransient {
   /// @notice Claim one matured policy period; all codes of the same subject share its nullifier.
   /// @dev Current qualification remains mandatory. Code expiry governs new acceptance;
   ///      spending authenticates current Q directly, without requiring a new generic code.
-  function claimBudget(Claim calldata claimData, ActionData calldata data, bytes calldata proof)
-    external nonReentrant
-  {
+  function claimBudget(
+    Claim calldata claimData,
+    ActionData calldata data,
+    bytes calldata proof
+  ) external nonReentrant {
     _validateSingleInputAction(data);
     BudgetRecord storage record = budgetRecords[claimData.budgetKey];
     if (!record.exists) revert InvalidBudget();
-    if (claimData.asOf > block.timestamp || block.timestamp - claimData.asOf > ACTION_PROOF_LIFETIME) {
+    if (
+      claimData.asOf > block.timestamp || block.timestamp - claimData.asOf > ACTION_PROOF_LIFETIME
+    ) {
       revert InvalidClaimTime();
     }
     _nonzero(claimData.periodNullifier);
-    if (nullifierSpent[claimData.periodNullifier] || claimData.periodNullifier == data.inputNullifiers[0]) {
+    if (
+      nullifierSpent[claimData.periodNullifier] ||
+      claimData.periodNullifier == data.inputNullifiers[0]
+    ) {
       revert NullifierAlreadySpent();
     }
-    if (!RECEIVE_REGISTRY.validateBudgetRoleStatus(claimData.issuanceRoot,
-        claimData.childRoleIndex, claimData.endorsementRoleIndex, claimData.trustedRoleIndex)) revert InvalidReceiveProof();
+    if (
+      !RECEIVE_REGISTRY.validateBudgetRoleStatus(
+        claimData.issuanceRoot,
+        claimData.childRoleIndex,
+        claimData.endorsementRoleIndex,
+        claimData.trustedRoleIndex
+      )
+    ) revert InvalidReceiveProof();
     uint256[] memory signals = new uint256[](23);
-    signals[0] = block.chainid; signals[1] = uint256(uint160(address(this)));
-    signals[2] = record.codeAlias; signals[3] = record.nonce; signals[4] = record.ownerCommitment;
-    signals[5] = record.viewKeyLo; signals[6] = record.viewKeyHi; signals[7] = record.policyCommitment;
-    signals[8] = claimData.budgetKey; signals[9] = record.eligibleFrom;
-    signals[10] = claimData.asOf; signals[11] = data.inputRoots[0];
-    signals[12] = data.inputNullifiers[0]; signals[13] = claimData.periodNullifier;
-    signals[14] = data.outputCommitments[0]; signals[15] = data.outputCommitments[1];
+    signals[0] = block.chainid;
+    signals[1] = uint256(uint160(address(this)));
+    signals[2] = record.codeAlias;
+    signals[3] = record.nonce;
+    signals[4] = record.ownerCommitment;
+    signals[5] = record.viewKeyLo;
+    signals[6] = record.viewKeyHi;
+    signals[7] = record.policyCommitment;
+    signals[8] = claimData.budgetKey;
+    signals[9] = record.eligibleFrom;
+    signals[10] = claimData.asOf;
+    signals[11] = data.inputRoots[0];
+    signals[12] = data.inputNullifiers[0];
+    signals[13] = claimData.periodNullifier;
+    signals[14] = data.outputCommitments[0];
+    signals[15] = data.outputCommitments[1];
     signals[16] = _ciphertextHash(data.outputCiphertexts[0]);
     signals[17] = _ciphertextHash(data.outputCiphertexts[1]);
     signals[18] = uint256(uint160(address(RECEIVE_REGISTRY)));
@@ -294,24 +365,35 @@ abstract contract ShieldedPoolCore is ReentrancyGuardTransient {
   }
 
   function transfer(
-    IReceiveRegistry.Code calldata code, bytes calldata codeProof,
-    ActionData calldata data, bytes calldata proof
+    IReceiveRegistry.Code calldata code,
+    bytes calldata codeProof,
+    ActionData calldata data,
+    bytes calldata proof
   ) external nonReentrant {
     _validateSingleInputAction(data);
     if (!RECEIVE_REGISTRY.verifyReceive(code, codeProof)) revert InvalidReceiveProof();
     uint256[] memory signals = new uint256[](12);
-    signals[0] = block.chainid; signals[1] = uint256(uint160(address(this)));
-    signals[2] = code.commonBinding; signals[3] = code.ownerCommitment;
-    signals[4] = code.viewKeyLo; signals[5] = code.viewKeyHi;
+    signals[0] = block.chainid;
+    signals[1] = uint256(uint160(address(this)));
+    signals[2] = code.commonBinding;
+    signals[3] = code.ownerCommitment;
+    signals[4] = code.viewKeyLo;
+    signals[5] = code.viewKeyHi;
     _actionSignals(signals, 6, data);
     if (!TRANSFER_VERIFIER.verifyProof(proof, signals)) revert InvalidZKProof();
     _spendInputs(data);
     _appendOutputs(Action.Transfer, data);
   }
 
-  function _actionSignals(uint256[] memory signals, uint256 offset, ActionData calldata data) private pure {
-    signals[offset] = data.inputRoots[0]; signals[offset + 1] = data.inputNullifiers[0];
-    signals[offset + 2] = data.outputCommitments[0]; signals[offset + 3] = data.outputCommitments[1];
+  function _actionSignals(
+    uint256[] memory signals,
+    uint256 offset,
+    ActionData calldata data
+  ) private pure {
+    signals[offset] = data.inputRoots[0];
+    signals[offset + 1] = data.inputNullifiers[0];
+    signals[offset + 2] = data.outputCommitments[0];
+    signals[offset + 3] = data.outputCommitments[1];
     signals[offset + 4] = _ciphertextHash(data.outputCiphertexts[0]);
     signals[offset + 5] = _ciphertextHash(data.outputCiphertexts[1]);
   }
@@ -321,8 +403,11 @@ abstract contract ShieldedPoolCore is ReentrancyGuardTransient {
   }
 
   function _validateAction(ActionData calldata data, uint256 inputCount) private view {
-    if (data.inputShardIds.length != inputCount || data.inputRoots.length != inputCount ||
-        data.inputNullifiers.length != inputCount) revert InvalidActionData();
+    if (
+      data.inputShardIds.length != inputCount ||
+      data.inputRoots.length != inputCount ||
+      data.inputNullifiers.length != inputCount
+    ) revert InvalidActionData();
     for (uint256 i; i < inputCount; ++i) {
       if (data.inputShardIds[i] > type(uint128).max) revert InvalidFieldElement();
       _nonzero(data.inputRoots[i]);
@@ -343,8 +428,13 @@ abstract contract ShieldedPoolCore is ReentrancyGuardTransient {
 
   /// @dev VALUE boundary relations contain exactly 7, 11 or 20 public fields.
   ///      No receive authorization or qualification state participates in this route.
-  function _verifyBoundary(Action action, ActionData calldata data, bytes calldata proof,
-    uint256 amount, address recipient) internal view {
+  function _verifyBoundary(
+    Action action,
+    ActionData calldata data,
+    bytes calldata proof,
+    uint256 amount,
+    address recipient
+  ) internal view {
     bool isShield = action == Action.Shield;
     uint256 inputs = data.inputNullifiers.length;
     if (isShield) {
@@ -353,10 +443,15 @@ abstract contract ShieldedPoolCore is ReentrancyGuardTransient {
       if (action != Action.Unshield || (inputs != 1 && inputs != 4)) revert InvalidActionData();
       _validateAction(data, inputs);
     }
-    uint256[] memory signals = new uint256[](isShield
-      ? ProofConstants.SHIELDED_SHIELD_PUBLIC_SIGNALS_LEN
-      : (inputs == 1 ? ProofConstants.SHIELDED_UNSHIELD_PUBLIC_SIGNALS_LEN
-        : ProofConstants.SHIELDED_UNSHIELD_4_PUBLIC_SIGNALS_LEN));
+    uint256[] memory signals = new uint256[](
+      isShield
+        ? ProofConstants.SHIELDED_SHIELD_PUBLIC_SIGNALS_LEN
+        : (
+          inputs == 1
+            ? ProofConstants.SHIELDED_UNSHIELD_PUBLIC_SIGNALS_LEN
+            : ProofConstants.SHIELDED_UNSHIELD_4_PUBLIC_SIGNALS_LEN
+        )
+    );
     uint256 n;
     signals[n++] = block.chainid;
     signals[n++] = uint256(uint160(address(this)));
@@ -371,9 +466,16 @@ abstract contract ShieldedPoolCore is ReentrancyGuardTransient {
     signals[n++] = _ciphertextHash(data.outputCiphertexts[1]);
     signals[n++] = amount;
     if (!isShield) signals[n] = uint256(uint160(recipient));
-    if (!VERIFIER.verifyProof(isShield ? ProofConstants.PROOF_PURPOSE_SHIELDED_SHIELD
-        : ProofConstants.PROOF_PURPOSE_SHIELDED_UNSHIELD,
-        ProofConstants.PROOF_ENCODING_ID_ABI_GROTH16_ABC, proof, signals)) revert InvalidZKProof();
+    if (
+      !VERIFIER.verifyProof(
+        isShield
+          ? ProofConstants.PROOF_PURPOSE_SHIELDED_SHIELD
+          : ProofConstants.PROOF_PURPOSE_SHIELDED_UNSHIELD,
+        ProofConstants.PROOF_ENCODING_ID_ABI_GROTH16_ABC,
+        proof,
+        signals
+      )
+    ) revert InvalidZKProof();
   }
 
   function _spendInputs(ActionData calldata data) private {
@@ -391,7 +493,9 @@ abstract contract ShieldedPoolCore is ReentrancyGuardTransient {
     emit ActionExecuted(
       uint8(action),
       data.inputShardIds.length == 0 ? 0 : data.inputShardIds[0],
-      data.inputShardIds.length > 1 ? data.inputShardIds[1] : (data.inputShardIds.length == 0 ? 0 : data.inputShardIds[0])
+      data.inputShardIds.length > 1
+        ? data.inputShardIds[1]
+        : (data.inputShardIds.length == 0 ? 0 : data.inputShardIds[0])
     );
     commitmentExists[data.outputCommitments[0]] = true;
     _append(data.outputCommitments[0], data.outputCiphertexts[0]);

@@ -20,7 +20,11 @@ import {
   PROTOCOL_UNICODE_NORMALIZATION_DATA_PATH,
   shieldedDeploymentBindingsFromAddresses,
 } from "../scripts/lib/protocolReleaseManifest.mjs";
-import { SHIELDED_DEPLOYMENT_CIRCUITS, PROTOCOL_DEPLOYMENT_CIRCUITS, RECEIVE_DEPLOYMENT_CONTRACTS } from "../scripts/lib/zkDeploymentCatalog.mjs";
+import {
+  SHIELDED_DEPLOYMENT_CIRCUITS,
+  PROTOCOL_DEPLOYMENT_CIRCUITS,
+  RECEIVE_DEPLOYMENT_CONTRACTS,
+} from "../scripts/lib/zkDeploymentCatalog.mjs";
 
 const ROOT = path.resolve(import.meta.dirname, "..");
 const hash = (digit) => digit.repeat(64);
@@ -276,7 +280,9 @@ const createProductionFixture = () => {
   };
   const shieldedAddresses = {
     deepFamily: ADDRESSES.proxy,
-    ...Object.fromEntries(RECEIVE_DEPLOYMENT_CONTRACTS.map(({property}, index) => [property, address(400 + index)])),
+    ...Object.fromEntries(
+      RECEIVE_DEPLOYMENT_CONTRACTS.map(({ property }, index) => [property, address(400 + index)]),
+    ),
     groth16VerifierAdapter: ADDRESSES.adapter,
     personCommitmentVerifier: ADDRESSES.personVerifier,
     disclosureBindingVerifier: ADDRESSES.disclosureVerifier,
@@ -292,9 +298,12 @@ const createProductionFixture = () => {
       ]),
     ),
     shieldedBoundaryVerifierAdapter: address(304),
-    ...Object.fromEntries(Object.values(PROTOCOL_DEPLOYMENT_CIRCUITS).flatMap((spec, index) => [
-      [spec.generatedLabel, address(500 + index)], [spec.adapterLabel, address(600 + index)],
-    ])),
+    ...Object.fromEntries(
+      Object.values(PROTOCOL_DEPLOYMENT_CIRCUITS).flatMap((spec, index) => [
+        [spec.generatedLabel, address(500 + index)],
+        [spec.adapterLabel, address(600 + index)],
+      ]),
+    ),
     shieldedErc20Pool: address(301),
     shieldedNativePool: address(302),
     shieldedPoolFactory: address(303),
@@ -312,9 +321,17 @@ const createProductionFixture = () => {
   Object.assign(manifest.deployments, {
     ...shieldedBindings,
     shieldedBoundaryVerifierAdapter: withHashes(shieldedBindings.shieldedBoundaryVerifierAdapter),
-    ...Object.fromEntries(["generatedVerifiers", "protocolVerifiers"].map(kind => [kind,
-      Object.fromEntries(Object.entries(shieldedBindings[kind]).map(([action, record]) => [action, withHashes(record)])),
-    ])),
+    ...Object.fromEntries(
+      ["generatedVerifiers", "protocolVerifiers"].map((kind) => [
+        kind,
+        Object.fromEntries(
+          Object.entries(shieldedBindings[kind]).map(([action, record]) => [
+            action,
+            withHashes(record),
+          ]),
+        ),
+      ]),
+    ),
     shieldedVerifiers: Object.fromEntries(
       Object.entries(shieldedBindings.shieldedVerifiers).map(([action, record]) => [
         action,
@@ -322,10 +339,12 @@ const createProductionFixture = () => {
       ]),
     ),
     ...Object.fromEntries(
-      ["shieldedErc20Pool", "shieldedNativePool", "shieldedPoolFactory", ...RECEIVE_DEPLOYMENT_CONTRACTS.map(({property}) => property)].map((key) => [
-        key,
-        withHashes(shieldedBindings[key]),
-      ]),
+      [
+        "shieldedErc20Pool",
+        "shieldedNativePool",
+        "shieldedPoolFactory",
+        ...RECEIVE_DEPLOYMENT_CONTRACTS.map(({ property }) => property),
+      ].map((key) => [key, withHashes(shieldedBindings[key])]),
     ),
   });
 
@@ -491,12 +510,21 @@ const createProductionFixture = () => {
     },
   };
   const deploymentArtifacts = {
-    shieldedBoundaryVerifierAdapter: { artifactSha256: HASHES.adapterArtifact, runtimeSha256: HASHES.adapterRuntime },
-    ...Object.fromEntries(["generatedVerifiers", "protocolVerifiers"].map(kind => [kind,
-      Object.fromEntries(Object.keys(PROTOCOL_DEPLOYMENT_CIRCUITS).map(action => [action,
-        { artifactSha256: HASHES.adapterArtifact, runtimeSha256: HASHES.adapterRuntime },
-      ])),
-    ])),
+    shieldedBoundaryVerifierAdapter: {
+      artifactSha256: HASHES.adapterArtifact,
+      runtimeSha256: HASHES.adapterRuntime,
+    },
+    ...Object.fromEntries(
+      ["generatedVerifiers", "protocolVerifiers"].map((kind) => [
+        kind,
+        Object.fromEntries(
+          Object.keys(PROTOCOL_DEPLOYMENT_CIRCUITS).map((action) => [
+            action,
+            { artifactSha256: HASHES.adapterArtifact, runtimeSha256: HASHES.adapterRuntime },
+          ]),
+        ),
+      ]),
+    ),
     shieldedVerifiers: Object.fromEntries(
       Object.keys(SHIELDED_DEPLOYMENT_CIRCUITS).map((action) => [
         action,
@@ -504,7 +532,12 @@ const createProductionFixture = () => {
       ]),
     ),
     ...Object.fromEntries(
-      ["shieldedErc20Pool", "shieldedNativePool", "shieldedPoolFactory", ...RECEIVE_DEPLOYMENT_CONTRACTS.map(({property}) => property)].map((key) => [
+      [
+        "shieldedErc20Pool",
+        "shieldedNativePool",
+        "shieldedPoolFactory",
+        ...RECEIVE_DEPLOYMENT_CONTRACTS.map(({ property }) => property),
+      ].map((key) => [
         key,
         { artifactSha256: HASHES.adapterArtifact, runtimeSha256: HASHES.adapterRuntime },
       ]),
@@ -601,7 +634,7 @@ const acceptanceReportForManifest = (manifest) => ({
         "shieldedErc20Pool",
         "shieldedNativePool",
         "shieldedPoolFactory",
-        ...RECEIVE_DEPLOYMENT_CONTRACTS.map(({property}) => property),
+        ...RECEIVE_DEPLOYMENT_CONTRACTS.map(({ property }) => property),
       ].map((key) => [key, structuredClone(manifest.deployments[key])]),
     ),
     deepFamily: {
@@ -1489,7 +1522,10 @@ describe("production protocol release manifest evidence", function () {
 
   it("binds compiled hashes for the boundary adapter and every receiving verifier", function () {
     const records = [
-      ["ShieldedBoundaryVerifierAdapter", fixture.deploymentArtifacts.shieldedBoundaryVerifierAdapter],
+      [
+        "ShieldedBoundaryVerifierAdapter",
+        fixture.deploymentArtifacts.shieldedBoundaryVerifierAdapter,
+      ],
       ...Object.entries(PROTOCOL_DEPLOYMENT_CIRCUITS).flatMap(([action, spec]) => [
         [spec.contract, fixture.deploymentArtifacts.generatedVerifiers[action]],
         [spec.adapterLabel, fixture.deploymentArtifacts.protocolVerifiers[action]],
@@ -1499,7 +1535,10 @@ describe("production protocol release manifest evidence", function () {
       for (const field of ["artifactSha256", "runtimeSha256"]) {
         const original = record[field];
         record[field] = hash("0");
-        assert.throws(() => fixture.inspect(), error => error.message.includes(`${label} ${field}`));
+        assert.throws(
+          () => fixture.inspect(),
+          (error) => error.message.includes(`${label} ${field}`),
+        );
         record[field] = original;
       }
     }

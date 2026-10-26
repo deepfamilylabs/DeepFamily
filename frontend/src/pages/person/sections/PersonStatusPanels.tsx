@@ -62,7 +62,9 @@ export function PersonErrorAlert({ person }: { person: PersonPageController }) {
         <AlertTriangle size={18} aria-hidden />
       </span>
       <div className="min-w-0 flex-1">
-        <p className="text-sm font-semibold text-ink">{t("person.fetchFailed", "Failed to load token")}</p>
+        <p className="text-sm font-semibold text-ink">
+          {t("person.fetchFailed", "Failed to load token")}
+        </p>
         <p className="mt-0.5 break-words text-[13.5px] text-ink-muted">{person.error}</p>
       </div>
       <div className="flex shrink-0 gap-2">

@@ -134,9 +134,7 @@ export default function FloatingActionButton({ className = "" }: FloatingActionB
 
     if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
 
-    const items = Array.from(
-      menuRef.current?.querySelectorAll<HTMLButtonElement>("button") ?? [],
-    );
+    const items = Array.from(menuRef.current?.querySelectorAll<HTMLButtonElement>("button") ?? []);
     if (items.length === 0) return;
 
     event.preventDefault();

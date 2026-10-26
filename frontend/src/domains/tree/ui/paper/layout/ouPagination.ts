@@ -241,14 +241,8 @@ function getOuEntryBaseWidth(partIndex: number): number {
   return partIndex === 0 ? OU_PERSON_BASE_WIDTH : OU_PERSON_CONTINUATION_BASE_WIDTH;
 }
 
-function getTextColumnCapacityForWidth(
-  widthPx: number,
-  baseWidth = OU_PERSON_BASE_WIDTH,
-): number {
-  return Math.max(
-    1,
-    Math.floor((widthPx - baseWidth) / OU_RECORD_COLUMN_WIDTH),
-  );
+function getTextColumnCapacityForWidth(widthPx: number, baseWidth = OU_PERSON_BASE_WIDTH): number {
+  return Math.max(1, Math.floor((widthPx - baseWidth) / OU_RECORD_COLUMN_WIDTH));
 }
 
 function fitOuChunkToColumnBudget(text: string, columnBudget: number): string {
@@ -260,10 +254,7 @@ function fitOuChunkToColumnBudget(text: string, columnBudget: number): string {
 }
 
 function getWidthSlotSpan(widthPx: number): number {
-  return Math.min(
-    OU_PAGE_SIDE_CAPACITY,
-    Math.max(1, Math.ceil(widthPx / OU_PERSON_SLOT_WIDTH)),
-  );
+  return Math.min(OU_PAGE_SIDE_CAPACITY, Math.max(1, Math.ceil(widthPx / OU_PERSON_SLOT_WIDTH)));
 }
 
 function getOuRecordTotalSlotSpan(person: PaperPerson, t: TranslateFn): number {
@@ -276,10 +267,7 @@ export function getOuRecordSlotSpan(person: PaperPerson, t: TranslateFn): number
   return Math.min(OU_PAGE_SIDE_CAPACITY, getOuRecordTotalSlotSpan(person, t));
 }
 
-export function splitOuRowEntries(
-  row: OuGenerationRow,
-  side: OuPageSide,
-): OuPersonRecordEntry[] {
+export function splitOuRowEntries(row: OuGenerationRow, side: OuPageSide): OuPersonRecordEntry[] {
   return side === "right"
     ? row.entries.filter((entry) => entry.side === "right")
     : row.entries.filter((entry) => entry.side === "left");
@@ -381,14 +369,7 @@ function paginateGenerationEntries(
           columnBudget * OU_RECORD_UNITS_PER_COLUMN,
         );
         const fittedText = fitOuChunkToColumnBudget(text, columnBudget);
-        pushEntry(
-          person,
-          fittedText,
-          partIndex,
-          entryRelationLabel,
-          personEntries,
-          availableWidth,
-        );
+        pushEntry(person, fittedText, partIndex, entryRelationLabel, personEntries, availableWidth);
         start += Array.from(fittedText).length;
         partIndex += 1;
       }
@@ -412,7 +393,9 @@ export function buildOuPaperBook(params: {
   const pageBodyWidths = params.pageBodyWidths || DEFAULT_OU_PAGE_BODY_WIDTHS;
   if (!generations.length) return { charts: [] };
 
-  const generationsByDepth = new Map(generations.map((generation) => [generation.depth, generation]));
+  const generationsByDepth = new Map(
+    generations.map((generation) => [generation.depth, generation]),
+  );
   const entriesByDepth = new Map(
     generations.map((generation) => [
       generation.depth,
@@ -434,9 +417,7 @@ export function buildOuPaperBook(params: {
     const repeatedDepth = chartIndex > 1 ? startDepth : undefined;
     const spreadCount = Math.max(
       1,
-      ...generationDepths.map((depth) =>
-        entriesByDepth.get(depth)?.length || 0,
-      ),
+      ...generationDepths.map((depth) => entriesByDepth.get(depth)?.length || 0),
     );
 
     charts.push({

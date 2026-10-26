@@ -85,12 +85,7 @@ function readFullName(coreInfo: any): string | undefined {
   return typeof name === "string" && name.length > 0 ? name : undefined;
 }
 
-function paginate<T>(
-  rows: T[],
-  offset: number,
-  limit: number,
-  truncated = false,
-): AccountPage<T> {
+function paginate<T>(rows: T[], offset: number, limit: number, truncated = false): AccountPage<T> {
   const start = Math.max(0, offset);
   const page = rows.slice(start, start + Math.max(0, limit));
   return {

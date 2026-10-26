@@ -21,7 +21,10 @@ export function PersonHeader({ person }: { person: PersonPageController }) {
     facts.push({
       key: "birth",
       label: t("familyTree.nodeDetail.birth", "Birth"),
-      value: [formatYMD(core.birthYear, core.birthMonth, core.birthDay, core.isBirthBC), core.birthPlace]
+      value: [
+        formatYMD(core.birthYear, core.birthMonth, core.birthDay, core.isBirthBC),
+        core.birthPlace,
+      ]
         .filter(Boolean)
         .join(" · "),
     });
@@ -30,7 +33,10 @@ export function PersonHeader({ person }: { person: PersonPageController }) {
     facts.push({
       key: "death",
       label: t("familyTree.nodeDetail.death", "Death"),
-      value: [formatYMD(core.deathYear, core.deathMonth, core.deathDay, core.isDeathBC), core.deathPlace]
+      value: [
+        formatYMD(core.deathYear, core.deathMonth, core.deathDay, core.isDeathBC),
+        core.deathPlace,
+      ]
         .filter(Boolean)
         .join(" · "),
     });
@@ -51,7 +57,9 @@ export function PersonHeader({ person }: { person: PersonPageController }) {
         {t("person.encyclopedia", "Encyclopedia")}
       </span>
 
-      <h1 className="page-title mt-2 break-words text-[1.75rem] text-ink sm:text-[2.25rem]">{name}</h1>
+      <h1 className="page-title mt-2 break-words text-[1.75rem] text-ink sm:text-[2.25rem]">
+        {name}
+      </h1>
 
       {facts.length > 0 && (
         <dl className="mt-4 border-t border-hairline sm:mt-5 sm:flex sm:border-b">

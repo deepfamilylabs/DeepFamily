@@ -56,9 +56,7 @@ export default function WalletSelectionModal({
               <Wallet className="w-[18px] h-[18px]" aria-hidden />
             </div>
             <div className="flex-1 min-w-0">
-              <h2 className={MODAL_TITLE}>
-                {t("wallet.selectWallet", "Select Wallet")}
-              </h2>
+              <h2 className={MODAL_TITLE}>{t("wallet.selectWallet", "Select Wallet")}</h2>
               <p className="text-xs text-ink-muted">
                 {t("wallet.connectDescription", "Connect your wallet to continue")}
               </p>
@@ -76,7 +74,12 @@ export default function WalletSelectionModal({
           <div className="p-5 space-y-2">
             {wallets.length > 0 ? (
               wallets.map((wallet) => (
-                <button key={wallet.id} type="button" onClick={() => onSelect(wallet)} className={ROW}>
+                <button
+                  key={wallet.id}
+                  type="button"
+                  onClick={() => onSelect(wallet)}
+                  className={ROW}
+                >
                   <div className="w-[38px] h-[38px] shrink-0 rounded-[10px] bg-surface-muted flex items-center justify-center overflow-hidden">
                     {wallet.icon ? (
                       <img
@@ -96,7 +99,10 @@ export default function WalletSelectionModal({
                     </div>
                   </div>
                   <span className="w-[7px] h-[7px] shrink-0 rounded-full bg-success" aria-hidden />
-                  <ChevronRight className="w-[17px] h-[17px] shrink-0 text-ink-subtle" aria-hidden />
+                  <ChevronRight
+                    className="w-[17px] h-[17px] shrink-0 text-ink-subtle"
+                    aria-hidden
+                  />
                 </button>
               ))
             ) : (
@@ -126,7 +132,12 @@ export default function WalletSelectionModal({
                       rel="noopener noreferrer"
                       className="flex items-center gap-3 p-3 rounded-[10px] bg-surface-alt border border-hairline transition-colors hover:border-primary"
                     >
-                      <img src={wallet.icon} alt="" aria-hidden className="w-6 h-6 object-contain" />
+                      <img
+                        src={wallet.icon}
+                        alt=""
+                        aria-hidden
+                        className="w-6 h-6 object-contain"
+                      />
                       <span className="flex-1 text-sm font-medium text-ink">{wallet.name}</span>
                       <ChevronRight className="w-4 h-4 text-ink-subtle" aria-hidden />
                     </a>

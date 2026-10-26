@@ -420,5 +420,4 @@ describe("DeepFamily lineage gas benchmark", function () {
     expect(await lineageIndex.root(TRUSTED_TREE)).to.equal(root);
     expect(await deepFamily.trustedEndorserOf(personHash, 1, overflowAccount)).to.equal(false);
   });
-
 });

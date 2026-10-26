@@ -1,4 +1,8 @@
-import type { EndorseErrorResultView, EndorseSuccessResultView, ExecuteEndorseFlowResult } from "./endorseTypes";
+import type {
+  EndorseErrorResultView,
+  EndorseSuccessResultView,
+  ExecuteEndorseFlowResult,
+} from "./endorseTypes";
 
 type SuccessfulEndorseResult = Extract<ExecuteEndorseFlowResult, { alreadyEndorsed: false }>;
 

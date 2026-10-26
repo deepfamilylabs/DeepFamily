@@ -6,11 +6,7 @@ export {
   useTreeNodeAccess,
   useTreeStatus,
 } from "./TreeViewContext";
-export {
-  ColorThemeProvider,
-  useColorTheme,
-  type ColorTheme,
-} from "./ColorThemeContext";
+export { ColorThemeProvider, useColorTheme, type ColorTheme } from "./ColorThemeContext";
 export {
   FamilyTreeViewConfigProvider,
   useFamilyTreeViewConfig,

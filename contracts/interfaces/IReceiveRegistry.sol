@@ -34,7 +34,11 @@ interface IReceiveRegistry {
 
   function isKnownIssuanceRoot(uint256 root) external view returns (bool);
   /// @dev State check only: the caller's fixed Claim circuit must authenticate these indices.
-  function validateBudgetRoleStatus(uint256 issuanceRoot, uint256 childRoleIndex,
-    uint256 endorsementRoleIndex, uint256 trustedRoleIndex) external view returns (bool);
+  function validateBudgetRoleStatus(
+    uint256 issuanceRoot,
+    uint256 childRoleIndex,
+    uint256 endorsementRoleIndex,
+    uint256 trustedRoleIndex
+  ) external view returns (bool);
   function isCodeRevoked(uint256 revocationTag) external view returns (bool);
 }

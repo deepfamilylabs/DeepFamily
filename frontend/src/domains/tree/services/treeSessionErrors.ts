@@ -37,8 +37,9 @@ export function classifyTreeSessionConnectionError(error: any): TreeSessionStatu
     message,
   );
   const isAbort = /AbortError|The user aborted a request/i.test(message);
-  const isFetchFail =
-    /Failed\s*to\s*fetch|NetworkError\s*when\s*attempting\s*to\s*fetch/i.test(message);
+  const isFetchFail = /Failed\s*to\s*fetch|NetworkError\s*when\s*attempting\s*to\s*fetch/i.test(
+    message,
+  );
   const isNetwork =
     reason === "NETWORK_ERROR" ||
     reason === "WALLET_POPUP_TIMEOUT" ||

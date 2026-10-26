@@ -47,7 +47,9 @@ describe("fresh-v1 identityHash integration", () => {
   });
 
   it("fails closed for an unsupported identity suite", async () => {
-    await expect(computeIdentityHashMaterial({ ...identity, identitySuiteId: 999 })).rejects.toMatchObject({
+    await expect(
+      computeIdentityHashMaterial({ ...identity, identitySuiteId: 999 }),
+    ).rejects.toMatchObject({
       code: "UNSUPPORTED_IDENTITY_SUITE",
     });
     await expect(computeIdentityHash({ ...identity, identitySuiteId: 999 })).resolves.toBe("");

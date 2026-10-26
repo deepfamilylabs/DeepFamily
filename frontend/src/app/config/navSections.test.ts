@@ -3,13 +3,7 @@ import { resolveNavSection } from "./navSections";
 
 describe("resolveNavSection", () => {
   it("maps every family volume and detail route to the family entry", () => {
-    for (const path of [
-      "/family",
-      "/people",
-      "/genealogyBook",
-      "/person/12",
-      "/editor/12",
-    ]) {
+    for (const path of ["/family", "/people", "/genealogyBook", "/person/12", "/editor/12"]) {
       expect(resolveNavSection(path)).toBe("familyTree");
     }
   });

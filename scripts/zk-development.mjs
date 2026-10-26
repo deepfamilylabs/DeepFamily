@@ -3,7 +3,11 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { runZkBuild } from "./zk-build.mjs";
 import { inspectZkReleaseArtifacts } from "./lib/zkArtifactTrust.mjs";
-import { parseCircuitArguments, selectCircuitNames, CORE_CIRCUITS } from "./lib/zkCircuitSelection.mjs";
+import {
+  parseCircuitArguments,
+  selectCircuitNames,
+  CORE_CIRCUITS,
+} from "./lib/zkCircuitSelection.mjs";
 import { buildProtocolDevelopment, setupProtocolDevelopment } from "./protocol-zk-development.mjs";
 import { buildBoundaryDevelopment, setupBoundaryDevelopment } from "./boundary-zk-development.mjs";
 import { checkCurrentArtifacts } from "./check-zk-artifacts.mjs";
@@ -36,7 +40,9 @@ export function parseDevelopmentArguments(argv) {
       throw new Error(`Expected one value for ${option}`);
     values[option] = value;
   }
-  const parsed = parseCircuitArguments(values["--circuit"] === undefined ? [] : ["--circuit", values["--circuit"]]);
+  const parsed = parseCircuitArguments(
+    values["--circuit"] === undefined ? [] : ["--circuit", values["--circuit"]],
+  );
   return { ...parsed, ptauPath: values["--ptau"] };
 }
 
@@ -55,11 +61,16 @@ export async function runDevelopment({
 } = {}) {
   root = path.resolve(root);
   const circuits = selectCircuitNames(circuit);
-  const core = circuits.filter(name => CORE_CIRCUITS.includes(name));
-  const protocol = circuits.filter(name => name.startsWith("protocol:")).map(name => name.slice("protocol:".length));
-  const boundaries = circuits.filter(name => name.startsWith("shielded:")).map(name => name.slice("shielded:".length));
+  const core = circuits.filter((name) => CORE_CIRCUITS.includes(name));
+  const protocol = circuits
+    .filter((name) => name.startsWith("protocol:"))
+    .map((name) => name.slice("protocol:".length));
+  const boundaries = circuits
+    .filter((name) => name.startsWith("shielded:"))
+    .map((name) => name.slice("shielded:".length));
 
-  if (core.length) await buildCore({ root, circuit: core.length === CORE_CIRCUITS.length ? "core" : core[0] });
+  if (core.length)
+    await buildCore({ root, circuit: core.length === CORE_CIRCUITS.length ? "core" : core[0] });
   // Validate existing identity keys before any receiving/boundary key rotation.
   await inspectIdentity({ root, requireBuiltR1cs: true });
   if (protocol.length) {
@@ -71,7 +82,11 @@ export async function runDevelopment({
     await setupBoundary({ root, circuits: boundaries, ptauPath });
   }
   const artifacts = await check({ root });
-  return { circuits, regeneratedCircuits: circuits.filter(name => !CORE_CIRCUITS.includes(name)), artifacts };
+  return {
+    circuits,
+    regeneratedCircuits: circuits.filter((name) => !CORE_CIRCUITS.includes(name)),
+    artifacts,
+  };
 }
 
 export async function main(argv = process.argv.slice(2), { log = console.log, ...options } = {}) {
@@ -80,13 +95,24 @@ export async function main(argv = process.argv.slice(2), { log = console.log, ..
     log(USAGE);
     return;
   }
-  const result = await runDevelopment({ ...options, circuit: parsed.circuit, ptauPath: parsed.ptauPath });
-  log(`[zk-development] All 13 artifact sets verified; ${result.regeneratedCircuits.length} development key sets regenerated. Identity and production keys are unchanged.`);
+  const result = await runDevelopment({
+    ...options,
+    circuit: parsed.circuit,
+    ptauPath: parsed.ptauPath,
+  });
+  log(
+    `[zk-development] All 13 artifact sets verified; ${result.regeneratedCircuits.length} development key sets regenerated. Identity and production keys are unchanged.`,
+  );
   return result;
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  try { await main(); }
-  catch (error) { console.error(`[zk-development] ${error.message}`); process.exitCode = 1; }
-  finally { await globalThis.curve_bn128?.terminate?.(); }
+  try {
+    await main();
+  } catch (error) {
+    console.error(`[zk-development] ${error.message}`);
+    process.exitCode = 1;
+  } finally {
+    await globalThis.curve_bn128?.terminate?.();
+  }
 }

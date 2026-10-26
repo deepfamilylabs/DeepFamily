@@ -151,13 +151,7 @@ const SVG_NODE_CONFIG = {
   },
 } satisfies Record<PaperGenealogyStyle, SvgNodeConfig>;
 
-function PaperSvgGuides({
-  style,
-  layout,
-}: {
-  style: PaperGenealogyStyle;
-  layout: SvgPaperLayout;
-}) {
+function PaperSvgGuides({ style, layout }: { style: PaperGenealogyStyle; layout: SvgPaperLayout }) {
   const { t } = useTranslation();
   const guideConfig = SVG_GUIDE_CONFIG[style];
   return (
@@ -267,10 +261,7 @@ function PaperSvgEdges({
           const y2 = to.y + to.h / 2;
           const mid = (x1 + x2) / 2;
           return (
-            <path
-              key={`${edge.from}->${edge.to}`}
-              d={`M ${x1} ${y1} H ${mid} V ${y2} H ${x2}`}
-            />
+            <path key={`${edge.from}->${edge.to}`} d={`M ${x1} ${y1} H ${mid} V ${y2} H ${x2}`} />
           );
         }
         const x1 = from.x + from.w / 2;
@@ -290,13 +281,7 @@ function PaperSvgEdges({
   );
 }
 
-function SvgPaperPersonNode({
-  node,
-  style,
-}: {
-  node: SvgPaperNode;
-  style: PaperGenealogyStyle;
-}) {
+function SvgPaperPersonNode({ node, style }: { node: SvgPaperNode; style: PaperGenealogyStyle }) {
   const nodeConfig = SVG_NODE_CONFIG[style];
   const title = clipText(node.ui.titleText || node.ui.shortHashText, nodeConfig.titleMaxLength);
   const details = node.classicalLines.slice(0, nodeConfig.detailLineCount);
@@ -444,8 +429,18 @@ export function SvgPaperRenderer({
       >
         <g ref={innerRef as React.RefObject<SVGGElement>}>
           <defs>
-            <pattern id={`paper-fiber-${style}`} width="28" height="28" patternUnits="userSpaceOnUse">
-              <path d="M 28 0 L 0 0 0 28" fill="none" stroke="rgba(138, 106, 59, 0.08)" strokeWidth="0.7" />
+            <pattern
+              id={`paper-fiber-${style}`}
+              width="28"
+              height="28"
+              patternUnits="userSpaceOnUse"
+            >
+              <path
+                d="M 28 0 L 0 0 0 28"
+                fill="none"
+                stroke="rgba(138, 106, 59, 0.08)"
+                strokeWidth="0.7"
+              />
               <circle cx="7" cy="19" r="0.7" fill="rgba(117, 95, 60, 0.12)" />
               <circle cx="21" cy="8" r="0.5" fill="rgba(117, 95, 60, 0.1)" />
             </pattern>

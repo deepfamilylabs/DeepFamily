@@ -21,13 +21,23 @@ contract FixedGroth16Verifier is IFixedProofVerifier {
     }
     VERIFIER = verifier;
     PUBLIC_SIGNAL_COUNT = publicSignalCount;
-    VERIFY_SELECTOR = bytes4(keccak256(bytes(string.concat(
-      "verifyProof(uint256[2],uint256[2][2],uint256[2],uint256[",
-      Strings.toString(publicSignalCount), "])"
-    ))));
+    VERIFY_SELECTOR = bytes4(
+      keccak256(
+        bytes(
+          string.concat(
+            "verifyProof(uint256[2],uint256[2][2],uint256[2],uint256[",
+            Strings.toString(publicSignalCount),
+            "])"
+          )
+        )
+      )
+    );
   }
 
-  function verifyProof(bytes calldata proof, uint256[] calldata signals) external view returns (bool) {
+  function verifyProof(
+    bytes calldata proof,
+    uint256[] calldata signals
+  ) external view returns (bool) {
     if (proof.length != 256 || signals.length != PUBLIC_SIGNAL_COUNT) return false;
     bytes memory input = new bytes(4 + 256 + 32 * signals.length);
     bytes4 selector = VERIFY_SELECTOR;

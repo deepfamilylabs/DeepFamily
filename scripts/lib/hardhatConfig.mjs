@@ -16,11 +16,9 @@ export const resolveEthereumRpcUrls = (env = process.env) => {
   const infuraApiKey = nonBlank(env.INFURA_API_KEY);
   return {
     mainnet:
-      nonBlank(env.ETHEREUM_MAINNET_RPC_URL) ||
-      `https://mainnet.infura.io/v3/${infuraApiKey}`,
+      nonBlank(env.ETHEREUM_MAINNET_RPC_URL) || `https://mainnet.infura.io/v3/${infuraApiKey}`,
     sepolia:
-      nonBlank(env.ETHEREUM_SEPOLIA_RPC_URL) ||
-      `https://sepolia.infura.io/v3/${infuraApiKey}`,
+      nonBlank(env.ETHEREUM_SEPOLIA_RPC_URL) || `https://sepolia.infura.io/v3/${infuraApiKey}`,
   };
 };
 

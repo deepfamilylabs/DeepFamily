@@ -39,7 +39,9 @@ export function AddVersionStatusPanel({
           ),
         },
         timeline,
-        done: successResult ? <AddVersionSuccessResult t={t} successResult={successResult} /> : null,
+        done: successResult ? (
+          <AddVersionSuccessResult t={t} successResult={successResult} />
+        ) : null,
         failed: { title: t("addVersion.failed", "Transaction Failed"), error: errorResult },
       }}
     />

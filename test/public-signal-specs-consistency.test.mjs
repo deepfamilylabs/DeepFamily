@@ -108,6 +108,5 @@ describe("ProofConstants consistency tests", () => {
     expect(DISCLOSURE_BINDING_PROOF_DESCRIPTOR.publicSignalSpec).to.equal(
       DISCLOSURE_BINDING_V1_PUBLIC_SIGNAL_SPEC.name,
     );
-
   });
 });

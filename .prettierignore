@@ -1,0 +1,3 @@
+# Generated Groth16 verifiers are pinned by SHA-256 in the circuit manifests.
+contracts/*Verifier.sol
+contracts/generated/

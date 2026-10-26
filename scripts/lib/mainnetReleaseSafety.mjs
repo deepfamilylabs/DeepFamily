@@ -27,7 +27,10 @@ export const MAINNET_TRANSACTION_LABELS = Object.freeze([
   ...Object.values(SHIELDED_DEPLOYMENT_CIRCUITS).map((spec) => spec.verifierLabel),
   "groth16VerifierAdapter",
   "shieldedBoundaryVerifierAdapter",
-  ...Object.values(PROTOCOL_DEPLOYMENT_CIRCUITS).flatMap(spec => [spec.generatedLabel, spec.adapterLabel]),
+  ...Object.values(PROTOCOL_DEPLOYMENT_CIRCUITS).flatMap((spec) => [
+    spec.generatedLabel,
+    spec.adapterLabel,
+  ]),
   "deepFamilyImplementation",
   "deepFamilyProxy",
   "tokenInitialize",

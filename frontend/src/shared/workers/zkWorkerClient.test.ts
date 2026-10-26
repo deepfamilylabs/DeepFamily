@@ -64,7 +64,8 @@ describe("ZK worker lifecycle", () => {
     try {
       await expect(
         zkWorkerCall("verifyPersonRelationProof", {
-          proof: { pi_a: [secret, "2", "1"] } as any, publicSignals: ["1"],
+          proof: { pi_a: [secret, "2", "1"] } as any,
+          publicSignals: ["1"],
         }),
       ).rejects.toThrow("Local cryptographic operation failed");
       expect(FakeWorker.instances[0].terminate).toHaveBeenCalledOnce();
@@ -77,13 +78,28 @@ describe("ZK worker lifecycle", () => {
     const listener = vi.fn();
     unsubscribeProgress = subscribePublicStateSyncProgress(listener);
     const call = zkWorkerCall("verifyPersonRelationProof", {
-      proof: {} as any, publicSignals: ["1"],
+      proof: {} as any,
+      publicSignals: ["1"],
     });
     const worker = FakeWorker.instances[0];
-    const progress = { domain: "authorization", phase: "download", completed: 2, total: 3, resumed: true };
+    const progress = {
+      domain: "authorization",
+      phase: "download",
+      completed: 2,
+      total: 3,
+      resumed: true,
+    };
     let settled = false;
-    void call.then(() => { settled = true; });
-    worker.emit("message", { type: "publicStateSyncProgress", progress, id: worker.messages[0].id, ok: true, result: "not-the-code" });
+    void call.then(() => {
+      settled = true;
+    });
+    worker.emit("message", {
+      type: "publicStateSyncProgress",
+      progress,
+      id: worker.messages[0].id,
+      ok: true,
+      result: "not-the-code",
+    });
     await Promise.resolve();
     expect(listener).toHaveBeenCalledExactlyOnceWith(progress);
     expect(settled).toBe(false);
@@ -99,16 +115,36 @@ describe("ZK worker lifecycle", () => {
   it("ignores malformed progress without settling a request or releasing its Worker", async () => {
     const listener = vi.fn();
     unsubscribeProgress = subscribePublicStateSyncProgress(listener);
-    const call = zkWorkerCall("verifyPersonRelationProof", { proof: {} as any, publicSignals: ["1"] });
+    const call = zkWorkerCall("verifyPersonRelationProof", {
+      proof: {} as any,
+      publicSignals: ["1"],
+    });
     const worker = FakeWorker.instances[0];
     let settled = false;
-    void call.then(() => { settled = true; });
+    void call.then(() => {
+      settled = true;
+    });
     const valid = { domain: "lineage", phase: "verify", completed: 1, total: 2 };
     for (const progress of [
-      undefined, null, {}, { ...valid, domain: "identity" }, { ...valid, phase: "proving" },
-      { ...valid, completed: -1 }, { ...valid, total: 0 }, { ...valid, completed: NaN },
-      { ...valid, total: Infinity }, { ...valid, total: "2" }, { ...valid, resumed: "yes" },
-    ]) worker.emit("message", { type: "publicStateSyncProgress", progress, id: worker.messages[0].id, ok: true, result: "malformed" });
+      undefined,
+      null,
+      {},
+      { ...valid, domain: "identity" },
+      { ...valid, phase: "proving" },
+      { ...valid, completed: -1 },
+      { ...valid, total: 0 },
+      { ...valid, completed: NaN },
+      { ...valid, total: Infinity },
+      { ...valid, total: "2" },
+      { ...valid, resumed: "yes" },
+    ])
+      worker.emit("message", {
+        type: "publicStateSyncProgress",
+        progress,
+        id: worker.messages[0].id,
+        ok: true,
+        result: "malformed",
+      });
     await Promise.resolve();
     expect(listener).not.toHaveBeenCalled();
     expect(settled).toBe(false);
@@ -120,11 +156,18 @@ describe("ZK worker lifecycle", () => {
 
   it("keeps the original timeout deadline after a progress message", async () => {
     vi.useFakeTimers();
-    const call = zkWorkerCall("verifyPersonRelationProof", { proof: {} as any, publicSignals: ["1"] }, { timeoutMs: 100 });
+    const call = zkWorkerCall(
+      "verifyPersonRelationProof",
+      { proof: {} as any, publicSignals: ["1"] },
+      { timeoutMs: 100 },
+    );
     const rejected = expect(call).rejects.toThrow("ZK worker timeout");
     const worker = FakeWorker.instances[0];
     vi.advanceTimersByTime(90);
-    worker.emit("message", { type: "publicStateSyncProgress", progress: { domain: "authorization", phase: "catchup", completed: 2, total: 3 } });
+    worker.emit("message", {
+      type: "publicStateSyncProgress",
+      progress: { domain: "authorization", phase: "catchup", completed: 2, total: 3 },
+    });
     expect(worker.terminate).not.toHaveBeenCalled();
     vi.advanceTimersByTime(10);
     await rejected;
@@ -136,11 +179,17 @@ describe("ZK worker lifecycle", () => {
     const params = { proof: {} as any, publicSignals: ["1"] };
     const active = zkWorkerCall("verifyPersonRelationProof", params);
     const queued = zkWorkerCall("verifyPersonRelationProof", params);
-    const rejected = Promise.all([expect(active).rejects.toThrow("ZK worker timeout"), expect(queued).rejects.toThrow("ZK worker timeout")]);
+    const rejected = Promise.all([
+      expect(active).rejects.toThrow("ZK worker timeout"),
+      expect(queued).rejects.toThrow("ZK worker timeout"),
+    ]);
     const worker = FakeWorker.instances[0];
     for (const completed of [1, 2]) {
       vi.advanceTimersByTime(179_000);
-      worker.emit("message", { type: "publicStateSyncProgress", progress: { domain: "authorization", phase: "download", completed, total: 4 } });
+      worker.emit("message", {
+        type: "publicStateSyncProgress",
+        progress: { domain: "authorization", phase: "download", completed, total: 4 },
+      });
       expect(worker.terminate).not.toHaveBeenCalled();
     }
     vi.advanceTimersByTime(179_999);
@@ -152,7 +201,10 @@ describe("ZK worker lifecycle", () => {
 
   it("does not renew a stalled default call for repeated, regressing, or total-only progress changes", async () => {
     vi.useFakeTimers();
-    const active = zkWorkerCall("verifyPersonRelationProof", { proof: {} as any, publicSignals: ["1"] });
+    const active = zkWorkerCall("verifyPersonRelationProof", {
+      proof: {} as any,
+      publicSignals: ["1"],
+    });
     const rejected = expect(active).rejects.toThrow("ZK worker timeout");
     const worker = FakeWorker.instances[0];
     vi.advanceTimersByTime(150_000);
@@ -160,7 +212,10 @@ describe("ZK worker lifecycle", () => {
     worker.emit("message", { type: "publicStateSyncProgress", progress });
     vi.advanceTimersByTime(150_000);
     for (const change of [{}, { completed: 1 }, { total: 5 }, { resumed: true }])
-      worker.emit("message", { type: "publicStateSyncProgress", progress: { ...progress, ...change } });
+      worker.emit("message", {
+        type: "publicStateSyncProgress",
+        progress: { ...progress, ...change },
+      });
     vi.advanceTimersByTime(29_999);
     expect(worker.terminate).not.toHaveBeenCalled();
     vi.advanceTimersByTime(1);
@@ -170,7 +225,10 @@ describe("ZK worker lifecycle", () => {
 
   it("renews for a phase's first empty completion only once", async () => {
     vi.useFakeTimers();
-    const active = zkWorkerCall("verifyPersonRelationProof", { proof: {} as any, publicSignals: ["1"] });
+    const active = zkWorkerCall("verifyPersonRelationProof", {
+      proof: {} as any,
+      publicSignals: ["1"],
+    });
     const rejected = expect(active).rejects.toThrow("ZK worker timeout");
     const worker = FakeWorker.instances[0];
     vi.advanceTimersByTime(150_000);
@@ -192,11 +250,17 @@ describe("ZK worker lifecycle", () => {
     const queued = zkWorkerCall("verifyPersonRelationProof", params);
     const rejected = expect(queued).rejects.toThrow("ZK worker timeout");
     const worker = FakeWorker.instances[0];
-    worker.emit("message", { type: "publicStateSyncProgress", progress: { domain: "lineage", phase: "verify", completed: 100, total: 200 } });
+    worker.emit("message", {
+      type: "publicStateSyncProgress",
+      progress: { domain: "lineage", phase: "verify", completed: 100, total: 200 },
+    });
     worker.emit("message", { id: worker.messages[0].id, ok: true, result: { ok: true } });
     await first;
     vi.advanceTimersByTime(150_000);
-    worker.emit("message", { type: "publicStateSyncProgress", progress: { domain: "lineage", phase: "verify", completed: 1, total: 20 } });
+    worker.emit("message", {
+      type: "publicStateSyncProgress",
+      progress: { domain: "lineage", phase: "verify", completed: 1, total: 20 },
+    });
     vi.advanceTimersByTime(179_999);
     expect(worker.terminate).not.toHaveBeenCalled();
     vi.advanceTimersByTime(1);
@@ -207,7 +271,10 @@ describe("ZK worker lifecycle", () => {
   it("rejects late progress from a terminated Worker while accepting its replacement", async () => {
     const listener = vi.fn();
     unsubscribeProgress = subscribePublicStateSyncProgress(listener);
-    const call = zkWorkerCall("verifyPersonRelationProof", { proof: {} as any, publicSignals: ["1"] });
+    const call = zkWorkerCall("verifyPersonRelationProof", {
+      proof: {} as any,
+      publicSignals: ["1"],
+    });
     const old = FakeWorker.instances[0];
     const rejected = expect(call).rejects.toBeInstanceOf(ZkWorkerTerminatedError);
     terminateZkWorker();
@@ -215,7 +282,10 @@ describe("ZK worker lifecycle", () => {
     const progress = { domain: "authorization", phase: "complete", completed: 3, total: 3 };
     old.emit("message", { type: "publicStateSyncProgress", progress });
     expect(listener).not.toHaveBeenCalled();
-    const replacement = zkWorkerCall("verifyPersonRelationProof", { proof: {} as any, publicSignals: ["1"] });
+    const replacement = zkWorkerCall("verifyPersonRelationProof", {
+      proof: {} as any,
+      publicSignals: ["1"],
+    });
     const next = FakeWorker.instances[1];
     old.emit("message", { type: "publicStateSyncProgress", progress, id: next.messages[0].id });
     expect(listener).not.toHaveBeenCalled();

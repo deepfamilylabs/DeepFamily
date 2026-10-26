@@ -22,8 +22,9 @@ async function fetchAsset(path: string, host: ZkAssetHost, digest?: string): Pro
   if (!response.ok) throw new Error(`Failed to load ${url}: ${response.status}`);
   const bytes = new Uint8Array(await response.arrayBuffer());
   if (digest) {
-    const actual = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", bytes)), (byte) =>
-      byte.toString(16).padStart(2, "0"),
+    const actual = Array.from(
+      new Uint8Array(await crypto.subtle.digest("SHA-256", bytes)),
+      (byte) => byte.toString(16).padStart(2, "0"),
     ).join("");
     if (actual !== digest) throw new Error(`ZK asset digest mismatch: ${path}`);
   }

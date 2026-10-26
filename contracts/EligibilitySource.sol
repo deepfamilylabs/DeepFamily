@@ -12,7 +12,11 @@ interface ISourceLineage {
 
 interface ISourceManagers {
   function eligibilitySource() external view returns (address);
-  function isTrustedEndorserManager(bytes32 personHash, uint256 versionIndex, address actor) external view returns (bool);
+  function isTrustedEndorserManager(
+    bytes32 personHash,
+    uint256 versionIndex,
+    address actor
+  ) external view returns (bool);
 }
 
 /**
@@ -76,26 +80,44 @@ contract EligibilitySource is IEligibilitySource {
   uint256[][3] private _revokedSecrets;
   mapping(uint8 role => mapping(uint256 roleIndex => bool revoked)) private _revokedRoleIndices;
 
-  event SourceLeafPublished(uint8 indexed treeId, uint256 indexed leafIndex, uint256 leaf, uint256 root);
+  event SourceLeafPublished(
+    uint8 indexed treeId,
+    uint256 indexed leafIndex,
+    uint256 leaf,
+    uint256 root
+  );
   event RoleRegistered(uint8 indexed role, uint256 indexed commitment);
   event RoleRevoked(uint8 indexed role, uint256 secret, uint256 indexed commitment);
 
   constructor(address lineageIndex, address factVerifier, address trustVerifier) {
-    if (lineageIndex.code.length == 0 || factVerifier.code.length == 0 || trustVerifier.code.length == 0) {
+    if (
+      lineageIndex.code.length == 0 ||
+      factVerifier.code.length == 0 ||
+      trustVerifier.code.length == 0
+    ) {
       revert InvalidDependency();
     }
     LINEAGE_INDEX = ISourceLineage(lineageIndex);
     address deepFamily = ISourceLineage(lineageIndex).DEEP_FAMILY();
-    if (deepFamily.code.length == 0 || block.chainid == 0 || block.chainid > type(uint64).max) revert InvalidDependency();
+    if (deepFamily.code.length == 0 || block.chainid == 0 || block.chainid > type(uint64).max)
+      revert InvalidDependency();
     DEEP_FAMILY = deepFamily;
     FACT_VERIFIER = IFixedProofVerifier(factVerifier);
     TRUST_VERIFIER = IFixedProofVerifier(trustVerifier);
   }
 
-  function sourceRoot() external view returns (uint256) { return _trees[0].root; }
-  function trustedRoot() external view returns (uint256) { return _trees[1].root; }
-  function sourceSize(uint8 treeId) external view returns (uint256) { return _tree(treeId).size; }
-  function sourceDepth(uint8 treeId) external view returns (uint256) { return _tree(treeId).depth; }
+  function sourceRoot() external view returns (uint256) {
+    return _trees[0].root;
+  }
+  function trustedRoot() external view returns (uint256) {
+    return _trees[1].root;
+  }
+  function sourceSize(uint8 treeId) external view returns (uint256) {
+    return _tree(treeId).size;
+  }
+  function sourceDepth(uint8 treeId) external view returns (uint256) {
+    return _tree(treeId).depth;
+  }
 
   function publishFact(
     uint256 childIdentity,
@@ -164,7 +186,14 @@ contract EligibilitySource is IEligibilitySource {
     signals[7] = lineageRoot;
     if (!TRUST_VERIFIER.verifyProof(proof, signals)) revert InvalidProof();
     bytes32 key = keccak256(abi.encode(parentIdentity, parentVersion, endorser));
-    _registerRole(2, trustRoleCommitment, address(0), parentHash, uint64(parentVersion), _trustedRoles[key]);
+    _registerRole(
+      2,
+      trustRoleCommitment,
+      address(0),
+      parentHash,
+      uint64(parentVersion),
+      _trustedRoles[key]
+    );
     (leafIndex, root) = _append(1, trustLeaf);
   }
 
@@ -182,7 +211,8 @@ contract EligibilitySource is IEligibilitySource {
       if (!record.registered) revert UnknownRole();
       if (record.revoked) revert RoleAlreadyRevoked();
       if (role == 2) {
-        if (!_isManager(record.parentHash, record.parentVersion, actor)) revert UnauthorizedCaller();
+        if (!_isManager(record.parentHash, record.parentVersion, actor))
+          revert UnauthorizedCaller();
       } else if (record.controller != actor) revert UnauthorizedCaller();
       record.revoked = true;
       _revokedSecrets[role].push(secret);
@@ -198,7 +228,11 @@ contract EligibilitySource is IEligibilitySource {
     _requireRevoked(1, _endorsementRoles[key]);
   }
 
-  function beforeTrustedChange(uint256 parentIdentity, uint256 parentVersion, address endorser) external view {
+  function beforeTrustedChange(
+    uint256 parentIdentity,
+    uint256 parentVersion,
+    address endorser
+  ) external view {
     if (msg.sender != DEEP_FAMILY) revert UnauthorizedCaller();
     bytes32 key = keccak256(abi.encode(parentIdentity, parentVersion, endorser));
     _requireRevoked(2, _trustedRoles[key]);
@@ -224,23 +258,37 @@ contract EligibilitySource is IEligibilitySource {
     return _revokedSecrets[role].length;
   }
 
-  function getRevokedRolePage(uint8 role, uint256 start, uint256 limit) external view returns (uint256[] memory page) {
+  function getRevokedRolePage(
+    uint8 role,
+    uint256 start,
+    uint256 limit
+  ) external view returns (uint256[] memory page) {
     if (role > 2) revert InvalidRole();
     uint256 length = _pageLength(_revokedSecrets[role].length, start, limit);
     page = new uint256[](length);
-    for (uint256 offset; offset < length; ++offset) page[offset] = _revokedSecrets[role][start + offset];
+    for (uint256 offset; offset < length; ++offset)
+      page[offset] = _revokedSecrets[role][start + offset];
   }
 
-  function getSourceLeafPage(uint8 treeId, uint256 start, uint256 limit) external view returns (uint256[] memory page) {
+  function getSourceLeafPage(
+    uint8 treeId,
+    uint256 start,
+    uint256 limit
+  ) external view returns (uint256[] memory page) {
     Tree storage tree = _tree(treeId);
     uint256 length = _pageLength(tree.size, start, limit);
     page = new uint256[](length);
     for (uint256 offset; offset < length; ++offset) page[offset] = tree.nodes[0][start + offset];
   }
 
-  function getSourceProof(uint8 treeId, uint256 leafIndex) external view returns (
-    uint256 leaf, uint256 root, uint256 index, uint256 depth, uint256[] memory siblings
-  ) {
+  function getSourceProof(
+    uint8 treeId,
+    uint256 leafIndex
+  )
+    external
+    view
+    returns (uint256 leaf, uint256 root, uint256 index, uint256 depth, uint256[] memory siblings)
+  {
     Tree storage tree = _tree(treeId);
     if (leafIndex >= tree.size) revert InvalidLeafIndex();
     leaf = tree.nodes[0][leafIndex];
@@ -271,7 +319,11 @@ contract EligibilitySource is IEligibilitySource {
   }
 
   function _registerRole(
-    uint8 role, uint256 commitment, address controller, bytes32 parentHash, uint64 parentVersion,
+    uint8 role,
+    uint256 commitment,
+    address controller,
+    bytes32 parentHash,
+    uint64 parentVersion,
     uint256[] storage keyRoles
   ) private {
     if (_roles[role][commitment].registered) revert DuplicateRole();
@@ -291,7 +343,8 @@ contract EligibilitySource is IEligibilitySource {
 
   function _requireRevoked(uint8 role, uint256[] storage commitments) private view {
     for (uint256 index; index < commitments.length; ++index) {
-      if (!_roles[role][commitments[index]].revoked) revert MissingRoleRevocation(role, commitments[index]);
+      if (!_roles[role][commitments[index]].revoked)
+        revert MissingRoleRevocation(role, commitments[index]);
     }
   }
 
@@ -299,7 +352,11 @@ contract EligibilitySource is IEligibilitySource {
     if (ISourceManagers(DEEP_FAMILY).eligibilitySource() != address(this)) revert InactiveSource();
   }
 
-  function _isManager(bytes32 personHash, uint256 version, address actor) private view returns (bool) {
+  function _isManager(
+    bytes32 personHash,
+    uint256 version,
+    address actor
+  ) private view returns (bool) {
     return ISourceManagers(DEEP_FAMILY).isTrustedEndorserManager(personHash, version, actor);
   }
 
@@ -315,7 +372,11 @@ contract EligibilitySource is IEligibilitySource {
     if (version == 0 || version > type(uint64).max) revert InvalidField();
   }
 
-  function _pageLength(uint256 count, uint256 start, uint256 limit) private pure returns (uint256 length) {
+  function _pageLength(
+    uint256 count,
+    uint256 start,
+    uint256 limit
+  ) private pure returns (uint256 length) {
     if (start > count || limit == 0 || limit > MAX_PAGE_SIZE) revert InvalidPage();
     length = count - start;
     if (length > limit) length = limit;

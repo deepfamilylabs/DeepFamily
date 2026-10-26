@@ -76,7 +76,7 @@ function fixture() {
     runner: { provider },
     getAddress: async () => ADDRESS,
     protocolVersion: async () => BigInt(SHIELDED_POOL_PROTOCOL_VERSION),
-    nullifierCount: async (overrides: { blockTag: number }) => overrides.blockTag === 1 ? 0n : 1n,
+    nullifierCount: async (overrides: { blockTag: number }) => (overrides.blockTag === 1 ? 0n : 1n),
     currentShardId: async () => 0n,
     noteShard: async (_shardId: bigint, overrides: { blockTag: number }) => ({
       size: overrides.blockTag === 1 ? 2n : 4n,
@@ -179,7 +179,10 @@ describe("shielded pool public event recovery", () => {
       blockChunk: 1,
     });
     expect(first.ownedNotes.get(111n)).toMatchObject({
-      note: "owned", action: 0, actionLogIndex: 0, outputIndex: 0,
+      note: "owned",
+      action: 0,
+      actionLogIndex: 0,
+      outputIndex: 0,
       transactionHash: context.logs[1].transactionHash,
     });
     expect(first.shards.get(0n)?.sizeBigInt).toBe(2n);
@@ -206,11 +209,19 @@ describe("shielded pool public event recovery", () => {
       [2, 2],
     ]);
     const iface = context.pool.interface;
-    expect(context.calls.every((call) => JSON.stringify(call.topics) === JSON.stringify([[
-      iface.getEvent("NoteAppended")!.topicHash,
-      iface.getEvent("NullifierSpent")!.topicHash,
-      iface.getEvent("ActionExecuted")!.topicHash,
-    ]]))).toBe(true);
+    expect(
+      context.calls.every(
+        (call) =>
+          JSON.stringify(call.topics) ===
+          JSON.stringify([
+            [
+              iface.getEvent("NoteAppended")!.topicHash,
+              iface.getEvent("NullifierSpent")!.topicHash,
+              iface.getEvent("ActionExecuted")!.topicHash,
+            ],
+          ]),
+      ),
+    ).toBe(true);
   });
 
   it("does not build a spending path for a one-leaf local root", async () => {

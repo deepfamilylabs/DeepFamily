@@ -12,9 +12,11 @@ import {
   shieldedDeploymentBindingsFromAddresses,
 } from "../scripts/lib/protocolReleaseManifest.mjs";
 import {
-  SHIELDED_DEPLOYMENT_CIRCUITS, PROTOCOL_DEPLOYMENT_CIRCUITS,
+  SHIELDED_DEPLOYMENT_CIRCUITS,
+  PROTOCOL_DEPLOYMENT_CIRCUITS,
   RECEIVE_DEPLOYMENT_CONTRACTS,
-  receiveDeploymentConstructorArgs, receiveDeploymentLibraries,
+  receiveDeploymentConstructorArgs,
+  receiveDeploymentLibraries,
   integratedDeploymentAddresses,
 } from "../scripts/lib/zkDeploymentCatalog.mjs";
 
@@ -41,7 +43,9 @@ describe("eSpace Mainnet resumable deployment integration", function () {
       transactionTimeoutMs: 30_000,
     });
     const nonceAfterFirst = await ethers.provider.getTransactionCount(deployerAddress, "pending");
-    expect(Object.keys(checkpoint.transactions)).to.have.length(Object.keys(first.transactionReceipts).length);
+    expect(Object.keys(checkpoint.transactions)).to.have.length(
+      Object.keys(first.transactionReceipts).length,
+    );
     expect(
       Object.values(checkpoint.transactions).every((transaction) =>
         ["confirmed", "finalized"].includes(transaction.status),
@@ -202,25 +206,46 @@ describe("eSpace Mainnet resumable deployment integration", function () {
         await ethers.getContractFactory(spec.verifierContractName, deployer)
       ).getDeployTransaction();
     }
-    requests.shieldedBoundaryVerifierAdapter = await (await ethers.getContractFactory("ShieldedBoundaryVerifierAdapter", deployer)).getDeployTransaction(
-      address("shieldedShieldVerifier"), address("shieldedUnshieldVerifier"), address("shieldedUnshield4Verifier"));
+    requests.shieldedBoundaryVerifierAdapter = await (
+      await ethers.getContractFactory("ShieldedBoundaryVerifierAdapter", deployer)
+    ).getDeployTransaction(
+      address("shieldedShieldVerifier"),
+      address("shieldedUnshieldVerifier"),
+      address("shieldedUnshield4Verifier"),
+    );
     for (const spec of Object.values(PROTOCOL_DEPLOYMENT_CIRCUITS)) {
-      requests[spec.generatedLabel] = await (await ethers.getContractFactory(spec.contract, deployer)).getDeployTransaction();
-      requests[spec.adapterLabel] = await (await ethers.getContractFactory("FixedGroth16Verifier", deployer)).getDeployTransaction(address(spec.generatedLabel),spec.publicSignals);
+      requests[spec.generatedLabel] = await (
+        await ethers.getContractFactory(spec.contract, deployer)
+      ).getDeployTransaction();
+      requests[spec.adapterLabel] = await (
+        await ethers.getContractFactory("FixedGroth16Verifier", deployer)
+      ).getDeployTransaction(address(spec.generatedLabel), spec.publicSignals);
     }
-    const receiveAddresses = Object.fromEntries(intents.filter((intent) => intent.kind === "deployment").map(({label, predictedAddress}) => [label, predictedAddress]));
+    const receiveAddresses = Object.fromEntries(
+      intents
+        .filter((intent) => intent.kind === "deployment")
+        .map(({ label, predictedAddress }) => [label, predictedAddress]),
+    );
     receiveAddresses.deepFamily = address("deepFamilyProxy");
     receiveAddresses.lineageIndex = address("deepFamilyLineageIndex");
-    for (const {contractName, property} of RECEIVE_DEPLOYMENT_CONTRACTS) {
-      requests[property] = await (await ethers.getContractFactory(contractName, { signer: deployer, libraries: receiveDeploymentLibraries(property, receiveAddresses) })).getDeployTransaction(...receiveDeploymentConstructorArgs(property, receiveAddresses));
+    for (const { contractName, property } of RECEIVE_DEPLOYMENT_CONTRACTS) {
+      requests[property] = await (
+        await ethers.getContractFactory(contractName, {
+          signer: deployer,
+          libraries: receiveDeploymentLibraries(property, receiveAddresses),
+        })
+      ).getDeployTransaction(...receiveDeploymentConstructorArgs(property, receiveAddresses));
     }
     const nativePool = await ethers.getContractFactory("ShieldedNativePool", {
       signer: deployer,
       libraries: { PoseidonT3: address("poseidonT3") },
     });
     requests.shieldedNativePool = await nativePool.getDeployTransaction(
-      address("shieldedBoundaryVerifierAdapter"), address("receiveRegistry"),
-      address("protocolFundVerifier"), address("protocolClaimVerifier"), address("protocolTransferVerifier"),
+      address("shieldedBoundaryVerifierAdapter"),
+      address("receiveRegistry"),
+      address("protocolFundVerifier"),
+      address("protocolClaimVerifier"),
+      address("protocolTransferVerifier"),
     );
     const poolFactory = await ethers.getContractFactory("ShieldedPoolFactory", {
       signer: deployer,
@@ -228,10 +253,19 @@ describe("eSpace Mainnet resumable deployment integration", function () {
     });
     requests.shieldedPoolFactory = await poolFactory.getDeployTransaction(
       address("deepFamilyToken"),
-      address("shieldedBoundaryVerifierAdapter"), address("shieldedNativePool"), address("receiveRegistry"),
-      address("protocolFundVerifier"), address("protocolClaimVerifier"), address("protocolTransferVerifier"),
+      address("shieldedBoundaryVerifierAdapter"),
+      address("shieldedNativePool"),
+      address("receiveRegistry"),
+      address("protocolFundVerifier"),
+      address("protocolClaimVerifier"),
+      address("protocolTransferVerifier"),
     );
-    requests.setEligibilitySource = {to: address("deepFamilyProxy"), data: DeepFamily.interface.encodeFunctionData("setEligibilitySource", [address("eligibilitySource")])};
+    requests.setEligibilitySource = {
+      to: address("deepFamilyProxy"),
+      data: DeepFamily.interface.encodeFunctionData("setEligibilitySource", [
+        address("eligibilitySource"),
+      ]),
+    };
     expect(Object.keys(requests)).to.have.length(intents.length);
 
     for (const intent of intents) {

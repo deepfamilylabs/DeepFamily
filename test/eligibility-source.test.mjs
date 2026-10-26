@@ -16,24 +16,59 @@ describe(" eligibility source", function () {
     const t3 = await hre.ethers.deployContract("PoseidonT3");
     const verifier = await hre.ethers.deployContract("FixedProofVerifierMock");
     const family = await hre.ethers.deployContract("SourceFamilyMock");
-    const lineage = await hre.ethers.deployContract("SourceLineageMock", [await family.getAddress()]);
-    const source = await (await hre.ethers.getContractFactory("EligibilitySource", {
-      libraries: { PoseidonT3: await t3.getAddress() },
-    })).deploy(await lineage.getAddress(), await verifier.getAddress(), await verifier.getAddress());
+    const lineage = await hre.ethers.deployContract("SourceLineageMock", [
+      await family.getAddress(),
+    ]);
+    const source = await (
+      await hre.ethers.getContractFactory("EligibilitySource", {
+        libraries: { PoseidonT3: await t3.getAddress() },
+      })
+    ).deploy(await lineage.getAddress(), await verifier.getAddress(), await verifier.getAddress());
     const chain = (await hre.ethers.provider.getNetwork()).chainId;
     const scope = BigInt(await source.getAddress());
     await family.setSource(await source.getAddress());
     await family.setManager(personHash(202n), 1, manager.address, true);
     const fact = async (offset = 0n, who = endorser, alteredProof = undefined) => {
-      const args = [201n, 202n, endorser.address, 1n, 10000n + offset,
-        commitment(0, 30000n + offset), commitment(1, 40000n + offset)];
-      const signals = [args[4], args[5], args[6], chain, scope, args[0], args[1], BigInt(args[2]), args[3], await lineage.root(0)];
-      return source.connect(who).publishFact(...args, proof(alteredProof ? alteredProof(signals) : signals));
+      const args = [
+        201n,
+        202n,
+        endorser.address,
+        1n,
+        10000n + offset,
+        commitment(0, 30000n + offset),
+        commitment(1, 40000n + offset),
+      ];
+      const signals = [
+        args[4],
+        args[5],
+        args[6],
+        chain,
+        scope,
+        args[0],
+        args[1],
+        BigInt(args[2]),
+        args[3],
+        await lineage.root(0),
+      ];
+      return source
+        .connect(who)
+        .publishFact(...args, proof(alteredProof ? alteredProof(signals) : signals));
     };
     const trust = async (offset = 0n, who = manager, alteredProof = undefined) => {
       const args = [202n, endorser.address, 1n, 20000n + offset, commitment(2, 50000n + offset)];
-      const signals = [args[3], args[4], chain, scope, args[0], BigInt(args[1]), args[2], await lineage.root(1)];
-      return source.connect(who).publishTrust(...args, proof(alteredProof ? alteredProof(signals) : signals));
+      const signals = [
+        args[3],
+        args[4],
+        chain,
+        scope,
+        args[0],
+        BigInt(args[1]),
+        args[2],
+        await lineage.root(1),
+      ];
+      return source
+        .connect(who)
+        .publishTrust(...args, proof(alteredProof ? alteredProof(signals) : signals));
     };
     return { source, family, lineage, endorser, manager, stranger, fact, trust, chain, scope };
   }
@@ -43,16 +78,20 @@ describe(" eligibility source", function () {
     await expect(fact(0n, stranger)).to.be.revertedWithCustomError(source, "UnauthorizedCaller");
     await expect(trust(0n, stranger)).to.be.revertedWithCustomError(source, "UnauthorizedCaller");
     for (let index = 0; index < 10; ++index) {
-      await expect(fact(0n, endorser, (signals) => {
-        signals[index] += 1n;
-        return signals;
-      })).to.be.revertedWithCustomError(source, "InvalidProof");
+      await expect(
+        fact(0n, endorser, (signals) => {
+          signals[index] += 1n;
+          return signals;
+        }),
+      ).to.be.revertedWithCustomError(source, "InvalidProof");
     }
     for (let index = 0; index < 8; ++index) {
-      await expect(trust(0n, manager, (signals) => {
-        signals[index] += 1n;
-        return signals;
-      })).to.be.revertedWithCustomError(source, "InvalidProof");
+      await expect(
+        trust(0n, manager, (signals) => {
+          signals[index] += 1n;
+          return signals;
+        }),
+      ).to.be.revertedWithCustomError(source, "InvalidProof");
     }
     expect(await source.sourceSize(0)).to.equal(0n);
     expect(await source.sourceSize(1)).to.equal(0n);
@@ -64,27 +103,38 @@ describe(" eligibility source", function () {
     await trust();
     await expect(fact()).to.be.revertedWithCustomError(source, "DuplicateRole");
     await expect(trust()).to.be.revertedWithCustomError(source, "DuplicateRole");
-    await expect(source.revokeRoles(endorser.address, [0], [30000]))
-      .to.be.revertedWithCustomError(source, "UnauthorizedCaller");
-    await expect(source.beforeEndorsementChange(201, endorser.address))
-      .to.be.revertedWithCustomError(source, "UnauthorizedCaller");
-    await expect(source.beforeTrustedChange(202, 1, endorser.address))
-      .to.be.revertedWithCustomError(source, "UnauthorizedCaller");
-    await expect(family.revoke(await source.getAddress(), stranger.address, [0], [30000]))
-      .to.be.revertedWithCustomError(source, "UnauthorizedCaller");
+    await expect(source.revokeRoles(endorser.address, [0], [30000])).to.be.revertedWithCustomError(
+      source,
+      "UnauthorizedCaller",
+    );
+    await expect(
+      source.beforeEndorsementChange(201, endorser.address),
+    ).to.be.revertedWithCustomError(source, "UnauthorizedCaller");
+    await expect(
+      source.beforeTrustedChange(202, 1, endorser.address),
+    ).to.be.revertedWithCustomError(source, "UnauthorizedCaller");
+    await expect(
+      family.revoke(await source.getAddress(), stranger.address, [0], [30000]),
+    ).to.be.revertedWithCustomError(source, "UnauthorizedCaller");
   });
 
   it("uses current lineage roots and matches compact source-tree proofs", async () => {
     const { source, fact, trust, lineage, chain, scope, endorser } = await setup();
-    const facts = [], trusts = [];
+    const facts = [],
+      trusts = [];
     for (let index = 0; index < 7; ++index) {
       await fact(BigInt(index));
       await trust(BigInt(index));
       facts.push({ leafIndex: BigInt(index), leaf: 10000n + BigInt(index) });
       trusts.push({ leafIndex: BigInt(index), leaf: 20000n + BigInt(index) });
-      for (const [treeId, writes] of [[0, facts], [1, trusts]]) {
+      for (const [treeId, writes] of [
+        [0, facts],
+        [1, trusts],
+      ]) {
         const tree = replayLineageTree(writes);
-        expect(treeId === 0 ? await source.sourceRoot() : await source.trustedRoot()).to.equal(tree.root);
+        expect(treeId === 0 ? await source.sourceRoot() : await source.trustedRoot()).to.equal(
+          tree.root,
+        );
         for (let leafIndex = 0; leafIndex <= index; ++leafIndex) {
           const expected = tree.generateProof(leafIndex);
           const actual = await source.getSourceProof(treeId, leafIndex);
@@ -97,54 +147,136 @@ describe(" eligibility source", function () {
       }
     }
     await lineage.setRoots(8001, 8002);
-    const args = [201n, 202n, endorser.address, 1n, 11000n, commitment(0, 31000n), commitment(1, 41000n)];
-    await expect(source.publishFact(...args,
-      proof([args[4], args[5], args[6], chain, scope, args[0], args[1], BigInt(args[2]), args[3], 1001n])))
-      .to.be.revertedWithCustomError(source, "InvalidProof");
-    expect([...await source.getSourceLeafPage(0, 5, 5)]).to.deep.equal([10005n, 10006n]);
+    const args = [
+      201n,
+      202n,
+      endorser.address,
+      1n,
+      11000n,
+      commitment(0, 31000n),
+      commitment(1, 41000n),
+    ];
+    await expect(
+      source.publishFact(
+        ...args,
+        proof([
+          args[4],
+          args[5],
+          args[6],
+          chain,
+          scope,
+          args[0],
+          args[1],
+          BigInt(args[2]),
+          args[3],
+          1001n,
+        ]),
+      ),
+    ).to.be.revertedWithCustomError(source, "InvalidProof");
+    expect([...(await source.getSourceLeafPage(0, 5, 5))]).to.deep.equal([10005n, 10006n]);
   });
 
   it("blocks a lineage mutation unless every associated role was revoked, and rolls back both states", async () => {
     const { source, family, lineage, endorser, fact } = await setup();
     await fact();
     await expect(family.mutateEndorsement(await lineage.getAddress(), 201, endorser.address))
-      .to.be.revertedWithCustomError(source, "MissingRoleRevocation").withArgs(0, commitment(0, 30000n));
-    await expect(family.connect(endorser).revokeAndEndorse(
-      await source.getAddress(), await lineage.getAddress(), 201, endorser.address, [0], [30000], false,
-    )).to.be.revertedWithCustomError(source, "MissingRoleRevocation").withArgs(1, commitment(1, 40000n));
+      .to.be.revertedWithCustomError(source, "MissingRoleRevocation")
+      .withArgs(0, commitment(0, 30000n));
+    await expect(
+      family
+        .connect(endorser)
+        .revokeAndEndorse(
+          await source.getAddress(),
+          await lineage.getAddress(),
+          201,
+          endorser.address,
+          [0],
+          [30000],
+          false,
+        ),
+    )
+      .to.be.revertedWithCustomError(source, "MissingRoleRevocation")
+      .withArgs(1, commitment(1, 40000n));
     expect(await source.revokedRoleCount(0)).to.equal(0n);
-    await expect(family.connect(endorser).revokeAndEndorse(
-      await source.getAddress(), await lineage.getAddress(), 201, endorser.address, [0, 1], [30000, 40000], true,
-    )).to.be.revertedWith("mock mutation failure");
+    await expect(
+      family
+        .connect(endorser)
+        .revokeAndEndorse(
+          await source.getAddress(),
+          await lineage.getAddress(),
+          201,
+          endorser.address,
+          [0, 1],
+          [30000, 40000],
+          true,
+        ),
+    ).to.be.revertedWith("mock mutation failure");
     expect(await source.revokedRoleCount(0)).to.equal(0n);
     expect(await source.revokedRoleCount(1)).to.equal(0n);
     expect(await lineage.root(0)).to.equal(1001n);
-    await family.connect(endorser).revokeAndEndorse(
-      await source.getAddress(), await lineage.getAddress(), 201, endorser.address, [0, 1], [30000, 40000], false,
-    );
+    await family
+      .connect(endorser)
+      .revokeAndEndorse(
+        await source.getAddress(),
+        await lineage.getAddress(),
+        201,
+        endorser.address,
+        [0, 1],
+        [30000, 40000],
+        false,
+      );
     expect(await source.isRoleRevoked(0, roleIndex(0, 30000n))).to.equal(true);
     expect(await source.isRoleRevoked(1, roleIndex(1, 40000n))).to.equal(true);
     expect(await source.isRoleRevoked(1, roleIndex(0, 30000n))).to.equal(false);
     expect(await lineage.root(0)).to.equal(1002n);
-    await expect(family.revoke(await source.getAddress(), endorser.address, [0], [30000]))
-      .to.be.revertedWithCustomError(source, "RoleAlreadyRevoked");
-    expect([...await source.getRevokedRolePage(0, 0, 5)]).to.deep.equal([30000n]);
+    await expect(
+      family.revoke(await source.getAddress(), endorser.address, [0], [30000]),
+    ).to.be.revertedWithCustomError(source, "RoleAlreadyRevoked");
+    expect([...(await source.getRevokedRolePage(0, 0, 5))]).to.deep.equal([30000n]);
   });
 
   it("authorizes trusted-role revocation using the current manager", async () => {
     const { source, family, lineage, endorser, manager, stranger, trust } = await setup();
     await trust();
-    await expect(family.connect(stranger).revokeAndUntrust(
-      await source.getAddress(), await lineage.getAddress(), 202, 1, endorser.address, [2], [50000],
-    )).to.be.revertedWithCustomError(source, "UnauthorizedCaller");
+    await expect(
+      family
+        .connect(stranger)
+        .revokeAndUntrust(
+          await source.getAddress(),
+          await lineage.getAddress(),
+          202,
+          1,
+          endorser.address,
+          [2],
+          [50000],
+        ),
+    ).to.be.revertedWithCustomError(source, "UnauthorizedCaller");
     await family.setManager(personHash(202n), 1, manager.address, false);
     await family.setManager(personHash(202n), 1, stranger.address, true);
-    await expect(family.connect(manager).revokeAndUntrust(
-      await source.getAddress(), await lineage.getAddress(), 202, 1, endorser.address, [2], [50000],
-    )).to.be.revertedWithCustomError(source, "UnauthorizedCaller");
-    await family.connect(stranger).revokeAndUntrust(
-      await source.getAddress(), await lineage.getAddress(), 202, 1, endorser.address, [2], [50000],
-    );
+    await expect(
+      family
+        .connect(manager)
+        .revokeAndUntrust(
+          await source.getAddress(),
+          await lineage.getAddress(),
+          202,
+          1,
+          endorser.address,
+          [2],
+          [50000],
+        ),
+    ).to.be.revertedWithCustomError(source, "UnauthorizedCaller");
+    await family
+      .connect(stranger)
+      .revokeAndUntrust(
+        await source.getAddress(),
+        await lineage.getAddress(),
+        202,
+        1,
+        endorser.address,
+        [2],
+        [50000],
+      );
     expect(await source.isRoleRevoked(2, roleIndex(2, 50000n))).to.equal(true);
     expect(await lineage.root(1)).to.equal(1003n);
   });

@@ -53,7 +53,10 @@ describe("personStoryLayout", () => {
       makeRecord({ title: "School" }),
       makeRecord({ title: "War" }),
     ];
-    expect(summariseRecordTitles(records, 2)).toEqual({ titles: ["Birth", "School"], truncated: true });
+    expect(summariseRecordTitles(records, 2)).toEqual({
+      titles: ["Birth", "School"],
+      truncated: true,
+    });
     expect(summariseRecordTitles(records)).toEqual({
       titles: ["Birth", "School", "War"],
       truncated: false,
@@ -62,7 +65,9 @@ describe("personStoryLayout", () => {
 
   it("cuts excerpts by code point and flattens whitespace", () => {
     expect(getRecordExcerpt("short\n text")).toBe("short text");
-    expect(getRecordExcerpt("184年：黄巾起义爆发后任骑都尉，参加颍川作战", 10)).toBe("184年：黄巾起义爆…");
+    expect(getRecordExcerpt("184年：黄巾起义爆发后任骑都尉，参加颍川作战", 10)).toBe(
+      "184年：黄巾起义爆…",
+    );
   });
 
   it("splits a quote from its source at the last em-dash pair", () => {
@@ -75,7 +80,9 @@ describe("personStoryLayout", () => {
   });
 
   it("finds http links in references and never returns other protocols", () => {
-    expect(splitReferenceLink("《三国志·魏书一·武帝纪》：https://zh.wikisource.org/wiki/三國志/卷01")).toEqual({
+    expect(
+      splitReferenceLink("《三国志·魏书一·武帝纪》：https://zh.wikisource.org/wiki/三國志/卷01"),
+    ).toEqual({
       label: "《三国志·魏书一·武帝纪》",
       url: "https://zh.wikisource.org/wiki/%E4%B8%89%E5%9C%8B%E5%BF%97/%E5%8D%B701",
       displayUrl: "zh.wikisource.org/wiki/三國志/卷01",

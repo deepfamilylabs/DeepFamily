@@ -464,7 +464,8 @@ export const REASON_FRIENDLY_MAP: Record<string, string> = {
   InvalidClaimTime: "The private proof timestamp expired. Generate a new proof and retry.",
   NullifierAlreadySpent: "This private note or claim period was already used.",
   StaleCounterRoot: "Authorization state changed. Refresh and generate a new proof.",
-  StaleAuthorizationCounter: "This identity’s authorization counter changed. Refresh and prepare the update again.",
+  StaleAuthorizationCounter:
+    "This identity’s authorization counter changed. Refresh and prepare the update again.",
   AuthorizationPathCollision: "The current authorization tree cannot represent this update.",
   EndorsementTimeOverflow: "The chain timestamp exceeds the supported endorsement time range.",
   InvalidCounterIncrement: "The authorization counter update is invalid.",
@@ -483,8 +484,10 @@ export const REASON_FRIENDLY_MAP: Record<string, string> = {
   ProofInvalid: "The proof failed verification. Generate a new proof.",
   CommitmentInvalid: "The proof commitment failed verification. Generate a new proof.",
   InvalidReceiveAction: "This receiving operation is not supported.",
-  InvalidReceiveAuthorization: "The receive code authorization is invalid. Request current material and prepare again.",
-  InvalidReceiveProof: "The receiving proof failed verification. Prepare it again with valid receiving material.",
+  InvalidReceiveAuthorization:
+    "The receive code authorization is invalid. Request current material and prepare again.",
+  InvalidReceiveProof:
+    "The receiving proof failed verification. Prepare it again with valid receiving material.",
   InvalidEligibilityMutation: "The qualification change could not be verified.",
   InvalidDependency: "The receiving service is not configured correctly.",
   InactiveSource: "The qualification source is not active for this deployment.",
