@@ -5,6 +5,11 @@ import { fileURLToPath } from "node:url";
 
 import { ZK_CEREMONY_CIRCUIT_FIELDS } from "../scripts/lib/zkArtifactTrust.mjs";
 import { readZkeyMpcMetadata } from "../scripts/lib/zkeyMpcMetadata.mjs";
+import {
+  SINGLE_OPERATOR_BEACON_ITERATIONS_EXP,
+  SINGLE_OPERATOR_BEACON_NAME,
+  SINGLE_OPERATOR_PARTICIPANT_ID,
+} from "../scripts/lib/zkProductionSetup.mjs";
 
 const PROJECT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -22,16 +27,26 @@ describe("zkey MPC metadata reader", function () {
       );
       expect(metadata.circuitHash).to.match(/^[0-9a-f]{128}$/u);
       if (manifest.trustedSetup.status === "development") {
-        expect(metadata.contributionCount).to.equal(1);
-        expect(metadata.contributions).to.have.length(1);
+        // Informal setups run the single-operator pipeline; development records attest none of it.
+        expect(metadata.contributionCount).to.equal(2);
+        expect(metadata.contributions).to.have.length(2);
         expect(metadata.contributions[0]).to.include({
           sequence: 1,
           type: 0,
-          name: "development-only",
+          name: SINGLE_OPERATOR_PARTICIPANT_ID,
           beaconHash: null,
           numIterationsExp: null,
         });
-        expect(metadata.contributions[0].contributionHash).to.match(/^[0-9a-f]{128}$/u);
+        expect(metadata.contributions[1]).to.include({
+          sequence: 2,
+          type: 1,
+          name: SINGLE_OPERATOR_BEACON_NAME,
+          numIterationsExp: SINGLE_OPERATOR_BEACON_ITERATIONS_EXP,
+        });
+        expect(metadata.contributions[1].beaconHash).to.match(/^[0-9a-f]{64}$/u);
+        for (const contribution of metadata.contributions) {
+          expect(contribution.contributionHash).to.match(/^[0-9a-f]{128}$/u);
+        }
       } else {
         expect(manifest.trustedSetup.status).to.equal("production");
         const transcript = JSON.parse(
