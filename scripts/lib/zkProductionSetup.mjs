@@ -49,15 +49,19 @@ import {
 } from "./snarkjsToolchain.mjs";
 import { readZkeyMpcMetadata } from "./zkeyMpcMetadata.mjs";
 import {
+  SHIELDED_DEVELOPMENT_MANIFEST_PATH,
   SHIELDED_PRODUCTION_MANIFEST_PATH,
   SHIELDED_SETUP_CIRCUITS,
   assertShieldedCompilationUnchanged,
+  buildShieldedDevelopmentRecords,
   buildShieldedProductionRecords,
   inspectShieldedProductionArtifacts,
   readShieldedReleaseCriteria,
+  shieldedDevelopmentInstallEntries,
   shieldedProductionInstallEntries,
   snapshotShieldedCompilation,
 } from "./shieldedProductionSetup.mjs";
+import { inspectLinkedReceiveArtifacts } from "./linkedReceiveArtifacts.mjs";
 import { sourceBundleSha256 } from "./shieldedSourceBundle.mjs";
 
 export const SINGLE_OPERATOR_PARTICIPANT_ID = "deepfamily-single-operator";
@@ -67,6 +71,8 @@ export const SINGLE_OPERATOR_BEACON_SOURCE =
 export const SINGLE_OPERATOR_TRUST_WARNING =
   "Production security trusts one operator to destroy every circuit-specific Phase 2 secret.";
 export const SINGLE_OPERATOR_BEACON_ITERATIONS_EXP = 10;
+export const DEVELOPMENT_KEYS_WARNING =
+  "Fresh-v1 development keys come from an unattested local contribution with no ceremony evidence; production ceremony required.";
 
 const SETUP_CIRCUITS = Object.freeze({
   person_commitment: Object.freeze({
@@ -157,6 +163,7 @@ const assertCleanGitState = ({
   env,
   gitExecutable,
   captureRunner = defaultCaptureRunner,
+  allowDirty = false,
 }) => {
   const commit = String(
     captureRunner({
@@ -166,14 +173,16 @@ const assertCleanGitState = ({
       env,
     }),
   ).trim();
-  const status = String(
-    captureRunner({
-      executable: gitExecutable,
-      args: ["status", "--porcelain=v1", "--untracked-files=all"],
-      cwd: root,
-      env,
-    }),
-  ).trim();
+  const status = allowDirty
+    ? ""
+    : String(
+        captureRunner({
+          executable: gitExecutable,
+          args: ["status", "--porcelain=v1", "--untracked-files=all"],
+          cwd: root,
+          env,
+        }),
+      ).trim();
   if (!/^[0-9a-f]{40}$/.test(commit)) {
     throw new Error("Production ZK setup requires a valid Git commit");
   }
@@ -1172,18 +1181,8 @@ const finalizeCircuitKeys = async ({
   return Object.freeze({ ...circuit, finalMetadata, metadata });
 };
 
-export const buildTranscriptAndManifest = async ({
-  root,
-  stageRoot,
-  initialManifest,
-  compiler,
-  ceremonyId,
-  ptau,
-  circuits,
-  beaconHash,
-  snarkjsRuntimeSha256 = initialManifest.toolchain.snarkjsRuntimeSha256,
-}) => {
-  const circuitEvidence = Object.fromEntries(
+const buildCircuitEvidence = ({ root, initialManifest, circuits }) =>
+  Object.fromEntries(
     Object.entries(circuits).map(([circuitName, circuit]) => {
       const reviewed = initialManifest?.circuits?.[circuitName];
       const sourcePath = path.join(root, SETUP_CIRCUITS[circuitName].source);
@@ -1211,6 +1210,19 @@ export const buildTranscriptAndManifest = async ({
       ];
     }),
   );
+
+export const buildTranscriptAndManifest = async ({
+  root,
+  stageRoot,
+  initialManifest,
+  compiler,
+  ceremonyId,
+  ptau,
+  circuits,
+  beaconHash,
+  snarkjsRuntimeSha256 = initialManifest.toolchain.snarkjsRuntimeSha256,
+}) => {
+  const circuitEvidence = buildCircuitEvidence({ root, initialManifest, circuits });
   const transcriptCircuits = Object.fromEntries(
     Object.entries(circuitEvidence).map(([circuitName, circuit]) => [
       circuitName,
@@ -1284,6 +1296,41 @@ export const buildTranscriptAndManifest = async ({
   return Object.freeze({ transcriptPath, manifestPath, transcript, manifest });
 };
 
+/**
+ * Informal setups install the same keys as development-only. Development records attest no
+ * ceremony step, so they claim no beacon and bind no transcript.
+ */
+export const buildDevelopmentManifest = async ({
+  root,
+  stageRoot,
+  initialManifest,
+  circuits,
+  snarkjsRuntimeSha256 = initialManifest.toolchain.snarkjsRuntimeSha256,
+}) => {
+  const manifest = {
+    schemaVersion: initialManifest.schemaVersion,
+    circomVersion: initialManifest.circomVersion,
+    snarkjsVersion: initialManifest.snarkjsVersion,
+    toolchain: {
+      ...initialManifest.toolchain,
+      snarkjsRuntimeSha256,
+    },
+    trustedSetup: {
+      status: "development",
+      trustModel: ZK_TRUST_MODEL_SINGLE_OPERATOR,
+      warning: DEVELOPMENT_KEYS_WARNING,
+      minimumContributors: 1,
+      contributorCount: 1,
+      beaconApplied: false,
+      transcriptSha256: null,
+    },
+    circuits: buildCircuitEvidence({ root, initialManifest, circuits }),
+  };
+  const manifestPath = path.join(stageRoot, "release", "zk-artifacts-manifest.json");
+  await writeCanonicalJson(manifestPath, manifest);
+  return Object.freeze({ transcriptPath: null, manifestPath, transcript: null, manifest });
+};
+
 const buildInstallEntries = ({ circuits, records }) => {
   const entries = [];
   for (const [circuitName, circuit] of Object.entries(circuits)) {
@@ -1305,7 +1352,9 @@ const buildInstallEntries = ({ circuits, records }) => {
     );
   }
   entries.push(
-    { source: records.transcriptPath, destination: ZK_CEREMONY_TRANSCRIPT_PATH },
+    ...(records.transcriptPath === null
+      ? []
+      : [{ source: records.transcriptPath, destination: ZK_CEREMONY_TRANSCRIPT_PATH }]),
     { source: records.manifestPath, destination: ZK_ARTIFACT_MANIFEST_PATH },
   );
   return entries;
@@ -1347,6 +1396,28 @@ export const buildStagedProofValidationCommands = ({ root, circuits }) =>
     }),
   ]);
 
+/** Read-only key checks: the full Phase 1 pTau verification and one zkey verification per circuit. */
+export const buildProductionKeyVerificationCommands = ({
+  root,
+  runtimeRoot = root,
+  ptauPath,
+  circuits,
+}) =>
+  Object.freeze([
+    buildProductionSnarkjsCommand({
+      root,
+      runtimeRoot,
+      args: ["powersoftau", "verify", ptauPath],
+    }),
+    ...Object.values(circuits).map((circuit) =>
+      buildProductionSnarkjsCommand({
+        root,
+        runtimeRoot,
+        args: ["zkey", "verify", circuit.r1cs, ptauPath, circuit.finalZkey],
+      }),
+    ),
+  ]);
+
 const validateStagedProductionArtifacts = async ({
   root,
   ptauPath,
@@ -1356,26 +1427,15 @@ const validateStagedProductionArtifacts = async ({
   runner,
   runtimeRoot = root,
   commandEnvironment,
+  informal = false,
 }) => {
-  validateZkArtifactManifest(manifest, { requireProduction: true });
-  validateProductionTranscript({ transcript, manifest });
-  await runner({
-    ...buildProductionSnarkjsCommand({
-      root,
-      runtimeRoot,
-      args: ["powersoftau", "verify", ptauPath],
-    }),
-    env: commandEnvironment,
-  });
-  for (const circuit of Object.values(circuits)) {
-    await runner({
-      ...buildProductionSnarkjsCommand({
-        root,
-        runtimeRoot,
-        args: ["zkey", "verify", circuit.r1cs, ptauPath, circuit.finalZkey],
-      }),
-      env: commandEnvironment,
-    });
+  validateZkArtifactManifest(manifest, { requireProduction: !informal });
+  if (!informal) validateProductionTranscript({ transcript, manifest });
+  const keyVerification = informal
+    ? []
+    : buildProductionKeyVerificationCommands({ root, runtimeRoot, ptauPath, circuits });
+  for (const command of keyVerification) {
+    await runner({ ...command, env: commandEnvironment });
   }
   for (const command of buildStagedProofValidationCommands({ root, circuits })) {
     await runner({ ...command, cwd: root, env: commandEnvironment });
@@ -1406,6 +1466,7 @@ const defaultPostCommitValidator = async ({
   ptauPath,
   runner,
   compilerEnvironment = process.env,
+  informal = false,
 }) => {
   for (const circuit of ["core", "shielded"]) {
     await runner({
@@ -1423,7 +1484,7 @@ const defaultPostCommitValidator = async ({
   });
   const artifacts = inspectZkReleaseArtifacts({
     root,
-    requireProduction: true,
+    requireProduction: !informal,
     requireBuiltR1cs: true,
   });
   return Object.freeze({ artifacts, ptauPath });
@@ -1433,6 +1494,7 @@ export const runSingleOperatorProductionSetup = async ({
   root = process.cwd(),
   ceremonyId = createCeremonyId(),
   rotate = false,
+  informal = false,
   expectedCurrentManifestSha256,
   expectedCurrentShieldedManifestSha256,
   expectedSnarkjsRuntimeSha256,
@@ -1462,6 +1524,14 @@ export const runSingleOperatorProductionSetup = async ({
     expectedCurrentManifestSha256 !== undefined || expectedSnarkjsRuntimeSha256 !== undefined;
   if (typeof rotate !== "boolean") {
     throw new Error("Production ZK setup rotate option must be a boolean");
+  }
+  if (typeof informal !== "boolean") {
+    throw new Error("Production ZK setup informal option must be a boolean");
+  }
+  if (informal && (rotate || shieldedReleaseCriteriaPath !== undefined)) {
+    throw new Error(
+      "Informal ZK setup installs development keys; it cannot rotate a production setup or record release criteria",
+    );
   }
   if (typeof includeShielded !== "boolean") {
     throw new Error("Production ZK setup includeShielded option must be a boolean");
@@ -1522,6 +1592,7 @@ export const runSingleOperatorProductionSetup = async ({
     env: baseEnvironment,
     gitExecutable,
     captureRunner,
+    allowDirty: informal,
   });
   let shieldedReleaseCriteria;
   let shieldedBaselineManifest;
@@ -1884,46 +1955,65 @@ export const runSingleOperatorProductionSetup = async ({
       ptauPath: stagedPtau.path,
       expected: stagedPtau,
     });
-    const records = await buildTranscriptAndManifest({
-      root: resolvedRoot,
-      stageRoot,
-      initialManifest: compilationManifest,
-      compiler: compilerEvidence,
-      ceremonyId: resolvedCeremonyId,
-      ptau,
-      circuits: finalized,
-      beaconHash,
-      snarkjsRuntimeSha256: reviewedSnarkjsRuntimeSha256,
-    });
+    const records = informal
+      ? await buildDevelopmentManifest({
+          root: resolvedRoot,
+          stageRoot,
+          initialManifest: compilationManifest,
+          circuits: finalized,
+          snarkjsRuntimeSha256: reviewedSnarkjsRuntimeSha256,
+        })
+      : await buildTranscriptAndManifest({
+          root: resolvedRoot,
+          stageRoot,
+          initialManifest: compilationManifest,
+          compiler: compilerEvidence,
+          ceremonyId: resolvedCeremonyId,
+          ptau,
+          circuits: finalized,
+          beaconHash,
+          snarkjsRuntimeSha256: reviewedSnarkjsRuntimeSha256,
+        });
     let shieldedRecords;
     if (includeShielded) {
-      shieldedRecords = await buildShieldedProductionRecords({
-        root: resolvedRoot,
-        stageRoot,
-        compiled: shieldedCompiled,
-        finalized: shieldedFinalized,
-        ptau,
-        compilerSha256: privateCompiler.sha256,
-        snarkjsRuntimeSha256: reviewedSnarkjsRuntimeSha256,
-        ceremonyId: resolvedCeremonyId,
-        releaseCriteria: shieldedReleaseCriteria,
-        operatorParticipantId: SINGLE_OPERATOR_PARTICIPANT_ID,
-        beaconName: SINGLE_OPERATOR_BEACON_NAME,
-        beaconHash,
-        beaconIterationsExp: SINGLE_OPERATOR_BEACON_ITERATIONS_EXP,
-        sourceDigest: setupSources.sourceBundleDigest,
-      });
+      shieldedRecords = informal
+        ? await buildShieldedDevelopmentRecords({
+            root: resolvedRoot,
+            stageRoot,
+            compiled: shieldedCompiled,
+            finalized: shieldedFinalized,
+            ptau,
+          })
+        : await buildShieldedProductionRecords({
+            root: resolvedRoot,
+            stageRoot,
+            compiled: shieldedCompiled,
+            finalized: shieldedFinalized,
+            ptau,
+            compilerSha256: privateCompiler.sha256,
+            snarkjsRuntimeSha256: reviewedSnarkjsRuntimeSha256,
+            ceremonyId: resolvedCeremonyId,
+            releaseCriteria: shieldedReleaseCriteria,
+            operatorParticipantId: SINGLE_OPERATOR_PARTICIPANT_ID,
+            beaconName: SINGLE_OPERATOR_BEACON_NAME,
+            beaconHash,
+            beaconIterationsExp: SINGLE_OPERATOR_BEACON_ITERATIONS_EXP,
+            sourceDigest: setupSources.sourceBundleDigest,
+          });
     }
     const coreEntries = buildInstallEntries({
       circuits: finalized,
       records,
     });
+    const shieldedInstallEntries = informal
+      ? shieldedDevelopmentInstallEntries
+      : shieldedProductionInstallEntries;
     // The core manifest remains the final installation marker. The shielded manifest is installed
     // immediately before it, after all shielded circuit artifacts and their transcript.
     const entries = includeShielded
       ? [
           ...coreEntries.slice(0, -1),
-          ...shieldedProductionInstallEntries({
+          ...shieldedInstallEntries({
             compiled: shieldedCompiled,
             finalized: shieldedFinalized,
             records: shieldedRecords,
@@ -1940,17 +2030,20 @@ export const runSingleOperatorProductionSetup = async ({
       runner,
       runtimeRoot: snarkjsRuntime.root,
       commandEnvironment: baseEnvironment,
+      informal,
     });
     if (includeShielded) {
       for (const [action, circuit] of Object.entries(shieldedFinalized)) {
-        await runner({
-          ...buildProductionSnarkjsCommand({
-            root: resolvedRoot,
-            runtimeRoot: snarkjsRuntime.root,
-            args: ["zkey", "verify", circuit.r1cs, stagedPtau.path, circuit.finalZkey],
-          }),
-          env: baseEnvironment,
-        });
+        if (!informal) {
+          await runner({
+            ...buildProductionSnarkjsCommand({
+              root: resolvedRoot,
+              runtimeRoot: snarkjsRuntime.root,
+              args: ["zkey", "verify", circuit.r1cs, stagedPtau.path, circuit.finalZkey],
+            }),
+            env: baseEnvironment,
+          });
+        }
         const vkey = JSON.parse(fs.readFileSync(circuit.verificationKey, "utf8"));
         if (vkey.nPublic !== SHIELDED_SETUP_CIRCUITS[action].publicSignals) {
           throw new Error(`${action} shielded production verification key signal count mismatch`);
@@ -1988,9 +2081,17 @@ export const runSingleOperatorProductionSetup = async ({
             ptauPath: stagedPtau.path,
             runner,
             compilerEnvironment,
+            ...(informal ? { informal } : {}),
           });
           assertSetupSourcesUnchanged();
-          if (includeShielded) {
+          if (includeShielded && informal) {
+            // The post-commit artifact check has already re-exported every development key.
+            inspectLinkedReceiveArtifacts({ root: resolvedRoot });
+            const installedPath = path.join(resolvedRoot, SHIELDED_DEVELOPMENT_MANIFEST_PATH);
+            if (sha256File(installedPath) !== sha256File(shieldedRecords.manifestPath)) {
+              throw new Error("Installed shielded development manifest changed after staging");
+            }
+          } else if (includeShielded) {
             const installed = inspectShieldedProductionArtifacts({
               root: resolvedRoot,
               ptauPath: stagedPtau.path,
@@ -2037,7 +2138,9 @@ export const runSingleOperatorProductionSetup = async ({
           }
         : { circuitCount: Object.keys(SETUP_CIRCUITS).length }),
       transcriptSha256:
-        validation?.artifacts?.transcriptSha256 ?? records.manifest.trustedSetup.transcript.sha256,
+        validation?.artifacts?.transcriptSha256 ??
+        records.manifest.trustedSetup.transcript?.sha256 ??
+        null,
     });
   } finally {
     try {

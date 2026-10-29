@@ -85,6 +85,7 @@ describe("parameterized ZK command wrappers", function () {
       expect(parseSetupArguments([])).to.deep.equal({
         help: false,
         rotate: false,
+        informal: false,
         ceremonyId: undefined,
         expectedCurrentManifestSha256: undefined,
         expectedSnarkjsRuntimeSha256: undefined,

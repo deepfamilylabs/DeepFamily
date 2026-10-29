@@ -7,8 +7,13 @@ import path from "node:path";
 
 import { runZkeyContributionFromStdin } from "../scripts/zk-contribute-from-stdin.mjs";
 import { parseArguments as parseProductionSetupArguments } from "../scripts/zk-setup.mjs";
-import { ZK_ARTIFACT_MANIFEST_PATH, sha256Text } from "../scripts/lib/zkArtifactTrust.mjs";
 import {
+  ZK_ARTIFACT_MANIFEST_PATH,
+  sha256Text,
+  validateZkArtifactManifest,
+} from "../scripts/lib/zkArtifactTrust.mjs";
+import {
+  DEVELOPMENT_KEYS_WARNING,
   SINGLE_OPERATOR_BEACON_ITERATIONS_EXP,
   SINGLE_OPERATOR_BEACON_NAME,
   SINGLE_OPERATOR_PARTICIPANT_ID,
@@ -17,6 +22,8 @@ import {
   assertSingleOperatorMetadata,
   buildProductionCompilerEvidence,
   buildProductionCircuitCompileCommand,
+  buildProductionKeyVerificationCommands,
+  buildDevelopmentManifest,
   buildProductionSnarkjsCommand,
   buildStagedProofValidationCommands,
   buildTranscriptAndManifest,
@@ -193,6 +200,73 @@ const installFirstSetupFixture = async (root) => {
   return { options, sourcePaths, manifest, compile };
 };
 
+const createCoreRecordFixture = async ({ root, stage }) => {
+  await fs.mkdir(path.join(stage, "release"), { recursive: true });
+  await fs.mkdir(path.join(root, "circuits"), { recursive: true });
+
+  const circuits = {};
+  const reviewedCircuits = {};
+  const stageBuild = path.join(stage, "build");
+  for (const circuitName of ["person_commitment", "disclosure_binding"]) {
+    const circuitDirectory = path.join(stage, circuitName);
+    await fs.mkdir(circuitDirectory, { recursive: true });
+    await fs.mkdir(path.join(stageBuild, `${circuitName}_js`), { recursive: true });
+    await fs.writeFile(
+      path.join(root, "circuits", `${circuitName}.circom`),
+      `${circuitName} source\n`,
+    );
+    const circuit = {
+      r1cs: path.join(stageBuild, `${circuitName}.r1cs`),
+      wasm: path.join(stageBuild, `${circuitName}_js`, `${circuitName}.wasm`),
+      finalZkey: path.join(circuitDirectory, `${circuitName}.zkey`),
+      verificationKey: path.join(circuitDirectory, `${circuitName}.vkey.json`),
+      solidityVerifier: path.join(circuitDirectory, `${circuitName}.sol`),
+      metadata: {
+        operatorContributionHash: "11".repeat(64),
+        beaconContributionHash: "22".repeat(64),
+      },
+    };
+    for (const [label, filePath] of Object.entries(circuit).filter(
+      ([label]) => label !== "metadata",
+    )) {
+      await fs.writeFile(filePath, `${circuitName} ${label}\n`);
+    }
+    circuits[circuitName] = circuit;
+    reviewedCircuits[circuitName] = {
+      sourceSha256: sha256Text(`${circuitName} source\n`),
+      r1csSha256: sha256Text(`${circuitName} r1cs\n`),
+      wasmSha256: sha256Text(`${circuitName} wasm\n`),
+    };
+  }
+
+  const canonicalToolchain = {
+    circomBinarySha256: CIRCOM_LINUX_X64_SHA256,
+    snarkjsCliSha256: "33".repeat(32),
+    snarkjsRuntimeSha256: "34".repeat(32),
+  };
+  const initialManifest = snapshotProductionCompilationManifest({
+    root,
+    stageBuild,
+    initialManifest: {
+      schemaVersion: 3,
+      circomVersion: CIRCOM_VERSION,
+      snarkjsVersion: "0.7.5",
+      toolchain: canonicalToolchain,
+      circuits: Object.fromEntries(
+        Object.keys(reviewedCircuits).map((name) => [
+          name,
+          {
+            sourceSha256: "00".repeat(32),
+            r1csSha256: "00".repeat(32),
+            wasmSha256: "00".repeat(32),
+          },
+        ]),
+      ),
+    },
+  });
+  return { circuits, reviewedCircuits, canonicalToolchain, initialManifest };
+};
+
 describe("single-operator production ZK setup safety", function () {
   let root;
   let stage;
@@ -226,6 +300,7 @@ describe("single-operator production ZK setup safety", function () {
     ).to.deep.equal({
       help: false,
       rotate: true,
+      informal: false,
       ceremonyId: "deepfamily-rotation-fixture",
       expectedCurrentManifestSha256: currentManifestSha256,
       expectedSnarkjsRuntimeSha256: replacementRuntimeSha256,
@@ -239,6 +314,35 @@ describe("single-operator production ZK setup safety", function () {
       expect(() => parseProductionSetupArguments(argumentsWithoutBinding)).to.throw(
         "Usage: npm run zk:setup",
       );
+    }
+  });
+
+  it("parses --informal once, with a ceremony id but without rotation or release criteria", function () {
+    expect(
+      parseProductionSetupArguments(["--informal", "--ceremony-id", "deepfamily-informal-fixture"]),
+    ).to.deep.equal({
+      help: false,
+      rotate: false,
+      informal: true,
+      ceremonyId: "deepfamily-informal-fixture",
+      expectedCurrentManifestSha256: undefined,
+      expectedSnarkjsRuntimeSha256: undefined,
+    });
+    for (const invalid of [
+      ["--informal", "--informal"],
+      ["--informal", "--shielded-release-criteria", "release-criteria.json"],
+      [
+        "--informal",
+        "--rotate",
+        "--expected-current-manifest-sha256",
+        "11".repeat(32),
+        "--expected-current-shielded-manifest-sha256",
+        "33".repeat(32),
+        "--expected-snarkjs-runtime-sha256",
+        "22".repeat(32),
+      ],
+    ]) {
+      expect(() => parseProductionSetupArguments(invalid)).to.throw("Usage: npm run zk:setup");
     }
   });
 
@@ -436,6 +540,64 @@ describe("single-operator production ZK setup safety", function () {
     }
   });
 
+  it("accepts a dirty working tree only in informal setup", async function () {
+    const invalid = await captureError(() =>
+      runSingleOperatorProductionSetup({ informal: "yes", root, env: { PATH: "/trusted/bin" } }),
+    );
+    expect(invalid?.message).to.equal("Production ZK setup informal option must be a boolean");
+    for (const informal of [false, true]) {
+      const captureCalls = [];
+      const error = await captureError(() =>
+        runSingleOperatorProductionSetup({
+          includeShielded: false,
+          informal,
+          root,
+          env: { PATH: "/trusted/bin" },
+          captureRunner: (invocation) => {
+            captureCalls.push(invocation.args[0]);
+            return invocation.args[0] === "rev-parse" ? "a".repeat(40) : " M scripts/zk-setup.mjs";
+          },
+          artifactInspector: () => {
+            throw new Error("stop after Git state inspection");
+          },
+        }),
+      );
+      expect(error?.message).to.equal(
+        informal
+          ? "stop after Git state inspection"
+          : "Production ZK setup requires a clean Git working tree",
+      );
+      expect(captureCalls).to.deep.equal(informal ? ["rev-parse"] : ["rev-parse", "status"]);
+    }
+  });
+
+  it("rejects informal rotation and release criteria before reading the checkout", async function () {
+    for (const options of [
+      {
+        rotate: true,
+        expectedCurrentManifestSha256: "11".repeat(32),
+        expectedCurrentShieldedManifestSha256: "33".repeat(32),
+        expectedSnarkjsRuntimeSha256: "22".repeat(32),
+      },
+      { shieldedReleaseCriteriaPath: "release-criteria.json" },
+    ]) {
+      const error = await captureError(() =>
+        runSingleOperatorProductionSetup({
+          ...options,
+          informal: true,
+          root,
+          env: {},
+          captureRunner: () => {
+            throw new Error("the checkout must not be read");
+          },
+        }),
+      );
+      expect(error?.message).to.equal(
+        "Informal ZK setup installs development keys; it cannot rotate a production setup or record release criteria",
+      );
+    }
+  });
+
   it("runs snarkjs through Node instead of a platform-specific .bin wrapper", function () {
     const command = buildProductionSnarkjsCommand({
       root,
@@ -455,51 +617,26 @@ describe("single-operator production ZK setup safety", function () {
     expect(command.args[0]).not.to.match(/\.cmd$/u);
   });
 
+  it("lists the read-only pTau and per-circuit zkey checks that informal setup skips", function () {
+    const commands = buildProductionKeyVerificationCommands({
+      root,
+      ptauPath: "phase1.ptau",
+      circuits: {
+        first: { r1cs: "first.r1cs", finalZkey: "first_final.zkey" },
+        second: { r1cs: "second.r1cs", finalZkey: "second_final.zkey" },
+      },
+    });
+
+    expect(commands.map((command) => command.args.slice(1))).to.deep.equal([
+      ["powersoftau", "verify", "phase1.ptau"],
+      ["zkey", "verify", "first.r1cs", "phase1.ptau", "first_final.zkey"],
+      ["zkey", "verify", "second.r1cs", "phase1.ptau", "second_final.zkey"],
+    ]);
+  });
+
   it("records fresh compilation and a reviewed runtime without changing canonical toolchain pins", async function () {
-    const releaseDirectory = path.join(stage, "release");
-    await fs.mkdir(releaseDirectory, { recursive: true });
-    await fs.mkdir(path.join(root, "circuits"), { recursive: true });
-
-    const circuits = {};
-    const reviewedCircuits = {};
-    const stageBuild = path.join(stage, "build");
-    for (const circuitName of ["person_commitment", "disclosure_binding"]) {
-      const circuitDirectory = path.join(stage, circuitName);
-      await fs.mkdir(circuitDirectory, { recursive: true });
-      await fs.mkdir(path.join(stageBuild, `${circuitName}_js`), { recursive: true });
-      await fs.writeFile(
-        path.join(root, "circuits", `${circuitName}.circom`),
-        `${circuitName} source\n`,
-      );
-      const circuit = {
-        r1cs: path.join(stageBuild, `${circuitName}.r1cs`),
-        wasm: path.join(stageBuild, `${circuitName}_js`, `${circuitName}.wasm`),
-        finalZkey: path.join(circuitDirectory, `${circuitName}.zkey`),
-        verificationKey: path.join(circuitDirectory, `${circuitName}.vkey.json`),
-        solidityVerifier: path.join(circuitDirectory, `${circuitName}.sol`),
-        metadata: {
-          operatorContributionHash: "11".repeat(64),
-          beaconContributionHash: "22".repeat(64),
-        },
-      };
-      for (const [label, filePath] of Object.entries(circuit).filter(
-        ([label]) => label !== "metadata",
-      )) {
-        await fs.writeFile(filePath, `${circuitName} ${label}\n`);
-      }
-      circuits[circuitName] = circuit;
-      reviewedCircuits[circuitName] = {
-        sourceSha256: sha256Text(`${circuitName} source\n`),
-        r1csSha256: sha256Text(`${circuitName} r1cs\n`),
-        wasmSha256: sha256Text(`${circuitName} wasm\n`),
-      };
-    }
-
-    const canonicalToolchain = {
-      circomBinarySha256: CIRCOM_LINUX_X64_SHA256,
-      snarkjsCliSha256: "33".repeat(32),
-      snarkjsRuntimeSha256: "34".repeat(32),
-    };
+    const { circuits, reviewedCircuits, canonicalToolchain, initialManifest } =
+      await createCoreRecordFixture({ root, stage });
     const compiler = buildProductionCompilerEvidence({
       compiler: {
         version: CIRCOM_VERSION,
@@ -520,26 +657,7 @@ describe("single-operator production ZK setup safety", function () {
     const records = await buildTranscriptAndManifest({
       root,
       stageRoot: stage,
-      initialManifest: snapshotProductionCompilationManifest({
-        root,
-        stageBuild,
-        initialManifest: {
-          schemaVersion: 3,
-          circomVersion: CIRCOM_VERSION,
-          snarkjsVersion: "0.7.5",
-          toolchain: canonicalToolchain,
-          circuits: Object.fromEntries(
-            Object.keys(reviewedCircuits).map((name) => [
-              name,
-              {
-                sourceSha256: "00".repeat(32),
-                r1csSha256: "00".repeat(32),
-                wasmSha256: "00".repeat(32),
-              },
-            ]),
-          ),
-        },
-      }),
+      initialManifest,
       compiler,
       ceremonyId: "deepfamily-production-fixture",
       ptau: {
@@ -564,6 +682,49 @@ describe("single-operator production ZK setup safety", function () {
     for (const [name, reviewed] of Object.entries(reviewedCircuits)) {
       expect(records.manifest.circuits[name]).to.include(reviewed);
     }
+  });
+
+  it("records informal keys as a development manifest that binds no transcript", async function () {
+    const { circuits, reviewedCircuits, canonicalToolchain, initialManifest } =
+      await createCoreRecordFixture({ root, stage });
+    const records = await buildDevelopmentManifest({
+      root,
+      stageRoot: stage,
+      initialManifest,
+      circuits,
+      snarkjsRuntimeSha256: "35".repeat(32),
+    });
+
+    expect(records.transcriptPath).to.equal(null);
+    expect(records.manifest.trustedSetup).to.deep.equal({
+      status: "development",
+      trustModel: "single-operator",
+      warning: DEVELOPMENT_KEYS_WARNING,
+      minimumContributors: 1,
+      contributorCount: 1,
+      beaconApplied: false,
+      transcriptSha256: null,
+    });
+    expect(records.manifest.toolchain).to.deep.equal({
+      ...canonicalToolchain,
+      snarkjsRuntimeSha256: "35".repeat(32),
+    });
+    for (const [name, reviewed] of Object.entries(reviewedCircuits)) {
+      expect(records.manifest.circuits[name]).to.include({
+        ...reviewed,
+        zkeySha256: sha256Text(`${name} finalZkey\n`),
+      });
+    }
+    validateZkArtifactManifest(records.manifest);
+    expect(() =>
+      validateZkArtifactManifest(records.manifest, { requireProduction: true }),
+    ).to.throw("Production release is blocked");
+    expect(JSON.parse(await fs.readFile(records.manifestPath, "utf8"))).to.deep.equal(
+      records.manifest,
+    );
+    expect(await fs.readdir(path.join(stage, "release"))).to.deep.equal([
+      "zk-artifacts-manifest.json",
+    ]);
   });
 
   it("rejects a manifest-selected canonical compiler digest before installing the pTau", async function () {

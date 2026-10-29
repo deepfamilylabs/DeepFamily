@@ -11,11 +11,15 @@ import {
   PRODUCTION_PTAU_SHA256,
 } from "../scripts/lib/productionPtau.mjs";
 import {
+  SHIELDED_DEVELOPMENT_MANIFEST_PATH,
+  SHIELDED_PHASE2_TRANSCRIPT_PATH,
   SHIELDED_PRODUCTION_MANIFEST_PATH,
   SHIELDED_SETUP_CIRCUITS,
   assertShieldedCompilationUnchanged,
+  buildShieldedDevelopmentRecords,
   buildShieldedProductionRecords,
   inspectShieldedProductionArtifacts,
+  shieldedDevelopmentInstallEntries,
   shieldedProductionInstallEntries,
   snapshotShieldedCompilation,
   verifyShieldedProductionCeremony,
@@ -254,6 +258,69 @@ describe("shielded production setup artifacts", function () {
         records,
       }),
     ).to.throw("Missing staged receive linking artifact");
+  });
+
+  it("records informal keys and their link keys in the development manifest only", async function () {
+    const generated = [
+      "frontend/public/zk/shielded/receive-link-keys.json",
+      "contracts/AnonymousReceivePresentationVerifier.sol",
+      "contracts/FundReceivePresentationVerifier.sol",
+      "contracts/AttachedReceivePresentationVerifier.sol",
+    ];
+    const recordStage = fs.mkdtempSync(path.join(fixture.stageRoot, "records-"));
+    fs.mkdirSync(path.join(recordStage, "release"));
+    const records = await buildShieldedDevelopmentRecords({
+      root: fixture.root,
+      stageRoot: recordStage,
+      compiled: fixture.compiled,
+      finalized: fixture.finalized,
+      ptau: { sha256: PRODUCTION_PTAU_SHA256 },
+      linkSynchronizer: async ({ outputRoot, manifest }) => {
+        for (const file of generated) write(outputRoot, file, `staged ${file}`);
+        manifest.linkKeys = {
+          path: generated[0],
+          sha256: sha256File(path.join(outputRoot, generated[0])),
+        };
+      },
+    });
+    expect(Object.keys(records.manifest)).to.deep.equal([
+      "schema",
+      "developmentOnly",
+      "productionReady",
+      "ptauSha256",
+      "circuits",
+      "linkKeys",
+    ]);
+    expect(records.manifest).to.include({
+      schema: "deepfamily/shielded-development-keys@1",
+      developmentOnly: true,
+      productionReady: false,
+      ptauSha256: PRODUCTION_PTAU_SHA256,
+    });
+    for (const [action, spec] of Object.entries(SHIELDED_SETUP_CIRCUITS)) {
+      const item = records.manifest.circuits[action];
+      expect(item).to.include({
+        source: spec.source,
+        r1csSha256: fixture.compiled[action].r1csSha256,
+        zkeySha256: sha256File(fixture.finalized[action].finalZkey),
+      });
+      expect(item.solidityVerifierSha256).to.equal(
+        spec.verifierPath ? sha256File(fixture.finalized[action].solidityVerifier) : undefined,
+      );
+    }
+    const entries = shieldedDevelopmentInstallEntries({
+      compiled: fixture.compiled,
+      finalized: fixture.finalized,
+      records,
+    });
+    expect(entries.at(-1)).to.deep.equal({
+      source: records.manifestPath,
+      destination: SHIELDED_DEVELOPMENT_MANIFEST_PATH,
+    });
+    const destinations = entries.map(({ destination }) => destination);
+    expect(destinations).to.include.members(generated);
+    expect(destinations).to.not.include(SHIELDED_PRODUCTION_MANIFEST_PATH);
+    expect(destinations).to.not.include(SHIELDED_PHASE2_TRANSCRIPT_PATH);
   });
 
   it("keeps issuer source evidence stable when generated receive keys and verifiers change", function () {

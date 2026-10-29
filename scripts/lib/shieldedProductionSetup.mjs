@@ -31,6 +31,7 @@ import {
 
 export const SHIELDED_PRODUCTION_MANIFEST_PATH = "circuits/shielded-production-manifest.json";
 export const SHIELDED_PHASE2_TRANSCRIPT_PATH = "release-evidence/shielded/phase2-transcript.json";
+export const SHIELDED_DEVELOPMENT_MANIFEST_PATH = "circuits/shielded-development-manifest.json";
 
 const SHA256 = /^[0-9a-f]{64}$/u;
 const BLAKE2B512 = /^[0-9a-f]{128}$/u;
@@ -201,6 +202,29 @@ export function assertShieldedCompilationUnchanged(compiled) {
   }
 }
 
+// Derives the receive link keys and fixed verifiers into the stage and binds them in the manifest.
+const stageLinkedReceiveArtifacts = async ({
+  root,
+  stageRoot,
+  manifest,
+  finalized,
+  linkSynchronizer,
+}) => {
+  const linkedRoot = path.join(stageRoot, "linked");
+  await linkSynchronizer({
+    root,
+    outputRoot: linkedRoot,
+    manifest,
+    circuitFiles: Object.fromEntries(
+      Object.entries(finalized).map(([action, key]) => [
+        action,
+        { zkey: key.finalZkey, vkey: key.verificationKey },
+      ]),
+    ),
+  });
+  return linkedRoot;
+};
+
 export async function buildShieldedProductionRecords({
   root,
   stageRoot,
@@ -302,24 +326,70 @@ export async function buildShieldedProductionRecords({
     circuits,
     ...(releaseCriteria === undefined ? {} : { releaseCriteria: { ...releaseCriteria } }),
   };
-  const linkedRoot = path.join(stageRoot, "linked");
-  await linkSynchronizer({
+  const linkedRoot = await stageLinkedReceiveArtifacts({
     root,
-    outputRoot: linkedRoot,
+    stageRoot,
     manifest,
-    circuitFiles: Object.fromEntries(
-      Object.entries(finalized).map(([action, key]) => [
-        action,
-        { zkey: key.finalZkey, vkey: key.verificationKey },
-      ]),
-    ),
+    finalized,
+    linkSynchronizer,
   });
   const manifestPath = path.join(stageRoot, "release", "shielded-production-manifest.json");
   await fsp.writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, { flag: "wx" });
   return Object.freeze({ transcriptPath, manifestPath, transcript, manifest, linkedRoot });
 }
 
-export function shieldedProductionInstallEntries({ compiled, finalized, records }) {
+/** Informal setups record the same keys as development-only, without ceremony or source claims. */
+export async function buildShieldedDevelopmentRecords({
+  root,
+  stageRoot,
+  compiled,
+  finalized,
+  ptau,
+  linkSynchronizer = syncLinkedReceiveArtifacts,
+}) {
+  requireDigest(ptau?.sha256, "Shielded development Powers of Tau");
+  assertShieldedCompilationUnchanged(compiled);
+  const circuits = {};
+  for (const [action, spec] of Object.entries(SHIELDED_SETUP_CIRCUITS)) {
+    const built = compiled[action];
+    const key = finalized[action];
+    if (built?.source !== spec.source || key?.circuitName !== spec.source) {
+      throw new Error(`Missing ${action} shielded development artifacts`);
+    }
+    circuits[action] = {
+      source: spec.source,
+      sourceSha256: built.sourceSha256,
+      r1csSha256: built.r1csSha256,
+      wasmSha256: built.wasmSha256,
+      zkeySha256: sha256File(key.finalZkey),
+      verificationKeySha256: sha256File(key.verificationKey),
+      ...(spec.verifierPath && {
+        verifierPath: spec.verifierPath,
+        verifierContractName: spec.verifierContractName,
+        solidityVerifierSha256: sha256File(key.solidityVerifier),
+      }),
+    };
+  }
+  const manifest = {
+    schema: "deepfamily/shielded-development-keys@1",
+    developmentOnly: true,
+    productionReady: false,
+    ptauSha256: ptau.sha256,
+    circuits,
+  };
+  const linkedRoot = await stageLinkedReceiveArtifacts({
+    root,
+    stageRoot,
+    manifest,
+    finalized,
+    linkSynchronizer,
+  });
+  const manifestPath = path.join(stageRoot, "release", "shielded-development-manifest.json");
+  await fsp.writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, { flag: "wx" });
+  return Object.freeze({ manifestPath, manifest, linkedRoot });
+}
+
+const shieldedArtifactInstallEntries = ({ compiled, finalized, records }) => {
   const entries = [];
   for (const [action, spec] of Object.entries(SHIELDED_SETUP_CIRCUITS)) {
     const built = compiled[action];
@@ -353,10 +423,23 @@ export function shieldedProductionInstallEntries({ compiled, finalized, records 
           return { source, destination: file };
         })
       : []),
-    { source: records.transcriptPath, destination: SHIELDED_PHASE2_TRANSCRIPT_PATH },
-    { source: records.manifestPath, destination: SHIELDED_PRODUCTION_MANIFEST_PATH },
   );
   return entries;
+};
+
+export function shieldedProductionInstallEntries({ compiled, finalized, records }) {
+  return [
+    ...shieldedArtifactInstallEntries({ compiled, finalized, records }),
+    { source: records.transcriptPath, destination: SHIELDED_PHASE2_TRANSCRIPT_PATH },
+    { source: records.manifestPath, destination: SHIELDED_PRODUCTION_MANIFEST_PATH },
+  ];
+}
+
+export function shieldedDevelopmentInstallEntries({ compiled, finalized, records }) {
+  return [
+    ...shieldedArtifactInstallEntries({ compiled, finalized, records }),
+    { source: records.manifestPath, destination: SHIELDED_DEVELOPMENT_MANIFEST_PATH },
+  ];
 }
 
 /** Static, read-only production checks shared by the artifact and ceremony commands. */

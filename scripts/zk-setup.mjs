@@ -9,6 +9,7 @@ const usage = () => {
   console.log(`Usage:
   npm run zk:setup
   npm run zk:setup -- --ceremony-id <stable-audit-id>
+  npm run zk:setup -- --informal
   npm run zk:setup -- --rotate \\
     --expected-current-manifest-sha256 <current-production-manifest-sha256> \\
     --expected-current-shielded-manifest-sha256 <current-shielded-manifest-sha256> \\
@@ -38,12 +39,18 @@ runtime graph. Both forms require a clean Git working tree, stage all outputs be
 and restore the previous artifact set if final validation fails. They intentionally record that
 production security trusts the operator to destroy every Phase 2 secret.
 The same final keys, verification/link keys and Solidity verifiers are used in local development,
-CI and releases. Build, fetch and check commands reuse them without generating new keys.`);
+CI and releases. Build, fetch and check commands reuse them without generating new keys.
+
+--informal runs the same compilation, contribution, beacon and export steps, but installs the
+keys as development artifacts: development manifests that claim no ceremony and bind no
+transcript, so release:preflight rejects them. It skips the full Phase 1 "powersoftau verify",
+every "zkey verify" and the clean Git working tree requirement, and it cannot be combined with
+--rotate or --shielded-release-criteria.`);
 };
 
 const USAGE_ERROR =
   "Usage: npm run zk:setup -- [--ceremony-id <stable-audit-id>] " +
-  "[--shielded-release-criteria <committed-json-path>] or " +
+  "[--informal | --shielded-release-criteria <committed-json-path>] or " +
   "--rotate --expected-current-manifest-sha256 <sha256> " +
   "--expected-current-shielded-manifest-sha256 <sha256> " +
   "--expected-snarkjs-runtime-sha256 <sha256> " +
@@ -54,15 +61,17 @@ export const parseArguments = (argv) => {
   const parsed = {
     help: false,
     rotate: false,
+    informal: false,
     ceremonyId: undefined,
     expectedCurrentManifestSha256: undefined,
     expectedSnarkjsRuntimeSha256: undefined,
   };
   for (let index = 0; index < argv.length; index += 1) {
     const argument = argv[index];
-    if (argument === "--rotate") {
-      if (parsed.rotate) throw new Error(USAGE_ERROR);
-      parsed.rotate = true;
+    if (argument === "--rotate" || argument === "--informal") {
+      const flag = argument === "--rotate" ? "rotate" : "informal";
+      if (parsed[flag]) throw new Error(USAGE_ERROR);
+      parsed[flag] = true;
       continue;
     }
     const field =
@@ -94,7 +103,8 @@ export const parseArguments = (argv) => {
       (parsed.expectedCurrentManifestSha256 === undefined ||
         parsed.expectedSnarkjsRuntimeSha256 === undefined ||
         parsed.expectedCurrentShieldedManifestSha256 === undefined)) ||
-    (!parsed.rotate && hasRotationEvidence)
+    (!parsed.rotate && hasRotationEvidence) ||
+    (parsed.informal && (parsed.rotate || parsed.shieldedReleaseCriteriaPath !== undefined))
   ) {
     throw new Error(USAGE_ERROR);
   }
@@ -108,19 +118,31 @@ export const main = async (argv = process.argv.slice(2)) => {
     return;
   }
   console.warn(
-    `Starting single-operator final ZK ${parsed.rotate ? "rotation" : "setup"}. ` +
-      "Keep this machine isolated and destroy " +
-      "all Phase 2 entropy after the process exits.",
+    parsed.informal
+      ? "Starting informal ZK setup: development keys, pTau and zkey verification skipped."
+      : `Starting single-operator final ZK ${parsed.rotate ? "rotation" : "setup"}. ` +
+          "Keep this machine isolated and destroy " +
+          "all Phase 2 entropy after the process exits.",
   );
   const result = await runSingleOperatorProductionSetup({
     ceremonyId: parsed.ceremonyId,
     rotate: parsed.rotate,
+    informal: parsed.informal,
     expectedCurrentManifestSha256: parsed.expectedCurrentManifestSha256,
     expectedCurrentShieldedManifestSha256: parsed.expectedCurrentShieldedManifestSha256,
     expectedSnarkjsRuntimeSha256: parsed.expectedSnarkjsRuntimeSha256,
     includeShielded: true,
     shieldedReleaseCriteriaPath: parsed.shieldedReleaseCriteriaPath,
   });
+  if (parsed.informal) {
+    console.log("Informal ZK setup completed; development keys installed:");
+    console.log(`  manifest:   ${result.manifestSha256}`);
+    console.log(`  shielded:   ${result.shieldedManifestSha256}`);
+    console.log(
+      "Review and commit every generated artifact together. A release needs the formal npm run zk:setup.",
+    );
+    return;
+  }
   console.log("Final ZK setup completed and verified:");
   console.log(`  ceremony:   ${result.ceremonyId}`);
   console.log(`  trust:      ${result.trustModel} (${result.contributorCount} contributor)`);

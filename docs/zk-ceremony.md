@@ -225,6 +225,24 @@ npm run zk:setup -- \
   --ceremony-id deepfamily-production-2026-001
 ```
 
+For day-to-day key regeneration, add `--informal`:
+
+```bash
+npm run zk:setup -- --informal
+```
+
+It runs the same compilation, Phase 2 contribution, beacon and export steps, so the proving keys,
+link keys and Solidity verifiers are produced exactly as in a formal setup. It installs them as
+development artifacts: `circuits/zk-artifacts-manifest.json` with development status and
+`circuits/shielded-development-manifest.json`. Development records attest no ceremony step, so they
+claim no beacon, bind no transcript and are rejected by `npm run release:preflight`; a release needs
+the formal setup. They bind the circuits, keys and toolchain but not the rest of the source tree, so
+other edits keep the keys usable. The informal setup skips the full Phase 1 `powersoftau verify`
+(about two hours for the pinned pTau beacon), every `zkey verify` and the clean Git working tree
+requirement; the pTau SHA-256 pin, staged proof checks and post-install checks still run.
+`--informal` cannot be combined with `--rotate` or `--shielded-release-criteria`, and it refuses to
+replace a production setup.
+
 To record shielded release thresholds, optionally pass
 `--shielded-release-criteria <reviewed-criteria.json>`. Supply a reviewed JSON file containing
 six positive integer limits: `fundMaxGas`, `claim3MaxGas`,
