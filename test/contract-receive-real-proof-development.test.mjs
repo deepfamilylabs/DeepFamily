@@ -358,7 +358,7 @@ describe("Receive presentation real-proof canonical pool and letter integration"
           data.receiveAuthorizations[0] = {
             checkpointId: 1n,
             asOf: BigInt(presented.presentation.asOf),
-            expiresAt: fundCredential.expiresAt,
+            deadline: BigInt(presented.presentation.deadline),
             recipientBinding: presented.recipientBinding,
             proof: prover.presentation(presented),
           };
@@ -398,9 +398,9 @@ describe("Receive presentation real-proof canonical pool and letter integration"
             witness,
             inputs.signals,
           ).solidityProof;
-          const wrongExpiry = structuredClone(data);
-          wrongExpiry.receiveAuthorizations[0].expiresAt += 1n;
-          await expect(pool.fund(wrongExpiry, businessProof)).to.be.revertedWithCustomError(
+          const wrongDeadline = structuredClone(data);
+          wrongDeadline.receiveAuthorizations[0].deadline += 1n;
+          await expect(pool.fund(wrongDeadline, businessProof)).to.be.revertedWithCustomError(
             pool,
             "InvalidReceiveProof",
           );
@@ -463,7 +463,7 @@ describe("Receive presentation real-proof canonical pool and letter integration"
         transfer.receiveAuthorizations[0] = {
           checkpointId: 1n,
           asOf: BigInt(transferPresentation.presentation.asOf),
-          expiresAt: anonymous.expiresAt,
+          deadline: BigInt(transferPresentation.presentation.deadline),
           recipientBinding: transferPresentation.recipientBinding,
           proof: prover.presentation(transferPresentation),
         };
@@ -575,7 +575,7 @@ describe("Receive presentation real-proof canonical pool and letter integration"
             messageId,
             checkpointId: 1n,
             asOf: BigInt(prepared.presentation.asOf),
-            expiresAt: anonymous.expiresAt,
+            deadline: BigInt(prepared.presentation.deadline),
             recipientBinding: prepared.recipientBinding,
           };
           const attached = {
@@ -675,7 +675,7 @@ describe("Receive presentation real-proof canonical pool and letter integration"
           messageId: pendingId,
           checkpointId: 1n,
           asOf: BigInt(pending.presentation.asOf),
-          expiresAt: anonymous.expiresAt,
+          deadline: BigInt(pending.presentation.deadline),
           recipientBinding: pending.recipientBinding,
         };
         const identity = buildLineageFixture().witness;
@@ -748,13 +748,16 @@ describe("Receive presentation real-proof canonical pool and letter integration"
         } else {
           restoredKeys.push(deriveShieldedHeirKeyMaterial(BigInt(identity.derivedSecretField)));
         }
+        // A proof prepared before the revocation ends at its own deadline, which never
+        // outlasts the 15-minute retirement window of the checkpoint it used.
         const retired = await state.getCheckpoint(1n);
-        await hre.networkHelpers.time.increaseTo(retired.retiredAt + 899n);
+        assert.ok(pendingDelivery.deadline <= retired.retiredAt + 900n);
+        await hre.networkHelpers.time.increaseTo(pendingDelivery.deadline - 1n);
         await letters.registerLetter.staticCall(pendingDelivery, pendingCiphertext, pendingProof);
-        await hre.networkHelpers.time.increaseTo(retired.retiredAt + 900n);
+        await hre.networkHelpers.time.increaseTo(pendingDelivery.deadline);
         await expect(
           letters.registerLetter.staticCall(pendingDelivery, pendingCiphertext, pendingProof),
-        ).to.be.revertedWithCustomError(state, "CheckpointExpired");
+        ).to.be.revertedWithCustomError(letters, "ExpiredReceiveCode");
         assert.equal(await letters.usedMessage(pendingId), false);
         assert.throws(
           () =>
@@ -804,6 +807,7 @@ describe("Receive presentation real-proof canonical pool and letter integration"
           ...pendingDelivery,
           checkpointId: 2n,
           asOf: BigInt(renewed.presentation.asOf),
+          deadline: BigInt(renewed.presentation.deadline),
           recipientBinding: renewed.recipientBinding,
         };
         await recordTransaction(
@@ -816,8 +820,59 @@ describe("Receive presentation real-proof canonical pool and letter integration"
           envelope: pendingEnvelope,
           ciphertext: hre.ethers.getBytes(pendingCiphertext),
         });
-        // Code expiry stops new receipts while previously authenticated immutable blobs recover.
-        await hre.networkHelpers.time.increaseTo(anonymous.expiresAt);
+        // A letter proved one minute before the code expires still lands within its own
+        // deadline. Once the code has expired no new proof can be prepared, while every
+        // previously authenticated immutable blob still recovers below.
+        const lastId = 801n;
+        const lastEnvelope = createShieldedLetterEnvelope({ body: "到期前一分钟", salt: 901n });
+        const lastCiphertext = hre.ethers.hexlify(
+          await encryptShieldedLetter({
+            chainId,
+            lettersAddress,
+            messageId: lastId,
+            recipientPublicKey: viewingKey,
+            envelope: lastEnvelope,
+          }),
+        );
+        const lastRequest = {
+          credential: { ...anonymous, authorizationCounter: 1n, proof: renewedIssuer.proof },
+          chainId,
+          consumer: lettersAddress,
+          action: 1n,
+          messageId: lastId,
+          payloadHash: hre.ethers.keccak256(lastCiphertext),
+          checkpointId: 2n,
+          state: updatedCounterState,
+          salt: lastEnvelope.salt,
+        };
+        await hre.networkHelpers.time.increaseTo(anonymous.expiresAt - 60n);
+        const last = prepareShieldedReceivePresentation({ ...lastRequest, asOf: await now() });
+        const lastProof = prover.presentation(last);
+        await hre.networkHelpers.time.increaseTo(anonymous.expiresAt + 60n);
+        await recordTransaction(
+          "lastMinuteLetter",
+          letters.registerLetter(
+            {
+              messageId: lastId,
+              checkpointId: 2n,
+              asOf: BigInt(last.presentation.asOf),
+              deadline: BigInt(last.presentation.deadline),
+              recipientBinding: last.recipientBinding,
+            },
+            lastCiphertext,
+            lastProof,
+          ),
+        );
+        records.push({
+          messageId: lastId,
+          record: await letters.letterRecord(lastId),
+          envelope: lastEnvelope,
+          ciphertext: hre.ethers.getBytes(lastCiphertext),
+        });
+        assert.throws(
+          () => prepareShieldedReceivePresentation({ ...lastRequest, asOf: anonymous.expiresAt }),
+          /expired/u,
+        );
         await expect(
           letters.registerLetter.staticCall(pendingDelivery, pendingCiphertext, pendingProof),
         ).to.be.revertedWithCustomError(letters, "ExpiredReceiveCode");

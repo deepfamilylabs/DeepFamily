@@ -1499,7 +1499,7 @@
       "CheckpointExpired": "授权状态已过期，请刷新后重新生成证明。",
       "InvalidLetterConfiguration": "当前部署尚未配置私密家书投递。",
       "InvalidLetterField": "私密家书数据无效，请重新准备信件。",
-      "ExpiredReceiveCode": "收款码已过期，请获取新码。",
+      "ExpiredReceiveCode": "收款码已过期，或付款准备已超过 15 分钟。请重新提交；码已过期时请获取新码。",
       "MessageAlreadyRegistered": "这封家书已经登记。",
       "InvalidLetterProof": "私密家书证明未通过验证。",
       "PublicInputNotInField": "证明包含无效的公开值，请重新生成证明。",

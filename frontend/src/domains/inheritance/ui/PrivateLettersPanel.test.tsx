@@ -25,7 +25,7 @@ const context: ShieldedWorkerContext = {
   lineageIndexAddress: "0x3333333333333333333333333333333333333333", poolAddress: "0x4444444444444444444444444444444444444444",
   poolDeploymentBlock: 1, assetKind: "native", lettersAddress: "0x5555555555555555555555555555555555555555",
 };
-const letter = { delivery: { messageId: "7", checkpointId: "1", asOf: "900", expiresAt: "1200", recipientBinding: "9" }, ciphertext: "0x010203", proof: "0x1234" };
+const letter = { delivery: { messageId: "7", checkpointId: "1", asOf: "900", deadline: "1200", recipientBinding: "9" }, ciphertext: "0x010203", proof: "0x1234" };
 type InboxResult = { letters: { messageId: string; body: string; registeredAt: string; attachment: null }[]; unavailable: number };
 const tr = (key: string) => `shielded.privateLetters.${key}`;
 const props = () => ({ mode: "write" as const, context, signer: {} as Signer, disabled: false, wallet: null, recoveryReady: true, budgetCommitment: "", onBudgetChange: vi.fn() });

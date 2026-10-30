@@ -1,4 +1,7 @@
-import { emptyShieldedReceiveAuthorizations } from "@deepfamily/protocol-core";
+import {
+  emptyShieldedReceiveAuthorizations,
+  SHIELDED_RECEIVE_PROOF_LIFETIME,
+} from "@deepfamily/protocol-core";
 
 /** Deploy the exact linked SMT implementation used by production deployments. */
 export async function identityAuthorizationStateFactory(hre) {
@@ -28,8 +31,16 @@ export async function deployMockReceiveAuthorization(hre) {
 /**
  * The mock verifies all eleven exact public signals. Recipient binding must come from the
  * actual money-circuit opening; it is never synthesized or bypassed in production code.
+ * A longer lifetime than the circuit's isolates tests of other time windows.
  */
-export async function authorizeMockReceive(hre, pool, data, action, bindings) {
+export async function authorizeMockReceive(
+  hre,
+  pool,
+  data,
+  action,
+  bindings,
+  lifetime = SHIELDED_RECEIVE_PROOF_LIFETIME,
+) {
   data.receiveAuthorizations = emptyShieldedReceiveAuthorizations();
   const state = await hre.ethers.getContractAt(
     "IdentityAuthorizationState",
@@ -38,7 +49,7 @@ export async function authorizeMockReceive(hre, pool, data, action, bindings) {
   const checkpointId = await state.currentCheckpointId();
   const { root } = await state.getCheckpoint(checkpointId);
   const asOf = BigInt((await hre.ethers.provider.getBlock("latest")).timestamp);
-  const expiresAt = asOf + 7200n;
+  const deadline = asOf + lifetime;
   const hash = BigInt(await pool.receiveActionHash(data));
   const chainId = (await hre.ethers.provider.getNetwork()).chainId;
   const consumer = BigInt(await pool.getAddress());
@@ -55,13 +66,13 @@ export async function authorizeMockReceive(hre, pool, data, action, bindings) {
       checkpointId,
       root,
       asOf,
-      expiresAt,
+      deadline,
       recipientBinding,
     ];
     data.receiveAuthorizations[slot] = {
       checkpointId,
       asOf,
-      expiresAt,
+      deadline,
       recipientBinding,
       proof: hre.ethers.AbiCoder.defaultAbiCoder().encode(["uint256[11]"], [inputs]),
     };

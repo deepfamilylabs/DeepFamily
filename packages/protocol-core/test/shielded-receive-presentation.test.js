@@ -9,6 +9,7 @@ import {
   prepareShieldedReceivePresentation,
   rebuildShieldedIdentityAuthorizationState,
   getShieldedIdentityAuthorizationWitness,
+  SHIELDED_RECEIVE_PROOF_LIFETIME,
 } from "../index.js";
 
 const credential = {
@@ -48,12 +49,14 @@ test("presentation authenticates an operation without publishing its reusable cr
   assert.equal(result.presentation.depth, "0");
   assert.equal(result.presentation.absent, "1");
   assert.equal(result.presentation.siblings.length, 64);
-  assert.equal(result.publicSignals[9], credential.expiresAt);
+  assert.equal(result.publicSignals[9], request.asOf + SHIELDED_RECEIVE_PROOF_LIFETIME);
+  assert.equal(result.deadline, result.publicSignals[9]);
   assert.equal(result.publicSignals[10], computeShieldedReceiveCredentialBinding(request));
   assert.equal(result.request.kind, "anonymous");
   assert.equal(result.request.credentialPublicSignals.length, 11);
   assert.equal(result.publicSignals.includes(credential.authorizationAlias), false);
   assert.equal(result.publicSignals.includes(credential.ownerCommitment), false);
+  assert.equal(result.publicSignals.includes(credential.expiresAt), false);
   assert.deepEqual(
     prepareShieldedReceivePresentation({ ...request, payloadHash: new Uint8Array(32).fill(171) })
       .publicSignals,
@@ -65,8 +68,17 @@ test("presentation authenticates an operation without publishing its reusable cr
     { checkpointId: 0 },
     { asOf: credential.expiresAt },
     { payloadHash: "0x12" },
+    { asOf: (1n << 64n) - 100n, credential: { ...credential, expiresAt: (1n << 64n) - 1n } },
   ])
     assert.throws(() => prepareShieldedReceivePresentation({ ...request, ...patch }));
+});
+
+test("a code unexpired at asOf keeps its deadline even when that deadline passes the expiry", () => {
+  const last = prepareShieldedReceivePresentation({ ...request, asOf: credential.expiresAt - 1n });
+  assert.equal(last.deadline, credential.expiresAt - 1n + SHIELDED_RECEIVE_PROOF_LIFETIME);
+  assert.ok(last.deadline > credential.expiresAt);
+  const later = prepareShieldedReceivePresentation({ ...request, asOf: request.asOf + 600n });
+  assert.notEqual(later.publicSignals[9], prepareShieldedReceivePresentation(request).publicSignals[9]);
 });
 
 test("current state rejects revoked code and renewed code retains original recipient keys", () => {

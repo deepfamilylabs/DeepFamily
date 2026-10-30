@@ -18,6 +18,7 @@ import {
   deriveShieldedHeirKeyMaterial,
   deriveShieldedIndependentKeyMaterial,
   deriveShieldedViewPublicKey,
+  SHIELDED_RECEIVE_PROOF_LIFETIME,
   verifyShieldedNotePayload,
   wrapIdentityCommitmentAsPersonHash,
 } from "@deepfamily/protocol-core";
@@ -988,7 +989,7 @@ describe("local unified funding preparation", () => {
           prepared.data.receiveAuthorizations[0] = {
             checkpointId: 1n,
             asOf: BigInt(timestamp),
-            expiresAt,
+            deadline: BigInt(timestamp) + SHIELDED_RECEIVE_PROOF_LIFETIME,
             recipientBinding: binding,
             proof: "0x",
           };

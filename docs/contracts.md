@@ -1167,7 +1167,6 @@ leaf does not free its slot.
 function root(uint8 treeId) external view returns (uint256);
 function size(uint8 treeId) external view returns (uint256);
 function depth(uint8 treeId) external view returns (uint256);
-function isKnownRoot(uint8 treeId, uint256 candidate) external view returns (bool);
 function CHECKPOINT_RETIREMENT_WINDOW() external view returns (uint256);
 function currentCheckpointId() external view returns (uint256);
 function getCheckpoint(uint256 checkpointId) external view returns (
@@ -1234,9 +1233,9 @@ checkpoint created later. The deadline of the original ID never changes.
 
 This deliberately permits revoked qualifications for at most 15 minutes after revocation.
 During that window a claimant may still collect already mature unpaid periods; the window is
-not a cap on the amount paid. The pool never combines independently known historical roots,
-which could represent qualifications that never coexisted. `isKnownRoot` remains a separate
-per-tree history view with a one-hour window; it does not authorize pool actions.
+not a cap on the amount paid. The index keeps no per-tree root history: a superseded root is
+known only through its paired checkpoint, so the pool never combines roots that never
+coexisted.
 
 Only the proxy may call the `on*` hooks. The index stores current tree nodes and exposes
 `getMerkleProof`, `versionParents` and `getEndorsementMetadata`. Global reconstruction uses

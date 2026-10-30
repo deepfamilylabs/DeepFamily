@@ -11,11 +11,17 @@ import {
   computeShieldedBudgetNoteCommitment,
   prepareReceivePresentationWitness,
   prepareShieldedReceivePresentation,
+  SHIELDED_RECEIVE_PROOF_LIFETIME,
 } from "@deepfamily/protocol-core";
 import { assertConstraintViolation } from "./constraint_assertions.mjs";
 
 const root = path.resolve(import.meta.dirname, "../..");
 const pool = "0x2222222222222222222222222222222222222222";
+// A consistent asOf/deadline pair; the circuit fixes deadline = asOf + 15 minutes.
+const at = (asOf) => ({
+  asOf: String(asOf),
+  deadline: String(asOf + SHIELDED_RECEIVE_PROOF_LIFETIME),
+});
 const circuitNames = {
   anonymous: "shielded_anonymous_receive_presentation",
   fund: "shielded_fund_receive_presentation",
@@ -180,10 +186,12 @@ test("linked receive presentations preserve credential prefixes and complete ope
           const { witness } = fixture(kind);
           const invalid = (patch) =>
             assertConstraintViolation(() => calc.calculateWitness({ ...witness, ...patch }, 1));
+          const expiry = BigInt(witness.credentialPublicSignals[2]);
           for (const patch of [
-            { asOf: witness.expiresAt },
-            { asOf: String(BigInt(witness.expiresAt) + 1n) },
-            { expiresAt: String(BigInt(witness.expiresAt) + 1n) },
+            at(expiry),
+            at(expiry + 1n),
+            { deadline: String(BigInt(witness.deadline) + 1n) },
+            { deadline: String(BigInt(witness.deadline) - 1n) },
             { chainId: "0" },
             { consumer: "0" },
             { checkpointId: "0" },
@@ -217,9 +225,21 @@ test("linked receive presentations preserve credential prefixes and complete ope
             changed[slot] = value;
             await invalid({ credentialPublicSignals: changed });
           }
+          // The public deadline must still fit the consumers' uint64 field.
+          const lastExpiry = [...witness.credentialPublicSignals];
+          lastExpiry[2] = String((1n << 64n) - 1n);
+          await invalid({ credentialPublicSignals: lastExpiry, ...at((1n << 64n) - 100n) });
         }
       },
     );
+
+    await t.test("a deadline may pass the code's expiry only when asOf precedes it", async () => {
+      for (const [kind, calc] of Object.entries(calculators)) {
+        const { witness } = fixture(kind);
+        const expiry = BigInt(witness.credentialPublicSignals[2]);
+        await calc.calculateWitness({ ...witness, ...at(expiry - 1n) }, 1);
+      }
+    });
 
     await t.test(
       "letters permit a message ID while money operations require output slots",

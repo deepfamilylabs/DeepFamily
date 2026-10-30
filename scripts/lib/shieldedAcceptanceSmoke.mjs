@@ -232,6 +232,9 @@ export async function runShieldedAcceptanceSmoke({
   const loadAuthorizationWitness = async (alias) => {
     const contract = deployed.identityAuthorizationState;
     assert.ok(contract, "Integrated deployment has no shared authorization state");
+    // An in-process chain mines only on transactions; a fresh block keeps asOf within the
+    // receive proof lifetime. Live acceptance chains produce blocks on their own.
+    if (chainId === 31337n) await provider.send("evm_mine", []);
     const block = await provider.getBlock("latest");
     assert.ok(block?.hash, "Authorization checkpoint block is unavailable");
     const overrides = { blockTag: block.number };
@@ -365,7 +368,7 @@ export async function runShieldedAcceptanceSmoke({
       data.receiveAuthorizations[slot] = {
         checkpointId: checkpoint.checkpointId,
         asOf: checkpoint.asOf,
-        expiresAt: credential.expiresAt,
+        deadline: prepared.deadline,
         recipientBinding: prepared.recipientBinding,
         proof: result.solidityProof,
       };

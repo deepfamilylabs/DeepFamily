@@ -686,7 +686,7 @@ describe("private letter recovery with original keys", () => {
     const ciphertext = await encryptShieldedLetter({ ...letterContext, messageId, recipientPublicKey: getBytes(await deriveShieldedViewPublicKey(hpkeIkm)), envelope });
     return { messageId, ciphertext, ciphertextHash: computeShieldedLetterCiphertextHash(ciphertext), recipientBinding: "9",
       relationCommitment: String(computeShieldedLetterRelationCommitment({ attachment, salt: 17n, binding: 9n })),
-      registeredAt: "700", expiresAt: "800", transactionHash: "0xletter" };
+      registeredAt: "700", deadline: "800", transactionHash: "0xletter" };
   }
   it("decrypts expired-code letters with the original identity and validates the budget reference", async () => {
     const session = new ShieldedAssetSession();

@@ -35,8 +35,6 @@ contract DeepFamilyLineageIndex is ERC165, IDeepFamilyLineageIndex {
 
   uint8 public constant ENDORSEMENT_TREE = 0;
   uint8 public constant TRUSTED_TREE = 1;
-  /// @notice Per-tree history; pools use the paired checkpoint window below.
-  uint256 public constant ROOT_HISTORY_WINDOW = 1 hours;
   /// @notice Qualification changes take effect for all proofs within this retirement window.
   uint256 public constant override CHECKPOINT_RETIREMENT_WINDOW = 15 minutes;
   uint256 public constant MAX_SNAPSHOT_PAGE_SIZE = 256;
@@ -53,7 +51,6 @@ contract DeepFamilyLineageIndex is ERC165, IDeepFamilyLineageIndex {
     uint256 depth;
     uint256 root;
     mapping(uint256 level => mapping(uint256 index => uint256 node)) nodes;
-    mapping(uint256 root => uint256 replacedAt) replacedAt;
   }
 
   Tree[2] private _trees;
@@ -300,14 +297,6 @@ contract DeepFamilyLineageIndex is ERC165, IDeepFamilyLineageIndex {
     }
   }
 
-  function isKnownRoot(uint8 treeId, uint256 candidate) external view override returns (bool) {
-    Tree storage tree = _tree(treeId);
-    if (candidate == 0) return false;
-    if (candidate == tree.root) return true;
-    uint256 replacedAt = tree.replacedAt[candidate];
-    return replacedAt != 0 && block.timestamp <= replacedAt + ROOT_HISTORY_WINDOW;
-  }
-
   function getCheckpoint(
     uint256 checkpointId
   )
@@ -526,7 +515,6 @@ contract DeepFamilyLineageIndex is ERC165, IDeepFamilyLineageIndex {
   ) private {
     uint256 oldRoot = tree.root;
     if (oldRoot != newRoot) {
-      if (oldRoot != 0) tree.replacedAt[oldRoot] = block.timestamp;
       tree.root = newRoot;
       _recordCheckpoint();
     }

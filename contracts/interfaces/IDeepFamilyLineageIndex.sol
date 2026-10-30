@@ -100,8 +100,6 @@ interface IDeepFamilyLineageIndex is IERC165 {
     uint256 start,
     uint256 limit
   ) external view returns (TrustedSnapshot[] memory);
-  /// @notice Per-tree history. Pool eligibility uses paired checkpoints instead.
-  function isKnownRoot(uint8 treeId, uint256 candidate) external view returns (bool);
   function CHECKPOINT_RETIREMENT_WINDOW() external view returns (uint256);
   function currentCheckpointId() external view returns (uint256);
   function getCheckpoint(

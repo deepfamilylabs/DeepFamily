@@ -786,7 +786,7 @@ export class ShieldedAssetSession {
     const proof = await proveShieldedReceivePresentation({ ...presentation.request, ...(attachmentWitness ? { attachment: attachmentWitness } : {}) }, expected);
     current();
     return { delivery: { messageId: String(messageId), checkpointId: String(state.checkpointId), asOf: String(state.asOf),
-      expiresAt: String(credential.expiresAt), recipientBinding: String(binding) }, ciphertext: hexlify(ciphertext), proof: proof.proof, ...(attachment ? { attachment } : {}) };
+      deadline: String(presentation.deadline), recipientBinding: String(binding) }, ciphertext: hexlify(ciphertext), proof: proof.proof, ...(attachment ? { attachment } : {}) };
   }
 
   async recoverLetters(params: ShieldedAssetWorkerCallMap["recoverLetters"]["params"]): Promise<ShieldedAssetWorkerCallMap["recoverLetters"]["result"]> {
@@ -1500,7 +1500,7 @@ export class ShieldedAssetSession {
       requireValue(credential.disclosure === (actualAction === "fund" ? "fund" : "anonymous"), "Use the receive material for this operation.");
       const salt = generateShieldedRandomField();
       const binding = computeShieldedReceiveCredentialBinding({ credential, salt });
-      prepared.data.receiveAuthorizations[0] = { checkpointId: 0n, asOf: 0n, expiresAt: credential.expiresAt, recipientBinding: binding, proof: "0x" };
+      prepared.data.receiveAuthorizations[0] = { checkpointId: 0n, asOf: 0n, deadline: 0n, recipientBinding: binding, proof: "0x" };
       prepared.witness.receiveBindings = [String(binding), "0"];
       if (actualAction === "fund") {
         prepared.witness.receiveAuthorizationAlias = String(credential.authorizationAlias);
@@ -1616,7 +1616,7 @@ export class ShieldedAssetSession {
           chainId: params.context.chainId, consumer: params.context.poolAddress, action: pending.actionId === SHIELDED_POOL_ACTION.Fund ? 3 : 4,
           messageId: item.slot, payloadHash });
         const proof = await proveShieldedReceivePresentation(presentation.request, presentation.publicSignals);
-        authorizations[item.slot] = { checkpointId: state.checkpointId, asOf: state.asOf, expiresAt: item.credential.expiresAt,
+        authorizations[item.slot] = { checkpointId: state.checkpointId, asOf: state.asOf, deadline: presentation.deadline,
           recipientBinding: presentation.recipientBinding, proof: proof.proof };
       }
       pending.prepared.data.receiveAuthorizations = authorizations;

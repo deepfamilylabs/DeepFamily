@@ -1499,7 +1499,7 @@
       "CheckpointExpired": "The authorization state expired. Refresh and generate a new proof.",
       "InvalidLetterConfiguration": "Private letter delivery is not configured for this deployment.",
       "InvalidLetterField": "The private letter data is invalid. Prepare the letter again.",
-      "ExpiredReceiveCode": "The receive code has expired. Request a new code.",
+      "ExpiredReceiveCode": "The receive code has expired, or this payment was prepared more than 15 minutes ago. Submit it again; if the code has expired, request a new code.",
       "MessageAlreadyRegistered": "This letter has already been registered.",
       "InvalidLetterProof": "The private letter proof failed verification.",
       "PublicInputNotInField": "The proof contains an invalid public value. Generate a new proof.",

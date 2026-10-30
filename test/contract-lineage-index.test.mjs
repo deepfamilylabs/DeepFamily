@@ -368,29 +368,6 @@ describe("DeepFamily lineage index", function () {
     );
   });
 
-  it("keeps a replaced root verifiable for one hour only", async () => {
-    const context = await setup();
-    const { deepFamily, lineageIndex, signers } = context;
-    const family = await addFamily(context);
-    await (await deepFamily.connect(signers[1]).endorseVersion(family.childHash, 1)).wait();
-    const replaced = await lineageIndex.root(ENDORSEMENT_TREE);
-    await (await deepFamily.connect(signers[2]).endorseVersion(family.childHash, 1)).wait();
-    const current = await lineageIndex.root(ENDORSEMENT_TREE);
-    expect(current).to.not.equal(replaced);
-
-    expect(await lineageIndex.isKnownRoot(ENDORSEMENT_TREE, current)).to.equal(true);
-    expect(await lineageIndex.isKnownRoot(ENDORSEMENT_TREE, replaced)).to.equal(true);
-    expect(await lineageIndex.isKnownRoot(ENDORSEMENT_TREE, 0)).to.equal(false);
-    expect(await lineageIndex.isKnownRoot(TRUSTED_TREE, current)).to.equal(false);
-    await hre.networkHelpers.time.increase(3601);
-    expect(await lineageIndex.isKnownRoot(ENDORSEMENT_TREE, replaced)).to.equal(false);
-    expect(await lineageIndex.isKnownRoot(ENDORSEMENT_TREE, current)).to.equal(true);
-    await expect(lineageIndex.isKnownRoot(2, current)).to.be.revertedWithCustomError(
-      lineageIndex,
-      "InvalidTreeId",
-    );
-  });
-
   it("records paired checkpoint roots and constrains asOf to their actual lifetime", async () => {
     const context = await setup();
     const { deepFamily, lineageIndex, signers } = context;

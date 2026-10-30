@@ -144,8 +144,12 @@ template ShieldedReceiveBudgetLookup() {
 // privately to the issuer Groth16 proof by the external verifier; this circuit
 // alone does not authenticate an issuer. Only the operation suffix is public
 // on chain. Keeping that boundary outside the circuit avoids recursive pairing.
+// The code's expiry stays in that private prefix. The suffix carries only
+// deadline = asOf + RECEIVE_PROOF_LIFETIME: the code is unexpired at asOf, and
+// the consumer accepts the operation until the deadline.
 template ShieldedReceivePresentation(KIND) {
     assert(KIND == 1 || KIND == 2 || KIND == 3);
+    var RECEIVE_PROOF_LIFETIME = 900;
     var OFFSET = 0;
     if (KIND == 2) OFFSET = 1;
     var CREDENTIAL_COUNT = 11 + OFFSET;
@@ -163,7 +167,7 @@ template ShieldedReceivePresentation(KIND) {
     signal input checkpointId;
     signal input stateRoot;
     signal input asOf;
-    signal input expiresAt;
+    signal input deadline;
     signal input binding;
     signal input salt;
     signal input depth;
@@ -183,16 +187,17 @@ template ShieldedReceivePresentation(KIND) {
     operationSignals[6] <== checkpointId;
     operationSignals[7] <== stateRoot;
     operationSignals[8] <== asOf;
-    operationSignals[9] <== expiresAt;
+    operationSignals[9] <== deadline;
     operationSignals[10] <== binding;
 
     signal alias <== credentialPublicSignals[0];
     signal counter <== credentialPublicSignals[1];
+    signal expiresAt <== credentialPublicSignals[2];
     signal owner <== credentialPublicSignals[3 + OFFSET];
     signal viewLo <== credentialPublicSignals[4 + OFFSET];
     signal viewHi <== credentialPublicSignals[5 + OFFSET];
     signal mode <== credentialPublicSignals[6 + OFFSET];
-    expiresAt === credentialPublicSignals[2];
+    deadline === asOf + RECEIVE_PROOF_LIFETIME;
     // Restate the issuer's fixed suite and key bounds so every prefix field
     // participates in the presentation's public verification-key relation.
     mode * (1 - mode) === 0;
@@ -207,14 +212,15 @@ template ShieldedReceivePresentation(KIND) {
     component viewZero = IsZero();
     viewZero.in <== viewLo + viewHi;
     viewZero.out === 0;
-    signal uint64Values[5];
+    signal uint64Values[6];
     uint64Values[0] <== chainId;
     uint64Values[1] <== asOf;
     uint64Values[2] <== expiresAt;
     uint64Values[3] <== counter;
     uint64Values[4] <== oldValue;
-    component uint64Bits[5];
-    for (var i = 0; i < 5; i++) {
+    uint64Values[5] <== deadline;
+    component uint64Bits[6];
+    for (var i = 0; i < 6; i++) {
         uint64Bits[i] = Num2Bits(64);
         uint64Bits[i].in <== uint64Values[i];
     }

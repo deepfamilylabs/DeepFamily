@@ -21,8 +21,11 @@ the live counter and updates its stored dictionary through
 API; the old global-tree transition APIs and authorization ABI have been removed.
 The replacement development keys and fixed verifier match the six-signal circuit.
 Incrementing the counter invalidates earlier credentials on this chain
-within the checkpoint retirement window of 15 minutes. Credential expiry is checked
-against the execution block and has no grace period. Incrementing the counter does
+within the checkpoint retirement window of 15 minutes. Credential expiry stays private:
+the presentation proves the credential is unexpired at its `asOf`, and the only public
+time is `deadline = asOf + 15 minutes`, which the consumer checks against the execution
+block. A payment or letter started before expiry may therefore land up to 15 minutes
+after it; nothing can be started once the credential has expired. Incrementing the counter does
 not change spending or decryption keys, existing balances, budgets or old letters.
 
 Authorization reads and receive presentations still support complete 64-level
@@ -104,8 +107,8 @@ commitment is allowed only where the business circuit proves the actual input ow
 is also the output owner; Shield remains a self-deposit operation.
 
 `PrivateLetterArchive` uses the same authorization state as the canonical pool
-factory. It authenticates ciphertext, message ID, recipient commitment and credential
-expiry before writing immutable Archive segments. Attachments additionally prove
+factory. It authenticates ciphertext, message ID, recipient commitment and the proof
+deadline before writing immutable Archive segments. Attachments additionally prove
 membership of an actual private Fund note under an accepted canonical pool root,
 with the same owner, viewing key and mode. The attachment circuit supports the
 production 32-level note tree. It does not require the credential identity to equal

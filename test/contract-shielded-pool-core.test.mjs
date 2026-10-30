@@ -6,6 +6,7 @@ import {
   buildShieldedPoolPublicSignals,
   encodePublicShieldedBudgetEnvelope,
   replayLineageTree,
+  SHIELDED_RECEIVE_PROOF_LIFETIME,
 } from "@deepfamily/protocol-core";
 
 const ciphertext = (byte) => `0x${byte.repeat(512)}`;
@@ -14,7 +15,7 @@ const ACTION_PURPOSE_BASE = 2;
 const emptyAuthorization = () => ({
   checkpointId: 0n,
   asOf: 0n,
-  expiresAt: 0n,
+  deadline: 0n,
   recipientBinding: 0n,
   proof: "0x",
 });
@@ -128,7 +129,7 @@ describe("ShieldedErc20Pool contract boundaries", function () {
     data,
     slot,
     action,
-    { expiresAt, checkpointId = 1n, asOf, binding = 777n } = {},
+    { deadline, checkpointId = 1n, asOf, binding = 777n } = {},
   ) {
     const latest = BigInt((await hre.ethers.provider.getBlock("latest")).timestamp);
     const state = await hre.ethers.getContractAt(
@@ -138,7 +139,7 @@ describe("ShieldedErc20Pool contract boundaries", function () {
     const authorization = {
       checkpointId,
       asOf: asOf ?? latest,
-      expiresAt: expiresAt ?? latest + 3600n,
+      deadline: deadline ?? (asOf ?? latest) + SHIELDED_RECEIVE_PROOF_LIFETIME,
       recipientBinding: binding,
       proof: "0x",
     };
@@ -154,7 +155,7 @@ describe("ShieldedErc20Pool contract boundaries", function () {
       checkpointId,
       root,
       authorization.asOf,
-      authorization.expiresAt,
+      authorization.deadline,
       binding,
     ];
     authorization.proof = hre.ethers.AbiCoder.defaultAbiCoder().encode(["uint256[11]"], [inputs]);
@@ -181,9 +182,9 @@ describe("ShieldedErc20Pool contract boundaries", function () {
       pool,
       "InvalidReceiveAuthorization",
     );
-    const wrongExpiry = structuredClone(funding);
-    wrongExpiry.receiveAuthorizations[0].expiresAt += 1n;
-    await expect(pool.fund(wrongExpiry, proof)).to.be.revertedWithCustomError(
+    const wrongDeadline = structuredClone(funding);
+    wrongDeadline.receiveAuthorizations[0].deadline += 1n;
+    await expect(pool.fund(wrongDeadline, proof)).to.be.revertedWithCustomError(
       pool,
       "InvalidReceiveProof",
     );
@@ -240,7 +241,7 @@ describe("ShieldedErc20Pool contract boundaries", function () {
     await pool.privateTransfer(transfer, proof);
   });
 
-  it("rejects expired codes at the exact expiry and retired shared counter checkpoints", async () => {
+  it("rejects receive authorizations at the exact deadline and retired shared counter checkpoints", async () => {
     const { pool, authorizationState } = await setup();
     const deposit = actionData();
     await pool.shield(100n, deposit, await proofFor(pool, 0, deposit, 100n));
@@ -252,14 +253,14 @@ describe("ShieldedErc20Pool contract boundaries", function () {
       outputCommitments: [943n, 944n],
     });
     const expiry = BigInt((await hre.ethers.provider.getBlock("latest")).timestamp) + 20n;
-    await authorize(pool, funding, 0, 3, { expiresAt: expiry });
+    await authorize(pool, funding, 0, 3, { deadline: expiry });
     const proof = await proofFor(pool, 1, funding);
     await hre.networkHelpers.time.increaseTo(expiry);
     await expect(pool.fund.staticCall(funding, proof)).to.be.revertedWithCustomError(
       pool,
       "ExpiredReceiveCode",
     );
-    await authorize(pool, funding, 0, 3, { expiresAt: expiry + 7200n });
+    await authorize(pool, funding, 0, 3, { deadline: expiry + 7200n });
     const checkpointProof = await proofFor(pool, 1, funding);
     const inputs = [
       961n,
@@ -296,7 +297,7 @@ describe("ShieldedErc20Pool contract boundaries", function () {
     await authorize(pool, transfer, 1, 4, { binding: 778n });
     const proof = await proofFor(pool, 3, transfer);
     for (const slot of [0, 1]) {
-      for (const field of ["asOf", "expiresAt", "recipientBinding"]) {
+      for (const field of ["asOf", "deadline", "recipientBinding"]) {
         const changed = structuredClone(transfer);
         // Keep a valid state time to ensure the exact proof binding rejects the metadata.
         changed.receiveAuthorizations[slot][field] += field === "asOf" ? -1n : 1n;
@@ -323,7 +324,7 @@ describe("ShieldedErc20Pool contract boundaries", function () {
     await pool.privateTransfer(transfer, proof);
   });
 
-  it("checks expiry independently for every transfer output and accepts a fresh matching receipt", async () => {
+  it("checks the receive deadline independently for every transfer output and accepts a fresh matching receipt", async () => {
     const { pool } = await setup();
     const deposit = actionData();
     await pool.shield(100n, deposit, await proofFor(pool, 0, deposit, 100n));
@@ -334,8 +335,8 @@ describe("ShieldedErc20Pool contract boundaries", function () {
       outputCommitments: [983n, 984n],
     });
     const deadline = BigInt((await hre.ethers.provider.getBlock("latest")).timestamp) + 20n;
-    await authorize(pool, transfer, 0, 4, { expiresAt: deadline + 3600n });
-    await authorize(pool, transfer, 1, 4, { expiresAt: deadline, binding: 778n });
+    await authorize(pool, transfer, 0, 4, { deadline: deadline + 3600n });
+    await authorize(pool, transfer, 1, 4, { deadline: deadline, binding: 778n });
     const proof = await proofFor(pool, 3, transfer);
     await hre.networkHelpers.time.increaseTo(deadline - 1n);
     await pool.privateTransfer.staticCall(transfer, proof);
@@ -346,7 +347,7 @@ describe("ShieldedErc20Pool contract boundaries", function () {
     );
     expect(await pool.nullifierSpent(981n)).to.equal(false);
     expect(await pool.commitmentExists(983n)).to.equal(false);
-    await authorize(pool, transfer, 1, 4, { expiresAt: deadline + 3600n, binding: 778n });
+    await authorize(pool, transfer, 1, 4, { deadline: deadline + 3600n, binding: 778n });
     await pool.privateTransfer(transfer, proof);
     expect(await pool.nullifierSpent(981n)).to.equal(true);
   });

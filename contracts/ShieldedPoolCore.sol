@@ -57,7 +57,8 @@ abstract contract ShieldedPoolCore is ReentrancyGuardTransient {
   struct ReceiveAuthorization {
     uint256 checkpointId;
     uint64 asOf;
-    uint64 expiresAt;
+    // asOf plus the proof's fixed 15-minute lifetime. The code's own expiry stays private.
+    uint64 deadline;
     uint256 recipientBinding;
     bytes proof;
   }
@@ -408,7 +409,7 @@ abstract contract ShieldedPoolCore is ReentrancyGuardTransient {
           required ||
           authorization.checkpointId != 0 ||
           authorization.asOf != 0 ||
-          authorization.expiresAt != 0 ||
+          authorization.deadline != 0 ||
           authorization.proof.length != 0
         ) {
           revert InvalidReceiveAuthorization();
@@ -420,7 +421,7 @@ abstract contract ShieldedPoolCore is ReentrancyGuardTransient {
       }
       _requireNonzeroField(authorization.recipientBinding);
       _requireField(authorization.checkpointId);
-      if (block.timestamp >= authorization.expiresAt) revert ExpiredReceiveCode();
+      if (block.timestamp >= authorization.deadline) revert ExpiredReceiveCode();
       uint256 root = AUTHORIZATION_STATE.validateCheckpoint(
         authorization.checkpointId,
         authorization.asOf
@@ -436,7 +437,7 @@ abstract contract ShieldedPoolCore is ReentrancyGuardTransient {
       inputs[6] = authorization.checkpointId;
       inputs[7] = root;
       inputs[8] = authorization.asOf;
-      inputs[9] = authorization.expiresAt;
+      inputs[9] = authorization.deadline;
       inputs[10] = authorization.recipientBinding;
       try RECEIVE_VERIFIER.verifyProof(authorization.proof, inputs) {} catch {
         revert InvalidReceiveProof();

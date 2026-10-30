@@ -21,7 +21,7 @@ const dataFor = (overrides = {}) => ({
   receiveAuthorizations: Array.from({ length: 2 }, () => ({
     checkpointId: 0n,
     asOf: 0n,
-    expiresAt: 0n,
+    deadline: 0n,
     recipientBinding: 0n,
     proof: "0x",
   })),

@@ -42,7 +42,7 @@ const context: ShieldedWorkerContext = {
   assetKind: "native", lettersAddress: "0x5555555555555555555555555555555555555555",
 };
 const letter: ProvenPrivateLetter = {
-  delivery: { messageId: "7", checkpointId: "1", asOf: "900", expiresAt: "1200", recipientBinding: "9" },
+  delivery: { messageId: "7", checkpointId: "1", asOf: "900", deadline: "1200", recipientBinding: "9" },
   ciphertext: "0x010203", proof: "0x1234",
 };
 const draft = { code: "budget-receive-code", body: "A private family letter" };

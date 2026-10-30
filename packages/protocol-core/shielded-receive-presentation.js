@@ -18,6 +18,11 @@ export const SHIELDED_RECEIVE_PRESENTATION_ACTION = Object.freeze({
 });
 export const SHIELDED_RECEIVE_BINDING_DOMAIN = 202610210102n;
 export const SHIELDED_FUND_RECEIVE_BINDING_DOMAIN = 202610220102n;
+/**
+ * Seconds from asOf to the public deadline, fixed by the presentation circuit. The code is
+ * checked as unexpired at asOf; consumers accept the operation until the deadline.
+ */
+export const SHIELDED_RECEIVE_PROOF_LIFETIME = 900n;
 const field = (value, label) => bigintFrom(value, label, SNARK_SCALAR_FIELD - 1n);
 const check = (condition, message) =>
   protocolAssert(condition, "INVALID_SHIELDED_RECEIVE_PRESENTATION", message);
@@ -76,7 +81,7 @@ export function emptyShieldedReceiveAuthorizations() {
   return Array.from({ length: 2 }, () => ({
     checkpointId: 0n,
     asOf: 0n,
-    expiresAt: 0n,
+    deadline: 0n,
     recipientBinding: 0n,
     proof: "0x",
   }));
@@ -84,7 +89,8 @@ export function emptyShieldedReceiveAuthorizations() {
 
 /**
  * Builds private prover input, never a public transport packet. The issuer and presentation
- * proofs are linked over hidden common inputs. No identity, R or reusable proof is sent on chain.
+ * proofs are linked over hidden common inputs. No identity, R, code expiry or reusable proof
+ * is sent on chain.
  */
 export function prepareShieldedReceivePresentation(input) {
   const credential = input.credential;
@@ -100,6 +106,8 @@ export function prepareShieldedReceivePresentation(input) {
   const messageId = bigintFrom(input.messageId, "messageId", MAX_UINT128);
   check(chainId > 0n && consumer > 0n && checkpointId > 0n, "Receive context must be nonzero");
   check(asOf < signals[2], "Receive credential has expired at the selected state time");
+  const deadline = asOf + SHIELDED_RECEIVE_PROOF_LIFETIME;
+  check(deadline <= MAX_UINT64, "Receive state time is out of range");
   const hashBytes = getBytes(input.payloadHash);
   check(hashBytes.length === 32, "Receive operation hash must be 32 bytes");
   const hash = BigInt(hexlify(hashBytes));
@@ -123,7 +131,7 @@ export function prepareShieldedReceivePresentation(input) {
     checkpointId,
     lookup.stateRoot,
     asOf,
-    signals[2],
+    deadline,
     binding,
   ];
   const presentation = Object.fromEntries(
@@ -137,7 +145,7 @@ export function prepareShieldedReceivePresentation(input) {
       "checkpointId",
       "stateRoot",
       "asOf",
-      "expiresAt",
+      "deadline",
       "binding",
     ].map((name, i) => [name, String(publicSignals[i])]),
   );
@@ -154,6 +162,7 @@ export function prepareShieldedReceivePresentation(input) {
   return {
     publicSignals,
     recipientBinding: binding,
+    deadline,
     presentation,
     request: {
       kind,
@@ -196,7 +205,7 @@ export function prepareReceivePresentationWitness(request) {
     "checkpointId",
     "stateRoot",
     "asOf",
-    "expiresAt",
+    "deadline",
     "binding",
   ];
   const witness = { credentialPublicSignals: commonInputs };

@@ -1428,10 +1428,13 @@ export const SHIELDED_RECEIVE_PRESENTATION_ACTION: Readonly<{
 export * from "./groth16-link.js";
 export const SHIELDED_RECEIVE_BINDING_DOMAIN: bigint;
 export const SHIELDED_FUND_RECEIVE_BINDING_DOMAIN: bigint;
+/** Seconds from a receive proof's asOf to its public deadline. */
+export const SHIELDED_RECEIVE_PROOF_LIFETIME: bigint;
 export interface ShieldedReceiveAuthorization {
   checkpointId: BigNumberish;
   asOf: BigNumberish;
-  expiresAt: BigNumberish;
+  /** asOf plus SHIELDED_RECEIVE_PROOF_LIFETIME; the code's own expiry stays private. */
+  deadline: BigNumberish;
   recipientBinding: BigNumberish;
   proof: string;
 }
@@ -1462,6 +1465,7 @@ export function prepareShieldedReceivePresentation(input: {
 }): {
   publicSignals: bigint[];
   recipientBinding: bigint;
+  deadline: bigint;
   presentation: Record<string, string | string[]>;
   request: {
     kind: "anonymous" | "fund" | "attachment";

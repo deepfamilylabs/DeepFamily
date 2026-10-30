@@ -10,7 +10,7 @@ beforeEach(() => { vi.clearAllMocks(); mocks.validateCheckpoint.mockReset().mock
 function fixture() {
   const iface = new Interface(PRIVATE_LETTER_ABI);
   const blob = { payloadHash: `0x${"33".repeat(32)}`, pointer: "0x2222222222222222222222222222222222222222", payloadLength: 3n, segmentCount: 1n };
-  const record = { blob, recipientBinding: 9n, relationCommitment: 0n, expiresAt: 1200n, registeredAt: 1000n };
+  const record = { blob, recipientBinding: 9n, relationCommitment: 0n, deadline: 1200n, registeredAt: 1000n };
   const event = iface.encodeEventLog(iface.getEvent("LetterRegistered")!, [7, blob, 9, 0, 1200, 1000]);
   const provider = { getBlockNumber: async () => 20, getBlock: vi.fn(async () => ({ hash: "0xanchor" })), getCode: vi.fn(),
     getLogs: vi.fn(async (_filter: { topics: unknown[] }) => [{ ...event, blockNumber: 15, index: 0, transactionHash: "0xtransaction" }]) };
@@ -41,7 +41,7 @@ describe("authenticated private letter recovery", () => {
 function submissionFixture() {
   const address = "0x1111111111111111111111111111111111111111";
   const iface = new Interface(PRIVATE_LETTER_ABI);
-  const letter = { delivery: { messageId: "7", checkpointId: "1", asOf: "900", expiresAt: "1200", recipientBinding: "9" }, ciphertext: "0x010203", proof: "0x1234" };
+  const letter = { delivery: { messageId: "7", checkpointId: "1", asOf: "900", deadline: "1200", recipientBinding: "9" }, ciphertext: "0x010203", proof: "0x1234" };
   const blob = { payloadHash: keccak256(letter.ciphertext), pointer: "0x2222222222222222222222222222222222222222", payloadLength: 3n, segmentCount: 1n };
   const contract = {
     interface: iface, AUTHORIZATION_STATE: async () => address,
@@ -62,7 +62,7 @@ function submissionFixture() {
 describe("private letter retry and receipt confirmation", () => {
   it("reconciles an already registered message before checking its now-expired receive code", async () => {
     const f = submissionFixture();
-    f.contract.letterRecord.mockResolvedValue({ registeredAt: 1000n, recipientBinding: 9n, relationCommitment: 0n, expiresAt: 1200n, blob: f.blob } as never);
+    f.contract.letterRecord.mockResolvedValue({ registeredAt: 1000n, recipientBinding: 9n, relationCommitment: 0n, deadline: 1200n, blob: f.blob } as never);
     f.provider.getBlock.mockResolvedValue({ timestamp: 1300 });
     await expect(submitPrivateLetter(f.input)).resolves.toEqual({ transactionHash: "0xprior" });
     expect(f.contract.registerLetter).not.toHaveBeenCalled();
@@ -70,7 +70,7 @@ describe("private letter retry and receipt confirmation", () => {
   });
   it("rejects a retry if the existing registration authenticates a different expiry", async () => {
     const f = submissionFixture();
-    f.contract.letterRecord.mockResolvedValue({ registeredAt: 1000n, recipientBinding: 9n, relationCommitment: 0n, expiresAt: 1300n, blob: f.blob } as never);
+    f.contract.letterRecord.mockResolvedValue({ registeredAt: 1000n, recipientBinding: 9n, relationCommitment: 0n, deadline: 1300n, blob: f.blob } as never);
     await expect(submitPrivateLetter(f.input)).rejects.toThrow("another registered letter");
     expect(f.contract.registerLetter).not.toHaveBeenCalled();
   });

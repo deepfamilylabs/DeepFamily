@@ -142,6 +142,9 @@ export default {
       gas: "auto",
       gasPrice: "auto",
       blockGasLimit: 30000000,
+      // Like live chains, keep producing blocks while idle: receive proofs take asOf from the
+      // latest block and must land within 15 minutes of it.
+      mining: { auto: true, interval: 15_000 },
     },
     // Local development network
     localhost: {

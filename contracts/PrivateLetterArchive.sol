@@ -24,7 +24,8 @@ contract PrivateLetterArchive is DeepFamilyArchive {
     uint128 messageId;
     uint256 checkpointId;
     uint64 asOf;
-    uint64 expiresAt;
+    // asOf plus the proof's fixed 15-minute lifetime. The code's own expiry stays private.
+    uint64 deadline;
     uint256 recipientBinding;
   }
 
@@ -41,7 +42,7 @@ contract PrivateLetterArchive is DeepFamilyArchive {
     uint256 recipientBinding;
     uint256 relationCommitment;
     uint64 registeredAt;
-    uint64 expiresAt;
+    uint64 deadline;
   }
 
   uint256 private constant SCALAR_FIELD =
@@ -59,7 +60,7 @@ contract PrivateLetterArchive is DeepFamilyArchive {
     BlobRef blob,
     uint256 recipientBinding,
     uint256 relationCommitment,
-    uint64 expiresAt,
+    uint64 deadline,
     uint64 registeredAt
   );
 
@@ -140,7 +141,7 @@ contract PrivateLetterArchive is DeepFamilyArchive {
     bytes calldata ciphertext,
     uint256 action
   ) private view returns (uint256[11] memory inputs) {
-    if (block.timestamp >= delivery.expiresAt) revert ExpiredReceiveCode();
+    if (block.timestamp >= delivery.deadline) revert ExpiredReceiveCode();
     if (usedMessage[delivery.messageId]) revert MessageAlreadyRegistered();
     if (
       delivery.recipientBinding == 0 ||
@@ -163,7 +164,7 @@ contract PrivateLetterArchive is DeepFamilyArchive {
       delivery.checkpointId,
       counterRoot,
       uint256(delivery.asOf),
-      uint256(delivery.expiresAt),
+      uint256(delivery.deadline),
       delivery.recipientBinding
     ];
   }
@@ -182,14 +183,14 @@ contract PrivateLetterArchive is DeepFamilyArchive {
       recipientBinding: delivery.recipientBinding,
       relationCommitment: relationCommitment,
       registeredAt: timestamp,
-      expiresAt: delivery.expiresAt
+      deadline: delivery.deadline
     });
     emit LetterRegistered(
       delivery.messageId,
       blob,
       delivery.recipientBinding,
       relationCommitment,
-      delivery.expiresAt,
+      delivery.deadline,
       timestamp
     );
   }

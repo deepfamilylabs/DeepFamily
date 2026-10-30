@@ -708,7 +708,7 @@ describe("Worker-backed shielded wallet", () => {
     ["native", "CFX"], ["erc20", "DEEP"], ["erc20", "TEST"],
   ] as const)("sends a standalone letter from the unlocked workspace in the %s %s context", async (assetKind, assetSymbol) => {
     mocks.lettersAddress = "0x1111111111111111111111111111111111111111";
-    const preparedLetter = { delivery: { messageId: "7", checkpointId: "1", asOf: "900", expiresAt: "1200", recipientBinding: "9" }, ciphertext: "0x010203", proof: "0x1234" };
+    const preparedLetter = { delivery: { messageId: "7", checkpointId: "1", asOf: "900", deadline: "1200", recipientBinding: "9" }, ciphertext: "0x010203", proof: "0x1234" };
     await renderUnlockedPanel(signer, { ...modules, assetKind, assetSymbol });
     const originalCall = mocks.call.getMockImplementation()!;
     mocks.call.mockImplementation(async (method: string) => {
@@ -2508,7 +2508,7 @@ describe("Worker-backed shielded wallet", () => {
   ] as const)("handles inline budget letters in mode %s with outcome %s", async (keyMode, outcome) => {
     mocks.lettersAddress = "0x1111111111111111111111111111111111111111";
     mocks.verify.mockResolvedValue({ disclosure: "fund", personHash: identity.personHash, keyMode, fingerprint: "child-fingerprint" });
-    const preparedLetter = { delivery: { messageId: "7", checkpointId: "1", asOf: "900", expiresAt: "1200", recipientBinding: "9" }, ciphertext: "0x010203", proof: "0x1234" };
+    const preparedLetter = { delivery: { messageId: "7", checkpointId: "1", asOf: "900", deadline: "1200", recipientBinding: "9" }, ciphertext: "0x010203", proof: "0x1234" };
     mocks.call.mockImplementation(async (method, params) => {
       if (method === "recover") return {
         ...emptyWallet,

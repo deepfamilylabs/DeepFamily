@@ -5,35 +5,35 @@ import { createIdentityAuthorizationContract } from "./shieldedIdentityAuthoriza
 import { waitForShieldedTransaction } from "./shieldedTransactionReceipt";
 
 const BLOB = "tuple(bytes32 payloadHash,address pointer,uint64 payloadLength,uint32 segmentCount)";
-const DELIVERY = "tuple(uint128 messageId,uint256 checkpointId,uint64 asOf,uint64 expiresAt,uint256 recipientBinding)";
+const DELIVERY = "tuple(uint128 messageId,uint256 checkpointId,uint64 asOf,uint64 deadline,uint256 recipientBinding)";
 const ATTACHMENT = "tuple(address asset,address pool,uint256 shardId,uint256 noteRoot,uint256 relationCommitment)";
 export const PRIVATE_LETTER_ABI = [
   "function AUTHORIZATION_STATE() view returns (address)", "function POOL_FACTORY() view returns (address)",
   "function DEEP_FAMILY() view returns (address)", "function creationBlock() view returns (uint256)",
-  `function letterRecord(uint128) view returns (tuple(${BLOB} blob,uint256 recipientBinding,uint256 relationCommitment,uint64 registeredAt,uint64 expiresAt))`,
+  `function letterRecord(uint128) view returns (tuple(${BLOB} blob,uint256 recipientBinding,uint256 relationCommitment,uint64 registeredAt,uint64 deadline))`,
   `function registerLetter(${DELIVERY} delivery,bytes ciphertext,bytes proof)`,
   `function registerAttachedLetter(${DELIVERY} delivery,${ATTACHMENT} attachment,bytes ciphertext,bytes proof)`,
-  `event LetterRegistered(uint128 indexed messageId,${BLOB} blob,uint256 recipientBinding,uint256 relationCommitment,uint64 expiresAt,uint64 registeredAt)`,
+  `event LetterRegistered(uint128 indexed messageId,${BLOB} blob,uint256 recipientBinding,uint256 relationCommitment,uint64 deadline,uint64 registeredAt)`,
 ] as const;
 
 export const createPrivateLetterContract = (address: string, runner: ContractRunner) => new Contract(address, PRIVATE_LETTER_ABI, runner);
 
 export type ProvenPrivateLetter = {
-  delivery: { messageId: string; checkpointId: string; asOf: string; expiresAt: string; recipientBinding: string };
+  delivery: { messageId: string; checkpointId: string; asOf: string; deadline: string; recipientBinding: string };
   ciphertext: string;
   proof: string;
   attachment?: { asset: string; pool: string; shardId: string; noteRoot: string; relationCommitment: string };
 };
 export type PrivateLetterChainRecord = {
   messageId: string; recipientBinding: string; relationCommitment: string;
-  registeredAt: string; expiresAt: string; ciphertextHash: string; ciphertext: Uint8Array;
+  registeredAt: string; deadline: string; ciphertextHash: string; ciphertext: Uint8Array;
   transactionHash: string;
 };
 
 /** This proof can no longer execute, so retrying may safely prepare a fresh message. */
 export class PrivateLetterPreparationExpiredError extends Error {
   constructor() {
-    super("The receive code or authorization checkpoint expired before letter submission");
+    super("The receive authorization or its checkpoint expired before letter submission");
     this.name = "PrivateLetterPreparationExpiredError";
   }
 }
@@ -61,12 +61,12 @@ export async function readPrivateLetters(contract: Contract): Promise<PrivateLet
       if (seen.has(messageId)) throw new Error("Private letter history contains duplicate messages");
       seen.add(messageId);
       const record = await contract.letterRecord(messageId, { blockTag: toBlock });
-      for (const field of ["recipientBinding", "relationCommitment", "registeredAt", "expiresAt"])
+      for (const field of ["recipientBinding", "relationCommitment", "registeredAt", "deadline"])
         if (BigInt(record[field]) !== BigInt(parsed[field])) throw new Error("Private letter record does not match its registration");
       for (const field of ["pointer", "payloadHash", "payloadLength", "segmentCount"])
         if (String(record.blob[field]).toLowerCase() !== String(parsed.blob[field]).toLowerCase()) throw new Error("Private letter archive reference does not match its registration");
       const blob = await readArchiveBlob({ pointer: record.blob.pointer, payloadHash: record.blob.payloadHash, payloadLength: record.blob.payloadLength, segmentCount: record.blob.segmentCount, blockTag: toBlock, getCode: (pointer, blockTag) => provider.getCode(pointer, blockTag) });
-      letters.push({ messageId, recipientBinding: String(record.recipientBinding), relationCommitment: String(record.relationCommitment), registeredAt: String(record.registeredAt), expiresAt: String(record.expiresAt), ciphertextHash: blob.payloadHash, ciphertext: blob.payload, transactionHash: log.transactionHash });
+      letters.push({ messageId, recipientBinding: String(record.recipientBinding), relationCommitment: String(record.relationCommitment), registeredAt: String(record.registeredAt), deadline: String(record.deadline), ciphertextHash: blob.payloadHash, ciphertext: blob.payload, transactionHash: log.transactionHash });
     }
   }
   if ((await provider.getBlock(toBlock))?.hash !== anchor.hash) throw new Error("Private letter archive was reorganized");
@@ -83,7 +83,7 @@ export async function submitPrivateLetter(input: { address: string; signer: Sign
   if (BigInt(existing.registeredAt) !== 0n) {
     if (BigInt(existing.recipientBinding) !== BigInt(delivery.recipientBinding) ||
       String(existing.blob.payloadHash).toLowerCase() !== keccak256(ciphertext).toLowerCase() ||
-      BigInt(existing.expiresAt) !== BigInt(delivery.expiresAt) ||
+      BigInt(existing.deadline) !== BigInt(delivery.deadline) ||
       BigInt(existing.relationCommitment) !== BigInt(attachment?.relationCommitment ?? 0)) throw new Error("Message number belongs to another registered letter");
     const logs = await contract.queryFilter(contract.filters.LetterRegistered(delivery.messageId), await contract.creationBlock());
     if (logs.length !== 1) throw new Error("Existing letter registration could not be confirmed");
@@ -91,7 +91,7 @@ export async function submitPrivateLetter(input: { address: string; signer: Sign
   }
   const block = await provider.getBlock("latest");
   if (!block) throw new Error("The latest chain block is unavailable");
-  if (BigInt(block.timestamp) >= BigInt(delivery.expiresAt)) throw new PrivateLetterPreparationExpiredError();
+  if (BigInt(block.timestamp) >= BigInt(delivery.deadline)) throw new PrivateLetterPreparationExpiredError();
   const authorization = createIdentityAuthorizationContract(await contract.AUTHORIZATION_STATE(), provider);
   try {
     await authorization.validateCheckpoint(delivery.checkpointId, delivery.asOf);
@@ -119,7 +119,7 @@ export async function submitPrivateLetter(input: { address: string; signer: Sign
       return event?.name === "LetterRegistered" && BigInt(event.args.messageId) === BigInt(delivery.messageId) &&
         BigInt(event.args.recipientBinding) === BigInt(delivery.recipientBinding) &&
         BigInt(event.args.relationCommitment) === BigInt(attachment?.relationCommitment ?? 0) &&
-        BigInt(event.args.expiresAt) === BigInt(delivery.expiresAt) &&
+        BigInt(event.args.deadline) === BigInt(delivery.deadline) &&
         String(event.args.blob.payloadHash).toLowerCase() === keccak256(ciphertext).toLowerCase();
     } catch { return false; }
   });

@@ -5,7 +5,10 @@ import {
 import "../hardhat-test-setup.mjs";
 import { expect } from "chai";
 import hre from "hardhat";
-import { buildShieldedIdentityAuthorizationState } from "@deepfamily/protocol-core";
+import {
+  buildShieldedIdentityAuthorizationState,
+  SHIELDED_RECEIVE_PROOF_LIFETIME,
+} from "@deepfamily/protocol-core";
 import { readArchiveBlob } from "../packages/protocol-core/archive.js";
 
 // These tests deliberately use exact-input mocks to isolate contract boundary checks.
@@ -75,7 +78,7 @@ async function delivery(context, overrides = {}) {
     messageId: 123n,
     checkpointId,
     asOf: await now(),
-    expiresAt: (await now()) + 3600n,
+    deadline: (await now()) + SHIELDED_RECEIVE_PROOF_LIFETIME,
     recipientBinding: 456n,
     ...overrides,
   };
@@ -94,7 +97,7 @@ async function proof(context, data, payload = ciphertext, attachment, overrides 
     data.checkpointId,
     checkpoint.root,
     data.asOf,
-    data.expiresAt,
+    data.deadline,
     data.recipientBinding,
   ];
   if (attachment) {
@@ -220,14 +223,14 @@ describe("Shared identity authorization counter state", function () {
 describe("Authenticated private letter archive boundaries", function () {
   this.timeout(120_000);
 
-  it("binds ciphertext, message, recipient, authenticated expiry, chain and actual archive", async () => {
+  it("binds ciphertext, message, recipient, deadline, chain and actual archive", async () => {
     const context = await hre.networkHelpers.loadFixture(fixture);
     const data = await delivery(context);
     const valid = await proof(context, data);
     for (const changed of [
       { ...data, messageId: data.messageId + 1n },
       { ...data, recipientBinding: data.recipientBinding + 1n },
-      { ...data, expiresAt: data.expiresAt + 1n },
+      { ...data, deadline: data.deadline + 1n },
       { ...data, asOf: data.asOf + 1n },
     ]) {
       if (changed.asOf > (await now())) await hre.networkHelpers.time.increase(1);
@@ -258,7 +261,7 @@ describe("Authenticated private letter archive boundaries", function () {
     ).to.be.revertedWithCustomError(context.archive, "MessageAlreadyRegistered");
   });
 
-  it("round-trips immutable ciphertext with no person or NFT and preserves it after code expiry", async () => {
+  it("round-trips immutable ciphertext with no person or NFT and preserves it after its deadline", async () => {
     const context = await hre.networkHelpers.loadFixture(fixture);
     for (const length of [512, 16_385]) {
       const payload = `0x${"de".repeat(length)}`;
@@ -279,16 +282,16 @@ describe("Authenticated private letter archive boundaries", function () {
     expect((await context.archive.storyState(512n)).totalRecords).to.equal(0n);
   });
 
-  it("uses authenticated expiry strictly without applying the counter retirement grace", async () => {
+  it("uses the deadline strictly without applying the counter retirement grace", async () => {
     const context = await hre.networkHelpers.loadFixture(fixture);
-    const data = await delivery(context, { expiresAt: (await now()) + 30n });
+    const data = await delivery(context, { deadline: (await now()) + 30n });
     const valid = await proof(context, data);
     await (await update(context)).execute();
     const retired = await context.state.getCheckpoint(data.checkpointId);
-    expect(retired.retiredAt).to.be.lessThan(data.expiresAt);
-    await hre.networkHelpers.time.increaseTo(Number(data.expiresAt - 1n));
+    expect(retired.retiredAt).to.be.lessThan(data.deadline);
+    await hre.networkHelpers.time.increaseTo(Number(data.deadline - 1n));
     await context.archive.registerLetter.staticCall(data, ciphertext, valid);
-    await hre.networkHelpers.time.increaseTo(Number(data.expiresAt));
+    await hre.networkHelpers.time.increaseTo(Number(data.deadline));
     await expect(
       context.archive.registerLetter(data, ciphertext, valid),
     ).to.be.revertedWithCustomError(context.archive, "ExpiredReceiveCode");
@@ -296,7 +299,9 @@ describe("Authenticated private letter archive boundaries", function () {
 
   it("uses the same state checkpoint and rejects retired counter proofs at the exact deadline", async () => {
     const context = await hre.networkHelpers.loadFixture(fixture);
-    const data = await delivery(context);
+    // A real deadline (asOf + 15 minutes) always ends first; a longer mock deadline
+    // isolates the archive's own checkpoint-retirement check.
+    const data = await delivery(context, { deadline: (await now()) + 3600n });
     const valid = await proof(context, data);
     await (await update(context)).execute();
     const retired = await context.state.getCheckpoint(data.checkpointId);

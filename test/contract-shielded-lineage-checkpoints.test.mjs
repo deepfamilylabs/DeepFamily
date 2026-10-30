@@ -17,6 +17,9 @@ import {
   setupStubVerifiers,
 } from "./helpers/testHelper.mjs";
 
+// These tests cover the lineage window; a longer mock receive deadline keeps it out of the way.
+const LINEAGE_TEST_RECEIVE_LIFETIME = 7200n;
+
 const actionData = (overrides = {}) => ({
   inputShardIds: [0n, 0n],
   inputRoots: [0n, 0n],
@@ -122,7 +125,7 @@ describe("Shielded lineage checkpoint integration", function () {
       receiveAuthorizations: emptyShieldedReceiveAuthorizations(),
       periodNullifiers: Array.from({ length: 3 }, (_, i) => 500n + BigInt(i)),
     };
-    await authorizeMockReceive(hre, pool, data, 3, [777n, 0n]);
+    await authorizeMockReceive(hre, pool, data, 3, [777n, 0n], LINEAGE_TEST_RECEIVE_LIFETIME);
     return {
       data,
       claim,
@@ -222,7 +225,7 @@ describe("Shielded lineage checkpoint integration", function () {
       lineageCheckpointId: laterId,
       asOf: refreshedTime,
     };
-    await authorizeMockReceive(hre, pool, rebound, 3, [777n, 0n]);
+    await authorizeMockReceive(hre, pool, rebound, 3, [777n, 0n], LINEAGE_TEST_RECEIVE_LIFETIME);
     await expect(pool.fund.staticCall(rebound, prepared.fundProof)).to.be.revertedWithCustomError(
       pool,
       "InvalidZKProof",
@@ -248,8 +251,16 @@ describe("Shielded lineage checkpoint integration", function () {
     const current = await prepare(context);
     expect(current.data.relation0).to.not.equal(old.data.relation0);
     expect(current.data.relation1).to.not.equal(old.data.relation1);
-    expect(await lineageIndex.isKnownRoot(0, current.data.relation0)).to.equal(true);
-    expect(await lineageIndex.isKnownRoot(1, old.data.relation1)).to.equal(true);
+    // Each root pair is still valid in its own checkpoint; only the mix never coexisted.
+    for (const { data } of [old, current])
+      expect(
+        await lineageIndex.isKnownCheckpoint(
+          data.lineageCheckpointId,
+          data.relation0,
+          data.relation1,
+          data.asOf,
+        ),
+      ).to.equal(true);
     const mixed = { ...current.data, relation1: old.data.relation1 };
     const mixedClaim = { ...current.claim, relation1: old.data.relation1 };
     for (const lineageCheckpointId of [

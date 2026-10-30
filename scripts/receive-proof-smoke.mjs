@@ -279,7 +279,13 @@ export async function smokeReceiveProofs({
       [
         "expiry from issuer proof",
         (r) => {
-          r.presentation.expiresAt = "1900000001";
+          r.credentialPublicSignals[2] = String(BigInt(r.credentialPublicSignals[2]) + 1n);
+        },
+      ],
+      [
+        "deadline from asOf",
+        (r) => {
+          r.presentation.deadline = String(BigInt(r.presentation.deadline) + 1n);
         },
       ],
       [
