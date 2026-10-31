@@ -13,9 +13,9 @@ import { prepareReceiveProofFixtures } from "../scripts/receive-proof-smoke.mjs"
 const root = path.resolve(import.meta.dirname, "..");
 const directory = path.join(root, "frontend/public/zk/shielded");
 const sources = {
-  anonymousIssuer: "shielded_anonymous_receive_credential",
+  receiveIssuer: "shielded_receive_credential",
   fundIssuer: "shielded_fund_receive_credential",
-  anonymous: "shielded_anonymous_receive_presentation",
+  receive: "shielded_receive_presentation",
   fund: "shielded_fund_receive_presentation",
   owner: "shielded_identity_authorization_update",
 };
@@ -70,7 +70,7 @@ describe("Receive circuit real-proof public bindings", function () {
         issuerDirectory: directory,
       });
       requests = Object.fromEntries(
-        ["anonymous", "fund"].map((kind) => [
+        ["receive", "fund"].map((kind) => [
           kind,
           JSON.parse(fs.readFileSync(path.join(temporary, `${kind}.input.json`), "utf8")),
         ]),
@@ -86,7 +86,7 @@ describe("Receive circuit real-proof public bindings", function () {
   });
 
   for (const [kind, count] of [
-    ["anonymous", 22],
+    ["receive", 22],
     ["fund", 23],
   ]) {
     it(`${kind}: rejects mutation of all ${count} credential and operation signals`, async function () {
@@ -102,10 +102,10 @@ describe("Receive circuit real-proof public bindings", function () {
     });
   }
 
-  it("issuer proofs bind all 23 public signals and reject cross-disclosure reuse", async function () {
+  it("issuer proofs bind all 23 public signals and reject cross-purpose reuse", async function () {
     const proofs = {};
     for (const [kind, count] of [
-      ["anonymous", 11],
+      ["receive", 11],
       ["fund", 12],
     ]) {
       const request = requests[kind];
@@ -123,16 +123,16 @@ describe("Receive circuit real-proof public bindings", function () {
       );
     }
     const stripped = proofs.fund.publicSignals.filter((_, index) => index !== 3);
-    assert.deepEqual(stripped, proofs.anonymous.publicSignals);
+    assert.deepEqual(stripped, proofs.receive.publicSignals);
     assert.equal(
-      await snarkjs.groth16.verify(proofs.anonymous.key, stripped, proofs.fund.proof),
+      await snarkjs.groth16.verify(proofs.receive.key, stripped, proofs.fund.proof),
       false,
     );
     assert.equal(
       await snarkjs.groth16.verify(
         proofs.fund.key,
         proofs.fund.publicSignals,
-        proofs.anonymous.proof,
+        proofs.receive.proof,
       ),
       false,
     );

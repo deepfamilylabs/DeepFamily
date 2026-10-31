@@ -2,7 +2,7 @@
 pragma solidity ^0.8.24;
 
 /**
- * @dev Revert on any invalid proof. The circuit privately authenticates an anonymous receipt,
+ * @dev Revert on any invalid proof. The circuit privately authenticates a receive credential,
  *      queries its canonical R and counter in the shared dictionary, checks it is unexpired at
  *      asOf and binds ciphertext, recipient keys and the one-time operation to actual
  *      chain/consumer. No identity, R, counter, expiry, path, original code or reusable

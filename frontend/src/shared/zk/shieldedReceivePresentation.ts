@@ -10,7 +10,7 @@ import {
 } from "./shieldedZk";
 
 const PRESENTATION_CIRCUITS = {
-  anonymous: "anonymousReceivePresentation",
+  receive: "receivePresentation",
   fund: "fundReceivePresentation",
 } as const;
 
@@ -20,7 +20,7 @@ export async function proveShieldedReceivePresentation(
   expected: readonly (string | bigint | number)[],
 ) {
   const kind = request.kind;
-  if (kind !== "anonymous" && kind !== "fund") {
+  if (kind !== "receive" && kind !== "fund") {
     throw new Error("Unsupported receive proof kind");
   }
   const prepared = prepareReceivePresentationWitness(request);

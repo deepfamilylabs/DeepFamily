@@ -1,5 +1,5 @@
 {
-  "anonymous": {
+  "receive": {
     "verificationKey": {
       "protocol": "groth16",
       "curve": "bn128",

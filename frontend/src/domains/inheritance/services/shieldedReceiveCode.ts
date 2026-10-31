@@ -18,7 +18,7 @@ declare const verifiedRecipient: unique symbol;
  */
 export type VerifiedShieldedRecipient = {
   readonly identityCommitment?: bigint;
-  readonly disclosure?: "anonymous" | "fund";
+  readonly purpose?: "receive" | "fund";
   readonly authorizationAlias?: string;
   readonly authorizationCounter?: string;
   readonly expiresAt?: string;
@@ -62,7 +62,7 @@ export async function verifyShieldedReceiveCode(code: string): Promise<VerifiedS
     throw new ShieldedReceiveCodeError("invalid");
   }
   return {
-    disclosure: result.disclosure,
+    purpose: result.purpose,
     authorizationAlias: result.authorizationAlias,
     authorizationCounter: result.authorizationCounter,
     expiresAt: result.expiresAt,
@@ -86,7 +86,7 @@ export function peekShieldedReceiveCodePersonHash(code: string): string | null {
   if (!code.trim()) return null;
   try {
     const decoded = decodeShieldedReceiveCredential(code);
-    return decoded.disclosure === "fund" && decoded.identityCommitment !== undefined
+    return decoded.purpose === "fund" && decoded.identityCommitment !== undefined
       ? wrapIdentityCommitmentAsPersonHash(decoded.identityCommitment) : null;
   } catch {
     return null;
@@ -97,7 +97,7 @@ export function peekShieldedReceiveCodePersonHash(code: string): string | null {
 export async function createShieldedReceiveCodeForRecipient(credentials: {
   identity: IdentityFields;
   rawPassphrase: string;
-  disclosure?: "anonymous" | "fund";
+  purpose?: "receive" | "fund";
   context: { rpcUrl: string; chainId: string; factoryAddress: string; stateReadMode?: ShieldedStateReadMode };
   expiresAt: string;
 }): Promise<string> {

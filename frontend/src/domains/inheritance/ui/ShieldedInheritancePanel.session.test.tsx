@@ -372,7 +372,7 @@ function openIndependentKeyManagement(flow: "restore" | "create" = "restore") {
 }
 async function waitForReceiveCode(slot: "identity" | "independent") {
   await waitFor(() => expect(mocks.call).toHaveBeenCalledWith("receiveCode", expect.objectContaining({
-    slot, disclosure: "anonymous", context: expect.objectContaining({ chainId: "31337" }), expiresAt: expect.stringMatching(/^\d+$/),
+    slot, purpose: "receive", context: expect.objectContaining({ chainId: "31337" }), expiresAt: expect.stringMatching(/^\d+$/),
   }), expect.anything()));
   await waitFor(() => expect((screen.getByRole("button", { name: "shielded.actions.recover" }) as HTMLButtonElement).disabled).toBe(false));
 }

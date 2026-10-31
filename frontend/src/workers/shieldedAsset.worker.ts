@@ -13,7 +13,7 @@ self.addEventListener("message", (event: MessageEvent) => {
       const result = await session.call(request.method, request.params);
       self.postMessage({ id: request.id, ok: true, result });
     } catch (error) {
-      self.postMessage({ id: request.id, ok: false, error: { message: shieldedAssetErrorMessage(error) } });
+      self.postMessage({ id: request.id, ok: false, error: { message: shieldedAssetErrorMessage(error, request.method) } });
     } finally {
       request.params = undefined as never;
     }

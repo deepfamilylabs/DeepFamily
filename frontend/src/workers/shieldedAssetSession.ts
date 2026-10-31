@@ -102,6 +102,10 @@ import { createIdentityAuthorizationContract, loadShieldedIdentityAuthorizationW
 
 import { createPrivateLetterContract, readPrivateLetters } from "../domains/inheritance/services/privateLetterChain";
 import { proveShieldedReceivePresentation } from "../shared/zk/shieldedReceivePresentation";
+import {
+  ShieldedProofConfigurationError,
+  SHIELDED_PROOF_CONFIGURATION_ERROR_MESSAGE,
+} from "../shared/zk/shieldedProofErrors";
 
 type IdentityMaterial = Awaited<ReturnType<typeof deriveIdentityMaterial>>;
 type IndependentKeyMaterial = Awaited<ReturnType<typeof deriveShieldedIndependentKeyMaterial>>;
@@ -713,7 +717,7 @@ export class ShieldedAssetSession {
     requireValue(getAddress(await archive.POOL_FACTORY()) === getAddress(ctx.factoryAddress) &&
       getAddress(await archive.AUTHORIZATION_STATE()) === getAddress(authorizationAddress), "Letter archive belongs to another protocol deployment.");
     const verified = await this.recipient(params.code);
-    requireValue(verified.disclosure === "anonymous", "Use an anonymous receive code for letters.");
+    requireValue(verified.purpose === "receive", "Use a receive code for letters. Budget receiving credentials are only for funding budgets.");
     const credential = decodeShieldedReceiveCredential(params.code);
     const messageId = BigInt(hexlify(randomBytes(16))) || 1n;
     const salt = generateShieldedRandomField();
@@ -771,7 +775,7 @@ export class ShieldedAssetSession {
       ...serializeIdentity(this.identity),
       keyMode: keys.keyMode,
       keyMaterial: keys,
-      disclosure: params.disclosure ?? "anonymous",
+      purpose: params.purpose ?? "receive",
       authorizationCounter: state.witness.authorizationCounter,
       expiresAt: params.expiresAt,
     });
@@ -1059,8 +1063,10 @@ export class ShieldedAssetSession {
   ) {
     const { credential, action } = destination;
     requireValue(
-      credential.disclosure === (action === "fund" ? "fund" : "anonymous"),
-      "Use the receive material for this operation.",
+      credential.purpose === (action === "fund" ? "fund" : "receive"),
+      action === "fund"
+        ? "Use a budget receiving credential to receive budget funding."
+        : "Use a receive code for transfers. Budget receiving credentials are only for funding budgets.",
     );
     const authorizationAddress = String(await env.pool.AUTHORIZATION_STATE());
     const state = await loadShieldedIdentityAuthorizationWitnessForMode(
@@ -1223,7 +1229,7 @@ export class ShieldedAssetSession {
         requireValue(
           kind === 0 &&
             verified.keyMode === mode &&
-            verified.disclosure === "fund" && verified.personHash?.toLowerCase() === request.publicRecipient.toLowerCase(),
+            verified.purpose === "fund" && verified.personHash?.toLowerCase() === request.publicRecipient.toLowerCase(),
           "The receiving code does not match the selected child and funding entry.",
         );
       if (verified) {
@@ -1437,7 +1443,12 @@ export class ShieldedAssetSession {
       (actualAction === "privateTransfer" && request.action === "privateTransfer" && steps[0]?.inputs.join() === inputs.join() && firstStepIsFinal(steps))) {
       requireValue(receiveDestination, "The receiving destination was not verified.");
       const { credential } = receiveDestination;
-      requireValue(credential.disclosure === (actualAction === "fund" ? "fund" : "anonymous"), "Use the receive material for this operation.");
+      requireValue(
+        credential.purpose === (actualAction === "fund" ? "fund" : "receive"),
+        actualAction === "fund"
+          ? "Use a budget receiving credential to receive budget funding."
+          : "Use a receive code for transfers. Budget receiving credentials are only for funding budgets.",
+      );
       const salt = generateShieldedRandomField();
       const binding = computeShieldedReceiveCredentialBinding({ credential, salt });
       prepared.data.receiveAuthorizations[0] = { checkpointId: 0n, asOf: 0n, deadline: 0n, recipientBinding: binding, proof: "0x" };
@@ -1731,8 +1742,13 @@ export class ShieldedAssetSession {
 }
 
 /** Cryptographic library failures must not serialize witnesses, signatures, or passwords. */
-export function shieldedAssetErrorMessage(error: unknown): string {
-  return error instanceof AssetSessionError
-    ? error.message
-    : "Asset operation could not be completed. The original root was not replaced; check the recovery words, Shielded Key, credentials, deployment, and chain history.";
+export function shieldedAssetErrorMessage(
+  error: unknown,
+  method?: keyof ShieldedAssetWorkerCallMap,
+): string {
+  if (error instanceof AssetSessionError) return error.message;
+  if (error instanceof ShieldedProofConfigurationError) return SHIELDED_PROOF_CONFIGURATION_ERROR_MESSAGE;
+  return method === "receiveCode"
+    ? "Receive code generation failed. Check the network and proving files, then try again."
+    : "Asset operation could not be completed. Please try again.";
 }

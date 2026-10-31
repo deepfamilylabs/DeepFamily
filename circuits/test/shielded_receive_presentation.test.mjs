@@ -21,7 +21,7 @@ const at = (asOf) => ({
   deadline: String(asOf + SHIELDED_RECEIVE_PROOF_LIFETIME),
 });
 const circuitNames = {
-  anonymous: "shielded_anonymous_receive_presentation",
+  receive: "shielded_receive_presentation",
   fund: "shielded_fund_receive_presentation",
 };
 
@@ -31,7 +31,7 @@ const circuitNames = {
 function fixture(kind, { counter = 3n, keyMode = 0n, entries } = {}) {
   const alias = 17n;
   const credential = {
-    disclosure: kind === "fund" ? "fund" : "anonymous",
+    purpose: kind === "fund" ? "fund" : "receive",
     authorizationAlias: alias,
     authorizationCounter: counter,
     expiresAt: 1900000000n,
@@ -115,7 +115,7 @@ test("linked receive presentations preserve credential prefixes and complete ope
     }
 
     await t.test(
-      "all disclosures reject expired, malformed and unbound recipient statements",
+      "all purposes reject expired, malformed and unbound recipient statements",
       async () => {
         for (const [kind, calc] of Object.entries(calculators)) {
           const { witness } = fixture(kind);
@@ -139,7 +139,7 @@ test("linked receive presentations preserve credential prefixes and complete ope
             { cipherLo: String(1n << 128n) },
             { cipherHi: String(1n << 128n) },
             { oldValue: String(1n << 64n) },
-            { action: kind === "anonymous" ? "3" : "1" },
+            { action: kind === "receive" ? "3" : "1" },
           ])
             await invalid(patch);
           const offset = kind === "fund" ? 1 : 0;
@@ -179,8 +179,8 @@ test("linked receive presentations preserve credential prefixes and complete ope
     await t.test(
       "letters permit a message ID while money operations require output slots",
       async () => {
-        const calc = calculators.anonymous;
-        const { witness } = fixture("anonymous");
+        const calc = calculators.receive;
+        const { witness } = fixture("receive");
         for (const messageId of ["0", "1"])
           await calc.calculateWitness({ ...witness, action: "4", messageId }, 1);
         await assertConstraintViolation(() =>
@@ -197,7 +197,7 @@ test("linked receive presentations preserve credential prefixes and complete ope
     await t.test(
       "canonical authorization membership, absence and compressed collision proofs",
       async () => {
-        const calc = calculators.anonymous;
+        const calc = calculators.receive;
         for (const options of [
           { counter: 0n },
           { counter: 0n, entries: [[18n, 2n]] },
@@ -212,7 +212,7 @@ test("linked receive presentations preserve credential prefixes and complete ope
           { counter: (1n << 64n) - 1n, entries: [[17n, (1n << 64n) - 1n]] },
           { counter: 3n },
         ]) {
-          const { witness } = fixture("anonymous", options);
+          const { witness } = fixture("receive", options);
           await calc.calculateWitness(witness, 1);
           for (const patch of [
             { absent: witness.absent === "1" ? "0" : "1" },
@@ -227,7 +227,7 @@ test("linked receive presentations preserve credential prefixes and complete ope
               calc.calculateWitness({ ...witness, ...patch }, 1),
             );
         }
-        const zeroDepth = fixture("anonymous", { entries: [[17n, 3n]] }).witness;
+        const zeroDepth = fixture("receive", { entries: [[17n, 3n]] }).witness;
         const padded = [...zeroDepth.siblings];
         padded[63] = "1";
         await assertConstraintViolation(() =>
@@ -239,7 +239,7 @@ test("linked receive presentations preserve credential prefixes and complete ope
         await assertConstraintViolation(() =>
           calc.calculateWitness({ ...zeroDepth, depth: "1", stateRoot: String(redundantRoot) }, 1),
         );
-        const full = fixture("anonymous").witness;
+        const full = fixture("receive").witness;
         assert.equal(full.depth, "64");
         const deepest = [...full.siblings];
         deepest[63] = "0";

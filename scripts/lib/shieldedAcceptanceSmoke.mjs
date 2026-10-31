@@ -262,14 +262,14 @@ export async function runShieldedAcceptanceSmoke({
       asOf: BigInt(block.timestamp),
     };
   };
-  const receiveCodeFor = async (material, keys, disclosure = "fund") => {
-    const action = disclosure === "fund" ? "fundReceiveCredential" : "anonymousReceiveCredential";
+  const receiveCodeFor = async (material, keys, purpose = "fund") => {
+    const action = purpose === "fund" ? "fundReceiveCredential" : "receiveCredential";
     const files = candidate.circuits[action];
     const alias = computeShieldedAuthorizationAlias(material);
     const checkpoint = await loadAuthorizationWitness(alias);
     const statement = {
-      disclosure,
-      ...(disclosure === "fund" ? { identityCommitment: material.identityCommitment } : {}),
+      purpose,
+      ...(purpose === "fund" ? { identityCommitment: material.identityCommitment } : {}),
       authorizationAlias: alias,
       authorizationCounter: checkpoint.authorizationWitness.authorizationCounter,
       expiresAt: checkpoint.asOf + 86400n,
@@ -1213,7 +1213,7 @@ export async function runShieldedAcceptanceSmoke({
     ]);
     const transferPath = await notePath(publicFundChange);
     const transferData = valueData(publicFundChange, transferPath, transferOutputs);
-    const transferCredentials = [await receiveCodeFor(childMaterial, childKeys, "anonymous"), null];
+    const transferCredentials = [await receiveCodeFor(childMaterial, childKeys, "receive"), null];
     const transferReceiverWitness = await authorizeReceivers("privateTransfer", transferData, transferCredentials);
     const transferInputs = publicInputsFor("privateTransfer", transferData);
     const transferProof = await prove(

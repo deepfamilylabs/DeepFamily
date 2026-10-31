@@ -27,7 +27,7 @@ import { proveReceivePresentation, verifyReceivePresentation } from "./lib/recei
 
 const root = path.resolve(import.meta.dirname, "..");
 const sourceNames = {
-  anonymous: "shielded_anonymous_receive_credential",
+  receive: "shielded_receive_credential",
   fund: "shielded_fund_receive_credential",
 };
 const json = (file, value) => fs.writeFileSync(file, `${JSON.stringify(value, null, 2)}\n`);
@@ -114,7 +114,7 @@ export async function prepareReceiveProofFixtures(
       spendingSecret: String(keys.ownerSecret),
     };
     const credentials = {};
-    for (const [disclosure, source] of Object.entries(sourceNames)) {
+    for (const [purpose, source] of Object.entries(sourceNames)) {
       const vk = JSON.parse(fs.readFileSync(path.join(issuerDir, `${source}.vkey.json`), "utf8"));
       const proof = await snarkjs.groth16.fullProve(
         witness,
@@ -125,15 +125,15 @@ export async function prepareReceiveProofFixtures(
         { singleThread: true },
       );
       assert.equal(await snarkjs.groth16.verify(vk, proof.publicSignals, proof.proof), true);
-      credentials[disclosure] = {
-        disclosure,
+      credentials[purpose] = {
+        purpose,
         authorizationAlias: alias,
         authorizationCounter,
         expiresAt: 1900000000n,
         ownerCommitment: keys.ownerCommitment,
         viewingKey,
         keyMode: BigInt(keyMode),
-        ...(disclosure === "fund" ? { identityCommitment: identity } : {}),
+        ...(purpose === "fund" ? { identityCommitment: identity } : {}),
         proof: proof.proof,
       };
     }
@@ -149,13 +149,13 @@ export async function prepareReceiveProofFixtures(
     );
     const consumer = "0x1111111111111111111111111111111111111111";
     const cases = [];
-    for (const [name, action, disclosure] of [
-      ["anonymous", 1n, "anonymous"],
-      ["transfer", 4n, "anonymous"],
+    for (const [name, action, purpose] of [
+      ["receive", 1n, "receive"],
+      ["transfer", 4n, "receive"],
       ["fund", 3n, "fund"],
     ]) {
       const prepared = prepareShieldedReceivePresentation({
-        credential: credentials[disclosure],
+        credential: credentials[purpose],
         chainId: 31337n,
         consumer,
         action,

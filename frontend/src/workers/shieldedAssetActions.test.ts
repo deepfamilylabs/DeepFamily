@@ -143,9 +143,9 @@ const context: ShieldedWorkerContext = {
   assetKind: "native",
 };
 const secretKeys = deriveShieldedHeirKeyMaterial(13n);
-function receiveCredential(disclosure: "anonymous" | "fund" = "anonymous", overrides: { expiresAt?: bigint; authorizationCounter?: bigint } = {}) {
-  return { disclosure, authorizationAlias: 17n, authorizationCounter: 0n, expiresAt: 2000000000n,
-    ...(disclosure === "fund" ? { identityCommitment: 31n } : {}),
+function receiveCredential(purpose: "receive" | "fund" = "receive", overrides: { expiresAt?: bigint; authorizationCounter?: bigint } = {}) {
+  return { purpose, authorizationAlias: 17n, authorizationCounter: 0n, expiresAt: 2000000000n,
+    ...(purpose === "fund" ? { identityCommitment: 31n } : {}),
     ownerCommitment: 29n, viewingKey: `0x${"01".repeat(32)}`, keyMode: 0, identitySuiteId: 1, independentKeySuiteId: 1, independentKeyDerivationVersion: 1,
     proof: { protocol: "groth16", curve: "bn128", pi_a: ["1", "2", "1"], pi_b: [["1", "2"], ["3", "4"], ["1", "0"]], pi_c: ["1", "2", "1"] },
     ...overrides,
@@ -713,8 +713,8 @@ describe("asset Worker preview and proof boundary", () => {
         value(BigInt(index + 1), 1n, secretKeys.ownerCommitment),
       );
       // Isolate issuer proof verification while retaining real spend planning,
-      // disclosure handling and authenticated authorization-tree witnesses.
-      verifiedCredential(receiveCredential(action === "fund" ? "fund" : "anonymous", overrides));
+      // purpose handling and authenticated authorization-tree witnesses.
+      verifiedCredential(receiveCredential(action === "fund" ? "fund" : "receive", overrides));
       return session;
     };
     const useFinalSpend = () => {
@@ -729,8 +729,8 @@ describe("asset Worker preview and proof boundary", () => {
 
     it("rejects a proven credential for the wrong operation before preparing any merge", async () => {
       const session = await prepare();
-      verifiedCredential(receiveCredential(action === "fund" ? "anonymous" : "fund"));
-      await expect(session.call("preview", request())).rejects.toThrow(/operation|disclosure|receiving code/i);
+      verifiedCredential(receiveCredential(action === "fund" ? "receive" : "fund"));
+      await expect(session.call("preview", request())).rejects.toThrow(/receive code|receiving code|budget receiving credential/i);
       expect(mocks.verify).toHaveBeenCalledOnce();
       expect(mocks.transfer).not.toHaveBeenCalled();
       expect(mocks.fund).not.toHaveBeenCalled();

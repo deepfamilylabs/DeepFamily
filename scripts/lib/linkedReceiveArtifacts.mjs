@@ -112,7 +112,7 @@ export function inspectLinkedReceiveArtifacts({
     throw new Error("Receive linked verifier base has changed");
   const keys = json(root, RECEIVE_LINK_KEYS_PATH);
   const artifacts = {};
-  if (Object.keys(keys).sort().join(",") !== "anonymous,fund")
+  if (Object.keys(keys).sort().join(",") !== "fund,receive")
     throw new Error("Receive linker requires both circuit kinds");
   for (const [action, spec] of Object.entries(RECEIVE_PRESENTATION_CIRCUITS)) {
     const entry = keys[spec.kind];

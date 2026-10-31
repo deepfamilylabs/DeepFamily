@@ -3,19 +3,19 @@ pragma solidity ^0.8.24;
 
 import {IPrivateLetterVerifier} from "./interfaces/IPrivateLetterVerifiers.sol";
 
-/** @notice Fixed statement routing for the two shielded money receive disclosures. */
+/** @notice Fixed statement routing for the two shielded money receive purposes. */
 contract ReceivePresentationVerifierRouter is IPrivateLetterVerifier {
   error InvalidVerifier();
   error InvalidReceiveAction();
 
-  IPrivateLetterVerifier public immutable ANONYMOUS_VERIFIER;
+  IPrivateLetterVerifier public immutable RECEIVE_VERIFIER;
   IPrivateLetterVerifier public immutable FUND_VERIFIER;
 
-  constructor(address anonymousVerifier, address fundVerifier) {
-    if (anonymousVerifier.code.length == 0 || fundVerifier.code.length == 0) {
+  constructor(address receiveVerifier, address fundVerifier) {
+    if (receiveVerifier.code.length == 0 || fundVerifier.code.length == 0) {
       revert InvalidVerifier();
     }
-    ANONYMOUS_VERIFIER = IPrivateLetterVerifier(anonymousVerifier);
+    RECEIVE_VERIFIER = IPrivateLetterVerifier(receiveVerifier);
     FUND_VERIFIER = IPrivateLetterVerifier(fundVerifier);
   }
 
@@ -23,7 +23,7 @@ contract ReceivePresentationVerifierRouter is IPrivateLetterVerifier {
     if (inputs[2] == 3) {
       FUND_VERIFIER.verifyProof(proof, inputs);
     } else if (inputs[2] == 4) {
-      ANONYMOUS_VERIFIER.verifyProof(proof, inputs);
+      RECEIVE_VERIFIER.verifyProof(proof, inputs);
     } else {
       revert InvalidReceiveAction();
     }

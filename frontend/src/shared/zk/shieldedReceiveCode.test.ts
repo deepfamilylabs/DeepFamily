@@ -89,7 +89,7 @@ const identity = {
   identitySuiteId: 1,
   derivedSecretField: 123456789n,
   keyMode: 0 as const,
-  disclosure: "fund" as const,
+  purpose: "fund" as const,
   authorizationCounter: 0n,
   expiresAt: 2_000_000_000n,
   keyMaterial: deriveShieldedHeirKeyMaterial(123456789n),
@@ -186,7 +186,7 @@ describe("receive code proofs", () => {
     const viewingKey = await deriveShieldedViewPublicKey(keys.hpkeIkm);
     await expect(verifyShieldedReceiveCode(code)).resolves.toEqual({
       ok: true,
-      disclosure: "fund",
+      purpose: "fund",
       authorizationAlias: String(decodeShieldedReceiveCredential(code).authorizationAlias),
       authorizationCounter: "0",
       expiresAt: "2000000000",

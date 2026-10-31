@@ -6,13 +6,14 @@ import {
 } from "@deepfamily/protocol-core";
 import type { Groth16Proof } from "./zk";
 import { fetchZkAsset } from "./zkAssets";
+import { ShieldedProofConfigurationError } from "./shieldedProofErrors";
 // @ts-ignore snarkjs does not publish complete browser typings.
 import * as snarkjs from "snarkjs";
 
 export const SHIELDED_CIRCUIT_NAMES = Object.freeze({
-  anonymousReceiveCredential: "shielded_anonymous_receive_credential",
+  receiveCredential: "shielded_receive_credential",
   fundReceiveCredential: "shielded_fund_receive_credential",
-  anonymousReceivePresentation: "shielded_anonymous_receive_presentation",
+  receivePresentation: "shielded_receive_presentation",
   fundReceivePresentation: "shielded_fund_receive_presentation",
   identityAuthorizationUpdate: "shielded_identity_authorization_update",
   shield: "shielded_shield",
@@ -29,9 +30,9 @@ export type ShieldedCircuitName = keyof typeof SHIELDED_CIRCUIT_NAMES;
 
 /** Pool action counts mirror ProofConstants.sol; receive codes are verified off-chain. */
 const PUBLIC_SIGNAL_COUNTS: Record<ShieldedCircuitName, number> = {
-  anonymousReceiveCredential: SHIELDED_RECEIVE_CREDENTIAL_PUBLIC_SIGNAL_COUNTS.anonymous,
+  receiveCredential: SHIELDED_RECEIVE_CREDENTIAL_PUBLIC_SIGNAL_COUNTS.receive,
   fundReceiveCredential: SHIELDED_RECEIVE_CREDENTIAL_PUBLIC_SIGNAL_COUNTS.fund,
-  anonymousReceivePresentation: SHIELDED_RECEIVE_CREDENTIAL_PUBLIC_SIGNAL_COUNTS.anonymous + 11,
+  receivePresentation: SHIELDED_RECEIVE_CREDENTIAL_PUBLIC_SIGNAL_COUNTS.receive + 11,
   fundReceivePresentation: SHIELDED_RECEIVE_CREDENTIAL_PUBLIC_SIGNAL_COUNTS.fund + 11,
   identityAuthorizationUpdate: 6,
   shield: SHIELDED_POOL_PUBLIC_SIGNAL_COUNTS[SHIELDED_POOL_ACTION.Shield],
@@ -71,7 +72,7 @@ async function loadArtifacts(circuit: ShieldedCircuitName): Promise<Artifacts> {
     const linkedKind = receivePresentationKind(circuit);
     const pinnedKey = linkedKind ? SHIELDED_RECEIVE_LINK_KEYS?.[linkedKind]?.verificationKey : null;
     if (linkedKind && !pinnedKey) {
-      throw new Error("Receive presentation keys are missing; rebuild the ZK artifacts");
+      throw new ShieldedProofConfigurationError();
     }
     const [wasm, zkey, vkey] = await Promise.all([
       fetchZkAsset(artifactPath(circuit, ".wasm")),
@@ -89,7 +90,7 @@ async function loadArtifacts(circuit: ShieldedCircuitName): Promise<Artifacts> {
 }
 
 function receivePresentationKind(circuit: ShieldedCircuitName) {
-  if (circuit === "anonymousReceivePresentation") return "anonymous";
+  if (circuit === "receivePresentation") return "receive";
   if (circuit === "fundReceivePresentation") return "fund";
   return null;
 }
@@ -202,15 +203,21 @@ export async function generateShieldedProof(input: {
     circuit === "claim" || circuit === "claim32"
       ? claimWitness(input.witness, circuit)
       : input.witness;
+  const credentialKind =
+    circuit === "receiveCredential" ? "receive" : circuit === "fundReceiveCredential" ? "fund" : null;
+  const credentialKey = credentialKind
+    ? SHIELDED_RECEIVE_CREDENTIAL_VERIFICATION_KEYS?.[credentialKind]
+    : null;
+  if (
+    credentialKind &&
+    (credentialKey?.protocol !== "groth16" || credentialKey.nPublic !== PUBLIC_SIGNAL_COUNTS[circuit])
+  ) {
+    throw new ShieldedProofConfigurationError();
+  }
   const { wasm, zkey, vkey } = await loadArtifacts(circuit);
   const result = await snarkjs.groth16.fullProve(witness, wasm, zkey);
   assertShieldedPublicSignals(circuit, result.publicSignals, input.expectedPublicSignals);
-  const verificationKey =
-    input.circuit === "anonymousReceiveCredential"
-      ? SHIELDED_RECEIVE_CREDENTIAL_VERIFICATION_KEYS.anonymous
-      : input.circuit === "fundReceiveCredential"
-        ? SHIELDED_RECEIVE_CREDENTIAL_VERIFICATION_KEYS.fund
-        : vkey;
+  const verificationKey = credentialKey ?? vkey;
   if (!(await snarkjs.groth16.verify(verificationKey, result.publicSignals, result.proof))) {
     throw new Error(`Shielded ${input.circuit} proof failed local verification`);
   }

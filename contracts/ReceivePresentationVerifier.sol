@@ -4,7 +4,7 @@ pragma solidity ^0.8.28;
 // Generated from the fixed Circom issuer and presentation keys. Do not edit.
 import {LinkedGroth16Verifier} from "./libraries/LinkedGroth16Verifier.sol";
 
-contract AnonymousReceivePresentationVerifier is LinkedGroth16Verifier {
+contract ReceivePresentationVerifier is LinkedGroth16Verifier {
     function verifyProof(bytes calldata proof, uint256[11] calldata input) external view {
         uint256[] memory values = new uint256[](11);
         for (uint256 i; i < 11; ++i) values[i] = input[i];

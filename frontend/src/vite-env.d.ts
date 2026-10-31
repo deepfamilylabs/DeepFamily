@@ -2,13 +2,13 @@
 
 /** The receive-code Groth16 verification key, embedded by vite.config.ts at build time. */
 declare const __SHIELDED_RECEIVE_CREDENTIAL_VKEYS__: Readonly<
-  Record<"anonymous" | "fund", import("@deepfamily/protocol-core").Groth16VerificationKey>
+  Record<"receive" | "fund", import("@deepfamily/protocol-core").Groth16VerificationKey>
 >;
 
 /** Circuit verification keys and G1 delta points authenticated by the shielded manifest. */
 declare const __RECEIVE_LINK_KEYS__: Readonly<
   Record<
-    "anonymous" | "fund",
+    "receive" | "fund",
     {
       readonly verificationKey: import("@deepfamily/protocol-core").Groth16VerificationKey;
       readonly deltaG1: readonly string[];

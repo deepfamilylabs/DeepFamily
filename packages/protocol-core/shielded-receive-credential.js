@@ -10,10 +10,10 @@ import { receiveProofFromWords, receiveProofWords } from "./shielded-receive-pro
 export const SHIELDED_RECEIVE_CREDENTIAL_VERSION = 1;
 export const SHIELDED_AUTHORIZATION_ALIAS_DOMAIN = 202610210001n;
 export const SHIELDED_RECEIVE_CREDENTIAL_PUBLIC_SIGNAL_COUNTS = Object.freeze({
-  anonymous: 11,
+  receive: 11,
   fund: 12,
 });
-const PREFIX = Object.freeze({ anonymous: "dfrecv", fund: "dffund" });
+const PREFIX = Object.freeze({ receive: "dfrecv", fund: "dffund" });
 const MAX_FIELD = SNARK_SCALAR_FIELD - 1n;
 const field = (value, label) => bigintFrom(value, label, MAX_FIELD);
 const invalid = (condition, message) =>
@@ -25,8 +25,8 @@ function nonzeroField(value, label) {
   return result;
 }
 
-function disclosureOf(value = "anonymous") {
-  invalid(value === "anonymous" || value === "fund", "Unsupported credential disclosure");
+function purposeOf(value = "receive") {
+  invalid(value === "receive" || value === "fund", "Unsupported credential purpose");
   return value;
 }
 
@@ -41,7 +41,7 @@ function fixed(value, width) {
   return bytes;
 }
 
-/** Canonical across key modes and disclosures; never enters spending or HPKE derivation. */
+/** Canonical across key modes and purposes; never enters spending or HPKE derivation. */
 export function computeShieldedAuthorizationAlias(input) {
   return poseidon3([
     SHIELDED_AUTHORIZATION_ALIAS_DOMAIN,
@@ -52,7 +52,7 @@ export function computeShieldedAuthorizationAlias(input) {
 
 /** Exact issuer statement, including the circuit's first output R. */
 export function buildShieldedReceiveCredentialPublicSignals(input) {
-  const disclosure = disclosureOf(input.disclosure);
+  const purpose = purposeOf(input.purpose);
   const alias = nonzeroField(input.authorizationAlias, "authorizationAlias");
   const counter = bigintFrom(input.authorizationCounter, "authorizationCounter", MAX_UINT64);
   const expiry = bigintFrom(input.expiresAt, "expiresAt", MAX_UINT64);
@@ -72,29 +72,29 @@ export function buildShieldedReceiveCredentialPublicSignals(input) {
     "Unsupported credential suite",
   );
   const identity =
-    disclosure === "fund" ? [nonzeroField(input.identityCommitment, "identityCommitment")] : [];
+    purpose === "fund" ? [nonzeroField(input.identityCommitment, "identityCommitment")] : [];
   invalid(
-    disclosure === "fund" || input.identityCommitment === undefined,
-    "Anonymous credentials must not include an identity commitment",
+    purpose === "fund" || input.identityCommitment === undefined,
+    "Receive credentials must not include an identity commitment",
   );
   return [alias, counter, expiry, ...identity, owner, viewKeyLo, viewKeyHi, mode, ...metadata];
 }
 
 export function computeShieldedReceiveCredentialFingerprint(input) {
-  const disclosure = disclosureOf(input.disclosure);
+  const purpose = purposeOf(input.purpose);
   return sha256(
     concat([
-      toUtf8Bytes(`DeepFamily:ReceiveCredential:${disclosure}:v${SHIELDED_RECEIVE_CREDENTIAL_VERSION}`),
+      toUtf8Bytes(`DeepFamily:ReceiveCredential:${purpose}:v${SHIELDED_RECEIVE_CREDENTIAL_VERSION}`),
       ...buildShieldedReceiveCredentialPublicSignals(input).map((value) => fixed(value, 32)),
     ]),
   );
 }
 
-/** The two disclosures use distinct prefixes and distinct issuer verification keys. */
+/** The two purposes use distinct prefixes and distinct issuer verification keys. */
 export function encodeShieldedReceiveCredential(input) {
-  const disclosure = disclosureOf(input.disclosure);
+  const purpose = purposeOf(input.purpose);
   const signals = buildShieldedReceiveCredentialPublicSignals(input);
-  const offset = disclosure === "fund" ? 1 : 0;
+  const offset = purpose === "fund" ? 1 : 0;
   const payload = getBytes(
     concat([
       Uint8Array.of(SHIELDED_RECEIVE_CREDENTIAL_VERSION, Number(signals[6 + offset]), 1, 1, 1),
@@ -107,17 +107,17 @@ export function encodeShieldedReceiveCredential(input) {
       ...receiveProofWords(input.proof).map((value) => fixed(value, 32)),
     ]),
   );
-  return bech32m.encode(PREFIX[disclosure], bech32m.toWords(payload), false);
+  return bech32m.encode(PREFIX[purpose], bech32m.toWords(payload), false);
 }
 
 /** Parse and range-check only. The fixed issuer key must still verify the proof. */
 export function decodeShieldedReceiveCredential(code) {
-  let bytes, disclosure;
+  let bytes, purpose;
   try {
     const decoded = bech32m.decode(code.replace(/\s+/gu, ""), false);
-    disclosure = Object.keys(PREFIX).find((key) => PREFIX[key] === decoded.prefix);
+    purpose = Object.keys(PREFIX).find((key) => PREFIX[key] === decoded.prefix);
     bytes = bech32m.fromWords(decoded.words);
-    if (!disclosure || bytes[0] !== SHIELDED_RECEIVE_CREDENTIAL_VERSION || bytes.length !== (disclosure === "fund" ? 405 : 373))
+    if (!purpose || bytes[0] !== SHIELDED_RECEIVE_CREDENTIAL_VERSION || bytes.length !== (purpose === "fund" ? 405 : 373))
       throw new Error();
   } catch {
     protocolAssert(
@@ -133,11 +133,11 @@ export function decodeShieldedReceiveCredential(code) {
     return value;
   };
   const statement = {
-    disclosure,
+    purpose,
     authorizationAlias: read(32),
     authorizationCounter: read(8),
     expiresAt: read(8),
-    ...(disclosure === "fund" ? { identityCommitment: read(32) } : {}),
+    ...(purpose === "fund" ? { identityCommitment: read(32) } : {}),
     ownerCommitment: read(32),
     viewingKey: bytes.slice(offset, offset + 32),
     keyMode: bytes[1],

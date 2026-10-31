@@ -39,7 +39,7 @@ export type ShieldedReceiveCodeIdentity = {
   derivedSecretField: string | bigint;
   keyMode: 0 | 1;
   keyMaterial: { ownerSecret: BigNumberish; ownerCommitment: BigNumberish; hpkeIkm: string };
-  disclosure?: "anonymous" | "fund";
+  purpose?: "receive" | "fund";
   authorizationCounter: BigNumberish;
   expiresAt: BigNumberish;
 };
@@ -48,7 +48,7 @@ export type ShieldedReceiveCodeCheck =
   | {
       ok: true;
       identityCommitment?: string;
-      disclosure: "anonymous" | "fund";
+      purpose: "receive" | "fund";
       authorizationAlias: string;
       authorizationCounter: string;
       expiresAt: string;
@@ -88,13 +88,13 @@ export async function createShieldedReceiveCode(input: ShieldedReceiveCodeIdenti
   )
     throw new Error("Identity receive mode requires canonical identity keys");
   const viewingKey = await deriveShieldedViewPublicKey(keys.hpkeIkm);
-  const disclosure = input.disclosure ?? "anonymous";
+  const purpose = input.purpose ?? "receive";
   const statement = {
-    disclosure,
+    purpose,
     authorizationAlias: computeShieldedAuthorizationAlias(material),
     authorizationCounter: input.authorizationCounter,
     expiresAt: input.expiresAt,
-    ...(disclosure === "fund" ? { identityCommitment: material.identityCommitment } : {}),
+    ...(purpose === "fund" ? { identityCommitment: material.identityCommitment } : {}),
     ownerCommitment: keys.ownerCommitment,
     viewingKey,
     keyMode,
@@ -102,14 +102,14 @@ export async function createShieldedReceiveCode(input: ShieldedReceiveCodeIdenti
   };
   const publicSignals = buildShieldedReceiveCredentialPublicSignals(statement);
   const { proof } = await generateShieldedProof({
-    circuit: disclosure === "fund" ? "fundReceiveCredential" : "anonymousReceiveCredential",
+    circuit: purpose === "fund" ? "fundReceiveCredential" : "receiveCredential",
     witness: {
       identityCommitment: String(material.identityCommitment),
       authorizationCounter: String(input.authorizationCounter),
       expiresAt: String(input.expiresAt),
       ownerCommitment: String(keys.ownerCommitment),
-      viewKeyLo: String(publicSignals[disclosure === "fund" ? 5 : 4]),
-      viewKeyHi: String(publicSignals[disclosure === "fund" ? 6 : 5]),
+      viewKeyLo: String(publicSignals[purpose === "fund" ? 5 : 4]),
+      viewKeyHi: String(publicSignals[purpose === "fund" ? 6 : 5]),
       keyMode,
       identitySuiteId: material.identitySuiteId,
       independentKeySuiteId: 1,
@@ -145,7 +145,7 @@ export async function createShieldedReceiveCode(input: ShieldedReceiveCodeIdenti
 export async function createShieldedReceiveCodeFromCredentials(input: {
   identity: IdentityFields;
   rawPassphrase: string;
-  disclosure?: "anonymous" | "fund";
+  purpose?: "receive" | "fund";
   context: {
     rpcUrl: string;
     chainId: string;
@@ -182,7 +182,7 @@ export async function createShieldedReceiveCodeFromCredentials(input: {
       return await createShieldedReceiveCode({
         ...material,
         keyMode: 0,
-        disclosure: input.disclosure,
+        purpose: input.purpose,
         authorizationCounter: state.witness.authorizationCounter,
         expiresAt: input.expiresAt,
         keyMaterial: deriveShieldedHeirKeyMaterial(material.derivedSecretField),
@@ -231,7 +231,7 @@ export async function verifyShieldedReceiveCode(code: string): Promise<ShieldedR
     const verified =
       (await isInG2Subgroup(decoded.proof.pi_b)) &&
       (await snarkjs.groth16.verify(
-        SHIELDED_RECEIVE_CREDENTIAL_VERIFICATION_KEYS[decoded.disclosure],
+        SHIELDED_RECEIVE_CREDENTIAL_VERIFICATION_KEYS[decoded.purpose],
         decoded.publicSignals.map(String),
         decoded.proof,
       ));
@@ -241,7 +241,7 @@ export async function verifyShieldedReceiveCode(code: string): Promise<ShieldedR
   }
   return {
     ok: true,
-    disclosure: decoded.disclosure,
+    purpose: decoded.purpose,
     authorizationAlias: String(decoded.authorizationAlias),
     authorizationCounter: String(decoded.authorizationCounter),
     expiresAt: String(decoded.expiresAt),

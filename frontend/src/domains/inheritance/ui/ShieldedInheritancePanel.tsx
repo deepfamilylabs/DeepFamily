@@ -267,7 +267,8 @@ export function ShieldedInheritancePanel({
   const confirmedOverviewKey = useRef<{ credentialsHandle: string; fingerprint: string } | null>(null);
   const [codeSlot, setCodeSlot] = useState<ShieldedKeySlot>("identity");
   // "balances" means no wallet sheet is open; the overview always shows both wallets.
-  const [walletSection, setWalletSection] = useState<"balances" | "receiveCode" | "keys">("balances");
+  const [walletSection, setWalletSection] = useState<"balances" | "receiveCode" | "fundReceiveCredential" | "keys">("balances");
+  const codePurpose = walletSection === "fundReceiveCredential" ? "fund" : "receive";
   const [walletScreen, setWalletScreen] = useState<"workspace" | "manage" | "identity">(
     "workspace",
   );
@@ -330,7 +331,6 @@ export function ShieldedInheritancePanel({
     null,
   );
   const [ownCode, setOwnCode] = useState("");
-  const [codeDisclosure, setCodeDisclosure] = useState<"anonymous" | "fund">("anonymous");
   const [codeExpiry, setCodeExpiry] = useState(() => {
     const date = new Date(Date.now() + 90 * 86400_000);
     return new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
@@ -504,6 +504,7 @@ export function ShieldedInheritancePanel({
     !recipientTargetName;
   const recipientMatches =
     !!verifiedRecipient &&
+    verifiedRecipient.purpose === (action === "fund" ? "fund" : "receive") &&
     (action !== "fund" ||
       (verifiedRecipient.personHash?.toLowerCase() === personHash.toLowerCase() &&
         verifiedRecipient.keyMode === (effectiveEntry === "privateIndependent" ? 1 : 0)));
@@ -1117,13 +1118,13 @@ export function ShieldedInheritancePanel({
     setOwnCode("");
     if (hasSession) setWalletScreen("workspace");
   }
-  function openReceiveCode(next: ShieldedKeySlot) {
+  function openReceiveCode(next: ShieldedKeySlot, purpose: "receive" | "fund" = "receive") {
     if (busy || submissionPending) return;
     clearWalletSecretInputs();
     receiveCodeScope.current = "";
     setCodeSlot(next);
     setOwnCode("");
-    setWalletSection("receiveCode");
+    setWalletSection(purpose === "fund" ? "fundReceiveCredential" : "receiveCode");
     if (hasSession) setWalletScreen("workspace");
   }
   function showIndependentKeyManager(flow: "restore" | "create" | "backup") {
@@ -1537,11 +1538,11 @@ export function ShieldedInheritancePanel({
       if (!Number.isFinite(new Date(codeExpiry).getTime()) || new Date(codeExpiry).getTime() <= Date.now()) throw new Error(t("shielded.privateLetters.expiryFuture"));
       const result = await shieldedAssetWorkerCall(
         "receiveCode",
-        { slot: receivingSlot, context, disclosure: codeDisclosure, expiresAt: String(Math.floor(new Date(codeExpiry).getTime() / 1000)) },
+        { slot: receivingSlot, context, purpose: codePurpose, expiresAt: String(Math.floor(new Date(codeExpiry).getTime() / 1000)) },
         { timeoutMs: 1_200_000 },
       );
       if (current()) setOwnCode(result.code);
-    }, t("shielded.stages.receiveCode"));
+    }, t(codePurpose === "fund" ? "shielded.stages.fundReceiveCredential" : "shielded.stages.receiveCode"));
   }
   async function revokeReceiveCodes() {
     await run(async (current) => {
@@ -1569,7 +1570,7 @@ export function ShieldedInheritancePanel({
   // button retries.
   // A layout effect starts the job before paint, so the retry button never flashes first.
   useLayoutEffect(() => {
-    if (walletSection !== "receiveCode") {
+    if (walletSection !== "receiveCode" && walletSection !== "fundReceiveCredential") {
       receiveCodeScope.current = "";
       return;
     }
@@ -1577,6 +1578,7 @@ export function ShieldedInheritancePanel({
     const scope = JSON.stringify([
       contextKey,
       codeSlot,
+      codePurpose,
       session.identity?.handle,
       session.independentKey?.keyFingerprint,
     ]);
@@ -1587,6 +1589,7 @@ export function ShieldedInheritancePanel({
     walletSection,
     ownCode,
     codeSlot,
+    codePurpose,
     session.identity?.handle,
     session.independentKey?.keyFingerprint,
     receiveCodeReady,
@@ -1606,8 +1609,13 @@ export function ShieldedInheritancePanel({
     const generation = getShieldedAssetWorkerGeneration();
     void verifyShieldedReceiveCode(code)
       .then((result) => {
-        if (!cancelled && mounted.current && generation === getShieldedAssetWorkerGeneration())
-          setVerifiedRecipient(result);
+        if (cancelled || !mounted.current || generation !== getShieldedAssetWorkerGeneration()) return;
+        if (result.purpose !== (action === "fund" ? "fund" : "receive")) {
+          setVerifiedRecipient(null);
+          setCodeError(t(action === "fund" ? "shielded.fundReceiveCredentialRequired" : "shielded.receiveCodeRequired"));
+          return;
+        }
+        setVerifiedRecipient(result);
       })
       .catch((cause: unknown) => {
         if (!cancelled && mounted.current && generation === getShieldedAssetWorkerGeneration())
@@ -1616,14 +1624,14 @@ export function ShieldedInheritancePanel({
     return () => {
       cancelled = true;
     };
-  }, [code, needsCode]);
+  }, [code, needsCode, action]);
   async function generateConvenientCode() {
     await run(async (current) => {
       const form = recipientForm.current;
       if (!form) return;
       const credentials = form.readAndClear();
       try {
-        const pending = createShieldedReceiveCodeForRecipient({ ...credentials, context, disclosure: action === "fund" ? "fund" : "anonymous", expiresAt: String(Math.floor(Date.now() / 1000) + 90 * 86400) });
+        const pending = createShieldedReceiveCodeForRecipient({ ...credentials, context, purpose: action === "fund" ? "fund" : "receive", expiresAt: String(Math.floor(Date.now() / 1000) + 90 * 86400) });
         credentials.rawPassphrase = "";
         const result = await pending;
         if (current()) {
@@ -1634,7 +1642,7 @@ export function ShieldedInheritancePanel({
         credentials.rawPassphrase = "";
         form.clearSecretInputs();
       }
-    }, t("shielded.stages.receiveCode"));
+    }, t(action === "fund" ? "shielded.stages.fundReceiveCredential" : "shielded.stages.receiveCode"));
   }
   function trackBroadcast(provider: Provider, hash: string, id: string, label: string) {
     const center = latestTxCenter.current;
@@ -2208,43 +2216,37 @@ export function ShieldedInheritancePanel({
   );
   const walletSheet: ShieldedWalletSheetState | null = !showWorkspace
     ? null
-    : walletSection === "receiveCode"
-      ? { kind: "receiveCode", slot: codeSlot }
+    : walletSection === "receiveCode" || walletSection === "fundReceiveCredential"
+      ? { kind: walletSection, slot: codeSlot }
       : walletSection === "keys"
         ? { kind: "keys", flow: accessFlow }
         : null;
   const receiveCodeContent = (
-    <div role="group" aria-label={tr("receiveKeyLabel")} className="space-y-4">
+    <div role="group" aria-label={tr(codePurpose === "fund" ? "fundReceiveCredentialLabel" : "receiveKeyLabel")} className="space-y-4">
       {!session.identity ? (
         <WarningNotice>{tr("independentKeyRestoredIdentityHint")}</WarningNotice>
       ) : codeSlot === "independent" && !independentKeyReady ? (
         <p className="text-xs text-warning">{tr("walletLocked")}</p>
       ) : null}
-      <FieldBlock label={t("shielded.privateLetters.disclosure")}>
-        <select aria-label={t("shielded.privateLetters.disclosure")} className={FIELD_INPUT} disabled={busy || submissionPending} value={codeDisclosure} onChange={(event) => { setCodeDisclosure(event.target.value as "anonymous" | "fund"); setOwnCode(""); receiveCodeScope.current = ""; }}>
-          <option value="anonymous">{t("shielded.privateLetters.anonymousCode")}</option>
-          <option value="fund">{t("shielded.privateLetters.fundMaterial")}</option>
-        </select>
-      </FieldBlock>
-      <p className="text-xs text-ink-muted">{t(`shielded.privateLetters.${codeDisclosure === "anonymous" ? "anonymousPrivacy" : "fundPrivacy"}`)}</p>
+      <p className="text-xs text-ink-muted">{t(`shielded.privateLetters.${codePurpose === "receive" ? "receivePrivacy" : "fundPrivacy"}`)}</p>
       <FieldBlock label={t("shielded.privateLetters.expiresAt")}>
         <input type="datetime-local" aria-label={t("shielded.privateLetters.expiresAt")} className={FIELD_INPUT} value={codeExpiry} disabled={busy || submissionPending} onChange={(event) => { setCodeExpiry(event.target.value); setOwnCode(""); receiveCodeScope.current = ""; }} />
       </FieldBlock>
       {ownCode ? (
         <FieldBlock
-          label={t("shielded.receiveCodeLabel", { symbol })}
-          hint={t("shielded.receiveCodeShareHint", { symbol })}
+          label={t(codePurpose === "fund" ? "shielded.fundReceiveCredentialLabel" : "shielded.receiveCodeLabel", { symbol })}
+          hint={t(codePurpose === "fund" ? "shielded.fundReceiveCredentialShareHint" : "shielded.receiveCodeShareHint", { symbol })}
         >
           <div className="relative">
             <textarea
-              aria-label={t("shielded.receiveCodeLabel", { symbol })}
+              aria-label={t(codePurpose === "fund" ? "shielded.fundReceiveCredentialLabel" : "shielded.receiveCodeLabel", { symbol })}
               className={`${FIELD_TEXTAREA} min-h-28 resize-none pr-10`}
               readOnly
               value={ownCode}
               rows={5}
             />
             <div className="absolute right-1.5 top-1.5">
-              <CopyIconButton label={t("common.copy")} onClick={() => void copy(ownCode)} />
+              <CopyIconButton label={t(codePurpose === "fund" ? "shielded.copyFundReceiveCredential" : "shielded.copyReceiveCode")} onClick={() => void copy(ownCode)} />
             </div>
           </div>
         </FieldBlock>
@@ -2260,7 +2262,7 @@ export function ShieldedInheritancePanel({
             disabled={submissionPending}
             onClick={() => void createCode(codeSlot)}
           >
-            {t("shielded.generateReceiveCode")}
+            {t(codePurpose === "fund" ? "shielded.generateFundReceiveCredential" : "shielded.generateReceiveCode")}
           </PanelButton>
         </>
       ) : null}
@@ -2943,6 +2945,7 @@ export function ShieldedInheritancePanel({
             onSelectWallet={selectWallet}
             independentKeyState={independentKeyState}
             onReceiveCode={openReceiveCode}
+            onReceiveBudget={(receivingSlot) => openReceiveCode(receivingSlot, "fund")}
             onOpenIndependentKey={openIndependentKeyManager}
             openSheet={walletSheet}
             footer={walletSection === "keys" ? undefined : discoveryWarning}
@@ -2978,12 +2981,14 @@ export function ShieldedInheritancePanel({
           <ShieldedWalletSheet
             open={walletSheet !== null}
             title={
-              walletSheet?.kind === "receiveCode"
-                ? tr(codeSlot === "identity" ? "identityReceiveCode" : "independentKeyReceiveCode")
+              walletSheet?.kind === "receiveCode" || walletSheet?.kind === "fundReceiveCredential"
+                ? tr(codePurpose === "fund"
+                  ? codeSlot === "identity" ? "identityFundReceiveCredential" : "independentKeyFundReceiveCredential"
+                  : codeSlot === "identity" ? "identityReceiveCode" : "independentKeyReceiveCode")
                 : independentKeyTitle
             }
             icon={
-              walletSheet?.kind === "receiveCode"
+              walletSheet?.kind === "receiveCode" || walletSheet?.kind === "fundReceiveCredential"
                 ? QrCode
                 : accessFlow === "backup"
                   ? ShieldCheck
@@ -2992,7 +2997,7 @@ export function ShieldedInheritancePanel({
             closeLabel={t("common.close")}
             onClose={closeWalletSheet}
           >
-            {walletSheet?.kind === "receiveCode"
+            {walletSheet?.kind === "receiveCode" || walletSheet?.kind === "fundReceiveCredential"
               ? receiveCodeContent
               : walletSheet?.kind === "keys"
                 ? independentKeyManager

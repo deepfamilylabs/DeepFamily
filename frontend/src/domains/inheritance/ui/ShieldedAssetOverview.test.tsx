@@ -32,7 +32,7 @@ const wallets: ShieldedOverviewWallet[] = [
 type OverviewOptions = Partial<
   Pick<
     ComponentProps<typeof ShieldedAssetOverview>,
-    "selectionDisabled" | "busy" | "independentKeyState" | "onReceiveCode" | "onOpenIndependentKey" | "syncStatus"
+    "selectionDisabled" | "busy" | "independentKeyState" | "onReceiveCode" | "onReceiveBudget" | "onOpenIndependentKey" | "syncStatus"
   >
 > & { initialWallets?: ShieldedOverviewWallet[] };
 
@@ -43,6 +43,7 @@ function renderOverview({
   syncStatus,
   independentKeyState = "setup",
   onReceiveCode = vi.fn(),
+  onReceiveBudget = vi.fn(),
   onOpenIndependentKey = vi.fn(),
 }: OverviewOptions = {}) {
   const onSelectWallet = vi.fn();
@@ -77,6 +78,7 @@ function renderOverview({
         }}
         independentKeyState={independentKeyState}
         onReceiveCode={onReceiveCode}
+        onReceiveBudget={onReceiveBudget}
         onOpenIndependentKey={onOpenIndependentKey}
         openSheet={null}
       />
@@ -113,6 +115,16 @@ function cardSelectionLabel(name: string) {
 }
 
 describe("ShieldedAssetOverview synchronization", () => {
+  it("provides a dedicated budget receiving entry without selecting another wallet", () => {
+    const onReceiveBudget = vi.fn();
+    const onReceiveCode = vi.fn();
+    const { onSelectWallet } = renderOverview({ onReceiveBudget, onReceiveCode });
+    fireEvent.click(screen.getByRole("button", { name: "身份凭据预算接收凭证" }));
+    expect(onReceiveBudget).toHaveBeenCalledExactlyOnceWith("identity");
+    expect(onReceiveCode).not.toHaveBeenCalled();
+    expect(onSelectWallet).not.toHaveBeenCalled();
+    expect(screen.queryByRole("button", { name: "独立密钥预算接收凭证" })).toBeNull();
+  });
   it("keeps synchronization feedback in the overview without replacing wallet cards", () => {
     const { rerenderSyncStatus } = renderOverview();
     const identityCard = screen.getByRole("group", { name: "身份凭据" });
@@ -398,7 +410,7 @@ describe("ShieldedAssetOverview independent key availability", () => {
       within(card)
         .getAllByRole("button")
         .map((button) => button.getAttribute("aria-label")),
-    ).toEqual(["独立密钥收款码", "密钥"]);
+    ).toEqual(["独立密钥收款码", "独立密钥预算接收凭证", "密钥"]);
     fireEvent.click(within(card).getByRole("button", { name: "独立密钥收款码" }));
     expect(onReceiveCode).toHaveBeenCalledExactlyOnceWith("independent");
     expect(onSelectWallet).not.toHaveBeenCalled();

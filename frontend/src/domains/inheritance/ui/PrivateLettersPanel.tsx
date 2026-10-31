@@ -9,7 +9,7 @@ import { FIELD_TEXTAREA, FieldBlock, PanelButton } from "./inheritanceControls";
 
 export type PrivateLetterView = "write" | "inbox";
 
-/** Standalone letters to an anonymous receive code, and the unlocked keys' inbox. */
+/** Standalone letters to a receive code, and the unlocked keys' inbox. */
 export function PrivateLettersPanel(props: {
   mode: PrivateLetterView;
   titleId?: string;

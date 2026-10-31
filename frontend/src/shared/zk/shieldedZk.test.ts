@@ -2,12 +2,14 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   assertShieldedPublicSignals,
   generateShieldedProof,
+  SHIELDED_RECEIVE_CREDENTIAL_VERIFICATION_KEYS,
   SHIELDED_RECEIVE_LINK_KEYS,
   selectShieldedClaimCircuit,
   selectShieldedFundCircuit,
   selectShieldedValueCircuit,
   type ShieldedWitness,
 } from "./shieldedZk";
+import { ShieldedProofConfigurationError } from "./shieldedProofErrors";
 
 const mocks = vi.hoisted(() => ({
   fullProve: vi.fn(),
@@ -24,6 +26,27 @@ afterEach(() => {
 });
 
 describe("shielded proof public inputs", () => {
+  it.each([
+    ["receiveCredential", "receive", 11],
+    ["fundReceiveCredential", "fund", 12],
+  ] as const)("rejects missing embedded keys for %s before downloading or proving", async (circuit, kind, count) => {
+    const keys = SHIELDED_RECEIVE_CREDENTIAL_VERIFICATION_KEYS;
+    const descriptor = Object.getOwnPropertyDescriptor(keys, kind)!;
+    Reflect.deleteProperty(keys, kind);
+    try {
+      await expect(generateShieldedProof({
+        circuit,
+        witness: {},
+        expectedPublicSignals: Array(count).fill("0"),
+      })).rejects.toBeInstanceOf(ShieldedProofConfigurationError);
+      expect(mocks.fetchAsset).not.toHaveBeenCalled();
+      expect(mocks.fullProve).not.toHaveBeenCalled();
+      expect(mocks.verify).not.toHaveBeenCalled();
+    } finally {
+      Object.defineProperty(keys, kind, descriptor);
+    }
+  });
+
   it("rejects a proof for a different amount, root or recipient before submission", () => {
     // Single-input unshield: chainId, pool, one shard id, root and nullifier, two
     // outputs, two ciphertext hashes, amount, recipient.
@@ -43,9 +66,9 @@ describe("shielded proof public inputs", () => {
 
   it("checks each circuit against its own public-signal count", () => {
     for (const [circuit, count] of [
-      ["anonymousReceiveCredential", 11],
+      ["receiveCredential", 11],
       ["fundReceiveCredential", 12],
-      ["anonymousReceivePresentation", 22],
+      ["receivePresentation", 22],
       ["fundReceivePresentation", 23],
       ["identityAuthorizationUpdate", 6],
       ["shield", 7],
@@ -230,19 +253,19 @@ describe("shielded proof public inputs", () => {
 
     await expect(
       generateShieldedProof({
-        circuit: "anonymousReceivePresentation",
+        circuit: "receivePresentation",
         witness: { authorizationAlias: "7" },
         expectedPublicSignals,
       }),
     ).resolves.toEqual({ proof, publicSignals: expectedPublicSignals });
 
     expect(mocks.fetchAsset.mock.calls).toEqual([
-      ["/zk/shielded/shielded_anonymous_receive_presentation.wasm"],
-      ["/zk/shielded/shielded_anonymous_receive_presentation_final.zkey"],
+      ["/zk/shielded/shielded_receive_presentation.wasm"],
+      ["/zk/shielded/shielded_receive_presentation_final.zkey"],
     ]);
     expect(fetch).not.toHaveBeenCalled();
     expect(mocks.verify).toHaveBeenCalledExactlyOnceWith(
-      SHIELDED_RECEIVE_LINK_KEYS?.anonymous.verificationKey,
+      SHIELDED_RECEIVE_LINK_KEYS?.receive.verificationKey,
       expectedPublicSignals,
       proof,
     );

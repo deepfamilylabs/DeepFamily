@@ -262,7 +262,7 @@ async function startCandidateSpendReview(
   const input = notes[amount === "1000" ? 8 : 0];
   const value = (BigInt(amount) * 10n ** 18n).toString();
   const outputs = [value, (BigInt(input.amount) - BigInt(value)).toString()];
-  mocks.verify.mockResolvedValue({ personHash: identity.personHash, keyMode: 0, fingerprint: "recipient-fingerprint" });
+  mocks.verify.mockResolvedValue({ purpose: "receive", personHash: identity.personHash, keyMode: 0, fingerprint: "recipient-fingerprint" });
   mocks.call.mockImplementation(async (method, params) => {
     if (method === "recover") return { ...emptyWallet, notes };
     if (method === "discover") return emptyDiscovery;
@@ -448,7 +448,7 @@ async function createIndependentKeyForBackup(source: "random" | "signature" = "r
 }
 async function waitForReceiveCode(slot: "identity" | "independent") {
   await waitFor(() => expect(mocks.call).toHaveBeenCalledWith("receiveCode", expect.objectContaining({
-    slot, disclosure: "anonymous", context: expect.objectContaining({ chainId: "31337" }), expiresAt: expect.stringMatching(/^\d+$/),
+    slot, purpose: "receive", context: expect.objectContaining({ chainId: "31337" }), expiresAt: expect.stringMatching(/^\d+$/),
   }), expect.anything()));
   await waitUntilIdle();
 }
@@ -598,15 +598,15 @@ describe("Worker-backed shielded wallet", () => {
   });
   it("forwards the configured read mode to the recipient code generator", async () => {
     mocks.stateReadMode = "chain";
-    mocks.verify.mockResolvedValue({ personHash: identity.personHash, keyMode: 0, fingerprint: "recipient-fingerprint" });
+    mocks.verify.mockResolvedValue({ purpose: "fund", personHash: identity.personHash, keyMode: 0, fingerprint: "recipient-fingerprint" });
     await renderUnlockedPanel();
     chooseAction("fund");
     chooseFundingEntry("privateConvenient");
-    fireEvent.click(screen.getByRole("radio", { name: "shielded.recipientMethods.credentials" }));
+    fireEvent.click(screen.getByRole("radio", { name: "shielded.fundRecipientMethods.credentials" }));
     fireEvent.change(screen.getByLabelText("identity passphrase"), { target: { value: "recipient-secret" } });
-    fireEvent.click(screen.getByRole("button", { name: "shielded.generateReceiveCode" }));
+    fireEvent.click(screen.getByRole("button", { name: "shielded.generateFundReceiveCredential" }));
     await waitFor(() => expect(mocks.createRecipientCode).toHaveBeenCalledWith(expect.objectContaining({
-      context: expect.objectContaining({ stateReadMode: "chain" }), disclosure: "fund",
+      context: expect.objectContaining({ stateReadMode: "chain" }), purpose: "fund",
     })));
   });
   it("keeps the read-mode control absent while recovering or tracking a submission", async () => {
@@ -717,13 +717,13 @@ describe("Worker-backed shielded wallet", () => {
     });
     expect((screen.getByRole("button", { name: "shielded.privateLetters.inbox" }) as HTMLButtonElement).disabled).toBe(false);
     fireEvent.click(screen.getByRole("button", { name: "shielded.privateLetters.write" }));
-    fireEvent.change(screen.getByLabelText("shielded.privateLetters.recipientCode"), { target: { value: "valid-anonymous-code" } });
+    fireEvent.change(screen.getByLabelText("shielded.privateLetters.recipientCode"), { target: { value: "valid-receive-code" } });
     fireEvent.change(screen.getByLabelText("shielded.privateLetters.body"), { target: { value: "Letter without a deposit" } });
     fireEvent.click(screen.getByRole("button", { name: "shielded.privateLetters.send" }));
     await screen.findByText("shielded.privateLetters.sent: 0xletter");
     expect(mocks.call).toHaveBeenCalledWith("prepareLetter", {
       context: expect.objectContaining({ chainId: "31337", assetKind, lettersAddress: mocks.lettersAddress }),
-      code: "valid-anonymous-code", body: "Letter without a deposit",
+      code: "valid-receive-code", body: "Letter without a deposit",
     }, expect.anything());
     expect(mocks.submitLetter).toHaveBeenCalledWith(expect.objectContaining({ signer, letter: preparedLetter, address: mocks.lettersAddress }));
     expect(mocks.identity).toEqual(identity);
@@ -1161,6 +1161,41 @@ describe("Worker-backed shielded wallet", () => {
     expect(mocks.identity).toEqual(identity);
     expect(mocks.lock).not.toHaveBeenCalled();
   });
+  it.each(["identity", "independent"] as const)("separates receive codes and budget receiving credentials for the %s wallet", async receivingSlot => {
+    mocks.independentKey = { ...independentKey, recoveryVerified: true };
+    const defaultCall = mocks.call.getMockImplementation();
+    mocks.call.mockImplementation(async (method, params) => method === "receiveCode"
+      ? { code: `${params.purpose}-${params.slot}` }
+      : defaultCall?.(method, params));
+    await renderUnlockedPanel();
+    chooseAction("claim");
+    openReceiveCode(receivingSlot);
+    await waitFor(() => expect((screen.getByLabelText("shielded.receiveCodeLabel") as HTMLTextAreaElement).value).toBe(`receive-${receivingSlot}`));
+    expect(within(walletSheet()).queryByRole("combobox")).toBeNull();
+    expect(screen.getByRole("button", { name: "shielded.copyReceiveCode" })).toBeTruthy();
+    await waitUntilIdle();
+
+    fireEvent.click(screen.getByRole("button", { name: label(receivingSlot === "identity" ? "identityFundReceiveCredential" : "independentKeyFundReceiveCredential") }));
+    expect(screen.queryByLabelText("shielded.receiveCodeLabel")).toBeNull();
+    await waitFor(() => expect((screen.getByLabelText("shielded.fundReceiveCredentialLabel") as HTMLTextAreaElement).value).toBe(`fund-${receivingSlot}`));
+    expect(within(walletSheet()).queryByRole("combobox")).toBeNull();
+    expect(screen.getByRole("button", { name: "shielded.copyFundReceiveCredential" })).toBeTruthy();
+    expect(mocks.call).toHaveBeenLastCalledWith("receiveCode", expect.objectContaining({ slot: receivingSlot, purpose: "fund" }), expect.anything());
+    expect(navButton("claim").getAttribute("aria-current")).toBe("true");
+    expect(mocks.lock).not.toHaveBeenCalled();
+  });
+  it.each([
+    ["privateTransfer", "fund", "receiveCodeInputLabel", "receiveCodeRequired"],
+    ["fund", "receive", "fundReceiveCredentialInputLabel", "fundReceiveCredentialRequired"],
+  ] as const)("explains the required material when %s receives the wrong purpose", async (action, purpose, field, errorKey) => {
+    mocks.verify.mockResolvedValue({ purpose, personHash: identity.personHash, keyMode: 1, fingerprint: "recipient-fingerprint" });
+    await renderUnlockedPanel();
+    chooseAction(action);
+    fireEvent.change(screen.getByLabelText(`shielded.${field}`), { target: { value: "wrong-purpose-material" } });
+    await screen.findByText(`shielded.${errorKey}`);
+    expect((screen.getByRole("button", { name: submitLabel }) as HTMLButtonElement).disabled).toBe(true);
+    expect(mocks.call.mock.calls.some(([method]) => method === "preview")).toBe(false);
+  });
   it.each([
     ["create", "radio", "randomSource"],
     ["restore", "radio", "mnemonicRestore"],
@@ -1245,7 +1280,7 @@ describe("Worker-backed shielded wallet", () => {
     openReceiveCode("independent");
     expect(screen.queryByLabelText("shielded.receiveCodeLabel")).toBeNull();
     await waitFor(() => expect((screen.getByLabelText("shielded.receiveCodeLabel") as HTMLTextAreaElement).value).toBe("independent-receive-code"));
-    expect(mocks.call).toHaveBeenLastCalledWith("receiveCode", expect.objectContaining({ slot: "independent", disclosure: "anonymous", expiresAt: expect.stringMatching(/^\d+$/) }), expect.anything());
+    expect(mocks.call).toHaveBeenLastCalledWith("receiveCode", expect.objectContaining({ slot: "independent", purpose: "receive", expiresAt: expect.stringMatching(/^\d+$/) }), expect.anything());
     openReceiveCode("identity");
     expect(screen.queryByLabelText("shielded.receiveCodeLabel")).toBeNull();
     expect(mocks.identity).toEqual(identity);
@@ -1408,7 +1443,7 @@ describe("Worker-backed shielded wallet", () => {
   ] as const).flatMap((action) => (["identity", "independent"] as const).map((slot) => [action, slot] as const)))(
     "prepares %s with the globally selected %s wallet in its worker request", async (action, selectedSlot) => {
       mocks.independentKey = { ...independentKey, recoveryVerified: true };
-      mocks.verify.mockResolvedValue({ personHash: identity.personHash, keyMode: 1, fingerprint: "recipient-key" });
+      mocks.verify.mockResolvedValue({ purpose: action === "fund" ? "fund" : "receive", personHash: identity.personHash, keyMode: 1, fingerprint: "recipient-key" });
       mocks.call.mockImplementation(async (method, params) => method === "recover" ? {
         ...emptyWallet,
         children: [{ personHash: identity.personHash, rootVersionIndex: 0, eligible: true }],
@@ -1446,7 +1481,7 @@ describe("Worker-backed shielded wallet", () => {
         chooseOption("shielded.fields.familyVersion", "shielded.fundingVersionOption:0");
         chooseHeir(identity.personHash);
         fireEvent.change(screen.getByLabelText("shielded.fields.rate"), { target: { value: "1" } });
-        fireEvent.change(screen.getByLabelText("shielded.receiveCodeInputLabel"), { target: { value: "recipient-code" } });
+        fireEvent.change(screen.getByLabelText("shielded.fundReceiveCredentialInputLabel"), { target: { value: "recipient-code" } });
       } else {
         fireEvent.change(screen.getByLabelText(action === "privateTransfer" ? "shielded.fields.transferAmount" : "shielded.fields.amount"), { target: { value: "1" } });
         if (action === "privateTransfer") {
@@ -2109,12 +2144,12 @@ describe("Worker-backed shielded wallet", () => {
         { personHash: ineligibleChild, rootVersionIndex: 2, eligible: false },
       ],
     } : defaultCall?.(method, params));
-    mocks.verify.mockResolvedValue({ personHash: identity.personHash, keyMode: 1, fingerprint: "child-fingerprint" });
+    mocks.verify.mockResolvedValue({ purpose: "fund", personHash: identity.personHash, keyMode: 1, fingerprint: "child-fingerprint" });
     await renderUnlockedPanel();
     chooseAction("fund");
     const version = selectTrigger("shielded.fields.familyVersion");
     const amount = screen.getByLabelText("shielded.fields.rate") as HTMLInputElement;
-    const code = screen.getByLabelText("shielded.receiveCodeInputLabel") as HTMLTextAreaElement;
+    const code = screen.getByLabelText("shielded.fundReceiveCredentialInputLabel") as HTMLTextAreaElement;
     expect(version.disabled).toBe(false);
     expect(selectOptions("shielded.fields.familyVersion")).toEqual([
       "shielded.fundingVersionOption:2",
@@ -2275,18 +2310,18 @@ describe("Worker-backed shielded wallet", () => {
     chooseAction("fund");
     chooseFundingEntry("public");
     expect(screen.getByText(label("publicHint"))).toBeTruthy();
-    expect(screen.queryByLabelText("shielded.receiveCodeInputLabel")).toBeNull();
+    expect(screen.queryByLabelText("shielded.fundReceiveCredentialInputLabel")).toBeNull();
   });
   it("confines payer credential generation to the convenient entry", async () => {
     mocks.identity = identity;
     await renderPanel();
     chooseAction("fund");
     chooseFundingEntry("privateConvenient");
-    fireEvent.click(screen.getByRole("radio", { name: "shielded.recipientMethods.credentials" }));
-    expect(screen.getByText("shielded.generateReceiveCode")).toBeTruthy();
+    fireEvent.click(screen.getByRole("radio", { name: "shielded.fundRecipientMethods.credentials" }));
+    expect(screen.getByText("shielded.generateFundReceiveCredential")).toBeTruthy();
   });
   it("keeps the child, version and amount when switching funding entries", async () => {
-    mocks.verify.mockResolvedValue({ personHash: identity.personHash, keyMode: 1, fingerprint: "child-fingerprint" });
+    mocks.verify.mockResolvedValue({ purpose: "fund", personHash: identity.personHash, keyMode: 1, fingerprint: "child-fingerprint" });
     mocks.call.mockResolvedValue({
       ...emptyWallet,
       children: [{ personHash: identity.personHash, rootVersionIndex: 0, eligible: true }],
@@ -2296,10 +2331,10 @@ describe("Worker-backed shielded wallet", () => {
     chooseOption("shielded.fields.familyVersion", "shielded.fundingVersionOption:0");
     chooseHeir(identity.personHash);
     fireEvent.change(screen.getByLabelText("shielded.fields.rate"), { target: { value: "2" } });
-    fireEvent.change(screen.getByLabelText("shielded.receiveCodeInputLabel"), { target: { value: "independent-code" } });
+    fireEvent.change(screen.getByLabelText("shielded.fundReceiveCredentialInputLabel"), { target: { value: "independent-code" } });
     chooseFundingEntry("privateConvenient");
     // Only the receiving material belongs to an entry.
-    expect((screen.getByLabelText("shielded.receiveCodeInputLabel") as HTMLTextAreaElement).value).toBe("");
+    expect((screen.getByLabelText("shielded.fundReceiveCredentialInputLabel") as HTMLTextAreaElement).value).toBe("");
     chooseFundingEntry("public");
     expect(selectTrigger("shielded.fields.familyVersion").textContent).toBe("shielded.fundingVersionOption:0");
     expect(heirChoice(identity.personHash).checked).toBe(true);
@@ -2332,7 +2367,7 @@ describe("Worker-backed shielded wallet", () => {
     expect(screen.queryByRole("radio", { name: label("randomSource") })).toBeNull();
   });
   it.each([0, 1])("stays in funding after a private deposit in key mode %s", async keyMode => {
-    mocks.verify.mockResolvedValue({ disclosure: "fund", personHash: identity.personHash, keyMode, fingerprint: "child-fingerprint" });
+    mocks.verify.mockResolvedValue({ purpose: "fund", personHash: identity.personHash, keyMode, fingerprint: "child-fingerprint" });
     mocks.call.mockImplementation(async (method, params) => {
       if (method === "recover") return {
         ...emptyWallet,
@@ -2352,7 +2387,7 @@ describe("Worker-backed shielded wallet", () => {
     chooseOption("shielded.fields.familyVersion", "shielded.fundingVersionOption:0");
     chooseHeir(identity.personHash);
     fireEvent.change(screen.getByLabelText("shielded.fields.rate"), { target: { value: "1" } });
-    fireEvent.change(screen.getByLabelText("shielded.receiveCodeInputLabel"), { target: { value: "child-receive-code" } });
+    fireEvent.change(screen.getByLabelText("shielded.fundReceiveCredentialInputLabel"), { target: { value: "child-receive-code" } });
     const submit = screen.getByRole("button", { name: submitLabel }) as HTMLButtonElement;
     await waitFor(() => expect(submit.disabled).toBe(false));
     fireEvent.click(submit);
@@ -2361,7 +2396,7 @@ describe("Worker-backed shielded wallet", () => {
     expect(navButton("fund").getAttribute("aria-current")).toBe("true");
   });
   it("preserves the child and code across budget arrangements and restores custom amounts", async () => {
-    mocks.verify.mockResolvedValue({ personHash: identity.personHash, keyMode: 1, fingerprint: "child-fingerprint" });
+    mocks.verify.mockResolvedValue({ purpose: "fund", personHash: identity.personHash, keyMode: 1, fingerprint: "child-fingerprint" });
     const originalCall = mocks.call.getMockImplementation()!;
     mocks.call.mockImplementation(async (method, ...args) => method === "recover" ? {
       ...emptyWallet,
@@ -2376,10 +2411,10 @@ describe("Worker-backed shielded wallet", () => {
     fireEvent.change(screen.getByLabelText("shielded.fields.rate"), { target: { value: "2" } });
     chooseOption("shielded.fields.periodDays", "shielded.periodDaysSummary:14");
     fireEvent.change(screen.getByLabelText("shielded.fields.periods"), { target: { value: "3" } });
-    fireEvent.change(screen.getByLabelText("shielded.receiveCodeInputLabel"), { target: { value: "budget-code" } });
+    fireEvent.change(screen.getByLabelText("shielded.fundReceiveCredentialInputLabel"), { target: { value: "budget-code" } });
     const expectDraft = () => {
       expect(heirChoice(identity.personHash).checked).toBe(true);
-      expect((screen.getByLabelText("shielded.receiveCodeInputLabel") as HTMLTextAreaElement).value).toBe("budget-code");
+      expect((screen.getByLabelText("shielded.fundReceiveCredentialInputLabel") as HTMLTextAreaElement).value).toBe("budget-code");
       expect((screen.getByLabelText("shielded.fields.periods") as HTMLInputElement).value).toBe("3");
     };
     chooseOption("shielded.fields.fundingRule", "shielded.newFundingRule");
@@ -2410,7 +2445,7 @@ describe("Worker-backed shielded wallet", () => {
     ["privateIndependent", 1, "independent"],
   ] as const)("prepares %s funding with recipient key mode %s using the explicit %s payer key", async (entry, keyMode, source) => {
     mocks.independentKey = { ...independentKey, recoveryVerified: true };
-    mocks.verify.mockResolvedValue({ personHash: identity.personHash, keyMode, fingerprint: "child-fingerprint" });
+    mocks.verify.mockResolvedValue({ purpose: "fund", personHash: identity.personHash, keyMode, fingerprint: "child-fingerprint" });
     mocks.call.mockImplementation(async (method, params) => method === "recover" ? {
       ...emptyWallet,
       children: [{ personHash: identity.personHash, rootVersionIndex: 0, eligible: true }],
@@ -2426,7 +2461,7 @@ describe("Worker-backed shielded wallet", () => {
     chooseOption("shielded.fields.familyVersion", "shielded.fundingVersionOption:0");
     chooseHeir(identity.personHash);
     fireEvent.change(screen.getByLabelText("shielded.fields.rate"), { target: { value: "1" } });
-    fireEvent.change(screen.getByLabelText("shielded.receiveCodeInputLabel"), { target: { value: "child-receive-code" } });
+    fireEvent.change(screen.getByLabelText("shielded.fundReceiveCredentialInputLabel"), { target: { value: "child-receive-code" } });
     const submit = screen.getByRole("button", { name: submitLabel }) as HTMLButtonElement;
     await waitFor(() => expect(submit.disabled).toBe(false));
     expect(mocks.call.mock.calls.some(([method]) => method === "preview")).toBe(false);
@@ -2443,7 +2478,7 @@ describe("Worker-backed shielded wallet", () => {
     ["privateConvenient", 0, 0, "convenientEntry"],
     ["privateIndependent", 0, 1, "independentEntry"],
   ] as const)("keeps an existing %s template fixed for further funding", async (entry, bindingKind, keyMode, entryLabel) => {
-    mocks.verify.mockResolvedValue({ disclosure: "fund", personHash: identity.personHash, keyMode, fingerprint: "child-fingerprint" });
+    mocks.verify.mockResolvedValue({ purpose: "fund", personHash: identity.personHash, keyMode, fingerprint: "child-fingerprint" });
     mocks.call.mockImplementation(async (method, params) => method === "recover" ? {
       ...emptyWallet,
       familyRecordsAvailable: false,
@@ -2465,10 +2500,10 @@ describe("Worker-backed shielded wallet", () => {
       expect(screen.getByRole("radio", { name: label(key) }).matches(":disabled")).toBe(true);
     }
     expect(screen.getByText(label("fundingEntryFixed"))).toBeTruthy();
-    if (entry === "public") expect(screen.queryByLabelText("shielded.receiveCodeInputLabel")).toBeNull();
+    if (entry === "public") expect(screen.queryByLabelText("shielded.fundReceiveCredentialInputLabel")).toBeNull();
     else {
       expect((screen.getByRole("button", { name: submitLabel }) as HTMLButtonElement).disabled).toBe(true);
-      fireEvent.change(screen.getByLabelText("shielded.receiveCodeInputLabel"), { target: { value: "current-fund-material" } });
+      fireEvent.change(screen.getByLabelText("shielded.fundReceiveCredentialInputLabel"), { target: { value: "current-fund-material" } });
       await waitFor(() => expect((screen.getByRole("button", { name: submitLabel }) as HTMLButtonElement).disabled).toBe(false));
     }
     fireEvent.click(screen.getByRole("button", { name: submitLabel }));
@@ -3119,7 +3154,7 @@ describe("Worker-backed shielded wallet", () => {
     "prepares %s from the independent value found by scanning",
     async (action) => {
       mocks.independentKey = { ...independentKey, recoveryVerified: true };
-      mocks.verify.mockResolvedValue({ personHash: identity.personHash, keyMode: 0, fingerprint: "recipient-fingerprint" });
+      mocks.verify.mockResolvedValue({ purpose: "receive", personHash: identity.personHash, keyMode: 0, fingerprint: "recipient-fingerprint" });
       mocks.call.mockImplementation(async (method, params) =>
         method === "recover" ? receivedIndependentWallet : method === "discover" ? emptyDiscovery : method === "prove" ? stopAfterPreview() : {
           handle: "action:independent",
@@ -3170,6 +3205,7 @@ describe("Worker-backed shielded wallet", () => {
   it("requires only the recipient confirmation before preparing an independent transfer", async () => {
     mocks.independentKey = { ...independentKey, recoveryVerified: true };
     mocks.verify.mockResolvedValue({
+      purpose: "receive",
       personHash: identity.personHash,
       keyMode: 1,
       fingerprint: "independent-recipient-fingerprint",
@@ -3703,7 +3739,7 @@ describe("Worker-backed shielded wallet", () => {
     "handles %s consolidation when the receipt completes after %s",
     async (action, sessionChange) => {
       const commitments = Array.from({ length: 9 }, (_, index) => String(index + 11));
-      mocks.verify.mockResolvedValue({ personHash: identity.personHash, keyMode: 0, fingerprint: "recipient-fingerprint" });
+      mocks.verify.mockResolvedValue({ purpose: "receive", personHash: identity.personHash, keyMode: 0, fingerprint: "recipient-fingerprint" });
       let previews = 0;
       mocks.call.mockImplementation(async (method, params) => {
         if (method === "recover") return {

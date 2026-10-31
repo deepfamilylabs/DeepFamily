@@ -22,9 +22,10 @@ const UNICODE_LICENSE_SHA256 = 'e7a93b009565cfce55919a381437ac4db883e9da2126fa28
 // Payers verify receive codes in the browser. The verification key is embedded in the bundle
 // so that replacing a file under /zk cannot make a forged receive code verify.
 const shieldedReceiveCredentialVerificationKeys = Object.fromEntries(
-  ['anonymous', 'fund'].map(disclosure => {
-    const artifact = new URL(`./public/zk/shielded/shielded_${disclosure}_receive_credential.vkey.json`, import.meta.url)
-    return [disclosure, fs.existsSync(artifact) ? JSON.parse(fs.readFileSync(artifact, 'utf8')) : null]
+  ['receive', 'fund'].map(purpose => {
+    const source = purpose === 'fund' ? 'shielded_fund_receive_credential' : 'shielded_receive_credential'
+    const artifact = new URL(`./public/zk/shielded/${source}.vkey.json`, import.meta.url)
+    return [purpose, fs.existsSync(artifact) ? JSON.parse(fs.readFileSync(artifact, 'utf8')) : null]
   })
 )
 
@@ -45,10 +46,10 @@ const readReceiveLinkKeys = (required: boolean) => {
     throw new Error('Receive linking keys differ from the shielded manifest')
   }
   const keys = JSON.parse(bytes.toString('utf8'))
-  if (Object.keys(keys).sort().join() !== 'anonymous,fund') {
+  if (Object.keys(keys).sort().join() !== 'fund,receive') {
     throw new Error('Receive linking keys must authenticate both presentation circuits')
   }
-  for (const kind of ['anonymous', 'fund']) {
+  for (const kind of ['receive', 'fund']) {
     const key = keys[kind]
     const commonSignals = kind === 'fund' ? 12 : 11
     if (key?.verificationKey?.protocol !== 'groth16' ||
@@ -57,12 +58,16 @@ const readReceiveLinkKeys = (required: boolean) => {
       !Array.isArray(key.issuerDeltaG1) || key.issuerDeltaG1.length !== 3) {
       throw new Error(`Invalid receive linking key for ${kind}`)
     }
-    const issuerBytes = fs.readFileSync(new URL(`./public/zk/shielded/shielded_${kind}_receive_credential.vkey.json`, import.meta.url))
+    const issuerSource = kind === 'fund' ? 'shielded_fund_receive_credential' : 'shielded_receive_credential'
+    const presentationSource = kind === 'fund' ? 'shielded_fund_receive_presentation' : 'shielded_receive_presentation'
+    const issuerAction = kind === 'fund' ? 'fundReceiveCredential' : 'receiveCredential'
+    const presentationAction = kind === 'fund' ? 'fundReceivePresentation' : 'receivePresentation'
+    const issuerBytes = fs.readFileSync(new URL(`./public/zk/shielded/${issuerSource}.vkey.json`, import.meta.url))
     const issuerDigest = createHash('sha256').update(issuerBytes).digest('hex')
-    const presentationBytes = fs.readFileSync(new URL(`./public/zk/shielded/shielded_${kind}_receive_presentation.vkey.json`, import.meta.url))
+    const presentationBytes = fs.readFileSync(new URL(`./public/zk/shielded/${presentationSource}.vkey.json`, import.meta.url))
     if (issuerDigest !== key.issuerVerificationKeySha256 ||
-      issuerDigest !== manifest.circuits?.[`${kind}ReceiveCredential`]?.verificationKeySha256 ||
-      createHash('sha256').update(presentationBytes).digest('hex') !== manifest.circuits?.[`${kind}ReceivePresentation`]?.verificationKeySha256 ||
+      issuerDigest !== manifest.circuits?.[issuerAction]?.verificationKeySha256 ||
+      createHash('sha256').update(presentationBytes).digest('hex') !== manifest.circuits?.[presentationAction]?.verificationKeySha256 ||
       JSON.stringify(JSON.parse(presentationBytes.toString('utf8'))) !== JSON.stringify(key.verificationKey)) {
       throw new Error(`Receive linking keys do not match the pinned ${kind} Circom verification keys`)
     }

@@ -1653,7 +1653,7 @@
       "customPeriodDays": "自定义天数"
     },
     "receiveCodeLabel": "我的收款码",
-    "receiveCodeShareHint": "请仅私下分享：收款码可关联你的身份。",
+    "receiveCodeShareHint": "请私下交给付款人或寄信人；重复使用接收密钥可能关联不同收款。",
     "receiveCodeInputLabel": "收款人收款码",
     "receiveCodeInputHint": "收款码须属于所选子女。",
     "generateReceiveCode": "生成收款码",
@@ -1736,7 +1736,8 @@
       "proving": "正在生成证明…",
       "checkingGas": "正在估算手续费…",
       "submitting": "请在钱包中确认交易…",
-      "confirming": "正在等待交易确认…"
+      "confirming": "正在等待交易确认…",
+      "fundReceiveCredential": "正在生成预算接收凭证…"
     },
     "fundingPreview": "{{periods}} 期 · 每 {{days}} 天 {{rate}} {{symbol}}",
     "valueOption": "第 {{index}} 笔余额 · {{amount}} {{symbol}}",
@@ -1874,7 +1875,7 @@
       "recommended": "推荐",
       "fundingEntryFixed": "追加预算沿用原存入方式和接收密钥。",
       "claimViewLabel": "预算类型",
-      "receiveKeyLabel": "收款码类型",
+      "receiveKeyLabel": "收款码",
       "receiveCodeUnavailable": "暂不可用",
       "receiveCodeNeedsIdentity": "解锁身份凭据后，可使用收款码。",
       "receiveCodeNeedsKey": "解锁或新建独立密钥并完成验证后，可使用收款码。",
@@ -1897,7 +1898,11 @@
       "valueCandidatesHint": "勾选仅表示允许使用，不会全部花费。优先避免额外合并，尝试精确凑额，再减少找零；实际使用见预览。每笔交易最多使用 4 笔余额，候选数量不限。",
       "signatureMessage": "查看将要签名的固定消息",
       "planTransactions": "共 {{count}} 笔交易，请在钱包中逐笔确认。",
-      "continueIdentity": "解锁身份"
+      "continueIdentity": "解锁身份",
+      "identityFundReceiveCredential": "身份凭据预算接收凭证",
+      "independentKeyFundReceiveCredential": "独立密钥预算接收凭证",
+      "receiveBudget": "接收预算",
+      "fundReceiveCredentialLabel": "预算接收凭证"
     },
     "privateLetters": {
       "title": "私密家书",
@@ -1905,7 +1910,7 @@
       "inbox": "信箱",
       "refresh": "刷新信箱",
       "notConfigured": "当前网络尚未配置私密家书合约。",
-      "writeHint": "使用收件人的匿名收款码。",
+      "writeHint": "使用收件人的收款码。",
       "recipientCode": "收件人收款码",
       "body": "正文",
       "send": "加密并寄出",
@@ -1918,16 +1923,25 @@
       "emptyInbox": "当前解锁的密钥尚未解密出家书。",
       "recoveryHint": "恢复需要原身份资料和口令；独立密钥家书还需要原恢复词或 Shielded Key。收款码到期不影响读取既有家书。",
       "unavailable": "有 {{count}} 封信的密文暂时无法读取或校验。请刷新信箱重试。",
-      "disclosure": "收款材料用途",
-      "anonymousCode": "匿名收款码",
-      "fundMaterial": "预算收款码",
-      "anonymousPrivacy": "码内隐藏身份承诺。固定匿名标识或接收密钥可关联不同码；持有预算收款码的人可据此识别身份关联。",
-      "fundPrivacy": "此码会向出资方披露并认证继承身份，用于接收预算。请仅分享给预算出资方。",
+      "fundPrivacy": "交给出资方，用于建立或追加私有预算。此凭证会向其披露并认证接收人身份。",
       "expiresAt": "截止时间",
       "expiryFuture": "请选择未来的截止时间。",
       "revokeHint": "使本链该身份两种密钥模式的全部旧码作废，最长 15 分钟生效。既有余额、预算领取和家书仍可使用；已经获知的身份关联不会消失。",
       "revokeAll": "作废该身份全部旧收款码",
-      "revoking": "正在证明身份授权计数递增…"
+      "revoking": "正在证明身份授权计数递增…",
+      "receivePrivacy": "用于接收转账和家书。码内隐藏身份承诺；固定标识或接收密钥可关联不同码，持有预算接收凭证的人可据此识别身份关联。"
+    },
+    "copyReceiveCode": "复制收款码",
+    "fundReceiveCredentialLabel": "我的预算接收凭证",
+    "fundReceiveCredentialInputLabel": "接收人的预算接收凭证",
+    "fundReceiveCredentialShareHint": "仅交给预算出资方；此凭证会向其披露并认证你的接收身份。",
+    "copyFundReceiveCredential": "复制预算接收凭证",
+    "generateFundReceiveCredential": "生成预算接收凭证",
+    "fundReceiveCredentialRequired": "此操作需要预算接收凭证，请让接收人在“接收预算”中生成。",
+    "receiveCodeRequired": "此操作需要收款码，请让收款人在“收款码”中生成。",
+    "fundRecipientMethods": {
+      "receiveCode": "使用预算接收凭证（推荐）",
+      "credentials": "替接收人生成预算接收凭证"
     }
   }
 }

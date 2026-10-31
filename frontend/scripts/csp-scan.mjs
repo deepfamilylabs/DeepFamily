@@ -3,7 +3,7 @@ import { spawn } from 'node:child_process'
 import fs from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import path from 'node:path'
-import { splitShieldedLetterCiphertextHash, verifyLinkedGroth16Proof } from '@deepfamily/protocol-core'
+import { SHIELDED_RECEIVE_PROOF_LIFETIME, splitShieldedLetterCiphertextHash, verifyLinkedGroth16Proof } from '@deepfamily/protocol-core'
 import { createCspScanRpcFixture } from './lib/cspScanRpcFixture.mjs'
 
 const mode = process.env.CSP_SCAN_MODE === 'dev' ? 'dev' : 'preview'
@@ -210,7 +210,7 @@ const runWorkerFlows = async (page) => {
         rawPassphrase: receivePassphrase,
         context: input.receiveContext,
         expiresAt: input.expiresAt,
-        disclosure: 'anonymous',
+        purpose: 'receive',
       })
       const check = await call(zk, 'verifyShieldedReceiveCode', { code: created.code })
       const assetState = await call(asset, 'unlockIdentity', {
@@ -231,7 +231,7 @@ const runWorkerFlows = async (page) => {
         throw new Error('asset session returned invalid public field types or created an independent key root')
       }
       const assetCreated = await call(asset, 'receiveCode', {
-        slot: 'identity', context: input.receiveContext, expiresAt: input.expiresAt, disclosure: 'anonymous',
+        slot: 'identity', context: input.receiveContext, expiresAt: input.expiresAt, purpose: 'receive',
       })
       assertPublicFields(assetCreated, ['code'], 'asset receive code')
       if (typeof assetCreated.code !== 'string') {
@@ -239,18 +239,18 @@ const runWorkerFlows = async (page) => {
       }
       const assetCheck = await call(zk, 'verifyShieldedReceiveCode', { code: assetCreated.code })
       const publicCheckFields = [
-        'ok', 'disclosure', 'authorizationAlias', 'authorizationCounter', 'expiresAt',
+        'ok', 'purpose', 'authorizationAlias', 'authorizationCounter', 'expiresAt',
         'ownerCommitment', 'viewingKey', 'keyMode', 'identitySuiteId',
         'independentKeySuiteId', 'independentKeyDerivationVersion', 'fingerprint',
       ]
-      assertPublicFields(check, publicCheckFields, 'anonymous receive verification')
-      assertPublicFields(assetCheck, publicCheckFields, 'anonymous asset receive verification')
+      assertPublicFields(check, publicCheckFields, 'receive code verification')
+      assertPublicFields(assetCheck, publicCheckFields, 'asset receive code verification')
       const letter = await call(asset, 'prepareLetter', {
         context: input.receiveContext, code: created.code, body: 'CSP scan test letter',
       })
       assertPublicFields(letter, ['delivery', 'ciphertext', 'proof'], 'proven letter')
       assertPublicFields(letter.delivery, [
-        'messageId', 'checkpointId', 'asOf', 'expiresAt', 'recipientBinding',
+        'messageId', 'checkpointId', 'asOf', 'deadline', 'recipientBinding',
       ], 'letter delivery')
       return {
         personHash: lower(material.personHash),
@@ -266,7 +266,7 @@ const runWorkerFlows = async (page) => {
         assetReceiveCodeVerified: assetCheck.ok,
         assetKeyMode: assetCheck.keyMode,
         assetReceivingFieldsMatch: publicCheckFields.every(field => assetCheck[field] === check[field]),
-        anonymousDisclosureValidated: check.disclosure === 'anonymous' && check.expiresAt === input.expiresAt &&
+        receivePurposeValidated: check.purpose === 'receive' && check.expiresAt === input.expiresAt &&
           check.authorizationCounter === '0',
         assetPublicDtoValidated: true,
         letter,
@@ -298,7 +298,7 @@ const runWorkerFlows = async (page) => {
       result.assetIdentityCommitment === result.receiverIdentityCommitment &&
       result.assetIdentitySuiteId === Number(input.identitySuiteId) && result.assetKeyMode === 0,
     ],
-    ['anonymous verification exposes only the expected public fields', result.anonymousDisclosureValidated === true],
+    ['receive verification exposes only the expected public fields', result.receivePurposeValidated === true],
     ['both proving workers bind the same receiving keys and credential fields', result.assetReceivingFieldsMatch === true],
   ]
   const broken = checks.find(([, ok]) => !ok)
@@ -306,7 +306,7 @@ const runWorkerFlows = async (page) => {
 
   const { delivery, ciphertext, proof } = result.letter
   if (delivery.checkpointId !== rpcFixture.checkpointId || delivery.asOf !== rpcFixture.asOf ||
-    delivery.expiresAt !== rpcFixture.expiresAt || !/^0x[0-9a-f]+$/iu.test(proof) ||
+    BigInt(delivery.deadline) !== BigInt(rpcFixture.asOf) + SHIELDED_RECEIVE_PROOF_LIFETIME || !/^0x[0-9a-f]+$/iu.test(proof) ||
     (proof.length - 2) / 2 !== 1184) {
     throw new Error('worker flows: letter delivery does not match the controlled authorization state')
   }
@@ -314,10 +314,10 @@ const runWorkerFlows = async (page) => {
   const publicInputs = [
     BigInt(input.receiveContext.chainId), BigInt(input.receiveContext.lettersAddress), 1n,
     BigInt(delivery.messageId), cipherLo, cipherHi, BigInt(delivery.checkpointId),
-    BigInt(rpcFixture.stateRoot), BigInt(delivery.asOf), BigInt(delivery.expiresAt), BigInt(delivery.recipientBinding),
+    BigInt(rpcFixture.stateRoot), BigInt(delivery.asOf), BigInt(delivery.deadline), BigInt(delivery.recipientBinding),
   ]
-  const linkKeys = JSON.parse(await fs.readFile(new URL('../public/zk/shielded/receive-link-keys.json', import.meta.url), 'utf8')).anonymous
-  const issuerKey = JSON.parse(await fs.readFile(new URL('../public/zk/shielded/shielded_anonymous_receive_credential.vkey.json', import.meta.url), 'utf8'))
+  const linkKeys = JSON.parse(await fs.readFile(new URL('../public/zk/shielded/receive-link-keys.json', import.meta.url), 'utf8')).receive
+  const issuerKey = JSON.parse(await fs.readFile(new URL('../public/zk/shielded/shielded_receive_credential.vkey.json', import.meta.url), 'utf8'))
   const verifies = (publicInputs) => verifyLinkedGroth16Proof({
     proof, publicInputs,
     issuer: { verificationKey: issuerKey, deltaG1: linkKeys.issuerDeltaG1 },

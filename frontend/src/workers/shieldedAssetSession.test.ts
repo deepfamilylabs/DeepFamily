@@ -23,6 +23,10 @@ import {
   buildShieldedIdentityAuthorizationState,
 } from "@deepfamily/protocol-core";
 import { ShieldedAssetSession, shieldedAssetErrorMessage } from "./shieldedAssetSession";
+import {
+  ShieldedProofConfigurationError,
+  SHIELDED_PROOF_CONFIGURATION_ERROR_MESSAGE,
+} from "../shared/zk/shieldedProofErrors";
 import { InheritanceError } from "../domains/inheritance/model/inheritanceErrors";
 import type { ShieldedWorkerContext } from "../shared/workers/shieldedAssetWorkerTypes";
 
@@ -2475,5 +2479,26 @@ describe("ephemeral asset Worker independent key lifecycle", () => {
     expect(shieldedAssetErrorMessage(error)).not.toContain(secret);
     expect(shieldedAssetErrorMessage({ message: secret })).not.toContain(secret);
     expect(hexlify(fixedRoot)).not.toContain("password");
+  });
+
+  it("reports receive-code failures without unrelated key recovery advice or raw errors", () => {
+    const secret = "signature-password-witness-sentinel";
+    const failures = [
+      Object.assign(new Error(secret), { cause: { witness: secret } }),
+      { get message() { throw new Error(secret); } },
+    ];
+    for (const failure of failures) {
+      expect(shieldedAssetErrorMessage(failure, "receiveCode")).toBe(
+        "Receive code generation failed. Check the network and proving files, then try again.",
+      );
+      expect(shieldedAssetErrorMessage(failure)).toBe(
+        "Asset operation could not be completed. Please try again.",
+      );
+    }
+    const configurationError = new ShieldedProofConfigurationError();
+    configurationError.message = secret;
+    expect(shieldedAssetErrorMessage(configurationError, "receiveCode")).toBe(
+      SHIELDED_PROOF_CONFIGURATION_ERROR_MESSAGE,
+    );
   });
 });

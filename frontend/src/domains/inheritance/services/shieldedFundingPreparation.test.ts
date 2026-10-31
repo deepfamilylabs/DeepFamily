@@ -122,7 +122,7 @@ async function setup(periodDays = 30n) {
   const heirPersonHash = wrapIdentityCommitmentAsPersonHash(heirIdentity).toLowerCase();
   // The worker verifies a receive code before a payer can hold this type.
   const recipient = {
-    disclosure: "fund",
+    purpose: "fund",
     keyMode: 0,
     identityCommitment: heirIdentity,
     ownerCommitment: heirKeys.ownerCommitment,
@@ -473,7 +473,7 @@ describe("local unified funding preparation", () => {
     };
     const input = { ...fixture.common, fundMode: 1 as const, budget, budgetPeriods: 1n };
     await expect(prepareShieldedFund({ ...input, recipient: undefined })).rejects.toThrow(
-      "current Fund identity disclosure material",
+      "current budget receiving credential",
     );
     const refill = await prepareShieldedFund(input);
     expect(refill.outputs[0].note.keyMode).toBe(1n);

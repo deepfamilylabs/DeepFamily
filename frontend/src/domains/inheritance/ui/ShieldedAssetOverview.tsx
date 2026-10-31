@@ -2,6 +2,7 @@ import { useId, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Fingerprint,
+  CalendarDays,
   KeyRound,
   LockKeyhole,
   LockOpen,
@@ -35,7 +36,7 @@ export type ShieldedOverviewWallet = {
 };
 
 export type ShieldedWalletSheetState =
-  | { kind: "receiveCode"; slot: ShieldedKeySlot }
+  | { kind: "receiveCode" | "fundReceiveCredential"; slot: ShieldedKeySlot }
   | { kind: "keys"; flow: ShieldedIndependentKeyFlow };
 
 const WALLET_ICON = { identity: Fingerprint, independent: KeyRound } as const;
@@ -62,6 +63,7 @@ export function ShieldedAssetOverview({
   onSelectWallet,
   independentKeyState,
   onReceiveCode,
+  onReceiveBudget,
   onOpenIndependentKey,
   openSheet,
   footer,
@@ -90,6 +92,7 @@ export function ShieldedAssetOverview({
    */
   independentKeyState: "ready" | "setup";
   onReceiveCode: (slot: ShieldedKeySlot) => void;
+  onReceiveBudget: (slot: ShieldedKeySlot) => void;
   onOpenIndependentKey: (flow: ShieldedIndependentKeyFlow) => void;
   /** The wallet sheet that is open, so its trigger reports that it is expanded. */
   openSheet: ShieldedWalletSheetState | null;
@@ -236,6 +239,7 @@ export function ShieldedAssetOverview({
           const Icon = WALLET_ICON[wallet.slot];
           const longBalance = wallet.available.length > 14 || wallet.budget.length > 14;
           const receiveOpen = openSheet?.kind === "receiveCode" && openSheet.slot === wallet.slot;
+          const budgetReceiveOpen = openSheet?.kind === "fundReceiveCredential" && openSheet.slot === wallet.slot;
           const selectionId = `${selectionName}-${wallet.slot}`;
           const needsKeySetup = wallet.slot === "independent" && independentKeyState !== "ready";
           const canReceive = wallet.unlocked && !needsKeySetup;
@@ -402,6 +406,17 @@ export function ShieldedAssetOverview({
                     >
                       <QrCode className="h-3.5 w-3.5" aria-hidden="true" />
                       {t("shielded.actions.receiveCode", { symbol })}
+                    </button>
+                    <button
+                      type="button"
+                      className={`${WALLET_ACTION} text-ink/80 hover:text-ink`}
+                      disabled={busy}
+                      aria-expanded={budgetReceiveOpen}
+                      aria-label={tr(wallet.slot === "identity" ? "identityFundReceiveCredential" : "independentKeyFundReceiveCredential")}
+                      onClick={() => onReceiveBudget(wallet.slot)}
+                    >
+                      <CalendarDays className="h-3.5 w-3.5" aria-hidden="true" />
+                      {tr("receiveBudget")}
                     </button>
                     {wallet.slot === "independent" ? (
                       <button

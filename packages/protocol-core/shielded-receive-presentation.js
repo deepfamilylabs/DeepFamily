@@ -29,7 +29,7 @@ const check = (condition, message) =>
 /** Shared by the presentation circuit and the money circuit's private receiver witness. */
 export function computeShieldedReceiveCredentialBinding({ credential, salt }) {
   const signals = buildShieldedReceiveCredentialPublicSignals(credential);
-  const offset = credential.disclosure === "fund" ? 1 : 0;
+  const offset = credential.purpose === "fund" ? 1 : 0;
   const randomizer = field(salt, "salt");
   check(randomizer !== 0n, "A receive presentation requires a nonzero randomizer");
   let binding = poseidon3([SHIELDED_RECEIVE_BINDING_DOMAIN, signals[0], signals[3 + offset]]);
@@ -99,8 +99,8 @@ export function prepareShieldedReceivePresentation(input) {
     Object.values(SHIELDED_RECEIVE_PRESENTATION_ACTION).includes(Number(action)),
     "Unknown receive action",
   );
-  const isFund = credential.disclosure === "fund";
-  check(isFund === (action === 3n), "Use the credential disclosure required by this operation");
+  const isFund = credential.purpose === "fund";
+  check(isFund === (action === 3n), "Use the credential purpose required by this operation");
   const chainId = bigintFrom(input.chainId, "chainId", MAX_UINT64);
   const consumer = BigInt(getAddress(input.consumer));
   const checkpointId = field(input.checkpointId, "checkpointId");
@@ -166,7 +166,7 @@ export function prepareShieldedReceivePresentation(input) {
     deadline,
     presentation,
     request: {
-      kind: isFund ? "fund" : "anonymous",
+      kind: isFund ? "fund" : "receive",
       credentialProof: credential.proof,
       credentialPublicSignals: signals.map(String),
       presentation,
@@ -180,7 +180,7 @@ export function prepareShieldedReceivePresentation(input) {
  */
 export function prepareReceivePresentationWitness(request) {
   const kinds = {
-    anonymous: ["anonymousReceivePresentation", 11],
+    receive: ["receivePresentation", 11],
     fund: ["fundReceivePresentation", 12],
   };
   check(request && Object.hasOwn(kinds, request.kind), "Unsupported receive presentation kind");

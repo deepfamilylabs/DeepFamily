@@ -442,7 +442,7 @@ and renewal happen locally after reading the latest shared authorization counter
 payment checks the latest state again. The asset Worker uses Circom and snarkjs for
 both issuance and presentation. LinkG16 links their ordinary Groth16 proofs over
 the same hidden credential fields and rerandomizes them before submission, keeping
-the original code, alias and identity off chain for anonymous receipts. There is
+the original code, alias and identity off chain for receive operations. There is
 no recursive verifier circuit or separate Go/WASM runtime. The original identity
 preimage, canonical alias and key-ownership constraints remain in the issuer.
 
@@ -518,21 +518,27 @@ progress advances; explicit caller deadlines are unchanged and stalled tasks sti
 The RPC must retain the pinned block while pages are downloaded. Rebuilding current state can
 still require substantial traffic, disk and verification time; it is not a constant-size first sync.
 
-Identity credentials and the independent key each issue both receive code types. An
-anonymous receive code (`dfrecv`) serves private transfers and letters. The UI calls the
-Fund credential (`dffund`) a **Budget receive code**; its help text says that it discloses
+Identity credentials and the independent key each issue both credential purposes. A
+receive code (`dfrecv`) serves private transfers and letters. The UI calls the
+Fund credential (`dffund`) a **Budget receiving credential**; its help text says that it discloses
 and authenticates the heir identity to the funder, which private funding needs to prove the
-parent-child relationship and trusted endorsement. A budget receive code carries only that
+parent-child relationship and trusted endorsement. A budget receiving credential carries only that
 Fund issuer proof and is accepted only for private budgets. Budgets carry no letters, so
 funding needs no second code or transaction. Changing the arrangement or family version
 preserves the selected child and receive code when still applicable; reselecting the same
 child does not reset the form.
 
+Both wallet cards offer **Receive code** and **Receive a budget** as separate entries.
+The generated material has a purpose-specific title, copy action and share hint; there
+is no type dropdown. Budget forms ask for a budget receiving credential, while transfer
+and letter forms ask for a receive code. A mismatched purpose is explained before the
+user can prepare a transaction.
+
 The locked page shows the unlock form; private letters appear in the unlocked workspace.
 The task rail lists Private letters below Child budgets, with separate
 Write a letter and Inbox entries that open in the shared task area. Entering the inbox reads
 letters once; its refresh button explicitly reads again. Letters are standalone and take the
-recipient's anonymous receive code.
+recipient's receive code.
 `VITE_SHIELDED_STATE_READ_MODE` controls the read strategy at build time: `rebuild` keeps the
 existing local reconstruction behavior, and `chain` opts into direct chain paths. Missing,
 blank or unrecognized values use `rebuild`. Restart the dev server or rebuild the frontend
@@ -734,10 +740,10 @@ Proof workflows load public artifacts at runtime:
 
 If proof generation or verification fails in dev, first confirm the expected files exist in `public/zk/` (run `npm run zk:assets:fetch`). For a remote build, publish the `.br` objects before deployment, including when first adopting Brotli with unchanged proving keys. On HTTP 404, run `npm run zk:assets:publish` for the current manifests. On a digest mismatch, check the served bytes and ensure the object has `Content-Encoding: br` and the original WASM or binary content type.
 
-The payer loads one presentation's WASM and zkey, with uncompressed sizes of 13.56 MiB for anonymous receipts
+The payer loads one presentation's WASM and zkey, with uncompressed sizes of 13.56 MiB for receive operations
 or 13.69 MiB for Fund. The roughly 17 KiB linking key file is shared; its digest and
 both fixed on-chain verifiers are pinned by the shielded manifest's `linkKeys`. Browsers
-do not fetch R1CS files. Submitted linked proofs are 1,184 bytes for anonymous receipts
+do not fetch R1CS files. Submitted linked proofs are 1,184 bytes for receive operations
 and 1,216 bytes for Fund, with eleven public signals and ciphertext counted separately. See [private letters](private-letters.md#browser-artifacts) for exact sizes.
 
 Brotli reduces network transfer; the prover receives the same decoded bytes and uses the same

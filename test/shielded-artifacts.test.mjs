@@ -70,7 +70,7 @@ describe("current public shielded artifacts", function () {
         assert.ok(entry.vkey.includes(path.join("frontend", "public", "zk", "shielded")));
         assert.equal(entry.contractName, SHIELDED_SETUP_CIRCUITS[action].verifierContractName);
       }
-      assert.equal(candidate.circuits.anonymousReceiveCredential.verifier, null);
+      assert.equal(candidate.circuits.receiveCredential.verifier, null);
       fs.appendFileSync(candidate.circuits.claim.verifier, "\nmodified");
       assert.throws(
         () => loadCandidateArtifacts({ root, ...options }),

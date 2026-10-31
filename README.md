@@ -174,9 +174,9 @@ under `frontend/public/zk/` and Solidity verifiers under `contracts/`.
 
 Receive presentations use LinkG16 to link two ordinary Circom proofs over the same hidden
 credential fields, without recursive pairing checks inside a circuit or a Go/WASM prover.
-The payer loads one presentation's WASM/zkey, with uncompressed sizes of about 13.56 MiB for anonymous receipts
+The payer loads one presentation's WASM/zkey, with uncompressed sizes of about 13.56 MiB for receive operations
 or 13.69 MiB for Fund, plus a shared 17 KiB link-key file.
-The submitted proof is 1,184 bytes (anonymous) or 1,216 bytes (Fund), excluding
+The submitted proof is 1,184 bytes (receive) or 1,216 bytes (Fund), excluding
 public signals and ciphertext. First use needs no recipient registration or transaction;
 credential creation and payment still read the latest authorization counter. See
 [private letters](docs/private-letters.md) for the exact flow and sizes.

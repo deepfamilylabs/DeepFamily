@@ -30,7 +30,7 @@ type InboxResult = { letters: { messageId: string; body: string; registeredAt: s
 const tr = (key: string) => `shielded.privateLetters.${key}`;
 const props = () => ({ mode: "write" as const, context, signer: {} as Signer, disabled: false, recoveryReady: true });
 function fillLetter() {
-  fireEvent.change(screen.getByLabelText(tr("recipientCode")), { target: { value: "anonymous-code" } });
+  fireEvent.change(screen.getByLabelText(tr("recipientCode")), { target: { value: "receive-code" } });
   fireEvent.change(screen.getByLabelText(tr("body")), { target: { value: "Private letter text" } });
 }
 function InboxPage({ sessionScope = "original", instance = "original" }: { sessionScope?: string; instance?: string }) {

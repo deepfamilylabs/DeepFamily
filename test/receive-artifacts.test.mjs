@@ -130,14 +130,14 @@ describe("Circom receive linking artifacts", function () {
     assert.equal(result.circuitCount, 2);
     assert.equal(result.status, "development");
     assert.equal(result.verification, "passed");
-    assert.deepEqual(Object.keys(result.artifacts).sort(), ["anonymous", "fund"]);
+    assert.deepEqual(Object.keys(result.artifacts).sort(), ["fund", "receive"]);
   });
 
   for (const file of [
     RECEIVE_LINK_KEYS_PATH,
     "contracts/libraries/LinkedGroth16Verifier.sol",
     "contracts/FundReceivePresentationVerifier.sol",
-    "frontend/public/zk/shielded/shielded_anonymous_receive_credential.vkey.json",
+    "frontend/public/zk/shielded/shielded_receive_credential.vkey.json",
     "frontend/public/zk/shielded/shielded_fund_receive_presentation.vkey.json",
   ]) {
     it(`rejects modified ${file}`, function () {
@@ -148,7 +148,7 @@ describe("Circom receive linking artifacts", function () {
 
   it("rejects a presentation key swapped inside an otherwise freshly hashed bundle", function () {
     const keys = JSON.parse(read(RECEIVE_LINK_KEYS_PATH));
-    keys.anonymous.verificationKey = keys.fund.verificationKey;
+    keys.receive.verificationKey = keys.fund.verificationKey;
     const raw = JSON.stringify(keys);
     write(RECEIVE_LINK_KEYS_PATH, raw);
     const file = "circuits/shielded-development-manifest.json";
@@ -182,7 +182,7 @@ describe("Circom receive linking artifacts", function () {
 import { readZkeyDeltaG1 } from "./scripts/lib/linkedVerifierSource.mjs";
 const pool = { sentinel: true };
 globalThis.curve_bn128 = pool;
-await readZkeyDeltaG1("frontend/public/zk/shielded/shielded_anonymous_receive_credential_final.zkey");
+await readZkeyDeltaG1("frontend/public/zk/shielded/shielded_receive_credential_final.zkey");
 assert.equal(globalThis.curve_bn128, pool);`,
       ],
       { cwd: repository, timeout: 30_000, stdio: "pipe" },
@@ -198,7 +198,7 @@ assert.equal(globalThis.curve_bn128, pool);`,
 
   it("rejects a modified zkey whose manifest hash was not refreshed", async function () {
     copyZkeys();
-    const file = `frontend/public/zk/shielded/${SHIELDED_CIRCUITS.anonymousReceiveCredential}_final.zkey`;
+    const file = `frontend/public/zk/shielded/${SHIELDED_CIRCUITS.receiveCredential}_final.zkey`;
     write(file, Buffer.concat([read(file), Buffer.from([0])]));
     assert.equal(inspectLinkedReceiveArtifacts({ root }).verification, "passed");
     await assert.rejects(verify(), /SHA-256 mismatch/u);
@@ -215,14 +215,14 @@ assert.equal(globalThis.curve_bn128, pool);`,
   ]) {
     it(`rejects a zkey with ${name} even after its manifest hash is refreshed`, async function () {
       copyZkeys();
-      const file = `frontend/public/zk/shielded/${SHIELDED_CIRCUITS.anonymousReceivePresentation}_final.zkey`;
+      const file = `frontend/public/zk/shielded/${SHIELDED_CIRCUITS.receivePresentation}_final.zkey`;
       const raw = read(file);
       const points = groth16HeaderPoints(raw);
       assert.equal(points[replace].equals(points[replacement]), false);
       points[replace].set(points[replacement]);
       write(file, raw);
       writeManifest((manifest) => {
-        manifest.circuits.anonymousReceivePresentation.zkeySha256 = hash(raw);
+        manifest.circuits.receivePresentation.zkeySha256 = hash(raw);
       });
       assert.equal(inspectLinkedReceiveArtifacts({ root }).verification, "passed");
       await assert.rejects(verify(), expected);
@@ -232,7 +232,7 @@ assert.equal(globalThis.curve_bn128, pool);`,
   for (const field of ["deltaG1", "issuerDeltaG1"]) {
     it(`rejects an invalid ${field} even after the bundle hash is refreshed`, async function () {
       const keys = JSON.parse(read(RECEIVE_LINK_KEYS_PATH));
-      keys.anonymous[field] = ["0", "0"];
+      keys.receive[field] = ["0", "0"];
       const raw = `${JSON.stringify(keys, null, 2)}\n`;
       write(RECEIVE_LINK_KEYS_PATH, raw);
       writeManifest((manifest) => {
@@ -257,17 +257,17 @@ assert.equal(globalThis.curve_bn128, pool);`,
   }
 
   it("rejects a substituted vkey even when the bundle and manifest consistently use it", async function () {
-    const file = `frontend/public/zk/shielded/${SHIELDED_CIRCUITS.anonymousReceivePresentation}.vkey.json`;
+    const file = `frontend/public/zk/shielded/${SHIELDED_CIRCUITS.receivePresentation}.vkey.json`;
     const vkey = JSON.parse(read(file));
     vkey.IC[0] = vkey.IC[1];
     const rawVkey = `${JSON.stringify(vkey, null, 2)}\n`;
     write(file, rawVkey);
     const keys = JSON.parse(read(RECEIVE_LINK_KEYS_PATH));
-    keys.anonymous.verificationKey = vkey;
+    keys.receive.verificationKey = vkey;
     const rawKeys = `${JSON.stringify(keys, null, 2)}\n`;
     write(RECEIVE_LINK_KEYS_PATH, rawKeys);
     writeManifest((manifest) => {
-      manifest.circuits.anonymousReceivePresentation.verificationKeySha256 = hash(rawVkey);
+      manifest.circuits.receivePresentation.verificationKeySha256 = hash(rawVkey);
       manifest.linkKeys.sha256 = hash(rawKeys);
     });
     assert.equal(inspectLinkedReceiveArtifacts({ root }).verification, "passed");
@@ -276,8 +276,8 @@ assert.equal(globalThis.curve_bn128, pool);`,
 
   for (const file of [
     RECEIVE_LINK_KEYS_PATH,
-    "contracts/AnonymousReceivePresentationVerifier.sol",
-    `frontend/public/zk/shielded/${SHIELDED_CIRCUITS.anonymousReceivePresentation}_final.zkey`,
+    "contracts/ReceivePresentationVerifier.sol",
+    `frontend/public/zk/shielded/${SHIELDED_CIRCUITS.receivePresentation}_final.zkey`,
   ]) {
     it(`rejects a symbolic link in place of ${file}`, async function () {
       copyZkeys();
@@ -299,7 +299,7 @@ assert.equal(globalThis.curve_bn128, pool);`,
           privateDirectoryFactory: ({ prefix }) => {
             temporaryDirectory = fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()), prefix));
             fs.chmodSync(temporaryDirectory, 0o700);
-            const file = "contracts/AnonymousReceivePresentationVerifier.sol";
+            const file = "contracts/ReceivePresentationVerifier.sol";
             write(file, `${read(file)} `);
             return temporaryDirectory;
           },

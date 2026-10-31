@@ -120,8 +120,8 @@ describe("ZK public proving assets", function () {
   it("lists Circom receive presentations through the shared manifest without a separate runtime", function () {
     const file = path.join(root, "circuits/shielded-development-manifest.json");
     const manifest = JSON.parse(fs.readFileSync(file, "utf8"));
-    manifest.circuits.anonymousReceivePresentation = {
-      source: "shielded_anonymous_receive_presentation",
+    manifest.circuits.receivePresentation = {
+      source: "shielded_receive_presentation",
       wasmSha256: "a".repeat(64),
       zkeySha256: "b".repeat(64),
     };

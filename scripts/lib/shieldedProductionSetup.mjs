@@ -58,7 +58,7 @@ const publicSignalCount = (action) => {
   return RECEIVE_PRESENTATION_CIRCUITS[action]
     ? RECEIVE_PRESENTATION_CIRCUITS[action].hiddenInputs +
       RECEIVE_PRESENTATION_CIRCUITS[action].publicInputs
-    : action === "anonymousReceiveCredential"
+    : action === "receiveCredential"
       ? 11
       : action === "fundReceiveCredential"
         ? 12

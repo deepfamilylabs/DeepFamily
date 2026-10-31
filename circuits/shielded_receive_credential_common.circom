@@ -66,7 +66,7 @@ template ShieldedReceiveCredential() {
     owner.inputs[1] <== spendingSecret;
     owner.out === ownerCommitment;
 
-    // Canonical across both disclosures and both key modes. Neither spending
+    // Canonical across both purposes and both key modes. Neither spending
     // nor viewing keys enter the alias derivation.
     component aliasHash = Poseidon(3);
     aliasHash.inputs[0] <== 202610210001;

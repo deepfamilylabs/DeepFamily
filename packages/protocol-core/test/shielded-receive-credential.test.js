@@ -32,12 +32,12 @@ const base = {
   proof,
 };
 
-test("anonymous transport carries canonical R, counter and expiry without identity", () => {
+test("receive transport carries canonical R, counter and expiry without identity", () => {
   const encoded = encodeShieldedReceiveCredential(base);
   const decoded = decodeShieldedReceiveCredential(encoded);
   assert.match(encoded, /^dfrecv1/u);
   assert.equal(bech32m.fromWords(bech32m.decode(encoded, false).words).length, 373);
-  assert.equal(decoded.disclosure, "anonymous");
+  assert.equal(decoded.purpose, "receive");
   assert.equal(SHIELDED_RECEIVE_CREDENTIAL_VERSION, 1);
   assert.equal(decoded.receiveCodeVersion, 1);
   assert.equal(decoded.publicSignals.at(-1), 1n);
@@ -54,12 +54,13 @@ test("anonymous transport carries canonical R, counter and expiry without identi
   );
 });
 
-test("Fund disclosure authenticates I and shares the same R across key modes", () => {
+test("Fund purpose authenticates I and shares the same R across key modes", () => {
   for (const keyMode of [0, 1]) {
-    const input = { ...base, disclosure: "fund", identityCommitment: 19n, keyMode };
+    const input = { ...base, purpose: "fund", identityCommitment: 19n, keyMode };
     const code = encodeShieldedReceiveCredential(input);
     const decoded = decodeShieldedReceiveCredential(code);
     assert.match(code, /^dffund1/u);
+    assert.equal(decoded.purpose, "fund");
     assert.equal(decoded.publicSignals.length, 12);
     assert.equal(decoded.publicSignals[3], 19n);
     assert.equal(decoded.authorizationAlias, base.authorizationAlias);
@@ -68,10 +69,10 @@ test("Fund disclosure authenticates I and shares the same R across key modes", (
     const packet = bech32m.fromWords(bech32m.decode(code, false).words);
     const stripped = new Uint8Array([...packet.slice(0, 53), ...packet.slice(85)]);
     // Structural stripping cannot preserve the original verified public vector.
-    const anonymous = decodeShieldedReceiveCredential(
+    const receive = decodeShieldedReceiveCredential(
       bech32m.encode("dfrecv", bech32m.toWords(stripped), false),
     );
-    assert.notDeepEqual(anonymous.publicSignals, decoded.publicSignals);
+    assert.notDeepEqual(receive.publicSignals, decoded.publicSignals);
   }
 });
 
@@ -104,6 +105,7 @@ test("credential parsing accepts only the fresh-v1 format and canonical fields",
     decodeShieldedReceiveCredential(encoded),
   );
   for (const patch of [
+    { purpose: "transfer" },
     { authorizationCounter: 1n << 64n },
     { expiresAt: 0n },
     { expiresAt: 1n << 64n },

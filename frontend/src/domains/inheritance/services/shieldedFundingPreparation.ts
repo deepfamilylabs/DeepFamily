@@ -310,12 +310,12 @@ async function currentContext(input: PrepareShieldedFundInput) {
     const recipient = input.recipient;
     if (
       !recipient ||
-      recipient.disclosure !== "fund" ||
+      recipient.purpose !== "fund" ||
       !recipient.identityCommitment ||
       !recipient.personHash ||
       recipient.ownerCommitment === 0n
     )
-      throw new Error("Private funding requires current Fund identity disclosure material");
+      throw new Error("Private funding requires a current budget receiving credential");
     heir = {
       ...recipient,
       identityCommitment: recipient.identityCommitment,

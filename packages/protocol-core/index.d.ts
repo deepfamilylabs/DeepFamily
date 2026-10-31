@@ -1243,12 +1243,12 @@ export function decryptShieldedLetter(
   },
 ): Promise<ShieldedLetterEnvelope>;
 
-/** Issuance transport; use the matching fixed anonymous/Fund verification key. */
-export type ShieldedReceiveCredentialDisclosure = "anonymous" | "fund";
+/** Issuance transport; use the matching fixed receive/Fund verification key. */
+export type ShieldedReceiveCredentialPurpose = "receive" | "fund";
 export const SHIELDED_RECEIVE_CREDENTIAL_VERSION: 1;
 export const SHIELDED_AUTHORIZATION_ALIAS_DOMAIN: bigint;
 export const SHIELDED_RECEIVE_CREDENTIAL_PUBLIC_SIGNAL_COUNTS: Readonly<{
-  anonymous: 11;
+  receive: 11;
   fund: 12;
 }>;
 export interface ShieldedReceiveCredentialProof {
@@ -1260,11 +1260,11 @@ export interface ShieldedReceiveCredentialProof {
 }
 
 export interface ShieldedReceiveCredentialStatement {
-  disclosure?: ShieldedReceiveCredentialDisclosure;
+  purpose?: ShieldedReceiveCredentialPurpose;
   authorizationAlias: BigNumberish;
   authorizationCounter: BigNumberish;
   expiresAt: BigNumberish;
-  /** Present only in the Fund disclosure; never in an anonymous packet. */
+  /** Present only in a Fund credential; omitted from a receive credential. */
   identityCommitment?: BigNumberish;
   ownerCommitment: BigNumberish;
   viewingKey: BytesLike;
@@ -1290,7 +1290,7 @@ export function encodeShieldedReceiveCredential(
   },
 ): string;
 export function decodeShieldedReceiveCredential(code: string): {
-  disclosure: ShieldedReceiveCredentialDisclosure;
+  purpose: ShieldedReceiveCredentialPurpose;
   authorizationAlias: bigint;
   authorizationCounter: bigint;
   expiresAt: bigint;
@@ -1438,7 +1438,7 @@ export function prepareShieldedReceivePresentation(input: {
   deadline: bigint;
   presentation: Record<string, string | string[]>;
   request: {
-    kind: "anonymous" | "fund";
+    kind: "receive" | "fund";
     credentialProof: ShieldedReceiveCredentialProof;
     credentialPublicSignals: string[];
     presentation: Record<string, string | string[]>;
@@ -1470,7 +1470,7 @@ export function rebuildShieldedIdentityAuthorizationState(
 
 /** Local prover input; the credential prefix must be blinded by LinkG16 before transport. */
 export function prepareReceivePresentationWitness(request: Record<string, unknown>): {
-  circuit: "anonymousReceivePresentation" | "fundReceivePresentation";
+  circuit: "receivePresentation" | "fundReceivePresentation";
   witness: Record<string, string | string[]>;
   commonInputs: string[];
   publicInputs: string[];

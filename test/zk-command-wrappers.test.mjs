@@ -214,7 +214,7 @@ describe("parameterized ZK command wrappers", function () {
       expect(commands.map(({ circuit }) => circuit)).to.deep.equal([
         "person",
         "disclosure",
-        "shielded:anonymousReceiveCredential",
+        "shielded:receiveCredential",
         "shielded:fundReceiveCredential",
         "shielded:identityAuthorizationUpdate",
         "shielded:shield",
@@ -222,7 +222,7 @@ describe("parameterized ZK command wrappers", function () {
         "shielded:claim",
         "shielded:privateTransfer",
         "shielded:unshield",
-        "shielded:anonymousReceivePresentation",
+        "shielded:receivePresentation",
         "shielded:fundReceivePresentation",
         "shielded:claim32",
         "shielded:privateTransfer4",
@@ -234,7 +234,7 @@ describe("parameterized ZK command wrappers", function () {
         ["mkdir", path.join(fixtureRoot, "zk-artifacts", "shielded")],
         ["run", "person"],
         ["run", "disclosure"],
-        ["run", "shielded:anonymousReceiveCredential"],
+        ["run", "shielded:receiveCredential"],
         ["run", "shielded:fundReceiveCredential"],
         ["run", "shielded:identityAuthorizationUpdate"],
         ["run", "shielded:shield"],
@@ -242,7 +242,7 @@ describe("parameterized ZK command wrappers", function () {
         ["run", "shielded:claim"],
         ["run", "shielded:privateTransfer"],
         ["run", "shielded:unshield"],
-        ["run", "shielded:anonymousReceivePresentation"],
+        ["run", "shielded:receivePresentation"],
         ["run", "shielded:fundReceivePresentation"],
         ["run", "shielded:claim32"],
         ["run", "shielded:privateTransfer4"],
@@ -250,7 +250,7 @@ describe("parameterized ZK command wrappers", function () {
       ]);
       expect(commands[1].args[0]).to.equal(path.join("circuits", "disclosure_binding.circom"));
       expect(commands[2].args[0]).to.equal(
-        path.join("circuits", "shielded_anonymous_receive_credential.circom"),
+        path.join("circuits", "shielded_receive_credential.circom"),
       );
       expect(commands[2].args.at(-1)).to.equal(path.join("zk-artifacts", "shielded"));
       expect(commands.at(-1).args[0]).to.equal(path.join("circuits", "shielded_unshield_4.circom"));

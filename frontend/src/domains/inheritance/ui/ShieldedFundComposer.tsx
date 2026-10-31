@@ -393,6 +393,7 @@ export function ShieldedFundComposer(props: ShieldedFundComposerProps) {
         {privateFunding ? (
           props.entry === "privateIndependent" ? (
             <ShieldedReceiveCodeInput
+              purpose="fund"
               code={props.code}
               hint={t("shielded.privateLetters.fundPrivacy")}
               error={codeError}
@@ -402,6 +403,7 @@ export function ShieldedFundComposer(props: ShieldedFundComposerProps) {
             />
           ) : (
             <ShieldedRecipientInput
+              purpose="fund"
               method={props.recipientInputMethod}
               onMethodChange={props.onRecipientInputMethodChange}
               code={props.code}

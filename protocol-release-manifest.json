@@ -1674,7 +1674,7 @@
       "artifactSha256": null,
       "runtimeSha256": null
     },
-    "anonymousReceivePresentationVerifier": {
+    "receivePresentationVerifier": {
       "address": null,
       "immutables": {},
       "artifactSha256": null,
@@ -1689,7 +1689,7 @@
     "receivePresentationVerifierRouter": {
       "address": null,
       "immutables": {
-        "ANONYMOUS_VERIFIER": null,
+        "RECEIVE_VERIFIER": null,
         "FUND_VERIFIER": null
       },
       "artifactSha256": null,

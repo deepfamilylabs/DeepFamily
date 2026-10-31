@@ -213,7 +213,7 @@ export type ShieldedAssetWorkerCallMap = {
     result: { letters: { messageId: string; body: string; registeredAt: string; slot: ShieldedKeySlot; transactionHash: string }[]; unavailable: number };
   };
   receiveCode: {
-    params: { slot: ShieldedKeySlot; context?: ShieldedWorkerContext; disclosure?: "anonymous" | "fund"; expiresAt?: string };
+    params: { slot: ShieldedKeySlot; context?: ShieldedWorkerContext; purpose?: "receive" | "fund"; expiresAt?: string };
     result: { code: string };
   };
   authorizeIdentityCounter: {

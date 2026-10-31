@@ -4,9 +4,9 @@
   "productionReady": false,
   "ptauSha256": "f807e065fde53f72f4bf4d57140fab85b26daa6cc95bdfec7cce93622b3a367c",
   "circuits": {
-    "anonymousReceiveCredential": {
-      "source": "shielded_anonymous_receive_credential",
-      "sourceSha256": "4c503f9b73886dc14f661e7eddf50c7b96dd51b3a8410fecd26fb27c59278537",
+    "receiveCredential": {
+      "source": "shielded_receive_credential",
+      "sourceSha256": "42df19fdc43bd1d3665a3c27aaabdfef60131e71d8f4040aa497e6dac705da66",
       "r1csSha256": "d2e38e00b6c0bb48d7485c2ea5302054db317b032edc9fd87b8a5a38b199b47a",
       "wasmSha256": "31fd0b10344319107b38fbb8267de8d3402584782dce12ae08c6499db09fb2ad",
       "zkeySha256": "70b315dc07b1a66ee5d2f7bc3aad6b99c5eafddd1e074dd0a869ef84f779733e",
@@ -86,8 +86,8 @@
       "verifierContractName": "ShieldedUnshieldVerifier",
       "solidityVerifierSha256": "0a3d46e7fa4e0571537c9cb361de63ee8ba5c50ba2008d95c7d4153e4329d28d"
     },
-    "anonymousReceivePresentation": {
-      "source": "shielded_anonymous_receive_presentation",
+    "receivePresentation": {
+      "source": "shielded_receive_presentation",
       "sourceSha256": "00d014d9b4985e46db410e522c8bd7383ef3701005b169f6de91383276deaf79",
       "r1csSha256": "19d1cfc9eed42b8cd50d62190bc83bcdfb4be919aa517af53be78e687baa727a",
       "wasmSha256": "2634a0b44bab664b3670b4cd2a411c1fcf02edf1eac9f76911d09efa2aa7dd4d",
@@ -138,12 +138,12 @@
   },
   "linkKeys": {
     "path": "frontend/public/zk/shielded/receive-link-keys.json",
-    "sha256": "3a229f43c4eb2fc3f0d77566e735b7db6f846b7ca08d04ffc90854591ad926b3",
+    "sha256": "edb98d25daa1242ec5c031adf9d63b29561e9a64a6577817e38c007c06887de4",
     "verifierBaseSha256": "01cc96b04fc8272f2e44ea339761c348e6c34b7203486ad02ab123bb7fd69de2",
     "verifiers": {
-      "anonymous": {
-        "path": "contracts/AnonymousReceivePresentationVerifier.sol",
-        "sha256": "58181c922d50f47eef00108d13038062dd5783c2dc12e5ee791cf9cbfb84c2a8"
+      "receive": {
+        "path": "contracts/ReceivePresentationVerifier.sol",
+        "sha256": "08d4e6aaa626f7c0b680c93034d4ec7b9d5471eb8b752c57a77079b1bca9b20d"
       },
       "fund": {
         "path": "contracts/FundReceivePresentationVerifier.sol",

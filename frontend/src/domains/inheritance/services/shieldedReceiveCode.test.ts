@@ -35,7 +35,7 @@ const personHash = wrapIdentityCommitmentAsPersonHash(fixture.identityCommitment
 const viewingKey = `0x${"42".repeat(32)}`;
 // Decoding only needs canonical proof coordinates; the worker verifies the proof.
 const code = encodeShieldedReceiveCredential({
-  disclosure: "fund", authorizationAlias: 17n, authorizationCounter: 0n, expiresAt: 2_000_000_000n, keyMode: 0, identitySuiteId: 1,
+  purpose: "fund", authorizationAlias: 17n, authorizationCounter: 0n, expiresAt: 2_000_000_000n, keyMode: 0, identitySuiteId: 1,
   identityCommitment: fixture.identityCommitment,
   ownerCommitment: 29n,
   viewingKey,

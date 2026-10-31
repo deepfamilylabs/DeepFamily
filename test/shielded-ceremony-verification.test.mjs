@@ -252,9 +252,9 @@ describe("shielded production ceremony verification snapshots", function () {
   });
 
   it("checks the embedded final beacon after the mathematical zkey check", async function () {
-    fixture.metadata.anonymousReceiveCredential.contributions[1].beaconHash = "ff".repeat(32);
+    fixture.metadata.receiveCredential.contributions[1].beaconHash = "ff".repeat(32);
     const error = await captureError(() => verifyShieldedCeremonyArtifacts(fixture.options));
-    expect(error.message).to.include("anonymousReceiveCredential zkey beacon differs");
+    expect(error.message).to.include("receiveCredential zkey beacon differs");
     expect(fixture.calls).to.have.length(3);
     const snapshotRoot = path.dirname(fixture.calls[0].args[3]);
     expect(fs.existsSync(snapshotRoot)).to.equal(false);
@@ -263,8 +263,8 @@ describe("shielded production ceremony verification snapshots", function () {
   for (const [name, locate, message] of [
     [
       "zkey",
-      (root) => path.join(root, "anonymousReceiveCredential.zkey"),
-      "anonymousReceiveCredential zkey snapshot SHA-256 mismatch",
+      (root) => path.join(root, "receiveCredential.zkey"),
+      "receiveCredential zkey snapshot SHA-256 mismatch",
     ],
     ["compiler", (root) => path.join(root, "circom"), "Circom compiler snapshot SHA-256 mismatch"],
     ["pTau", (root) => path.join(root, "phase1.ptau"), "Powers of Tau snapshot SHA-256 mismatch"],
@@ -298,12 +298,12 @@ describe("shielded production ceremony verification snapshots", function () {
         runner: (invocation) => {
           fixture.runner(invocation);
           if (fixture.calls.length === 2) {
-            mutate(path.join(invocation.args.at(-1), "shielded_anonymous_receive_credential.r1cs"));
+            mutate(path.join(invocation.args.at(-1), "shielded_receive_credential.r1cs"));
           }
         },
       }),
     );
-    expect(error.message).to.include("anonymousReceiveCredential rebuilt R1CS SHA-256 mismatch");
+    expect(error.message).to.include("receiveCredential rebuilt R1CS SHA-256 mismatch");
     expect(fixture.calls).to.have.length(2);
   });
 });

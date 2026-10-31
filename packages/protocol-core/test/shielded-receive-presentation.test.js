@@ -13,7 +13,7 @@ import {
 } from "../index.js";
 
 const credential = {
-  disclosure: "anonymous",
+  purpose: "receive",
   authorizationAlias: 13n,
   authorizationCounter: 0n,
   expiresAt: 1900000000n,
@@ -52,7 +52,7 @@ test("presentation authenticates an operation without publishing its reusable cr
   assert.equal(result.publicSignals[9], request.asOf + SHIELDED_RECEIVE_PROOF_LIFETIME);
   assert.equal(result.deadline, result.publicSignals[9]);
   assert.equal(result.publicSignals[10], computeShieldedReceiveCredentialBinding(request));
-  assert.equal(result.request.kind, "anonymous");
+  assert.equal(result.request.kind, "receive");
   assert.equal(result.request.credentialPublicSignals.length, 11);
   assert.equal(result.publicSignals.includes(credential.authorizationAlias), false);
   assert.equal(result.publicSignals.includes(credential.ownerCommitment), false);
@@ -93,7 +93,7 @@ test("current state rejects revoked code and renewed code retains original recip
   });
   assert.equal(renewed.presentation.absent, "0");
   assert.equal(renewed.recipientBinding, computeShieldedReceiveCredentialBinding(request));
-  const fund = { ...credential, disclosure: "fund", identityCommitment: 101n };
+  const fund = { ...credential, purpose: "fund", identityCommitment: 101n };
   const original = computeShieldedReceiveCredentialBinding({ credential: fund, salt: 37n });
   for (const patch of [
     { identityCommitment: 102n },

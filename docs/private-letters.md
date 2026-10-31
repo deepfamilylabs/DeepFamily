@@ -1,14 +1,14 @@
 # Private letters and receive authorization
 
-The inheritance page uses two fresh-v1 receive credentials. Anonymous credentials
+The inheritance page uses two fresh-v1 receive credentials. Receive credentials
 (`dfrecv`) serve private transfers and letters. Fund credentials (`dffund`), shown as
-budget receive codes, disclose the authenticated heir identity to the payer and serve
+budget receiving credentials, disclose the authenticated heir identity to the payer and serve
 private budgets only.
-Both disclosures use version 1, with distinct fixed issuer verification keys;
+Both purposes use version 1, with distinct fixed issuer verification keys;
 they cannot be converted by removing the identity field. The unpublished protocol
 defines one current format, without historical-format decoding or migration.
 
-An identity's two key modes and disclosures share the alias R and authorization
+An identity's two key modes and purposes share the alias R and authorization
 counter. First use requires no recipient registration or transaction. Credentials
 and renewals are proved locally; creation and payment still read the latest shared
 authorization state without filtering RPC events by the recipient's alias. The
@@ -34,18 +34,25 @@ paths. Owner authorization is independent of tree depth. Distinct aliases with
 identical low 64 bits cannot both be inserted; this separate dictionary capacity
 limit rejects without modifying state.
 
-## Budget receive codes
+## Budget receiving credentials
 
-Identity credentials and the independent key each issue both receive code types: an
-anonymous receive code and a **Budget receive code**. A budget receive code is the single
+Identity credentials and the independent key each issue a receive code and a
+**Budget receiving credential**. A budget receiving credential is the single
 Fund credential. It discloses and authenticates the heir identity to the funder, which
 private funding needs to prove the parent-child relationship and trusted endorsement. Only
-private Fund accepts it; private transfers and letters require an anonymous receive code.
-The UI explains that sharing a budget receive code discloses the heir identity to the
+private Fund accepts it; private transfers and letters require a receive code.
+The UI explains that sharing a budget receiving credential discloses the heir identity to the
 funder. Public identity budgets need no receive code.
 
+Each unlocked wallet card has separate **Receive code** and **Receive a budget**
+entries. The first generates a receive code directly; the second generates a budget
+receiving credential. Both open a wallet-bound sheet with expiry and revocation
+controls, without a credential-type selector. Generated titles, copy actions and
+funding inputs identify their purpose. Pasting the other purpose's material produces
+an explicit request for the required code or credential before a transaction is prepared.
+
 Budgets carry no letters: funding needs one code and one transaction, and letters are
-written separately to the recipient's anonymous receive code. Letter plaintext and receive
+written separately to the recipient's receive code. Letter plaintext and receive
 material stay in the active session and are cleared when its wallet, identity, key or
 deployment context is invalidated. They are not silently persisted as plaintext to support
 retry after reload.
@@ -87,8 +94,8 @@ AAD.
 The inheritance page places Private letters below Child budgets in the unlocked
 workspace's task rail. Write a letter and Inbox are separate entries; they use the
 same task area as deposits and claims. The inbox reads when selected and provides
-an explicit refresh action. A letter proof requires a valid anonymous
-receive credential and a transaction wallet; it does not require the sender's
+an explicit refresh action. A letter proof requires a valid receive
+credential and a transaction wallet; it does not require the sender's
 identity secrets. Reading an inbox requires the original receiving keys. Wallet
 or key-session changes invalidate pending submissions and clear locally displayed
 plaintext.
@@ -108,7 +115,7 @@ WASM and zkey download sizes are:
 
 | Presentation                 |                  WASM + zkey | Linked proof | Public signals |
 | ---------------------------- | ---------------------------: | -----------: | -------------: |
-| Anonymous / private transfer | 14,216,094 bytes (13.56 MiB) |  1,184 bytes |             11 |
+| Receive / private transfer | 14,216,094 bytes (13.56 MiB) |  1,184 bytes |             11 |
 | Fund                         | 14,355,354 bytes (13.69 MiB) |  1,216 bytes |             11 |
 
 Only the needed presentation is loaded. The roughly 17 KiB link-key file is shared

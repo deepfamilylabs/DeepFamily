@@ -96,7 +96,7 @@ template ShieldedReceiveCounterLookup() {
     current[0] === stateRoot;
 }
 
-// KIND: 1 anonymous (letters or transfers), 2 Fund.
+// KIND: 1 receive (letters or transfers), 2 Fund.
 // The issuer's exact public statement is the first output prefix. It is linked
 // privately to the issuer Groth16 proof by the external verifier; this circuit
 // alone does not authenticate an issuer. Only the operation suffix is public

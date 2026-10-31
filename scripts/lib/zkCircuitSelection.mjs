@@ -1,5 +1,5 @@
 export const SHIELDED_CIRCUITS = Object.freeze({
-  anonymousReceiveCredential: "shielded_anonymous_receive_credential",
+  receiveCredential: "shielded_receive_credential",
   fundReceiveCredential: "shielded_fund_receive_credential",
   identityAuthorizationUpdate: "shielded_identity_authorization_update",
   shield: "shielded_shield",
@@ -7,7 +7,7 @@ export const SHIELDED_CIRCUITS = Object.freeze({
   claim: "shielded_claim_64",
   privateTransfer: "shielded_private_transfer",
   unshield: "shielded_unshield",
-  anonymousReceivePresentation: "shielded_anonymous_receive_presentation",
+  receivePresentation: "shielded_receive_presentation",
   fundReceivePresentation: "shielded_fund_receive_presentation",
   claim32: "shielded_claim_32",
   privateTransfer4: "shielded_private_transfer_4",
@@ -16,12 +16,12 @@ export const SHIELDED_CIRCUITS = Object.freeze({
 
 /** Both Groth16 relations use the same hidden credential prefix; only operation fields escape. */
 export const RECEIVE_PRESENTATION_CIRCUITS = Object.freeze({
-  anonymousReceivePresentation: Object.freeze({
-    kind: "anonymous",
-    issuer: "anonymousReceiveCredential",
+  receivePresentation: Object.freeze({
+    kind: "receive",
+    issuer: "receiveCredential",
     hiddenInputs: 11,
     publicInputs: 11,
-    contractName: "AnonymousReceivePresentationVerifier",
+    contractName: "ReceivePresentationVerifier",
   }),
   fundReceivePresentation: Object.freeze({
     kind: "fund",
@@ -37,7 +37,7 @@ export const RECEIVE_PRESENTATION_CIRCUITS = Object.freeze({
  * go through the same build, setup and ceremony, but have no Solidity verifier.
  */
 export const SHIELDED_CLIENT_ONLY_CIRCUITS = Object.freeze([
-  "anonymousReceiveCredential",
+  "receiveCredential",
   "fundReceiveCredential",
   ...Object.keys(RECEIVE_PRESENTATION_CIRCUITS),
 ]);

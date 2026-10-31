@@ -14,15 +14,15 @@ export const RECEIVE_TEST_ROOT = path.resolve(import.meta.dirname, "../..");
 const root = RECEIVE_TEST_ROOT;
 const publicDir = path.join(root, "frontend/public/zk/shielded");
 const issuers = {
-  anonymous: "shielded_anonymous_receive_credential",
+  receive: "shielded_receive_credential",
   fund: "shielded_fund_receive_credential",
 };
 const verifiers = {
-  anonymous: "AnonymousReceivePresentationVerifier",
+  receive: "ReceivePresentationVerifier",
   fund: "FundReceivePresentationVerifier",
 };
 const presentationSources = [
-  "shielded_anonymous_receive_presentation",
+  "shielded_receive_presentation",
   "shielded_fund_receive_presentation",
 ];
 

@@ -218,7 +218,7 @@ describe("shielded production setup artifacts", function () {
   it("installs linker keys and both fixed verifiers with their production manifest", async function () {
     const generated = [
       "frontend/public/zk/shielded/receive-link-keys.json",
-      "contracts/AnonymousReceivePresentationVerifier.sol",
+      "contracts/ReceivePresentationVerifier.sol",
       "contracts/FundReceivePresentationVerifier.sol",
     ];
     const records = await fixture.createRecords({
@@ -262,7 +262,7 @@ describe("shielded production setup artifacts", function () {
   it("records informal keys and their link keys in the development manifest only", async function () {
     const generated = [
       "frontend/public/zk/shielded/receive-link-keys.json",
-      "contracts/AnonymousReceivePresentationVerifier.sol",
+      "contracts/ReceivePresentationVerifier.sol",
       "contracts/FundReceivePresentationVerifier.sol",
     ];
     const recordStage = fs.mkdtempSync(path.join(fixture.stageRoot, "records-"));
@@ -324,7 +324,7 @@ describe("shielded production setup artifacts", function () {
   it("keeps issuer source evidence stable when generated receive keys and verifiers change", function () {
     const generated = [
       "contracts/ShieldedIdentityAuthorizationUpdateVerifier.sol",
-      "contracts/AnonymousReceivePresentationVerifier.sol",
+      "contracts/ReceivePresentationVerifier.sol",
       "contracts/FundReceivePresentationVerifier.sol",
       "frontend/public/zk/shielded/receive-link-keys.json",
     ];

@@ -97,7 +97,7 @@ describe("integrated local ZK artifact preparation", function () {
     [
       "changed circuit",
       "development",
-      "zk-artifacts/shielded/shielded_anonymous_receive_presentation.r1cs",
+      "zk-artifacts/shielded/shielded_receive_presentation.r1cs",
     ],
     [
       "changed receive loader",

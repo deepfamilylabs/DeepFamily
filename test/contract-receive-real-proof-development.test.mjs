@@ -100,7 +100,7 @@ describe("Receive presentation real-proof canonical pool and letter integration"
         });
         const credentialInput = (name) =>
           JSON.parse(fs.readFileSync(path.join(credentialDir, `${name}.input.json`), "utf8"));
-        const raw = credentialInput("anonymous");
+        const raw = credentialInput("receive");
         let keys = await receiveProofFixtureKeyMaterial(keyMode);
         const heirOwnerCommitment = keys.ownerCommitment;
         const viewingKey = await deriveShieldedViewPublicKey(keys.hpkeIkm);
@@ -112,14 +112,14 @@ describe("Receive presentation real-proof canonical pool and letter integration"
           viewingKey,
           keyMode,
         };
-        const anonymous = {
+        const receive = {
           ...commonCredential,
-          disclosure: "anonymous",
+          purpose: "receive",
           proof: raw.credentialProof,
         };
         const fundCredential = {
           ...commonCredential,
-          disclosure: "fund",
+          purpose: "fund",
           proof: credentialInput("fund").credentialProof,
           identityCommitment: BigInt(credentialInput("fund").credentialPublicSignals[3]),
         };
@@ -130,7 +130,7 @@ describe("Receive presentation real-proof canonical pool and letter integration"
           privateTransfer: generated.ShieldedPrivateTransferVerifier,
         });
         const router = await hre.ethers.deployContract("ReceivePresentationVerifierRouter", [
-          await generated.AnonymousReceivePresentationVerifier.getAddress(),
+          await generated.ReceivePresentationVerifier.getAddress(),
           await generated.FundReceivePresentationVerifier.getAddress(),
         ]);
         // A genuine empty-state absence proof authenticates zero before revocation below.
@@ -167,7 +167,7 @@ describe("Receive presentation real-proof canonical pool and letter integration"
         const letters = await hre.ethers.deployContract("PrivateLetterArchive", [
           await family.getAddress(),
           await state.getAddress(),
-          await generated.AnonymousReceivePresentationVerifier.getAddress(),
+          await generated.ReceivePresentationVerifier.getAddress(),
           await factory.getAddress(),
         ]);
         const poolAddress = await pool.getAddress();
@@ -451,7 +451,7 @@ describe("Receive presentation real-proof canonical pool and letter integration"
         };
         const transferSalt = 203n;
         const transferPresentation = await prepare(
-          anonymous,
+          receive,
           poolAddress,
           4n,
           0n,
@@ -482,7 +482,7 @@ describe("Receive presentation real-proof canonical pool and letter integration"
             outputOwnerCommitments: [String(keys.ownerCommitment), String(donorOwner)],
             outputAmounts: ["100", String(selfChange.amount)],
             outputNonces: ["201", "202"],
-            receiveAuthorizationAliases: [String(anonymous.authorizationAlias), "0"],
+            receiveAuthorizationAliases: [String(receive.authorizationAlias), "0"],
             receiveSalts: [String(transferSalt), "0"],
             receiveKeyModes: [String(keyMode), "0"],
             receiveViewKeyLo: [raw.credentialPublicSignals[4], "0"],
@@ -530,7 +530,7 @@ describe("Receive presentation real-proof canonical pool and letter integration"
           }),
         );
         const prepared = await prepare(
-          anonymous,
+          receive,
           lettersAddress,
           1n,
           messageId,
@@ -585,7 +585,7 @@ describe("Receive presentation real-proof canonical pool and letter integration"
           }),
         );
         const pending = await prepare(
-          anonymous,
+          receive,
           lettersAddress,
           1n,
           pendingId,
@@ -684,7 +684,7 @@ describe("Receive presentation real-proof canonical pool and letter integration"
         assert.throws(
           () =>
             prepareShieldedReceivePresentation({
-              credential: anonymous,
+              credential: receive,
               chainId,
               consumer: lettersAddress,
               action: 1n,
@@ -697,11 +697,11 @@ describe("Receive presentation real-proof canonical pool and letter integration"
             }),
           /revoked/u,
         );
-        const renewedIssuer = prover.circom("shielded_anonymous_receive_credential", {
+        const renewedIssuer = prover.circom("shielded_receive_credential", {
           ...privateIdentity,
           identityCommitment: String(fundCredential.identityCommitment),
           authorizationCounter: "1",
-          expiresAt: String(anonymous.expiresAt),
+          expiresAt: String(receive.expiresAt),
           ownerCommitment: String(restoredKeys[0].ownerCommitment),
           viewKeyLo: raw.credentialPublicSignals[4],
           viewKeyHi: raw.credentialPublicSignals[5],
@@ -713,7 +713,7 @@ describe("Receive presentation real-proof canonical pool and letter integration"
           spendingSecret: String(restoredKeys[0].ownerSecret),
         });
         const renewed = prepareShieldedReceivePresentation({
-          credential: { ...anonymous, authorizationCounter: 1n, proof: renewedIssuer.proof },
+          credential: { ...receive, authorizationCounter: 1n, proof: renewedIssuer.proof },
           chainId,
           consumer: lettersAddress,
           action: 1n,
@@ -757,7 +757,7 @@ describe("Receive presentation real-proof canonical pool and letter integration"
           }),
         );
         const lastRequest = {
-          credential: { ...anonymous, authorizationCounter: 1n, proof: renewedIssuer.proof },
+          credential: { ...receive, authorizationCounter: 1n, proof: renewedIssuer.proof },
           chainId,
           consumer: lettersAddress,
           action: 1n,
@@ -767,10 +767,10 @@ describe("Receive presentation real-proof canonical pool and letter integration"
           state: updatedCounterState,
           salt: lastEnvelope.salt,
         };
-        await hre.networkHelpers.time.increaseTo(anonymous.expiresAt - 60n);
+        await hre.networkHelpers.time.increaseTo(receive.expiresAt - 60n);
         const last = prepareShieldedReceivePresentation({ ...lastRequest, asOf: await now() });
         const lastProof = prover.presentation(last);
-        await hre.networkHelpers.time.increaseTo(anonymous.expiresAt + 60n);
+        await hre.networkHelpers.time.increaseTo(receive.expiresAt + 60n);
         await recordTransaction(
           "lastMinuteLetter",
           letters.registerLetter(
@@ -792,7 +792,7 @@ describe("Receive presentation real-proof canonical pool and letter integration"
           ciphertext: hre.ethers.getBytes(lastCiphertext),
         });
         assert.throws(
-          () => prepareShieldedReceivePresentation({ ...lastRequest, asOf: anonymous.expiresAt }),
+          () => prepareShieldedReceivePresentation({ ...lastRequest, asOf: receive.expiresAt }),
           /expired/u,
         );
         await expect(

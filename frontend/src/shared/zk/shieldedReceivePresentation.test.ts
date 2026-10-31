@@ -5,7 +5,7 @@ const mocks = vi.hoisted(() => ({
   prepare: vi.fn(),
   prove: vi.fn(),
   link: vi.fn(),
-  issuerKeys: { anonymous: { name: "anonymous issuer" }, fund: { name: "fund issuer" } },
+  issuerKeys: { receive: { name: "receive issuer" }, fund: { name: "fund issuer" } },
   linkKeys: {} as Record<
     string,
     {
@@ -39,10 +39,10 @@ const operationProof = { ...issuerProof, pi_a: ["9", "10", "1"] };
 const expected = Array.from({ length: 11 }, (_, index) => String(index + 1));
 const witness = { authorizationAlias: "900", siblings: Array(64).fill("0") };
 
-function prepare(kind = "anonymous") {
+function prepare(kind = "receive") {
   const commonInputs = Array(kind === "fund" ? 12 : 11).fill("900");
   const publicInputs = [...expected];
-  const circuit = `${kind}ReceivePresentation`;
+  const circuit = kind === "fund" ? "fundReceivePresentation" : "receivePresentation";
   const prepared = { witness, commonInputs, publicInputs, circuit };
   mocks.prepare.mockReturnValue(prepared);
   return prepared;
@@ -53,7 +53,7 @@ describe("local receive presentation linking", () => {
     mocks.prepare.mockReset();
     mocks.prove.mockReset().mockResolvedValue({ proof: operationProof });
     mocks.link.mockReset().mockResolvedValue("0x1234");
-    for (const kind of ["anonymous", "fund"]) {
+    for (const kind of ["receive", "fund"]) {
       mocks.linkKeys[kind] = {
         verificationKey: { name: `${kind} presentation` },
         deltaG1: ["15", "16", "1"],
@@ -63,7 +63,7 @@ describe("local receive presentation linking", () => {
     prepare();
   });
 
-  it.each(["anonymous", "fund"])(
+  it.each(["receive", "fund"])(
     "links %s against fixed issuer and presentation keys, keeping shared values private",
     async (kind) => {
       const prepared = prepare(kind);
@@ -82,7 +82,7 @@ describe("local receive presentation linking", () => {
       expect(mocks.link).toHaveBeenCalledExactlyOnceWith({
         issuer: {
           proof: issuerProof,
-          verificationKey: mocks.issuerKeys[kind as "anonymous" | "fund"],
+          verificationKey: mocks.issuerKeys[kind as "receive" | "fund"],
           deltaG1: mocks.linkKeys[kind].issuerDeltaG1,
         },
         presentation: {
@@ -96,16 +96,16 @@ describe("local receive presentation linking", () => {
     },
   );
 
-  it.each(["changed transaction", "missing transaction value", "wrong disclosure"])(
+  it.each(["changed transaction", "missing transaction value", "wrong purpose"])(
     "rejects %s before generating a proof",
     async (attack) => {
       const prepared = prepare();
-      if (attack === "wrong disclosure") prepared.circuit = "fundReceivePresentation";
+      if (attack === "wrong purpose") prepared.circuit = "fundReceivePresentation";
       else if (attack === "missing transaction value") prepared.publicInputs.pop();
       else prepared.publicInputs[5] = "999";
       await expect(
         proveShieldedReceivePresentation(
-          { kind: "anonymous", credentialProof: issuerProof },
+          { kind: "receive", credentialProof: issuerProof },
           expected,
         ),
       ).rejects.toThrow("does not match the authenticated transaction");
@@ -115,10 +115,10 @@ describe("local receive presentation linking", () => {
   );
 
   it("rejects missing pinned keys without fetching an alternative verifier", async () => {
-    delete mocks.linkKeys.anonymous;
+    delete mocks.linkKeys.receive;
     await expect(
       proveShieldedReceivePresentation(
-        { kind: "anonymous", credentialProof: issuerProof },
+        { kind: "receive", credentialProof: issuerProof },
         expected,
       ),
     ).rejects.toThrow("keys are missing");
@@ -130,7 +130,7 @@ describe("local receive presentation linking", () => {
     mocks.link.mockRejectedValue(new Error("Credential proof failed verification"));
     await expect(
       proveShieldedReceivePresentation(
-        { kind: "anonymous", credentialProof: issuerProof },
+        { kind: "receive", credentialProof: issuerProof },
         expected,
       ),
     ).rejects.toThrow("Credential proof failed verification");

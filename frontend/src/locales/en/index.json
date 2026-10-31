@@ -1653,7 +1653,7 @@
       "customPeriodDays": "Custom days"
     },
     "receiveCodeLabel": "My receive code",
-    "receiveCodeShareHint": "Share privately: this code can be linked to your identity.",
+    "receiveCodeShareHint": "Share privately with a payer or letter sender. Reusing receiving keys can link payments.",
     "receiveCodeInputLabel": "Recipient's receive code",
     "receiveCodeInputHint": "The code must belong to the selected child.",
     "generateReceiveCode": "Generate receive code",
@@ -1736,7 +1736,8 @@
       "proving": "Generating proof…",
       "checkingGas": "Estimating fees…",
       "submitting": "Confirm the transaction in your wallet…",
-      "confirming": "Waiting for transaction confirmation…"
+      "confirming": "Waiting for transaction confirmation…",
+      "fundReceiveCredential": "Generating budget receiving credential…"
     },
     "fundingPreview": "{{periods}} periods · {{rate}} {{symbol}} every {{days}} days",
     "valueOption": "Balance {{index}} · {{amount}} {{symbol}}",
@@ -1874,7 +1875,7 @@
       "recommended": "Recommended",
       "fundingEntryFixed": "Additional funding keeps the original entry and receiving key.",
       "claimViewLabel": "Budget type",
-      "receiveKeyLabel": "Receive code type",
+      "receiveKeyLabel": "Receive code",
       "receiveCodeUnavailable": "Unavailable",
       "receiveCodeNeedsIdentity": "Unlock the identity credentials to use the receive code.",
       "receiveCodeNeedsKey": "Unlock or create an independent key and complete verification to use the receive code.",
@@ -1897,7 +1898,11 @@
       "valueCandidatesHint": "Checking a balance permits its use; it does not spend every checked balance. Selection avoids extra consolidation, seeks an exact amount, then prefers less change. Preview the actual inputs and change. Each transaction uses up to 4 balances; candidates are unlimited.",
       "signatureMessage": "View the fixed message to sign",
       "planTransactions": "{{count}} transactions. Confirm each one in your wallet.",
-      "continueIdentity": "Unlock identity"
+      "continueIdentity": "Unlock identity",
+      "identityFundReceiveCredential": "Identity-credential budget receiving credential",
+      "independentKeyFundReceiveCredential": "Independent-key budget receiving credential",
+      "receiveBudget": "Receive a budget",
+      "fundReceiveCredentialLabel": "Budget receiving credential"
     },
     "privateLetters": {
       "title": "Private letters",
@@ -1905,7 +1910,7 @@
       "inbox": "Inbox",
       "refresh": "Refresh inbox",
       "notConfigured": "Private letters are not configured for this network.",
-      "writeHint": "Use the recipient's anonymous receive code.",
+      "writeHint": "Use the recipient's receive code.",
       "recipientCode": "Recipient receive code",
       "body": "Letter body",
       "send": "Encrypt and send",
@@ -1918,16 +1923,25 @@
       "emptyInbox": "No letters could be decrypted with the currently unlocked keys.",
       "recoveryHint": "Restoration uses the original identity and passphrase. Independent-key letters also need the original recovery words or Shielded Key. Expired codes do not prevent reading existing letters.",
       "unavailable": "The ciphertext for {{count}} letters could not be read or verified. Refresh the inbox to retry.",
-      "disclosure": "Receive material purpose",
-      "anonymousCode": "Anonymous receive code",
-      "fundMaterial": "Budget receive code",
-      "anonymousPrivacy": "The code hides your identity commitment. A fixed alias or receiving key can link your codes; a person holding your budget receive code can identify that relationship.",
-      "fundPrivacy": "This code discloses and authenticates your inheritance identity to receive budgets. Share it only with budget funders.",
+      "fundPrivacy": "Give this credential to the funder to establish or add to a private budget. It discloses and authenticates the recipient identity.",
       "expiresAt": "Expires at",
       "expiryFuture": "Choose an expiry time in the future.",
       "revokeHint": "Invalidate all old codes for this identity on this chain, across both key modes. Updates take effect within 15 minutes. Existing balances, claims and letters remain available; known identity links remain known.",
       "revokeAll": "Invalidate all old receive codes",
-      "revoking": "Proving identity authorization update…"
+      "revoking": "Proving identity authorization update…",
+      "receivePrivacy": "For transfers and letters. The identity commitment stays hidden. Fixed identifiers or receiving keys can link codes; someone holding a budget receiving credential can identify that relationship."
+    },
+    "copyReceiveCode": "Copy receive code",
+    "fundReceiveCredentialLabel": "My budget receiving credential",
+    "fundReceiveCredentialInputLabel": "Recipient budget receiving credential",
+    "fundReceiveCredentialShareHint": "Share only with a budget funder. This credential discloses and authenticates your receiving identity.",
+    "copyFundReceiveCredential": "Copy budget receiving credential",
+    "generateFundReceiveCredential": "Generate budget receiving credential",
+    "fundReceiveCredentialRequired": "This operation requires a budget receiving credential. Ask the recipient to generate one from Receive a budget.",
+    "receiveCodeRequired": "This operation requires a receive code. Ask the recipient to generate one from Receive code.",
+    "fundRecipientMethods": {
+      "receiveCode": "Use a budget receiving credential (recommended)",
+      "credentials": "Generate a budget receiving credential for the recipient"
     }
   }
 }

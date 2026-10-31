@@ -22,6 +22,7 @@ export type ShieldedRecipientInputMethod = "receiveCode" | "credentials";
 export type ShieldedValueBalance = { commitment: string; amount: string };
 
 export interface ShieldedRecipientInputProps {
+  purpose?: "receive" | "fund";
   method: ShieldedRecipientInputMethod;
   onMethodChange: (method: ShieldedRecipientInputMethod) => void;
   code: string;
@@ -37,6 +38,7 @@ export interface ShieldedRecipientInputProps {
 
 /** Recipient by receive code, or by complete identity credentials that generate one locally. */
 export function ShieldedRecipientInput({
+  purpose = "receive",
   method,
   onMethodChange,
   code,
@@ -69,7 +71,13 @@ export function ShieldedRecipientInput({
                 checked={method === option}
                 onChange={() => onMethodChange(option)}
               />
-              {t(`shielded.recipientMethods.${option}`)}
+              {purpose === "fund"
+                ? option === "receiveCode"
+                  ? t("shielded.fundRecipientMethods.receiveCode")
+                  : t("shielded.fundRecipientMethods.credentials")
+                : option === "receiveCode"
+                  ? t("shielded.recipientMethods.receiveCode")
+                  : t("shielded.recipientMethods.credentials")}
             </label>
           ))}
         </div>
@@ -77,6 +85,7 @@ export function ShieldedRecipientInput({
       <fieldset disabled={busy} className="min-w-0">
         {method === "receiveCode" ? (
           <ShieldedReceiveCodeInput
+            purpose={purpose}
             code={code}
             hint={codeHint}
             error={codeError}
@@ -87,7 +96,7 @@ export function ShieldedRecipientInput({
           <div className="space-y-3">
             <ShieldedRecipientCredentialsForm ref={credentialsFormRef} />
             <PanelButton busy={busy} disabled={busy} onClick={onGenerateCode}>
-              {t("shielded.generateReceiveCode")}
+              {t(purpose === "fund" ? "shielded.generateFundReceiveCredential" : "shielded.generateReceiveCode")}
             </PanelButton>
           </div>
         )}
@@ -98,6 +107,7 @@ export function ShieldedRecipientInput({
 
 /** The recipient's receive code, with its verification and its hint on one line beneath. */
 export function ShieldedReceiveCodeInput({
+  purpose = "receive",
   code,
   hint,
   error,
@@ -105,6 +115,7 @@ export function ShieldedReceiveCodeInput({
   verification,
   disabled,
 }: {
+  purpose?: "receive" | "fund";
   code: string;
   hint?: string;
   error?: string;
@@ -115,9 +126,9 @@ export function ShieldedReceiveCodeInput({
   const { t } = useTranslation();
   return (
     <div className="min-w-0 space-y-2">
-      <FieldBlock label={t("shielded.receiveCodeInputLabel")}>
+      <FieldBlock label={t(purpose === "fund" ? "shielded.fundReceiveCredentialInputLabel" : "shielded.receiveCodeInputLabel")}>
         <textarea
-          aria-label={t("shielded.receiveCodeInputLabel")}
+          aria-label={t(purpose === "fund" ? "shielded.fundReceiveCredentialInputLabel" : "shielded.receiveCodeInputLabel")}
           className={`${FIELD_TEXTAREA} min-h-20`}
           value={code}
           disabled={disabled}
