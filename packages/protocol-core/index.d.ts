@@ -1191,28 +1191,20 @@ export function encodeShieldedIndependentKey(independentKeyRoot: BytesLike): str
 export function decodeShieldedIndependentKey(shieldedKey: string): Uint8Array;
 
 export const SHIELDED_LETTER_ENVELOPE_VERSION: 1;
-export const SHIELDED_LETTER_RELATION_DOMAIN: 202610210401n;
 export const SHIELDED_LETTER_HPKE_ENCAPSULATED_BYTES: 32;
 export interface ShieldedLetterScope {
   chainId: BigNumberish;
   lettersAddress: string;
 }
-export interface ShieldedLetterAttachment {
-  chainId: BigNumberish;
-  poolAddress: string;
-  budgetCommitment: BigNumberish;
-}
 export interface ShieldedLetterEnvelopeInput {
   version?: 1;
   body: string;
   salt?: BigNumberish;
-  attachment?: ShieldedLetterAttachment | null;
 }
 export interface ShieldedLetterEnvelope {
   version: 1;
   body: string;
   salt: bigint;
-  attachment: { chainId: bigint; poolAddress: string; budgetCommitment: bigint } | null;
 }
 export function normalizeShieldedLetterScope(input: ShieldedLetterScope): {
   chainId: bigint;
@@ -1235,12 +1227,6 @@ export function splitShieldedLetterCiphertextHash(ciphertext: BytesLike): {
   cipherLo: bigint;
   cipherHi: bigint;
 };
-export function computeShieldedLetterRelationCommitment(input: {
-  attachment?: ShieldedLetterAttachment | null;
-  salt: BigNumberish;
-  /** Required for attachments; read from the authenticated delivery proof result. */
-  binding?: BigNumberish;
-}): bigint;
 export function encryptShieldedLetter(
   input: ShieldedLetterScope & {
     messageId: BigNumberish;
@@ -1253,10 +1239,6 @@ export function decryptShieldedLetter(
     messageId: BigNumberish;
     hpkeIkm: BytesLike;
     ciphertext: BytesLike;
-    /** Authenticated contract result; exactly zero for standalone letters. */
-    relationCommitment: BigNumberish;
-    /** Authenticated operation binding; required for attachments. */
-    expectedBinding?: BigNumberish;
     expectedCiphertextHash?: BytesLike;
   },
 ): Promise<ShieldedLetterEnvelope>;
@@ -1324,17 +1306,6 @@ export function decodeShieldedReceiveCredential(code: string): {
   publicSignals: bigint[];
   proof: ShieldedReceiveCredentialProof;
 };
-
-/** Combined transport only; both contained issuer proofs must be verified independently. */
-export const SHIELDED_BUDGET_RECEIVE_CODE_VERSION: 1;
-export interface ShieldedBudgetReceiveCode {
-  fundCode: string;
-  anonymousCode: string;
-}
-export function encodeShieldedBudgetReceiveCode(input: ShieldedBudgetReceiveCode): string;
-export function decodeShieldedBudgetReceiveCode(code: string): ShieldedBudgetReceiveCode;
-/** Prefix dispatch only, without checksum, field or proof validation. */
-export function isShieldedBudgetReceiveCode(code: unknown): boolean;
 
 export const SHIELDED_IDENTITY_AUTHORIZATION_DEPTH: 64;
 export const SHIELDED_IDENTITY_COUNTER_AUTHORIZATION_DOMAIN: bigint;
@@ -1421,7 +1392,6 @@ export function prepareShieldedIdentityCounterAuthorization(input: {
 
 export const SHIELDED_RECEIVE_PRESENTATION_ACTION: Readonly<{
   Letter: 1;
-  AttachedLetter: 2;
   Fund: 3;
   PrivateTransfer: 4;
 }>;
@@ -1468,7 +1438,7 @@ export function prepareShieldedReceivePresentation(input: {
   deadline: bigint;
   presentation: Record<string, string | string[]>;
   request: {
-    kind: "anonymous" | "fund" | "attachment";
+    kind: "anonymous" | "fund";
     credentialProof: ShieldedReceiveCredentialProof;
     credentialPublicSignals: string[];
     presentation: Record<string, string | string[]>;
@@ -1500,10 +1470,7 @@ export function rebuildShieldedIdentityAuthorizationState(
 
 /** Local prover input; the credential prefix must be blinded by LinkG16 before transport. */
 export function prepareReceivePresentationWitness(request: Record<string, unknown>): {
-  circuit:
-    | "anonymousReceivePresentation"
-    | "fundReceivePresentation"
-    | "attachedReceivePresentation";
+  circuit: "anonymousReceivePresentation" | "fundReceivePresentation";
   witness: Record<string, string | string[]>;
   commonInputs: string[];
   publicInputs: string[];

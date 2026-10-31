@@ -96,50 +96,7 @@ template ShieldedReceiveCounterLookup() {
     current[0] === stateRoot;
 }
 
-// A compact fund-budget note path. Its fixed padding and index range match the
-// original receipt relation, including synthetic paths at the full depth 32.
-template ShieldedReceiveBudgetLookup() {
-    signal input leaf;
-    signal input root;
-    signal input depth;
-    signal input index;
-    signal input siblings[32];
-    component depthBits = Num2Bits(6);
-    depthBits.in <== depth;
-    component indexBits = Num2Bits(32);
-    indexBits.in <== index;
-    component depthIs[33];
-    var depthSum = 0;
-    for (var i = 0; i <= 32; i++) {
-        depthIs[i] = IsEqual();
-        depthIs[i].in[0] <== depth;
-        depthIs[i].in[1] <== i;
-        depthSum += depthIs[i].out;
-    }
-    depthSum === 1;
-    signal current[33];
-    current[0] <== leaf;
-    signal active[32];
-    signal left[32];
-    signal right[32];
-    component branch[32];
-    for (var i = 0; i < 32; i++) {
-        var activeSum = 0;
-        for (var j = i + 1; j <= 32; j++) activeSum += depthIs[j].out;
-        active[i] <== activeSum;
-        (1 - active[i]) * siblings[i] === 0;
-        (1 - active[i]) * indexBits.out[i] === 0;
-        left[i] <== current[i] + indexBits.out[i] * (siblings[i] - current[i]);
-        right[i] <== siblings[i] + indexBits.out[i] * (current[i] - siblings[i]);
-        branch[i] = Poseidon(2);
-        branch[i].inputs[0] <== left[i];
-        branch[i].inputs[1] <== right[i];
-        current[i + 1] <== current[i] + active[i] * (branch[i].out - current[i]);
-    }
-    current[32] === root;
-}
-
-// KIND: 1 anonymous (letters or transfers), 2 Fund, 3 attached letters.
+// KIND: 1 anonymous (letters or transfers), 2 Fund.
 // The issuer's exact public statement is the first output prefix. It is linked
 // privately to the issuer Groth16 proof by the external verifier; this circuit
 // alone does not authenticate an issuer. Only the operation suffix is public
@@ -148,15 +105,13 @@ template ShieldedReceiveBudgetLookup() {
 // deadline = asOf + RECEIVE_PROOF_LIFETIME: the code is unexpired at asOf, and
 // the consumer accepts the operation until the deadline.
 template ShieldedReceivePresentation(KIND) {
-    assert(KIND == 1 || KIND == 2 || KIND == 3);
+    assert(KIND == 1 || KIND == 2);
     var RECEIVE_PROOF_LIFETIME = 900;
     var OFFSET = 0;
     if (KIND == 2) OFFSET = 1;
     var CREDENTIAL_COUNT = 11 + OFFSET;
-    var OPERATION_COUNT = 11;
-    if (KIND == 3) OPERATION_COUNT = 14;
     signal output credentialSignals[CREDENTIAL_COUNT];
-    signal output operationSignals[OPERATION_COUNT];
+    signal output operationSignals[11];
     signal input credentialPublicSignals[CREDENTIAL_COUNT];
     signal input chainId;
     signal input consumer;
@@ -255,11 +210,9 @@ template ShieldedReceivePresentation(KIND) {
         (action - 1) * (action - 4) === 0;
         signal outputSlotBoolean <== messageId * (messageId - 1);
         (action - 1) * outputSlotBoolean === 0;
-    } else if (KIND == 2) {
+    } else {
         action === 3;
         messageId * (1 - messageId) === 0;
-    } else {
-        action === 2;
     }
 
     component lookup = ShieldedReceiveCounterLookup();
@@ -292,88 +245,5 @@ template ShieldedReceivePresentation(KIND) {
         binding === fundBinding.out;
     } else {
         binding === bindingThird.out;
-    }
-
-    if (KIND == 3) {
-        signal input budgetPool;
-        signal input budgetRoot;
-        signal input relation;
-        signal input budgetPolicy;
-        signal input budgetEnrollment;
-        signal input budgetRate;
-        signal input budgetRemaining;
-        signal input budgetNonce;
-        signal input budgetCiphertextHash;
-        signal input budgetDepth;
-        signal input budgetIndex;
-        signal input budgetSiblings[32];
-        operationSignals[11] <== budgetPool;
-        operationSignals[12] <== budgetRoot;
-        operationSignals[13] <== relation;
-        component poolBits = Num2Bits(160);
-        poolBits.in <== budgetPool;
-        component rateBits = Num2Bits(128);
-        rateBits.in <== budgetRate;
-        component remainingBits = Num2Bits(128);
-        remainingBits.in <== budgetRemaining;
-        signal budgetNonzeroValues[7];
-        budgetNonzeroValues[0] <== budgetPool;
-        budgetNonzeroValues[1] <== budgetRoot;
-        budgetNonzeroValues[2] <== relation;
-        budgetNonzeroValues[3] <== budgetPolicy;
-        budgetNonzeroValues[4] <== budgetEnrollment;
-        budgetNonzeroValues[5] <== budgetRate;
-        budgetNonzeroValues[6] <== budgetNonce;
-        component budgetNonzero[7];
-        for (var i = 0; i < 7; i++) {
-            budgetNonzero[i] = IsZero();
-            budgetNonzero[i].in <== budgetNonzeroValues[i];
-            budgetNonzero[i].out === 0;
-        }
-        component scope = Poseidon(3);
-        scope.inputs[0] <== 1031;
-        scope.inputs[1] <== chainId;
-        scope.inputs[2] <== budgetPool;
-        component authorizationTag = Poseidon(3);
-        authorizationTag.inputs[0] <== 1032;
-        authorizationTag.inputs[1] <== scope.out;
-        authorizationTag.inputs[2] <== 1033;
-        component authorization = Poseidon(5);
-        authorization.inputs[0] <== authorizationTag.out;
-        authorization.inputs[1] <== owner;
-        authorization.inputs[2] <== mode;
-        authorization.inputs[3] <== viewLo;
-        authorization.inputs[4] <== viewHi;
-        component fundTag = Poseidon(3);
-        fundTag.inputs[0] <== 1032;
-        fundTag.inputs[1] <== scope.out;
-        fundTag.inputs[2] <== 202610210301;
-        component leaf = Poseidon(8);
-        leaf.inputs[0] <== fundTag.out;
-        leaf.inputs[1] <== budgetPolicy;
-        leaf.inputs[2] <== budgetEnrollment;
-        leaf.inputs[3] <== authorization.out;
-        leaf.inputs[4] <== budgetRate;
-        leaf.inputs[5] <== budgetRemaining;
-        leaf.inputs[6] <== budgetNonce;
-        leaf.inputs[7] <== budgetCiphertextHash;
-        component leafZero = IsZero();
-        leafZero.in <== leaf.out;
-        leafZero.out === 0;
-        component budgetLookup = ShieldedReceiveBudgetLookup();
-        budgetLookup.leaf <== leaf.out;
-        budgetLookup.root <== budgetRoot;
-        budgetLookup.depth <== budgetDepth;
-        budgetLookup.index <== budgetIndex;
-        for (var i = 0; i < 32; i++) budgetLookup.siblings[i] <== budgetSiblings[i];
-        component reference = Poseidon(3);
-        reference.inputs[0] <== 202610210401;
-        reference.inputs[1] <== budgetPool;
-        reference.inputs[2] <== leaf.out;
-        component attachmentRelation = Poseidon(3);
-        attachmentRelation.inputs[0] <== reference.out;
-        attachmentRelation.inputs[1] <== binding;
-        attachmentRelation.inputs[2] <== salt;
-        relation === attachmentRelation.out;
     }
 }

@@ -6,14 +6,12 @@ import { waitForShieldedTransaction } from "./shieldedTransactionReceipt";
 
 const BLOB = "tuple(bytes32 payloadHash,address pointer,uint64 payloadLength,uint32 segmentCount)";
 const DELIVERY = "tuple(uint128 messageId,uint256 checkpointId,uint64 asOf,uint64 deadline,uint256 recipientBinding)";
-const ATTACHMENT = "tuple(address asset,address pool,uint256 shardId,uint256 noteRoot,uint256 relationCommitment)";
 export const PRIVATE_LETTER_ABI = [
   "function AUTHORIZATION_STATE() view returns (address)", "function POOL_FACTORY() view returns (address)",
   "function DEEP_FAMILY() view returns (address)", "function creationBlock() view returns (uint256)",
-  `function letterRecord(uint128) view returns (tuple(${BLOB} blob,uint256 recipientBinding,uint256 relationCommitment,uint64 registeredAt,uint64 deadline))`,
+  `function letterRecord(uint128) view returns (tuple(${BLOB} blob,uint256 recipientBinding,uint64 registeredAt,uint64 deadline))`,
   `function registerLetter(${DELIVERY} delivery,bytes ciphertext,bytes proof)`,
-  `function registerAttachedLetter(${DELIVERY} delivery,${ATTACHMENT} attachment,bytes ciphertext,bytes proof)`,
-  `event LetterRegistered(uint128 indexed messageId,${BLOB} blob,uint256 recipientBinding,uint256 relationCommitment,uint64 deadline,uint64 registeredAt)`,
+  `event LetterRegistered(uint128 indexed messageId,${BLOB} blob,uint256 recipientBinding,uint64 deadline,uint64 registeredAt)`,
 ] as const;
 
 export const createPrivateLetterContract = (address: string, runner: ContractRunner) => new Contract(address, PRIVATE_LETTER_ABI, runner);
@@ -22,10 +20,9 @@ export type ProvenPrivateLetter = {
   delivery: { messageId: string; checkpointId: string; asOf: string; deadline: string; recipientBinding: string };
   ciphertext: string;
   proof: string;
-  attachment?: { asset: string; pool: string; shardId: string; noteRoot: string; relationCommitment: string };
 };
 export type PrivateLetterChainRecord = {
-  messageId: string; recipientBinding: string; relationCommitment: string;
+  messageId: string; recipientBinding: string;
   registeredAt: string; deadline: string; ciphertextHash: string; ciphertext: Uint8Array;
   transactionHash: string;
 };
@@ -61,12 +58,12 @@ export async function readPrivateLetters(contract: Contract): Promise<PrivateLet
       if (seen.has(messageId)) throw new Error("Private letter history contains duplicate messages");
       seen.add(messageId);
       const record = await contract.letterRecord(messageId, { blockTag: toBlock });
-      for (const field of ["recipientBinding", "relationCommitment", "registeredAt", "deadline"])
+      for (const field of ["recipientBinding", "registeredAt", "deadline"])
         if (BigInt(record[field]) !== BigInt(parsed[field])) throw new Error("Private letter record does not match its registration");
       for (const field of ["pointer", "payloadHash", "payloadLength", "segmentCount"])
         if (String(record.blob[field]).toLowerCase() !== String(parsed.blob[field]).toLowerCase()) throw new Error("Private letter archive reference does not match its registration");
       const blob = await readArchiveBlob({ pointer: record.blob.pointer, payloadHash: record.blob.payloadHash, payloadLength: record.blob.payloadLength, segmentCount: record.blob.segmentCount, blockTag: toBlock, getCode: (pointer, blockTag) => provider.getCode(pointer, blockTag) });
-      letters.push({ messageId, recipientBinding: String(record.recipientBinding), relationCommitment: String(record.relationCommitment), registeredAt: String(record.registeredAt), deadline: String(record.deadline), ciphertextHash: blob.payloadHash, ciphertext: blob.payload, transactionHash: log.transactionHash });
+      letters.push({ messageId, recipientBinding: String(record.recipientBinding), registeredAt: String(record.registeredAt), deadline: String(record.deadline), ciphertextHash: blob.payloadHash, ciphertext: blob.payload, transactionHash: log.transactionHash });
     }
   }
   if ((await provider.getBlock(toBlock))?.hash !== anchor.hash) throw new Error("Private letter archive was reorganized");
@@ -78,13 +75,12 @@ export async function submitPrivateLetter(input: { address: string; signer: Sign
   const provider = input.signer.provider;
   if (!provider || (await provider.getNetwork()).chainId !== BigInt(input.chainId)) throw new Error("Transaction wallet is connected to the wrong network");
   const contract = createPrivateLetterContract(input.address, input.signer);
-  const { delivery, attachment, ciphertext, proof } = input.letter;
+  const { delivery, ciphertext, proof } = input.letter;
   const existing = await contract.letterRecord(delivery.messageId);
   if (BigInt(existing.registeredAt) !== 0n) {
     if (BigInt(existing.recipientBinding) !== BigInt(delivery.recipientBinding) ||
       String(existing.blob.payloadHash).toLowerCase() !== keccak256(ciphertext).toLowerCase() ||
-      BigInt(existing.deadline) !== BigInt(delivery.deadline) ||
-      BigInt(existing.relationCommitment) !== BigInt(attachment?.relationCommitment ?? 0)) throw new Error("Message number belongs to another registered letter");
+      BigInt(existing.deadline) !== BigInt(delivery.deadline)) throw new Error("Message number belongs to another registered letter");
     const logs = await contract.queryFilter(contract.filters.LetterRegistered(delivery.messageId), await contract.creationBlock());
     if (logs.length !== 1) throw new Error("Existing letter registration could not be confirmed");
     return { transactionHash: logs[0].transactionHash };
@@ -106,9 +102,7 @@ export async function submitPrivateLetter(input: { address: string; signer: Sign
   const finishWalletRequest = input.onWalletRequest?.();
   let transaction;
   try {
-    transaction = attachment
-      ? await contract.registerAttachedLetter(delivery, attachment, ciphertext, proof, { chainId: BigInt(input.chainId) })
-      : await contract.registerLetter(delivery, ciphertext, proof, { chainId: BigInt(input.chainId) });
+    transaction = await contract.registerLetter(delivery, ciphertext, proof, { chainId: BigInt(input.chainId) });
   } finally { finishWalletRequest?.(); }
   const confirmed = await waitForShieldedTransaction(transaction);
   const receipt = confirmed.receipt;
@@ -118,7 +112,6 @@ export async function submitPrivateLetter(input: { address: string; signer: Sign
       const event = contract.interface.parseLog(log);
       return event?.name === "LetterRegistered" && BigInt(event.args.messageId) === BigInt(delivery.messageId) &&
         BigInt(event.args.recipientBinding) === BigInt(delivery.recipientBinding) &&
-        BigInt(event.args.relationCommitment) === BigInt(attachment?.relationCommitment ?? 0) &&
         BigInt(event.args.deadline) === BigInt(delivery.deadline) &&
         String(event.args.blob.payloadHash).toLowerCase() === keccak256(ciphertext).toLowerCase();
     } catch { return false; }

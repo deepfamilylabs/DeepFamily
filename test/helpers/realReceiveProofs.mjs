@@ -20,12 +20,10 @@ const issuers = {
 const verifiers = {
   anonymous: "AnonymousReceivePresentationVerifier",
   fund: "FundReceivePresentationVerifier",
-  attachment: "AttachedReceivePresentationVerifier",
 };
 const presentationSources = [
   "shielded_anonymous_receive_presentation",
   "shielded_fund_receive_presentation",
-  "shielded_attached_receive_presentation",
 ];
 
 /** The unified npm test requires real artifacts; targeted optional runs can skip if absent. */

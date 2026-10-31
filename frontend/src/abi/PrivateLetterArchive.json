@@ -22,11 +22,6 @@
         },
         {
           "internalType": "address",
-          "name": "attachmentVerifier",
-          "type": "address"
-        },
-        {
-          "internalType": "address",
           "name": "poolFactory",
           "type": "address"
         }
@@ -42,11 +37,6 @@
     {
       "inputs": [],
       "name": "ExpiredReceiveCode",
-      "type": "error"
-    },
-    {
-      "inputs": [],
-      "name": "InvalidBudgetSource",
       "type": "error"
     },
     {
@@ -175,12 +165,6 @@
           "indexed": false,
           "internalType": "uint256",
           "name": "recipientBinding",
-          "type": "uint256"
-        },
-        {
-          "indexed": false,
-          "internalType": "uint256",
-          "name": "relationCommitment",
           "type": "uint256"
         },
         {
@@ -365,19 +349,6 @@
       ],
       "name": "StorySealed",
       "type": "event"
-    },
-    {
-      "inputs": [],
-      "name": "ATTACHMENT_VERIFIER",
-      "outputs": [
-        {
-          "internalType": "contract IPrivateAttachedLetterVerifier",
-          "name": "",
-          "type": "address"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
     },
     {
       "inputs": [],
@@ -696,11 +667,6 @@
               "type": "uint256"
             },
             {
-              "internalType": "uint256",
-              "name": "relationCommitment",
-              "type": "uint256"
-            },
-            {
               "internalType": "uint64",
               "name": "registeredAt",
               "type": "uint64"
@@ -763,88 +729,6 @@
         }
       ],
       "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "components": [
-            {
-              "internalType": "uint128",
-              "name": "messageId",
-              "type": "uint128"
-            },
-            {
-              "internalType": "uint256",
-              "name": "checkpointId",
-              "type": "uint256"
-            },
-            {
-              "internalType": "uint64",
-              "name": "asOf",
-              "type": "uint64"
-            },
-            {
-              "internalType": "uint64",
-              "name": "deadline",
-              "type": "uint64"
-            },
-            {
-              "internalType": "uint256",
-              "name": "recipientBinding",
-              "type": "uint256"
-            }
-          ],
-          "internalType": "struct PrivateLetterArchive.Delivery",
-          "name": "delivery",
-          "type": "tuple"
-        },
-        {
-          "components": [
-            {
-              "internalType": "address",
-              "name": "asset",
-              "type": "address"
-            },
-            {
-              "internalType": "address",
-              "name": "pool",
-              "type": "address"
-            },
-            {
-              "internalType": "uint256",
-              "name": "shardId",
-              "type": "uint256"
-            },
-            {
-              "internalType": "uint256",
-              "name": "noteRoot",
-              "type": "uint256"
-            },
-            {
-              "internalType": "uint256",
-              "name": "relationCommitment",
-              "type": "uint256"
-            }
-          ],
-          "internalType": "struct PrivateLetterArchive.Attachment",
-          "name": "attachment",
-          "type": "tuple"
-        },
-        {
-          "internalType": "bytes",
-          "name": "ciphertext",
-          "type": "bytes"
-        },
-        {
-          "internalType": "bytes",
-          "name": "proof",
-          "type": "bytes"
-        }
-      ],
-      "name": "registerAttachedLetter",
-      "outputs": [],
-      "stateMutability": "nonpayable",
       "type": "function"
     },
     {

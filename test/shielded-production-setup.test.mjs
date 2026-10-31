@@ -215,12 +215,11 @@ describe("shielded production setup artifacts", function () {
       Object.keys(SHIELDED_SETUP_CIRCUITS).length,
     );
   });
-  it("installs linker keys and all three fixed verifiers with their production manifest", async function () {
+  it("installs linker keys and both fixed verifiers with their production manifest", async function () {
     const generated = [
       "frontend/public/zk/shielded/receive-link-keys.json",
       "contracts/AnonymousReceivePresentationVerifier.sol",
       "contracts/FundReceivePresentationVerifier.sol",
-      "contracts/AttachedReceivePresentationVerifier.sol",
     ];
     const records = await fixture.createRecords({
       linkSynchronizer: async ({ outputRoot, circuitFiles, manifest }) => {
@@ -265,7 +264,6 @@ describe("shielded production setup artifacts", function () {
       "frontend/public/zk/shielded/receive-link-keys.json",
       "contracts/AnonymousReceivePresentationVerifier.sol",
       "contracts/FundReceivePresentationVerifier.sol",
-      "contracts/AttachedReceivePresentationVerifier.sol",
     ];
     const recordStage = fs.mkdtempSync(path.join(fixture.stageRoot, "records-"));
     fs.mkdirSync(path.join(recordStage, "release"));
@@ -328,7 +326,6 @@ describe("shielded production setup artifacts", function () {
       "contracts/ShieldedIdentityAuthorizationUpdateVerifier.sol",
       "contracts/AnonymousReceivePresentationVerifier.sol",
       "contracts/FundReceivePresentationVerifier.sol",
-      "contracts/AttachedReceivePresentationVerifier.sol",
       "frontend/public/zk/shielded/receive-link-keys.json",
     ];
     const original = sourceBundleSha256(fixture.root);
@@ -481,7 +478,7 @@ describe("shielded production setup artifacts", function () {
           return {
             status: "production",
             verification: "passed",
-            circuitCount: 3,
+            circuitCount: 2,
             manifestSha256: sha256File(path.join(fixture.root, SHIELDED_PRODUCTION_MANIFEST_PATH)),
           };
         },
@@ -503,7 +500,7 @@ describe("shielded production setup artifacts", function () {
           platform: "darwin",
         },
       ]);
-      expect(result.receive).to.include({ verification: "passed", circuitCount: 3 });
+      expect(result.receive).to.include({ verification: "passed", circuitCount: 2 });
       // The receive code exports a verification key but no Solidity verifier.
       expect(calls).to.have.length(
         1 +

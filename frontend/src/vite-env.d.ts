@@ -8,7 +8,7 @@ declare const __SHIELDED_RECEIVE_CREDENTIAL_VKEYS__: Readonly<
 /** Circuit verification keys and G1 delta points authenticated by the shielded manifest. */
 declare const __RECEIVE_LINK_KEYS__: Readonly<
   Record<
-    "anonymous" | "fund" | "attachment",
+    "anonymous" | "fund",
     {
       readonly verificationKey: import("@deepfamily/protocol-core").Groth16VerificationKey;
       readonly deltaG1: readonly string[];

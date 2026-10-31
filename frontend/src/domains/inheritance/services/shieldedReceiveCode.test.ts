@@ -2,8 +2,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   computeIdentityFromDerivedSecret,
   encodeShieldedReceiveCredential,
-  decodeShieldedReceiveCredential,
-  encodeShieldedBudgetReceiveCode,
   wrapIdentityCommitmentAsPersonHash,
 } from "@deepfamily/protocol-core";
 import {
@@ -58,17 +56,6 @@ beforeEach(() => {
 });
 
 describe("shielded receive codes", () => {
-  it("previews the authenticated heir named by a combined budget receive code", () => {
-    const fund = decodeShieldedReceiveCredential(code);
-    const { identityCommitment: _identity, ...shared } = fund;
-    const packageCode = encodeShieldedBudgetReceiveCode({
-      fundCode: code,
-      anonymousCode: encodeShieldedReceiveCredential({ ...shared, disclosure: "anonymous" }),
-    });
-    expect(peekShieldedReceiveCodePersonHash(packageCode)).toBe(personHash);
-    expect(peekShieldedReceiveCodePersonHash(packageCode.slice(0, -1))).toBeNull();
-  });
-
   it("returns payment keys only after the worker verifies the code", async () => {
     mocks.zkWorkerCall.mockResolvedValueOnce({
       ok: true,

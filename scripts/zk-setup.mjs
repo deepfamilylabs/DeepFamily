@@ -19,7 +19,7 @@ const usage = () => {
 Optional: --shielded-release-criteria <committed-json-path> records the six reviewed
 release thresholds. These thresholds are checked by release:preflight.
 
-Creates the single final artifact set for all sixteen Circom circuits with:
+Creates the single final artifact set for all fifteen Circom circuits with:
   - a hash-verified official compiler or fresh pinned-source private build for this host;
   - a frozen source and compiled R1CS/WASM snapshot checked before any Groth16 setup starts;
   - the pinned, published Powers of Tau Phase 1 file, hash-verified before use;

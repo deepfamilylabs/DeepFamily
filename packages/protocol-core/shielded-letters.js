@@ -1,6 +1,5 @@
 import { Aes128Gcm, CipherSuite, DhkemX25519HkdfSha256, HkdfSha256 } from "@hpke/core";
 import { getBytes, keccak256, solidityPacked, toUtf8Bytes } from "ethers";
-import { poseidon3 } from "poseidon-lite";
 import {
   asUint8Array,
   bigintFrom,
@@ -19,14 +18,12 @@ import { assertAddress } from "./identity.js";
 import { generateShieldedRandomField } from "./shielded-inheritance.js";
 
 export const SHIELDED_LETTER_ENVELOPE_VERSION = 1;
-export const SHIELDED_LETTER_RELATION_DOMAIN = 202610210401n;
 export const SHIELDED_LETTER_HPKE_ENCAPSULATED_BYTES = 32;
 
 const MAX_FIELD = SNARK_SCALAR_FIELD - 1n;
 const ENVELOPE_MAGIC = Uint8Array.of(0x44, 0x46, 0x4c, 0x45); // DFLE
 const CIPHERTEXT_PREFIX = Uint8Array.of(0x44, 0x46, 0x4c, 0x43, 1); // DFLC, version 1
 const ENVELOPE_HEADER_BYTES = 48;
-const ATTACHMENT_BYTES = 60;
 const AEAD_TAG_BYTES = 16;
 const ENCAPSULATED_OFFSET = CIPHERTEXT_PREFIX.length;
 const SEALED_OFFSET = ENCAPSULATED_OFFSET + SHIELDED_LETTER_HPKE_ENCAPSULATED_BYTES;
@@ -100,20 +97,6 @@ function writeField(bytes, offset, value) {
   }
 }
 
-function normalizeAttachment(value) {
-  if (value === undefined || value === null) return null;
-  protocolAssert(
-    typeof value === "object" && !Array.isArray(value),
-    "INVALID_SHIELDED_LETTER_ATTACHMENT",
-    "A structured private Fund budget reference is required",
-  );
-  return {
-    chainId: chainId(value.chainId),
-    poolAddress: nonzeroAddress(value.poolAddress, "attachment.poolAddress"),
-    budgetCommitment: field(value.budgetCommitment, "attachment.budgetCommitment", true),
-  };
-}
-
 function normalizeEnvelope(input, generateSalt = false) {
   protocolAssert(
     input !== null && typeof input === "object" && !Array.isArray(input),
@@ -143,16 +126,7 @@ function normalizeEnvelope(input, generateSalt = false) {
       generateSalt && input.salt === undefined
         ? generateShieldedRandomField()
         : field(input.salt, "salt", true),
-    attachment: normalizeAttachment(input.attachment),
   };
-}
-
-function assertAttachmentChain(envelope, scope) {
-  protocolAssert(
-    envelope.attachment === null || envelope.attachment.chainId === scope.chainId,
-    "SHIELDED_LETTER_ATTACHMENT_CHAIN_MISMATCH",
-    "Letter attachment belongs to another chain",
-  );
 }
 
 /** Letter deployments have their own scope; they never use a personHash or Story key. */
@@ -177,35 +151,27 @@ export function createShieldedLetterEnvelope(input) {
 }
 
 /**
- * Canonical binary envelope: DFLE, version, attachment flag, two zero reserved
- * bytes, 32-byte salt, uint64 UTF-8 length, optional uint64 chain/address/Fr
- * Fund reference, then the exact UTF-8 body. No application-level text size cap.
+ * Canonical binary envelope: DFLE, version, three zero reserved bytes, 32-byte
+ * salt, uint64 UTF-8 length, then the exact UTF-8 body. No application-level
+ * text size cap.
  */
 export function encodeShieldedLetterEnvelope(input) {
   const envelope = normalizeEnvelope(input);
   const body = utf8Bytes(envelope.body);
   try {
-    const bodyOffset =
-      ENVELOPE_HEADER_BYTES + (envelope.attachment === null ? 0 : ATTACHMENT_BYTES);
-    const bytes = new Uint8Array(bodyOffset + body.length);
+    const bytes = new Uint8Array(ENVELOPE_HEADER_BYTES + body.length);
     bytes.set(ENVELOPE_MAGIC);
     bytes[4] = SHIELDED_LETTER_ENVELOPE_VERSION;
-    bytes[5] = envelope.attachment === null ? 0 : 1;
     writeField(bytes, 8, envelope.salt);
     writeUint64BE(bytes, 40, BigInt(body.length));
-    if (envelope.attachment !== null) {
-      writeUint64BE(bytes, ENVELOPE_HEADER_BYTES, envelope.attachment.chainId);
-      bytes.set(getBytes(envelope.attachment.poolAddress), ENVELOPE_HEADER_BYTES + 8);
-      writeField(bytes, ENVELOPE_HEADER_BYTES + 28, envelope.attachment.budgetCommitment);
-    }
-    bytes.set(body, bodyOffset);
+    bytes.set(body, ENVELOPE_HEADER_BYTES);
     return bytes;
   } finally {
     wipeBytes(body);
   }
 }
 
-/** Reject noncanonical flags, lengths, reserved bytes, references and UTF-8. */
+/** Reject noncanonical lengths, reserved bytes and UTF-8. */
 export function decodeShieldedLetterEnvelope(value) {
   const bytes = asUint8Array(value, "letter envelope");
   protocolAssert(
@@ -220,32 +186,19 @@ export function decodeShieldedLetterEnvelope(value) {
     "Unsupported letter envelope version",
   );
   protocolAssert(
-    bytes[5] <= 1 && bytes[6] === 0 && bytes[7] === 0,
+    bytes[5] === 0 && bytes[6] === 0 && bytes[7] === 0,
     "INVALID_SHIELDED_LETTER_ENVELOPE",
-    "Letter envelope has invalid flags or reserved bytes",
+    "Letter envelope has invalid reserved bytes",
   );
-  const bodyOffset = ENVELOPE_HEADER_BYTES + (bytes[5] === 0 ? 0 : ATTACHMENT_BYTES);
   protocolAssert(
-    bytes.length >= bodyOffset && readUint64BE(bytes, 40) === BigInt(bytes.length - bodyOffset),
+    readUint64BE(bytes, 40) === BigInt(bytes.length - ENVELOPE_HEADER_BYTES),
     "INVALID_SHIELDED_LETTER_ENVELOPE",
     "Letter envelope has an invalid body length",
   );
   return normalizeEnvelope({
     version: bytes[4],
     salt: BigInt(bytesToHex(bytes.subarray(8, 40))),
-    attachment:
-      bytes[5] === 0
-        ? null
-        : {
-            chainId: readUint64BE(bytes, ENVELOPE_HEADER_BYTES),
-            poolAddress: bytesToHex(
-              bytes.subarray(ENVELOPE_HEADER_BYTES + 8, ENVELOPE_HEADER_BYTES + 28),
-            ),
-            budgetCommitment: BigInt(
-              bytesToHex(bytes.subarray(ENVELOPE_HEADER_BYTES + 28, bodyOffset)),
-            ),
-          },
-    body: decodeBody(bytes.subarray(bodyOffset)),
+    body: decodeBody(bytes.subarray(ENVELOPE_HEADER_BYTES)),
   });
 }
 
@@ -288,27 +241,6 @@ export function splitShieldedLetterCiphertextHash(ciphertext) {
 }
 
 /**
- * Research-aligned relation: H3(H3(tag,pool,FundCommitment),binding,salt).
- * The verified operation binding authenticates chain, contract, recipient,
- * ciphertext hash and message id. It must come from the verified delivery,
- * never from the decrypted sender-controlled envelope. Null means standalone.
- */
-export function computeShieldedLetterRelationCommitment(input) {
-  const attachment = normalizeAttachment(input.attachment);
-  const salt = field(input.salt, "salt", true);
-  if (attachment === null) return 0n;
-  return poseidon3([
-    poseidon3([
-      SHIELDED_LETTER_RELATION_DOMAIN,
-      BigInt(attachment.poolAddress),
-      attachment.budgetCommitment,
-    ]),
-    field(input.binding, "binding"),
-    salt,
-  ]);
-}
-
-/**
  * Encrypt the prepared envelope with the existing receiving HPKE key. Unlike
  * fixed-size money notes, letters use a single variable-length HPKE message;
  * Archive segmentation is applied to the resulting authenticated bytes.
@@ -316,7 +248,6 @@ export function computeShieldedLetterRelationCommitment(input) {
 export async function encryptShieldedLetter(input) {
   const scope = normalizeShieldedLetterScope(input);
   const envelope = normalizeEnvelope(input.envelope);
-  assertAttachmentChain(envelope, scope);
   const aad = buildShieldedLetterHpkeAad(input);
   const publicKey = bytes32(input.recipientPublicKey, "recipientPublicKey");
   const plaintext = encodeShieldedLetterEnvelope(envelope);
@@ -338,17 +269,14 @@ export async function encryptShieldedLetter(input) {
 }
 
 /**
- * Decrypt using either existing key mode's hpkeIkm, then authenticate the
- * attachment against the verified contract result before returning any body.
- * Code expiry/counters deliberately do not participate in historical recovery.
+ * Decrypt using either existing key mode's hpkeIkm. Code expiry/counters
+ * deliberately do not participate in historical recovery.
  */
 export async function decryptShieldedLetter(input) {
-  const scope = normalizeShieldedLetterScope(input);
   // Snapshot before the first await: hash checking and HPKE must use the same
   // bytes even if the caller reuses its archive download buffer concurrently.
   const ciphertext = copyBytes(assertCiphertext(input.ciphertext));
   const aad = buildShieldedLetterHpkeAad(input);
-  const expectedRelation = field(input.relationCommitment, "relationCommitment");
   if (input.expectedCiphertextHash !== undefined) {
     const expectedHash = copyBytes(input.expectedCiphertextHash, "expectedCiphertextHash");
     protocolAssert(
@@ -371,28 +299,8 @@ export async function decryptShieldedLetter(input) {
       info: HPKE_INFO,
     });
     plaintext = new Uint8Array(await recipient.open(ciphertext.subarray(SEALED_OFFSET), aad));
-    const envelope = decodeShieldedLetterEnvelope(plaintext);
-    assertAttachmentChain(envelope, scope);
-    const relation = computeShieldedLetterRelationCommitment({
-      attachment: envelope.attachment,
-      salt: envelope.salt,
-      binding: input.expectedBinding,
-    });
-    protocolAssert(
-      relation === expectedRelation &&
-        (envelope.attachment === null ? expectedRelation === 0n : expectedRelation !== 0n),
-      "SHIELDED_LETTER_RELATION_MISMATCH",
-      "Letter reference does not match its verified attachment relation",
-    );
-    return envelope;
-  } catch (error) {
-    if (
-      error instanceof ProtocolError &&
-      (error.code === "SHIELDED_LETTER_RELATION_MISMATCH" ||
-        error.code === "SHIELDED_LETTER_ATTACHMENT_CHAIN_MISMATCH")
-    ) {
-      throw error;
-    }
+    return decodeShieldedLetterEnvelope(plaintext);
+  } catch {
     // Do not propagate library or decoder details that could contain plaintext.
     throw new ProtocolError(
       "SHIELDED_LETTER_DECRYPTION_FAILED",

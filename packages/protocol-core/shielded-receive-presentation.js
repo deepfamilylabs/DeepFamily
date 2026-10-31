@@ -12,7 +12,6 @@ import {
 
 export const SHIELDED_RECEIVE_PRESENTATION_ACTION = Object.freeze({
   Letter: 1,
-  AttachedLetter: 2,
   Fund: 3,
   PrivateTransfer: 4,
 });
@@ -96,7 +95,10 @@ export function prepareShieldedReceivePresentation(input) {
   const credential = input.credential;
   const signals = buildShieldedReceiveCredentialPublicSignals(credential);
   const action = bigintFrom(input.action, "action", 4n);
-  check(action > 0n, "Unknown receive action");
+  check(
+    Object.values(SHIELDED_RECEIVE_PRESENTATION_ACTION).includes(Number(action)),
+    "Unknown receive action",
+  );
   const isFund = credential.disclosure === "fund";
   check(isFund === (action === 3n), "Use the credential disclosure required by this operation");
   const chainId = bigintFrom(input.chainId, "chainId", MAX_UINT64);
@@ -158,14 +160,13 @@ export function prepareShieldedReceivePresentation(input) {
     isOld0: String(lookup.isOld0),
     absent: String(lookup.absent),
   });
-  const kind = action === 2n ? "attachment" : isFund ? "fund" : "anonymous";
   return {
     publicSignals,
     recipientBinding: binding,
     deadline,
     presentation,
     request: {
-      kind,
+      kind: isFund ? "fund" : "anonymous",
       credentialProof: credential.proof,
       credentialPublicSignals: signals.map(String),
       presentation,
@@ -181,7 +182,6 @@ export function prepareReceivePresentationWitness(request) {
   const kinds = {
     anonymous: ["anonymousReceivePresentation", 11],
     fund: ["fundReceivePresentation", 12],
-    attachment: ["attachedReceivePresentation", 11],
   };
   check(request && Object.hasOwn(kinds, request.kind), "Unsupported receive presentation kind");
   const [circuit, count] = kinds[request.kind];
@@ -218,33 +218,6 @@ export function prepareReceivePresentationWitness(request) {
   );
   witness.siblings = p.siblings.map((value) => String(field(value, "authorization sibling")));
   const publicInputs = publicNames.map((name) => witness[name]);
-  if (request.kind === "attachment") {
-    const a = request.attachment;
-    check(a && typeof a === "object", "Missing attachment witness");
-    for (const name of ["budgetPool", "budgetRoot", "relation"]) {
-      witness[name] = String(field(a[name], name));
-      publicInputs.push(witness[name]);
-    }
-    for (const name of [
-      "policy",
-      "enrollment",
-      "rate",
-      "remaining",
-      "nonce",
-      "ciphertextHash",
-      "depth",
-      "index",
-    ]) {
-      witness[`budget${name[0].toUpperCase()}${name.slice(1)}`] = String(field(a[name], name));
-    }
-    check(
-      Array.isArray(a.siblings) && a.siblings.length === 32,
-      "Budget path requires 32 siblings",
-    );
-    witness.budgetSiblings = a.siblings.map((value) => String(field(value, "budget sibling")));
-  } else {
-    check(request.attachment === undefined, "Unexpected attachment witness");
-  }
   return { circuit, witness, commonInputs, publicInputs };
 }
 

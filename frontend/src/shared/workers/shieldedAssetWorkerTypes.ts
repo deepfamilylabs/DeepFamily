@@ -204,18 +204,13 @@ export type ShieldedAssetWorkerCallMap = {
     params: { expectedCredentialsHandle: string; expectedFingerprint: string };
     result: ShieldedAssetSessionState;
   };
-  validateLetter: {
-    params: { context: ShieldedWorkerContext; code: string; body: string; keyMode?: 0 | 1 };
-    result: { ok: true };
-  };
   prepareLetter: {
-    params: { context: ShieldedWorkerContext; code: string; body: string; budgetCommitment?: string };
+    params: { context: ShieldedWorkerContext; code: string; body: string };
     result: import("../../domains/inheritance/services/privateLetterChain").ProvenPrivateLetter;
   };
   recoverLetters: {
     params: { context: ShieldedWorkerContext };
-    result: { letters: { messageId: string; body: string; registeredAt: string; slot: ShieldedKeySlot; transactionHash: string;
-      attachment: { chainId: string; poolAddress: string; budgetCommitment: string } | null }[]; unavailable: number };
+    result: { letters: { messageId: string; body: string; registeredAt: string; slot: ShieldedKeySlot; transactionHash: string }[]; unavailable: number };
   };
   receiveCode: {
     params: { slot: ShieldedKeySlot; context?: ShieldedWorkerContext; disclosure?: "anonymous" | "fund"; expiresAt?: string };

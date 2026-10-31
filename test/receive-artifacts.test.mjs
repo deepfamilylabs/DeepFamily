@@ -125,12 +125,12 @@ describe("Circom receive linking artifacts", function () {
     fs.rmSync(root, { recursive: true, force: true });
   });
 
-  it("pins all three local linking verifiers without a second prover runtime", function () {
+  it("pins both local linking verifiers without a second prover runtime", function () {
     const result = inspectLinkedReceiveArtifacts({ root });
-    assert.equal(result.circuitCount, 3);
+    assert.equal(result.circuitCount, 2);
     assert.equal(result.status, "development");
     assert.equal(result.verification, "passed");
-    assert.deepEqual(Object.keys(result.artifacts).sort(), ["anonymous", "attachment", "fund"]);
+    assert.deepEqual(Object.keys(result.artifacts).sort(), ["anonymous", "fund"]);
   });
 
   for (const file of [
@@ -165,11 +165,11 @@ describe("Circom receive linking artifacts", function () {
     );
   });
 
-  it("independently derives the link bundle and all three verifiers from the real zkeys", async function () {
+  it("independently derives the link bundle and both verifiers from the real zkeys", async function () {
     const result = await verify();
     assert.equal(result.verification, "passed");
     assert.equal(result.status, "development");
-    assert.equal(result.circuitCount, 3);
+    assert.equal(result.circuitCount, 2);
   });
 
   it("preserves an existing curve pool when zkey reader dependencies first load", function () {

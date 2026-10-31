@@ -1,21 +1,19 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { Signer } from "ethers";
-import type { ShieldedAssetWorkerCallMap, ShieldedWalletSummary, ShieldedWorkerContext } from "../../../shared/workers/shieldedAssetWorkerTypes";
+import type { ShieldedAssetWorkerCallMap, ShieldedWorkerContext } from "../../../shared/workers/shieldedAssetWorkerTypes";
 import { shieldedAssetWorkerCall, subscribeShieldedAssetWorkerLock } from "../../../shared/workers/shieldedAssetWorkerClient";
 import { getWalletConnectionGeneration, subscribeWalletConnectionChange } from "../../wallet";
 import { PrivateLetterPreparationExpiredError, submitPrivateLetter, type ProvenPrivateLetter } from "../services/privateLetterChain";
-import { FIELD_INPUT, FIELD_TEXTAREA, FieldBlock, PanelButton, shortHex } from "./inheritanceControls";
+import { FIELD_TEXTAREA, FieldBlock, PanelButton } from "./inheritanceControls";
 
 export type PrivateLetterView = "write" | "inbox";
 
-/** One composer handles standalone letters and references to authenticated private Fund budgets. */
+/** Standalone letters to an anonymous receive code, and the unlocked keys' inbox. */
 export function PrivateLettersPanel(props: {
   mode: PrivateLetterView;
   titleId?: string;
-  context: ShieldedWorkerContext; signer: Signer | null; disabled: boolean; wallet: ShieldedWalletSummary | null; recoveryReady: boolean;
-  budgetCommitment: string; onBudgetChange: (value: string) => void;
-  composeRequest?: number;
+  context: ShieldedWorkerContext; signer: Signer | null; disabled: boolean; recoveryReady: boolean;
   sessionScope?: string;
   onBusyChange?: (busy: boolean) => void; beginWalletRequest?: () => () => void;
 }) {
@@ -68,7 +66,6 @@ export function PrivateLettersPanel(props: {
     previousSigner.current = props.signer;
     invalidateSending();
   }, [props.signer, invalidateSending]);
-  useEffect(() => { prepared.current = null; }, [props.budgetCommitment, props.composeRequest]);
   useEffect(() => {
     if (previousContextKey.current === contextKey) return;
     previousContextKey.current = contextKey;
@@ -85,7 +82,6 @@ export function PrivateLettersPanel(props: {
     setWorking(false);
     if (wasWorking) busyChange.current?.(false);
   }, [contextKey, contentScope]);
-  const budgets = props.wallet?.templates.filter(item => item.bindingKind === 0) ?? [];
   const busy = props.disabled || working;
   async function send() {
     if (props.mode !== "write" || !props.signer || !props.context.lettersAddress || busy) return;
@@ -96,7 +92,7 @@ export function PrivateLettersPanel(props: {
     setWorking(true); props.onBusyChange?.(true); setError("");
     try {
       const letter = prepared.current ?? await shieldedAssetWorkerCall("prepareLetter", {
-        context: props.context, code, body, budgetCommitment: props.budgetCommitment || undefined,
+        context: props.context, code, body,
       }, { timeoutMs: 1_200_000 });
       if (!current()) return;
       prepared.current = letter;
@@ -144,23 +140,15 @@ export function PrivateLettersPanel(props: {
     {props.context.lettersAddress && !props.recoveryReady ? <p className="text-sm text-ink-muted">{tr("recoveryKeysRequired")}</p> : null}
     {props.mode === "write" ? <div className="space-y-4">
       <p className="text-sm text-ink-muted">{tr("writeHint")}</p>
-      <FieldBlock label={tr("budget")}>
-        <select className={FIELD_INPUT} aria-label={tr("budget")} value={props.budgetCommitment} disabled={busy} onChange={event => { props.onBudgetChange(event.target.value); prepared.current = null; }}>
-          <option value="">{tr("standalone")}</option>
-          {props.budgetCommitment && !budgets.some(item => item.handle === props.budgetCommitment) ? <option value={props.budgetCommitment}>{shortHex(props.budgetCommitment)}</option> : null}
-          {budgets.map(item => <option key={item.handle} value={item.handle}>{shortHex(item.handle)}</option>)}
-        </select>
-      </FieldBlock>
       <FieldBlock label={tr("recipientCode")}><textarea aria-label={tr("recipientCode")} className={FIELD_TEXTAREA} rows={3} disabled={busy} value={code} onChange={event => { setCode(event.target.value); prepared.current = null; setSent(""); }} /></FieldBlock>
       <FieldBlock label={tr("body")}><textarea aria-label={tr("body")} className={FIELD_TEXTAREA} rows={6} disabled={busy} value={body} onChange={event => { setBody(event.target.value); prepared.current = null; setSent(""); }} /></FieldBlock>
       <PanelButton disabled={busy || !props.context.lettersAddress || !props.signer || !code.trim() || !body.trim()} onClick={() => void send()}>{working ? tr("working") : tr("send")}</PanelButton>
-      {props.budgetCommitment ? <p className="text-xs text-ink-muted">{tr("separateResults")}</p> : null}
     </div> : null}
     {props.mode === "inbox" && inbox ? <div className="space-y-3">
       <p className="text-xs text-ink-muted">{tr("recoveryHint")}</p>
       {inbox.unavailable > 0 ? <p role="alert" className="text-sm text-danger">{t("shielded.privateLetters.unavailable", { count: inbox.unavailable })}</p> : null}
       {inbox.letters.length === 0 && inbox.unavailable === 0 ? <p className="text-sm text-ink-muted">{tr("emptyInbox")}</p> : inbox.letters.map(letter => <article key={letter.messageId} className="space-y-2 rounded-xl bg-surface-alt p-4">
-        <p className="text-xs text-ink-muted">{new Date(Number(letter.registeredAt) * 1000).toLocaleString()}{letter.attachment ? ` · ${tr("budget")}: ${shortHex(letter.attachment.budgetCommitment)}` : ""}</p>
+        <p className="text-xs text-ink-muted">{new Date(Number(letter.registeredAt) * 1000).toLocaleString()}</p>
         <p className="whitespace-pre-wrap break-words text-sm text-ink">{letter.body}</p>
       </article>)}
     </div> : null}

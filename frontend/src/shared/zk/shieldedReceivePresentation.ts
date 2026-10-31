@@ -12,7 +12,6 @@ import {
 const PRESENTATION_CIRCUITS = {
   anonymous: "anonymousReceivePresentation",
   fund: "fundReceivePresentation",
-  attachment: "attachedReceivePresentation",
 } as const;
 
 /** Prove the operation locally, then hide and link the reusable credential inputs. */
@@ -21,7 +20,7 @@ export async function proveShieldedReceivePresentation(
   expected: readonly (string | bigint | number)[],
 ) {
   const kind = request.kind;
-  if (kind !== "anonymous" && kind !== "fund" && kind !== "attachment") {
+  if (kind !== "anonymous" && kind !== "fund") {
     throw new Error("Unsupported receive proof kind");
   }
   const prepared = prepareReceivePresentationWitness(request);
@@ -45,8 +44,7 @@ export async function proveShieldedReceivePresentation(
   const linkedProof = await linkGroth16Proofs({
     issuer: {
       proof: request.credentialProof as LinkedGroth16Proof,
-      verificationKey:
-        SHIELDED_RECEIVE_CREDENTIAL_VERIFICATION_KEYS[kind === "fund" ? "fund" : "anonymous"],
+      verificationKey: SHIELDED_RECEIVE_CREDENTIAL_VERIFICATION_KEYS[kind],
       deltaG1: keys.issuerDeltaG1,
     },
     presentation: {

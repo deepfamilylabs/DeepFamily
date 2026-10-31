@@ -45,28 +45,24 @@ const readReceiveLinkKeys = (required: boolean) => {
     throw new Error('Receive linking keys differ from the shielded manifest')
   }
   const keys = JSON.parse(bytes.toString('utf8'))
-  if (Object.keys(keys).sort().join() !== 'anonymous,attachment,fund') {
-    throw new Error('Receive linking keys must authenticate all three presentation circuits')
+  if (Object.keys(keys).sort().join() !== 'anonymous,fund') {
+    throw new Error('Receive linking keys must authenticate both presentation circuits')
   }
-  for (const kind of ['anonymous', 'fund', 'attachment']) {
+  for (const kind of ['anonymous', 'fund']) {
     const key = keys[kind]
     const commonSignals = kind === 'fund' ? 12 : 11
-    const publicSignals = kind === 'attachment' ? 14 : 11
     if (key?.verificationKey?.protocol !== 'groth16' ||
-      key.verificationKey.nPublic !== commonSignals + publicSignals ||
+      key.verificationKey.nPublic !== commonSignals + 11 ||
       !Array.isArray(key.deltaG1) || key.deltaG1.length !== 3 ||
       !Array.isArray(key.issuerDeltaG1) || key.issuerDeltaG1.length !== 3) {
       throw new Error(`Invalid receive linking key for ${kind}`)
     }
-    const issuer = kind === 'fund' ? 'fund' : 'anonymous'
-    const issuerBytes = fs.readFileSync(new URL(`./public/zk/shielded/shielded_${issuer}_receive_credential.vkey.json`, import.meta.url))
+    const issuerBytes = fs.readFileSync(new URL(`./public/zk/shielded/shielded_${kind}_receive_credential.vkey.json`, import.meta.url))
     const issuerDigest = createHash('sha256').update(issuerBytes).digest('hex')
-    const action = kind === 'attachment' ? 'attachedReceivePresentation' : `${kind}ReceivePresentation`
-    const source = kind === 'attachment' ? 'attached' : kind
-    const presentationBytes = fs.readFileSync(new URL(`./public/zk/shielded/shielded_${source}_receive_presentation.vkey.json`, import.meta.url))
+    const presentationBytes = fs.readFileSync(new URL(`./public/zk/shielded/shielded_${kind}_receive_presentation.vkey.json`, import.meta.url))
     if (issuerDigest !== key.issuerVerificationKeySha256 ||
-      issuerDigest !== manifest.circuits?.[`${issuer}ReceiveCredential`]?.verificationKeySha256 ||
-      createHash('sha256').update(presentationBytes).digest('hex') !== manifest.circuits?.[action]?.verificationKeySha256 ||
+      issuerDigest !== manifest.circuits?.[`${kind}ReceiveCredential`]?.verificationKeySha256 ||
+      createHash('sha256').update(presentationBytes).digest('hex') !== manifest.circuits?.[`${kind}ReceivePresentation`]?.verificationKeySha256 ||
       JSON.stringify(JSON.parse(presentationBytes.toString('utf8'))) !== JSON.stringify(key.verificationKey)) {
       throw new Error(`Receive linking keys do not match the pinned ${kind} Circom verification keys`)
     }

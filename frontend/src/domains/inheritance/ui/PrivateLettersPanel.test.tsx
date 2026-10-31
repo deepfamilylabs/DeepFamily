@@ -26,9 +26,9 @@ const context: ShieldedWorkerContext = {
   poolDeploymentBlock: 1, assetKind: "native", lettersAddress: "0x5555555555555555555555555555555555555555",
 };
 const letter = { delivery: { messageId: "7", checkpointId: "1", asOf: "900", deadline: "1200", recipientBinding: "9" }, ciphertext: "0x010203", proof: "0x1234" };
-type InboxResult = { letters: { messageId: string; body: string; registeredAt: string; attachment: null }[]; unavailable: number };
+type InboxResult = { letters: { messageId: string; body: string; registeredAt: string }[]; unavailable: number };
 const tr = (key: string) => `shielded.privateLetters.${key}`;
-const props = () => ({ mode: "write" as const, context, signer: {} as Signer, disabled: false, wallet: null, recoveryReady: true, budgetCommitment: "", onBudgetChange: vi.fn() });
+const props = () => ({ mode: "write" as const, context, signer: {} as Signer, disabled: false, recoveryReady: true });
 function fillLetter() {
   fireEvent.change(screen.getByLabelText(tr("recipientCode")), { target: { value: "anonymous-code" } });
   fireEvent.change(screen.getByLabelText(tr("body")), { target: { value: "Private letter text" } });
@@ -50,7 +50,7 @@ describe("private letter composer", () => {
     render(<StrictMode><InboxPage /></StrictMode>);
     expect(mocks.worker).toHaveBeenCalledTimes(1);
     expect((screen.getByRole("button", { name: "Another task" }) as HTMLButtonElement).disabled).toBe(true);
-    await act(async () => finish({ letters: [{ messageId: "7", body: "StrictMode recovered letter", registeredAt: "1000", attachment: null }], unavailable: 0 }));
+    await act(async () => finish({ letters: [{ messageId: "7", body: "StrictMode recovered letter", registeredAt: "1000" }], unavailable: 0 }));
     expect(screen.getByText("StrictMode recovered letter")).toBeTruthy();
     expect((screen.getByRole("button", { name: "Another task" }) as HTMLButtonElement).disabled).toBe(false);
     expect((screen.getByRole("button", { name: tr("refresh") }) as HTMLButtonElement).disabled).toBe(false);
@@ -66,10 +66,10 @@ describe("private letter composer", () => {
       instance={change === "component replacement" ? "replacement" : "original"}
     /></StrictMode>);
     expect(mocks.worker).toHaveBeenCalledTimes(2);
-    await act(async () => finish[0]({ letters: [{ messageId: "7", body: "Old inbox plaintext", registeredAt: "1000", attachment: null }], unavailable: 0 }));
+    await act(async () => finish[0]({ letters: [{ messageId: "7", body: "Old inbox plaintext", registeredAt: "1000" }], unavailable: 0 }));
     expect(screen.queryByText("Old inbox plaintext")).toBeNull();
     expect((screen.getByRole("button", { name: "Another task" }) as HTMLButtonElement).disabled).toBe(true);
-    await act(async () => finish[1]({ letters: [{ messageId: "8", body: "Current inbox plaintext", registeredAt: "1001", attachment: null }], unavailable: 0 }));
+    await act(async () => finish[1]({ letters: [{ messageId: "8", body: "Current inbox plaintext", registeredAt: "1001" }], unavailable: 0 }));
     expect(screen.getByText("Current inbox plaintext")).toBeTruthy();
     expect((screen.getByRole("button", { name: "Another task" }) as HTMLButtonElement).disabled).toBe(false);
   });
@@ -81,7 +81,7 @@ describe("private letter composer", () => {
     expect((screen.getByRole("button", { name: "Another task" }) as HTMLButtonElement).disabled).toBe(true);
     act(() => mocks.lock?.());
     expect((screen.getByRole("button", { name: "Another task" }) as HTMLButtonElement).disabled).toBe(false);
-    await act(async () => finish({ letters: [{ messageId: "7", body: "Locked inbox plaintext", registeredAt: "1000", attachment: null }], unavailable: 0 }));
+    await act(async () => finish({ letters: [{ messageId: "7", body: "Locked inbox plaintext", registeredAt: "1000" }], unavailable: 0 }));
     expect(screen.queryByText("Locked inbox plaintext")).toBeNull();
     expect(mocks.worker).toHaveBeenCalledTimes(1);
     expect((screen.getByRole("button", { name: "Another task" }) as HTMLButtonElement).disabled).toBe(false);
@@ -94,7 +94,7 @@ describe("private letter composer", () => {
   });
 
   it.each([false, true])("reports unavailable ciphertext without claiming an empty inbox (readable letters: %s)", async readable => {
-    mocks.worker.mockResolvedValue({ letters: readable ? [{ messageId: "7", body: "Readable letter", registeredAt: "1000", attachment: null }] : [], unavailable: 2 });
+    mocks.worker.mockResolvedValue({ letters: readable ? [{ messageId: "7", body: "Readable letter", registeredAt: "1000" }] : [], unavailable: 2 });
     render(<PrivateLettersPanel {...props()} mode="inbox" />);
     expect(await screen.findByRole("alert")).toHaveProperty("textContent", tr("unavailable"));
     expect(screen.queryByText(tr("emptyInbox"))).toBeNull();
@@ -107,16 +107,6 @@ describe("private letter composer", () => {
     expect((screen.getByRole("button", { name: tr("refresh") }) as HTMLButtonElement).disabled).toBe(true);
     expect(screen.getByText(tr("recoveryKeysRequired"))).toBeTruthy();
     expect(mocks.worker).not.toHaveBeenCalled();
-  });
-
-  it("reopens the same budget composer on every attached-letter entry request", () => {
-    const initial = { ...props(), budgetCommitment: "73", composeRequest: 1 };
-    const view = render(<PrivateLettersPanel {...initial} />);
-    expect(screen.getByLabelText(tr("budget"))).toBeTruthy();
-    view.rerender(<PrivateLettersPanel {...initial} mode="inbox" recoveryReady={false} />);
-    expect(screen.queryByLabelText(tr("budget"))).toBeNull();
-    view.rerender(<PrivateLettersPanel {...initial} composeRequest={2} />);
-    expect((screen.getByLabelText(tr("budget")) as HTMLSelectElement).value).toBe("73");
   });
 
   it("reuses an uncertain message and prepares a new proof only after irreversible expiry", async () => {
@@ -152,7 +142,7 @@ describe("private letter composer", () => {
   });
 
   it("removes recovered plaintext as soon as the secret session locks", async () => {
-    mocks.worker.mockResolvedValue({ letters: [{ messageId: "7", body: "Recovered private text", registeredAt: "1000", attachment: null }], unavailable: 0 });
+    mocks.worker.mockResolvedValue({ letters: [{ messageId: "7", body: "Recovered private text", registeredAt: "1000" }], unavailable: 0 });
     render(<PrivateLettersPanel {...props()} mode="inbox" />);
     await screen.findByText("Recovered private text");
     act(() => mocks.lock?.());
@@ -160,7 +150,7 @@ describe("private letter composer", () => {
   });
 
   it("clears the old inbox when the recovered identity or key is replaced", async () => {
-    mocks.worker.mockResolvedValue({ letters: [{ messageId: "7", body: "Old key's private text", registeredAt: "1000", attachment: null }], unavailable: 0 });
+    mocks.worker.mockResolvedValue({ letters: [{ messageId: "7", body: "Old key's private text", registeredAt: "1000" }], unavailable: 0 });
     const initial = props();
     const view = render(<PrivateLettersPanel {...initial} mode="inbox" sessionScope="original-key" />);
     await screen.findByText("Old key's private text");
@@ -171,7 +161,7 @@ describe("private letter composer", () => {
   });
 
   it("keeps verified letters visible until a read-mode refresh returns", async () => {
-    const oldLetter = { messageId: "7", body: "Verified private letter", registeredAt: "1000", attachment: null };
+    const oldLetter = { messageId: "7", body: "Verified private letter", registeredAt: "1000" };
     mocks.worker.mockResolvedValue({ letters: [oldLetter], unavailable: 0 });
     const initial = props();
     const view = render(<PrivateLettersPanel {...initial} mode="inbox" />);

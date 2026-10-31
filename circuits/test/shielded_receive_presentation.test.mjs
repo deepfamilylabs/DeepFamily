@@ -5,10 +5,9 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { WitnessCalculatorBuilder } from "circom_runtime";
-import { poseidon2, poseidon3 } from "poseidon-lite";
+import { poseidon2 } from "poseidon-lite";
 import {
   buildShieldedIdentityAuthorizationState,
-  computeShieldedBudgetNoteCommitment,
   prepareReceivePresentationWitness,
   prepareShieldedReceivePresentation,
   SHIELDED_RECEIVE_PROOF_LIFETIME,
@@ -16,7 +15,6 @@ import {
 import { assertConstraintViolation } from "./constraint_assertions.mjs";
 
 const root = path.resolve(import.meta.dirname, "../..");
-const pool = "0x2222222222222222222222222222222222222222";
 // A consistent asOf/deadline pair; the circuit fixes deadline = asOf + 15 minutes.
 const at = (asOf) => ({
   asOf: String(asOf),
@@ -25,16 +23,12 @@ const at = (asOf) => ({
 const circuitNames = {
   anonymous: "shielded_anonymous_receive_presentation",
   fund: "shielded_fund_receive_presentation",
-  attachment: "shielded_attached_receive_presentation",
 };
 
 // The fixture needs only the public credential statement. Authentication of its
 // issuer proof is a separate linked-verifier obligation, never a recursive
 // constraint in these presentation circuits.
-function fixture(
-  kind,
-  { counter = 3n, keyMode = 0n, entries, noteDepth = 0, noteIndex = 0n } = {},
-) {
+function fixture(kind, { counter = 3n, keyMode = 0n, entries } = {}) {
   const alias = 17n;
   const credential = {
     disclosure: kind === "fund" ? "fund" : "anonymous",
@@ -59,7 +53,7 @@ function fixture(
     credential,
     chainId: 31337n,
     consumer: "0x1111111111111111111111111111111111111111",
-    action: kind === "fund" ? 3n : kind === "attachment" ? 2n : 1n,
+    action: kind === "fund" ? 3n : 1n,
     messageId: kind === "fund" ? 0n : 42n,
     payloadHash: `0x${"ab".repeat(32)}`,
     checkpointId: 2n,
@@ -72,62 +66,6 @@ function fixture(
     ...prepared.presentation,
   };
   const publicSignals = [...witness.credentialPublicSignals.map(BigInt), ...prepared.publicSignals];
-  if (kind === "attachment") {
-    const note = {
-      budgetOrigin: "fund",
-      policyCommitment: 31n,
-      enrollmentCommitment: 32n,
-      heirOwnerCommitment: credential.ownerCommitment,
-      viewingKey: credential.viewingKey,
-      keyMode,
-      amountPerPeriod: 5n,
-      remaining: 15n,
-      nonce: 33n,
-      ciphertextHashField: 34n,
-    };
-    const leaf = computeShieldedBudgetNoteCommitment(note, { chainId: 31337n, poolAddress: pool });
-    const siblings = Array.from({ length: 32 }, (_, i) => (i < noteDepth ? BigInt(i + 1) : 0n));
-    let noteRoot = leaf;
-    for (let i = 0; i < noteDepth; i++)
-      noteRoot =
-        (noteIndex >> BigInt(i)) & 1n
-          ? poseidon2([siblings[i], noteRoot])
-          : poseidon2([noteRoot, siblings[i]]);
-    const relation = poseidon3([
-      poseidon3([202610210401n, BigInt(pool), leaf]),
-      prepared.recipientBinding,
-      4321n,
-    ]);
-    Object.assign(witness, {
-      budgetPool: String(BigInt(pool)),
-      budgetRoot: String(noteRoot),
-      relation: String(relation),
-      budgetPolicy: "31",
-      budgetEnrollment: "32",
-      budgetRate: "5",
-      budgetRemaining: "15",
-      budgetNonce: "33",
-      budgetCiphertextHash: "34",
-      budgetDepth: String(noteDepth),
-      budgetIndex: String(noteIndex),
-      budgetSiblings: siblings.map(String),
-    });
-    prepared.request.attachment = {
-      budgetPool: witness.budgetPool,
-      budgetRoot: witness.budgetRoot,
-      relation: witness.relation,
-      policy: witness.budgetPolicy,
-      enrollment: witness.budgetEnrollment,
-      rate: witness.budgetRate,
-      remaining: witness.budgetRemaining,
-      nonce: witness.budgetNonce,
-      ciphertextHash: witness.budgetCiphertextHash,
-      depth: witness.budgetDepth,
-      index: witness.budgetIndex,
-      siblings: witness.budgetSiblings,
-    };
-    publicSignals.push(BigInt(pool), noteRoot, relation);
-  }
   const flattened = prepareReceivePresentationWitness(prepared.request);
   assert.deepEqual(
     flattened.witness,
@@ -171,10 +109,7 @@ test("linked receive presentations preserve credential prefixes and complete ope
           const example = fixture(kind, { keyMode });
           const wires = await calc.calculateWitness(example.witness, 1);
           assert.deepEqual(wires.slice(1, example.publicSignals.length + 1), example.publicSignals);
-          assert.equal(
-            example.publicSignals.length,
-            kind === "attachment" ? 25 : kind === "fund" ? 23 : 22,
-          );
+          assert.equal(example.publicSignals.length, kind === "fund" ? 23 : 22);
         }
       });
     }
@@ -204,7 +139,7 @@ test("linked receive presentations preserve credential prefixes and complete ope
             { cipherLo: String(1n << 128n) },
             { cipherHi: String(1n << 128n) },
             { oldValue: String(1n << 64n) },
-            { action: kind === "anonymous" ? "2" : "1" },
+            { action: kind === "anonymous" ? "3" : "1" },
           ])
             await invalid(patch);
           const offset = kind === "fund" ? 1 : 0;
@@ -310,59 +245,6 @@ test("linked receive presentations preserve credential prefixes and complete ope
         deepest[63] = "0";
         await assertConstraintViolation(() =>
           calc.calculateWitness({ ...full, siblings: deepest }, 1),
-        );
-      },
-    );
-
-    await t.test(
-      "attachments authenticate budget note contents and the full 64/32 paths",
-      async () => {
-        const calc = calculators.attachment;
-        for (const keyMode of [0n, 1n]) {
-          const { witness, publicSignals } = fixture("attachment", {
-            keyMode,
-            noteDepth: 32,
-            noteIndex: (1n << 31n) + 17n,
-          });
-          const wires = await calc.calculateWitness(witness, 1);
-          assert.deepEqual(wires.slice(1, 26), publicSignals);
-          assert.equal(witness.depth, "64");
-          for (const name of [
-            "budgetPool",
-            "budgetRoot",
-            "relation",
-            "budgetPolicy",
-            "budgetEnrollment",
-            "budgetRate",
-            "budgetRemaining",
-            "budgetNonce",
-            "budgetCiphertextHash",
-            "budgetIndex",
-          ])
-            await assertConstraintViolation(() =>
-              calc.calculateWitness({ ...witness, [name]: String(BigInt(witness[name]) + 1n) }, 1),
-            );
-          for (const patch of [
-            { budgetPool: "0" },
-            { budgetPool: String(1n << 160n) },
-            { budgetRate: "0" },
-            { budgetRate: String(1n << 128n) },
-            { budgetRemaining: String(1n << 128n) },
-            { budgetDepth: "33" },
-            { budgetIndex: String(1n << 32n) },
-          ])
-            await assertConstraintViolation(() =>
-              calc.calculateWitness({ ...witness, ...patch }, 1),
-            );
-        }
-        const compact = fixture("attachment").witness;
-        const siblings = [...compact.budgetSiblings];
-        siblings[31] = "1";
-        await assertConstraintViolation(() =>
-          calc.calculateWitness({ ...compact, budgetSiblings: siblings }, 1),
-        );
-        await assertConstraintViolation(() =>
-          calc.calculateWitness({ ...compact, budgetIndex: "1" }, 1),
         );
       },
     );

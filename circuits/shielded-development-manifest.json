@@ -90,7 +90,7 @@
       "source": "shielded_anonymous_receive_presentation",
       "sourceSha256": "00d014d9b4985e46db410e522c8bd7383ef3701005b169f6de91383276deaf79",
       "r1csSha256": "19d1cfc9eed42b8cd50d62190bc83bcdfb4be919aa517af53be78e687baa727a",
-      "wasmSha256": "1c12bd30335975e69db5b381d9344a33371b8da251da964e2fce3f79436c2dcd",
+      "wasmSha256": "2634a0b44bab664b3670b4cd2a411c1fcf02edf1eac9f76911d09efa2aa7dd4d",
       "zkeySha256": "5c62c5f480ee4584e54433e66b72d6a783029c86bf7ce37292d3419653da61ee",
       "verificationKeySha256": "41d54ae019d30bd043d575fa462edd5b7777d2a84b8edb9c7bea05613fb1f04e"
     },
@@ -98,17 +98,9 @@
       "source": "shielded_fund_receive_presentation",
       "sourceSha256": "13d8430f587f80b127f3bba75f16c06cb32cf565089a86d52ff368e177b24054",
       "r1csSha256": "228135982efc557bff4373556e79192280be5aade4e4e13541e9d047922ad002",
-      "wasmSha256": "74df7c462c60d29b63a0277d829cb9a6de57887cd94c226bbf29021d12e03470",
+      "wasmSha256": "fce06c489999011a7dc65039afb5c6b71d9bd0d56bea8cb05a841e40ec42bf08",
       "zkeySha256": "96db3f6c6225eafd3198345d3d841d304b4eb3dd7c2c055723183a1754f5db1d",
       "verificationKeySha256": "e10e397d8b8a15b63057ed44525e7c124c581653becd46ab253216250594cdd8"
-    },
-    "attachedReceivePresentation": {
-      "source": "shielded_attached_receive_presentation",
-      "sourceSha256": "a4412dcf7d781eb0b137645a563064131d9d4d834e9560050e290fb3237bb18b",
-      "r1csSha256": "8398d9623ee2baefe756c6b8342f0b33dad175a88fcd4999105e47b1039f251a",
-      "wasmSha256": "de9bc9d1d3cc02fa24f2dbaa03fdc969916d10979eab1907fc8dbbe0fcadcc09",
-      "zkeySha256": "e8d02461a9e5e2af102d63b925d11bb4cca17a0cc9745bf0341eb583de5a4f4a",
-      "verificationKeySha256": "2cbc54a337501b49f4c67d3b5c72008c231520167b752bbb93a7f8cb461a274f"
     },
     "claim32": {
       "source": "shielded_claim_32",
@@ -146,7 +138,7 @@
   },
   "linkKeys": {
     "path": "frontend/public/zk/shielded/receive-link-keys.json",
-    "sha256": "6b2ccb0c39b5d0acba1d8dfabd8faae4dc0e86c983163a48b937434ba6e4a36b",
+    "sha256": "3a229f43c4eb2fc3f0d77566e735b7db6f846b7ca08d04ffc90854591ad926b3",
     "verifierBaseSha256": "01cc96b04fc8272f2e44ea339761c348e6c34b7203486ad02ab123bb7fd69de2",
     "verifiers": {
       "anonymous": {
@@ -156,10 +148,6 @@
       "fund": {
         "path": "contracts/FundReceivePresentationVerifier.sol",
         "sha256": "0f9cfa9d3c47317931ddd3f82c721171add133ee21ed2bedd143e4025f60a4bb"
-      },
-      "attachment": {
-        "path": "contracts/AttachedReceivePresentationVerifier.sol",
-        "sha256": "d159f6fbd960c37c52703996a7894bf1d45bd2df73353b80bd5960607a43dde2"
       }
     }
   }

@@ -6,11 +6,10 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { poseidon2, poseidon3 } from "poseidon-lite";
+import { poseidon3 } from "poseidon-lite";
 import { getBytes, keccak256 } from "ethers";
 import {
   SHIELDED_RECEIVE_CREDENTIAL_VERSION,
-  computeShieldedBudgetNoteCommitment,
   decodeShieldedIndependentKey,
   deriveShieldedHeirKeyMaterial,
   deriveShieldedIndependentKeyIdentitySecret,
@@ -149,13 +148,11 @@ export async function prepareReceiveProofFixtures(
           ],
     );
     const consumer = "0x1111111111111111111111111111111111111111";
-    const pool = "0x2222222222222222222222222222222222222222";
     const cases = [];
     for (const [name, action, disclosure] of [
       ["anonymous", 1n, "anonymous"],
       ["transfer", 4n, "anonymous"],
       ["fund", 3n, "fund"],
-      ["attachment", 2n, "anonymous"],
     ]) {
       const prepared = prepareShieldedReceivePresentation({
         credential: credentials[disclosure],
@@ -169,45 +166,6 @@ export async function prepareReceiveProofFixtures(
         state,
         salt: 4321n,
       });
-      if (name === "attachment") {
-        const note = {
-          budgetOrigin: "fund",
-          policyCommitment: 31n,
-          enrollmentCommitment: 32n,
-          heirOwnerCommitment: keys.ownerCommitment,
-          viewingKey,
-          keyMode: BigInt(keyMode),
-          amountPerPeriod: 5n,
-          remaining: 15n,
-          nonce: 33n,
-          ciphertextHashField: 34n,
-        };
-        const leaf = computeShieldedBudgetNoteCommitment(note, {
-          chainId: 31337n,
-          poolAddress: pool,
-        });
-        let noteRoot = leaf;
-        for (let level = 0; level < 32; level++) noteRoot = poseidon2([noteRoot, 0n]);
-        const relation = poseidon3([
-          poseidon3([202610210401n, BigInt(pool), leaf]),
-          prepared.recipientBinding,
-          4321n,
-        ]);
-        prepared.request.attachment = {
-          budgetPool: String(BigInt(pool)),
-          budgetRoot: String(noteRoot),
-          relation: String(relation),
-          policy: "31",
-          enrollment: "32",
-          rate: "5",
-          remaining: "15",
-          nonce: "33",
-          ciphertextHash: "34",
-          depth: "32",
-          index: "0",
-          siblings: Array(32).fill("0"),
-        };
-      }
       const file = path.join(outDir, `${name}.input.json`);
       json(file, prepared.request);
       cases.push({ name, kind: prepared.request.kind, input: file });
@@ -240,7 +198,7 @@ export async function smokeReceiveProofs({
     const proof = await proveReceivePresentation({ root, request });
     json(path.join(outDir, `${item.name}.proof.json`), proof);
     assert.equal(proof.verified, true);
-    assert.equal(proof.publicSignals.length, item.kind === "attachment" ? 14 : 11);
+    assert.equal(proof.publicSignals.length, 11);
     checks.push(`${item.name}: full-depth Circom proof and hidden credential linkage verify`);
     for (let index = 0; index < proof.publicSignals.length; index++) {
       const altered = [...proof.publicSignals];
@@ -307,27 +265,6 @@ export async function smokeReceiveProofs({
         },
       ],
     ];
-    if (item.kind === "attachment")
-      changes.push(
-        [
-          "Fund budget owner relation",
-          (r) => {
-            r.attachment.nonce = "99";
-          },
-        ],
-        [
-          "Fund note membership",
-          (r) => {
-            r.attachment.siblings[31] = "1";
-          },
-        ],
-        [
-          "Fund attachment relation",
-          (r) => {
-            r.attachment.relation = "126";
-          },
-        ],
-      );
     for (const [name, change] of changes) {
       const altered = structuredClone(request);
       change(altered);

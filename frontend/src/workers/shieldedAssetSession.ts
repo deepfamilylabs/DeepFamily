@@ -16,11 +16,10 @@ import {
   computeShieldedAuthorizationAlias,
   verifyShieldedIdentityAuthorizationWitness,
   prepareShieldedIdentityCounterAuthorization,
-  decodeShieldedReceiveCredential, decodeShieldedBudgetReceiveCode, isShieldedBudgetReceiveCode, computeShieldedReceiveCredentialBinding, computeShieldedReceiveActionHash,
+  decodeShieldedReceiveCredential, computeShieldedReceiveCredentialBinding, computeShieldedReceiveActionHash,
   emptyShieldedReceiveAuthorizations, prepareShieldedReceivePresentation, generateShieldedRandomField,
-  splitShieldedViewPublicKey, createShieldedLetterEnvelope, computeShieldedLetterRelationCommitment,
+  splitShieldedViewPublicKey, createShieldedLetterEnvelope,
   encryptShieldedLetter, decryptShieldedLetter, computeShieldedLetterCiphertextHash,
-  computeShieldedCiphertextHashField, normalizeShieldedBudgetOrigin,
   encodeGroth16AbcProofData,
   normalizeGroth16Proof,
   createShieldedIndependentKeyRoot,
@@ -33,7 +32,7 @@ import {
   decodeShieldedIndependentKey,
 } from "@deepfamily/protocol-core";
 import { normalizeShieldedStateReadMode, type ShieldedStateReadMode } from "../shared/config/shieldedStateReadMode";
-import { JsonRpcProvider, getAddress, getBigInt, getBytes, hexlify, randomBytes, ZeroAddress, type BigNumberish } from "ethers";
+import { JsonRpcProvider, getAddress, getBigInt, getBytes, hexlify, randomBytes, type BigNumberish } from "ethers";
 import {
   createDeepFamilyContract,
   createLineageIndexContract,
@@ -104,11 +103,6 @@ import { createIdentityAuthorizationContract, loadShieldedIdentityAuthorizationW
 import { createPrivateLetterContract, readPrivateLetters } from "../domains/inheritance/services/privateLetterChain";
 import { proveShieldedReceivePresentation } from "../shared/zk/shieldedReceivePresentation";
 
-function receiveCredentialFor(code: string, disclosure: "anonymous" | "fund") {
-  const bundle = isShieldedBudgetReceiveCode(code) ? decodeShieldedBudgetReceiveCode(code) : null;
-  return decodeShieldedReceiveCredential(bundle ? disclosure === "fund" ? bundle.fundCode : bundle.anonymousCode : code);
-}
-
 type IdentityMaterial = Awaited<ReturnType<typeof deriveIdentityMaterial>>;
 type IndependentKeyMaterial = Awaited<ReturnType<typeof deriveShieldedIndependentKeyMaterial>>;
 type Keys = { ownerSecret: bigint; ownerCommitment: bigint; hpkeIkm: string; keyMode: 0 | 1 };
@@ -135,7 +129,6 @@ const ASSET_METHODS = new Set([
   "clearPendingIndependentKey",
   "receiveCode",
   "prepareLetter",
-  "validateLetter",
   "recoverLetters",
   "authorizeIdentityCounter",
   "recover",
@@ -710,28 +703,6 @@ export class ShieldedAssetSession {
       : null;
   }
 
-  async validateLetter(params: ShieldedAssetWorkerCallMap["validateLetter"]["params"]): Promise<{ ok: true }> {
-    const current = this.sessionGuard();
-    const ctx = params.context;
-    requireValue(ctx.lettersAddress, "The private letter archive is not configured for this chain.");
-    // Match the envelope's strict text encoding before any funding transaction.
-    createShieldedLetterEnvelope({ body: params.body, salt: 1n });
-    const verified = await this.recipient(params.code, "anonymous");
-    requireValue(params.keyMode === undefined || verified.keyMode === params.keyMode,
-      "The letter receiving keys must use the selected budget mode.");
-    const credential = receiveCredentialFor(params.code, "anonymous");
-    const env = await this.context(ctx);
-    const archive = createPrivateLetterContract(ctx.lettersAddress, env.provider);
-    requireValue(getAddress(await archive.POOL_FACTORY()) === getAddress(ctx.factoryAddress) &&
-      getAddress(await archive.AUTHORIZATION_STATE()) === getAddress(await env.pool.AUTHORIZATION_STATE()),
-      "Letter archive belongs to another protocol deployment.");
-    await this.validateReceiveDestination({ credential, action: "privateTransfer" }, ctx, env);
-    const block = await env.provider.getBlock("latest");
-    requireValue(block && BigInt(block.timestamp) < credential.expiresAt, "Receive credential has expired.");
-    current();
-    return { ok: true };
-  }
-
   async prepareLetter(params: ShieldedAssetWorkerCallMap["prepareLetter"]["params"]): Promise<ShieldedAssetWorkerCallMap["prepareLetter"]["result"]> {
     const current = this.sessionGuard();
     const ctx = params.context;
@@ -741,52 +712,23 @@ export class ShieldedAssetSession {
     const authorizationAddress = await env.pool.AUTHORIZATION_STATE();
     requireValue(getAddress(await archive.POOL_FACTORY()) === getAddress(ctx.factoryAddress) &&
       getAddress(await archive.AUTHORIZATION_STATE()) === getAddress(authorizationAddress), "Letter archive belongs to another protocol deployment.");
-    const verified = await this.recipient(params.code, "anonymous");
+    const verified = await this.recipient(params.code);
     requireValue(verified.disclosure === "anonymous", "Use an anonymous receive code for letters.");
-    const credential = receiveCredentialFor(params.code, "anonymous");
+    const credential = decodeShieldedReceiveCredential(params.code);
     const messageId = BigInt(hexlify(randomBytes(16))) || 1n;
     const salt = generateShieldedRandomField();
     const binding = computeShieldedReceiveCredentialBinding({ credential, salt });
-    let attachment: { asset: string; pool: string; shardId: string; noteRoot: string; relationCommitment: string } | undefined;
-    let attachmentWitness: Record<string, unknown> | undefined;
-    let budgetReference;
-    if (params.budgetCommitment) {
-      await this.recover({ context: ctx });
-      const template = [...this.wallets.values()].flatMap(listRecoveredFundingTemplates)
-        .find(item => String(item.commitment) === params.budgetCommitment);
-      requireValue(template && template.note.binding !== "identity" && Number(normalizeShieldedBudgetOrigin(template.note.budgetOrigin)) === 0,
-        "Only a recovered, verified private Fund budget can have an attached letter.");
-      requireValue(getBigInt(template.note.heirOwnerCommitment) === verified.ownerCommitment &&
-        Number(template.note.keyMode ?? 0) === verified.keyMode && template.viewingKey?.toLowerCase() === verified.viewingKey.toLowerCase(),
-        "The anonymous receive code must use the original budget's receiving keys and mode.");
-      const wallet = [...this.wallets.values()].find(item => item.fundingTemplates?.has(template.commitment));
-      const tree = wallet?.shards.get(template.shardId);
-      requireValue(tree && tree.sizeBigInt >= 2n, "The budget's shared note tree is unavailable.");
-      const path = tree.generateProof(tree.indexOf(template.commitment));
-      requireValue(path.leaf === template.commitment && path.siblings.length <= 32, "The real budget is absent from its shared note tree.");
-      budgetReference = { chainId: ctx.chainId, poolAddress: ctx.poolAddress, budgetCommitment: template.commitment };
-      const relation = computeShieldedLetterRelationCommitment({ attachment: budgetReference, binding, salt });
-      const commitments = getShieldedBudgetCommitments(template.note, wallet!);
-      attachmentWitness = { budgetPool: String(BigInt(ctx.poolAddress)), budgetRoot: String(path.root), relation: String(relation),
-        policy: String(commitments.policyCommitment), enrollment: String(commitments.enrollmentCommitment),
-        rate: String(template.note.amountPerPeriod), remaining: String(template.note.remaining), nonce: String(template.note.nonce),
-        ciphertextHash: String(computeShieldedCiphertextHashField(template.ciphertext)), depth: String(path.siblings.length), index: String(path.index),
-        siblings: [...path.siblings, ...Array<bigint>(32 - path.siblings.length).fill(0n)].map(String) };
-      const asset = ctx.assetKind === "native" ? ZeroAddress : await env.pool.TOKEN();
-      attachment = { asset, pool: ctx.poolAddress, shardId: String(template.shardId), noteRoot: String(path.root), relationCommitment: String(relation) };
-    }
-    const envelope = createShieldedLetterEnvelope({ body: params.body, salt, attachment: budgetReference });
+    const envelope = createShieldedLetterEnvelope({ body: params.body, salt });
     const ciphertext = await encryptShieldedLetter({ chainId: ctx.chainId, lettersAddress: ctx.lettersAddress, messageId,
       recipientPublicKey: getBytes(verified.viewingKey), envelope });
     const state = await loadShieldedIdentityAuthorizationWitnessForMode(createIdentityAuthorizationContract(authorizationAddress, env.provider), credential.authorizationAlias, ctx.stateReadMode, { chainId: ctx.chainId, authorizationStateAddress: authorizationAddress });
     const presentation = prepareShieldedReceivePresentation({ credential, salt, authorizationWitness: state.witness, authorizationStateRoot: state.stateRoot, checkpointId: state.checkpointId,
-      asOf: state.asOf, chainId: ctx.chainId, consumer: ctx.lettersAddress, action: attachment ? 2 : 1, messageId,
+      asOf: state.asOf, chainId: ctx.chainId, consumer: ctx.lettersAddress, action: 1, messageId,
       payloadHash: computeShieldedLetterCiphertextHash(ciphertext) });
-    const expected = [...presentation.publicSignals, ...(attachment ? [BigInt(attachment.pool), BigInt(attachment.noteRoot), BigInt(attachment.relationCommitment)] : [])];
-    const proof = await proveShieldedReceivePresentation({ ...presentation.request, ...(attachmentWitness ? { attachment: attachmentWitness } : {}) }, expected);
+    const proof = await proveShieldedReceivePresentation(presentation.request, presentation.publicSignals);
     current();
     return { delivery: { messageId: String(messageId), checkpointId: String(state.checkpointId), asOf: String(state.asOf),
-      deadline: String(presentation.deadline), recipientBinding: String(binding) }, ciphertext: hexlify(ciphertext), proof: proof.proof, ...(attachment ? { attachment } : {}) };
+      deadline: String(presentation.deadline), recipientBinding: String(binding) }, ciphertext: hexlify(ciphertext), proof: proof.proof };
   }
 
   async recoverLetters(params: ShieldedAssetWorkerCallMap["recoverLetters"]["params"]): Promise<ShieldedAssetWorkerCallMap["recoverLetters"]["result"]> {
@@ -807,10 +749,8 @@ export class ShieldedAssetSession {
         const keys = this.keys(slot, false);
         try {
           const envelope = await decryptShieldedLetter({ chainId: ctx.chainId, lettersAddress: ctx.lettersAddress, messageId: record.messageId,
-            hpkeIkm: keys.hpkeIkm, ciphertext: record.ciphertext, expectedCiphertextHash: record.ciphertextHash,
-            expectedBinding: record.recipientBinding, relationCommitment: record.relationCommitment });
-          letters.push({ messageId: record.messageId, body: envelope.body, registeredAt: record.registeredAt, transactionHash: record.transactionHash, slot,
-            attachment: envelope.attachment ? { chainId: String(envelope.attachment.chainId), poolAddress: envelope.attachment.poolAddress, budgetCommitment: String(envelope.attachment.budgetCommitment) } : null });
+            hpkeIkm: keys.hpkeIkm, ciphertext: record.ciphertext, expectedCiphertextHash: record.ciphertextHash });
+          letters.push({ messageId: record.messageId, body: envelope.body, registeredAt: record.registeredAt, transactionHash: record.transactionHash, slot });
           break;
         } catch { /* All archived candidates are tried locally; unrelated recipients stay private. */ }
       }
@@ -1099,8 +1039,8 @@ export class ShieldedAssetSession {
     return { ok: true as const };
   }
 
-  private async recipient(code: string, disclosure?: "anonymous" | "fund"): Promise<VerifiedShieldedRecipient> {
-    const result = await verifyShieldedReceiveCode(code, disclosure);
+  private async recipient(code: string): Promise<VerifiedShieldedRecipient> {
+    const result = await verifyShieldedReceiveCode(code);
     requireValue(
       result.ok,
       "The receiving code is incomplete or failed its identity and ownership proof.",
@@ -1170,12 +1110,12 @@ export class ShieldedAssetSession {
     // Verify the final destination before any preparatory consolidation spend.
     const transferRecipient =
       request.action === "privateTransfer"
-        ? await this.recipient(request.recipientCode ?? "", "anonymous")
+        ? await this.recipient(request.recipientCode ?? "")
         : undefined;
     if (transferRecipient) {
       recipient = transferRecipient.fingerprint;
       receiveDestination = {
-        credential: receiveCredentialFor(request.recipientCode ?? "", "anonymous"),
+        credential: decodeShieldedReceiveCredential(request.recipientCode ?? ""),
         action: "privateTransfer",
       };
       await this.validateReceiveDestination(receiveDestination, ctx, env);
@@ -1288,7 +1228,7 @@ export class ShieldedAssetSession {
         );
       if (verified) {
         receiveDestination = {
-          credential: receiveCredentialFor(request.recipientCode ?? "", "fund"),
+          credential: decodeShieldedReceiveCredential(request.recipientCode ?? ""),
           action: "fund",
         };
         await this.validateReceiveDestination(receiveDestination, ctx, env);

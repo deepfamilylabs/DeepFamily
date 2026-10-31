@@ -1,8 +1,6 @@
 import type { ShieldedStateReadMode } from "../../../shared/config/shieldedStateReadMode";
 import {
   decodeShieldedReceiveCredential,
-  decodeShieldedBudgetReceiveCode,
-  isShieldedBudgetReceiveCode,
   wrapIdentityCommitmentAsPersonHash,
   type IdentityFields,
 } from "@deepfamily/protocol-core";
@@ -87,7 +85,7 @@ export async function verifyShieldedReceiveCode(code: string): Promise<VerifiedS
 export function peekShieldedReceiveCodePersonHash(code: string): string | null {
   if (!code.trim()) return null;
   try {
-    const decoded = decodeShieldedReceiveCredential(isShieldedBudgetReceiveCode(code) ? decodeShieldedBudgetReceiveCode(code).fundCode : code);
+    const decoded = decodeShieldedReceiveCredential(code);
     return decoded.disclosure === "fund" && decoded.identityCommitment !== undefined
       ? wrapIdentityCommitmentAsPersonHash(decoded.identityCommitment) : null;
   } catch {

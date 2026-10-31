@@ -112,8 +112,8 @@ export function inspectLinkedReceiveArtifacts({
     throw new Error("Receive linked verifier base has changed");
   const keys = json(root, RECEIVE_LINK_KEYS_PATH);
   const artifacts = {};
-  if (Object.keys(keys).sort().join(",") !== "anonymous,attachment,fund")
-    throw new Error("Receive linker requires all three circuit kinds");
+  if (Object.keys(keys).sort().join(",") !== "anonymous,fund")
+    throw new Error("Receive linker requires both circuit kinds");
   for (const [action, spec] of Object.entries(RECEIVE_PRESENTATION_CIRCUITS)) {
     const entry = keys[spec.kind];
     const source = SHIELDED_CIRCUITS[action];
@@ -156,7 +156,7 @@ export function inspectLinkedReceiveArtifacts({
   return {
     status: production ? "production" : "development",
     verification: "passed",
-    circuitCount: 3,
+    circuitCount: 2,
     manifestSha256: sha256(read(root, manifestFile)),
     artifacts,
   };

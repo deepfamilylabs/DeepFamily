@@ -518,42 +518,21 @@ progress advances; explicit caller deadlines are unchanged and stalled tasks sti
 The RPC must retain the pinned block while pages are downloaded. Rebuilding current state can
 still require substantial traffic, disk and verification time; it is not a constant-size first sync.
 
-Budget funding and an optional letter share one form and submission flow.
-The UI name **Budget receive code** replaces the exposed Fund-disclosure-material
-term, while the help text explicitly says that it discloses and authenticates the
-heir identity to the funder. The `dfbudget` version-1 package contains separately
-proved Fund and anonymous credentials with matching alias, authorization counter,
-expiry, owner,
-full viewing key, recipient key mode and suite/version metadata. Both proofs must
-be verified; the Fund credential is used only for funding and the anonymous
-credential for letters. No circuit, verifier or contract permission is broadened.
-
-Both identity-credential and independent-key private budgets offer an optional
-letter in the funding form. Changing the arrangement or family version preserves
-the selected child and receive code when still applicable, and retains the letter
-draft. Selecting a different child clears the previous letter; reselecting the
-same child does not reset the form. After preflight, the page submits the budget and waits
-for success before preparing the real-budget attachment proof and requesting the
-second transaction. It keeps the user in the funding flow and reuses the receiving
-package. The form explains the two transactions, wallet confirmations and fees;
-deposit and letter results are displayed separately. The pre-submission draft and
-expected budget are retained in an awaiting-deposit step tied to the funding
-submission ID. An unknown funding result waits for reconciliation; only a confirmed
-matching ID can consume that step and start letter delivery, and it can do so once.
-A confirmed failure cancels the matching awaiting step while preserving the form
-draft; locking or replacing the session clears the continuation.
-Letter failure, cancellation or refreshed authorization must never resubmit a
-successful deposit. Retry invokes only the letter step, reusing any prepared
-message until irreversible expiry permits replacement. If no prepared proof is
-reusable, the receiving material may be updated while retaining the confirmed
-budget. Plaintext remains confined to the current session. Public budgets explain
-that attachments are unavailable. Letters for existing budgets are composed by selecting the budget in the Write a letter task; ordinary private-transfer
-attachments are outside this change. See [private letters](private-letters.md#budget-receive-codes-and-inline-letters).
+Identity credentials and the independent key each issue both receive code types. An
+anonymous receive code (`dfrecv`) serves private transfers and letters. The UI calls the
+Fund credential (`dffund`) a **Budget receive code**; its help text says that it discloses
+and authenticates the heir identity to the funder, which private funding needs to prove the
+parent-child relationship and trusted endorsement. A budget receive code carries only that
+Fund issuer proof and is accepted only for private budgets. Budgets carry no letters, so
+funding needs no second code or transaction. Changing the arrangement or family version
+preserves the selected child and receive code when still applicable; reselecting the same
+child does not reset the form.
 
 The locked page shows the unlock form; private letters appear in the unlocked workspace.
 The task rail lists Private letters below Child budgets, with separate
 Write a letter and Inbox entries that open in the shared task area. Entering the inbox reads
-letters once; its refresh button explicitly reads again. The write task lets users select an existing private budget for an attachment.
+letters once; its refresh button explicitly reads again. Letters are standalone and take the
+recipient's anonymous receive code.
 `VITE_SHIELDED_STATE_READ_MODE` controls the read strategy at build time: `rebuild` keeps the
 existing local reconstruction behavior, and `chain` opts into direct chain paths. Missing,
 blank or unrecognized values use `rebuild`. Restart the dev server or rebuild the frontend
@@ -750,18 +729,16 @@ Proof workflows load public artifacts at runtime:
 - Local location: `frontend/public/zk/` (served as `/zk/…` by the dev server); verification keys and the small receive-link key file are committed, `npm run zk:assets:fetch` installs proving files
 - Builds: `.wasm`/`.zkey` come from `<VITE_ZK_ASSET_BASE_URL>/<sha256>/<file name>.br` with `Content-Encoding: br`; native fetch decompresses them before checking the original manifest digests embedded at build time (`shared/zk/zkAssets.ts`); `.vkey.json` stays same-origin
 - Compression: `npm run zk:assets:publish` automatically creates adjacent, ignored `.br` files at Brotli quality 5 and reports sizes before uploading
-- Circuit catalog: 2 identity/disclosure circuits plus 14 shielded circuits, 16 in total
+- Circuit catalog: 2 identity/disclosure circuits plus 13 shielded circuits, 15 in total
 - Generation and verification details: see [zk-proofs.md](zk-proofs.md)
 
 If proof generation or verification fails in dev, first confirm the expected files exist in `public/zk/` (run `npm run zk:assets:fetch`). For a remote build, publish the `.br` objects before deployment, including when first adopting Brotli with unchanged proving keys. On HTTP 404, run `npm run zk:assets:publish` for the current manifests. On a digest mismatch, check the served bytes and ensure the object has `Content-Encoding: br` and the original WASM or binary content type.
 
-The payer loads one presentation's WASM and zkey, with uncompressed sizes of 13.56 MiB for anonymous receipts,
-13.69 MiB for Fund or 20.97 MiB for attached letters. The roughly 26 KiB linking
-key file is shared; its digest and three fixed on-chain verifiers are pinned by
-the shielded manifest's `linkKeys`. Browsers do not fetch R1CS files. Submitted
-linked proofs are 1,184 bytes for anonymous/attached receipts and 1,216 bytes for
-Fund, with eleven public signals (fourteen for attachments) and ciphertext counted
-separately. See [private letters](private-letters.md#browser-artifacts) for exact sizes.
+The payer loads one presentation's WASM and zkey, with uncompressed sizes of 13.56 MiB for anonymous receipts
+or 13.69 MiB for Fund. The roughly 17 KiB linking key file is shared; its digest and
+both fixed on-chain verifiers are pinned by the shielded manifest's `linkKeys`. Browsers
+do not fetch R1CS files. Submitted linked proofs are 1,184 bytes for anonymous receipts
+and 1,216 bytes for Fund, with eleven public signals and ciphertext counted separately. See [private letters](private-letters.md#browser-artifacts) for exact sizes.
 
 Brotli reduces network transfer; the prover receives the same decoded bytes and uses the same
 memory and constraints. The circuit manifests, contract verifiers and submitted proofs are unchanged.

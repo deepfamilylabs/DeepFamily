@@ -14,7 +14,6 @@ export const SHIELDED_CIRCUIT_NAMES = Object.freeze({
   fundReceiveCredential: "shielded_fund_receive_credential",
   anonymousReceivePresentation: "shielded_anonymous_receive_presentation",
   fundReceivePresentation: "shielded_fund_receive_presentation",
-  attachedReceivePresentation: "shielded_attached_receive_presentation",
   identityAuthorizationUpdate: "shielded_identity_authorization_update",
   shield: "shielded_shield",
   fund: "shielded_fund",
@@ -34,7 +33,6 @@ const PUBLIC_SIGNAL_COUNTS: Record<ShieldedCircuitName, number> = {
   fundReceiveCredential: SHIELDED_RECEIVE_CREDENTIAL_PUBLIC_SIGNAL_COUNTS.fund,
   anonymousReceivePresentation: SHIELDED_RECEIVE_CREDENTIAL_PUBLIC_SIGNAL_COUNTS.anonymous + 11,
   fundReceivePresentation: SHIELDED_RECEIVE_CREDENTIAL_PUBLIC_SIGNAL_COUNTS.fund + 11,
-  attachedReceivePresentation: SHIELDED_RECEIVE_CREDENTIAL_PUBLIC_SIGNAL_COUNTS.anonymous + 14,
   identityAuthorizationUpdate: 6,
   shield: SHIELDED_POOL_PUBLIC_SIGNAL_COUNTS[SHIELDED_POOL_ACTION.Shield],
   fund: SHIELDED_POOL_PUBLIC_SIGNAL_COUNTS[SHIELDED_POOL_ACTION.Fund],
@@ -93,7 +91,6 @@ async function loadArtifacts(circuit: ShieldedCircuitName): Promise<Artifacts> {
 function receivePresentationKind(circuit: ShieldedCircuitName) {
   if (circuit === "anonymousReceivePresentation") return "anonymous";
   if (circuit === "fundReceivePresentation") return "fund";
-  if (circuit === "attachedReceivePresentation") return "attachment";
   return null;
 }
 

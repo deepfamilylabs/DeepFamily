@@ -1,7 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { getBytes, keccak256 } from "ethers";
-import { poseidon3 } from "poseidon-lite";
 import { SNARK_SCALAR_FIELD } from "../constants.js";
 import { predictArchiveSegmentCount } from "../archive.js";
 import { deriveShieldedHeirKeyMaterial } from "../shielded-inheritance.js";
@@ -9,11 +8,9 @@ import { deriveShieldedIndependentKeyMaterial } from "../shielded-independent-ke
 import { deriveShieldedViewPublicKey } from "../shielded-hpke.js";
 import {
   SHIELDED_LETTER_ENVELOPE_VERSION,
-  SHIELDED_LETTER_RELATION_DOMAIN,
   buildShieldedLetterHpkeAad,
   computeShieldedLetterCiphertextHash,
   computeShieldedLetterCiphertextHashField,
-  computeShieldedLetterRelationCommitment,
   createShieldedLetterEnvelope,
   decodeShieldedLetterEnvelope,
   decryptShieldedLetter,
@@ -25,10 +22,8 @@ import {
 import { independentKeyVector } from "./shielded-independent-key.fixture.js";
 
 const LETTERS = "0x0000000000000000000000000000000000000001";
-const POOL = "0x0000000000000000000000000000000000000002";
 const OTHER_LETTERS = "0x0000000000000000000000000000000000000003";
 const context = { chainId: 1030n, lettersAddress: LETTERS, messageId: 44n };
-const attachment = { chainId: 1030n, poolAddress: POOL, budgetCommitment: 987n };
 const key = deriveShieldedHeirKeyMaterial(13n);
 const publicKey = await deriveShieldedViewPublicKey(key.hpkeIkm);
 const isCode = (code) => (error) => error.code === code;
@@ -42,14 +37,13 @@ async function decrypt(ciphertext, input = {}) {
     ...context,
     hpkeIkm: key.hpkeIkm,
     ciphertext,
-    relationCommitment: 0n,
     ...input,
   });
 }
 
 test("canonical letter envelope has a fixed, deterministic binary encoding", () => {
   const envelope = createShieldedLetterEnvelope({ body: "A", salt: 1n });
-  assert.deepEqual(envelope, { version: 1, body: "A", salt: 1n, attachment: null });
+  assert.deepEqual(envelope, { version: 1, body: "A", salt: 1n });
   const bytes = encodeShieldedLetterEnvelope(envelope);
   assert.equal(
     Buffer.from(bytes).toString("hex"),
@@ -57,11 +51,6 @@ test("canonical letter envelope has a fixed, deterministic binary encoding", () 
   );
   assert.deepEqual(decodeShieldedLetterEnvelope(bytes), envelope);
   assert.deepEqual(encodeShieldedLetterEnvelope(decodeShieldedLetterEnvelope(bytes)), bytes);
-
-  const attached = createShieldedLetterEnvelope({ body: "A", salt: 1n, attachment });
-  const attachedBytes = encodeShieldedLetterEnvelope(attached);
-  assert.equal(attachedBytes.length, bytes.length + 60);
-  assert.deepEqual(decodeShieldedLetterEnvelope(attachedBytes), attached);
 });
 
 test("plain text round-trips exactly without normalizing signatures or Unicode", () => {
@@ -96,14 +85,14 @@ test("message salt is generated once, encoded for recovery and shared with the p
   );
 });
 
-test("noncanonical envelope versions, flags, fields, lengths and UTF-8 are rejected", () => {
+test("noncanonical envelope versions, reserved bytes, fields, lengths and UTF-8 are rejected", () => {
   const good = encodeShieldedLetterEnvelope(
     createShieldedLetterEnvelope({ body: "ABC", salt: 9n }),
   );
   for (const [offset, value] of [
     [0, 0],
     [4, 2],
-    [5, 2],
+    [5, 1],
     [6, 1],
     [7, 1],
     [47, 2],
@@ -261,89 +250,6 @@ test("scope and message number reject absent, zero, or noncanonical values", () 
   assert.throws(
     () => buildShieldedLetterHpkeAad({ ...context, messageId: SNARK_SCALAR_FIELD }),
     isCode("INTEGER_OUT_OF_RANGE"),
-  );
-});
-
-test("attached reference matches the researched relation and verified operation binding", async () => {
-  const envelope = createShieldedLetterEnvelope({ body: "预算附信", salt: 8n, attachment });
-  const ciphertext = await encrypt(envelope);
-  // Binding is computed only after ciphertext hashing, and is never inside
-  // sender-controlled plaintext. This synthetic field stands in for that
-  // separately verified delivery proof's authenticated binding.
-  const binding = 1111n;
-  const relation = computeShieldedLetterRelationCommitment({ ...envelope, binding });
-  assert.equal(
-    relation,
-    poseidon3([
-      poseidon3([SHIELDED_LETTER_RELATION_DOMAIN, BigInt(POOL), attachment.budgetCommitment]),
-      binding,
-      envelope.salt,
-    ]),
-  );
-  assert.deepEqual(
-    await decrypt(ciphertext, { relationCommitment: relation, expectedBinding: binding }),
-    envelope,
-  );
-  assert.equal(computeShieldedLetterRelationCommitment({ salt: 8n, attachment: null }), 0n);
-  assert.throws(() => computeShieldedLetterRelationCommitment(envelope), isCode("INVALID_INTEGER"));
-});
-
-test("proof for budget A cannot display an envelope referencing budget B", async () => {
-  const envelopeA = createShieldedLetterEnvelope({ body: "A 的附信", salt: 8n, attachment });
-  const envelopeB = createShieldedLetterEnvelope({
-    body: "伪装为 B 的附信",
-    salt: 8n,
-    attachment: { ...attachment, budgetCommitment: attachment.budgetCommitment + 1n },
-  });
-  const ciphertextB = await encrypt(envelopeB);
-  const binding = 2222n;
-  const relationA = computeShieldedLetterRelationCommitment({ ...envelopeA, binding });
-  await assert.rejects(
-    decrypt(ciphertextB, { relationCommitment: relationA, expectedBinding: binding }),
-    isCode("SHIELDED_LETTER_RELATION_MISMATCH"),
-  );
-  for (const changed of [
-    { ...envelopeA, salt: 9n },
-    { ...envelopeA, attachment: { ...attachment, poolAddress: OTHER_LETTERS } },
-  ]) {
-    await assert.rejects(
-      decrypt(await encrypt(changed), { relationCommitment: relationA, expectedBinding: binding }),
-      isCode("SHIELDED_LETTER_RELATION_MISMATCH"),
-    );
-  }
-  await assert.rejects(
-    decrypt(await encrypt(envelopeA), {
-      relationCommitment: relationA,
-      expectedBinding: binding + 1n,
-    }),
-    isCode("SHIELDED_LETTER_RELATION_MISMATCH"),
-  );
-});
-
-test("standalone and attached registrations cannot impersonate each other", async () => {
-  const independent = createShieldedLetterEnvelope({ body: "独立家书", salt: 8n });
-  const attached = createShieldedLetterEnvelope({ body: "自报预算", salt: 8n, attachment });
-  const binding = 3333n;
-  const relation = computeShieldedLetterRelationCommitment({ ...attached, binding });
-  await assert.rejects(
-    decrypt(await encrypt(attached), { relationCommitment: 0n, expectedBinding: binding }),
-    isCode("SHIELDED_LETTER_RELATION_MISMATCH"),
-  );
-  await assert.rejects(
-    decrypt(await encrypt(independent), { relationCommitment: relation, expectedBinding: binding }),
-    isCode("SHIELDED_LETTER_RELATION_MISMATCH"),
-  );
-  await assert.rejects(decrypt(await encrypt(attached), { relationCommitment: relation }));
-  await assert.rejects(decrypt(await encrypt(independent), { relationCommitment: undefined }));
-  await assert.rejects(
-    encrypt(
-      createShieldedLetterEnvelope({
-        body: "跨链预算",
-        salt: 8n,
-        attachment: { ...attachment, chainId: 1031n },
-      }),
-    ),
-    isCode("SHIELDED_LETTER_ATTACHMENT_CHAIN_MISMATCH"),
   );
 });
 

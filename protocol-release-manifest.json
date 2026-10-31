@@ -1686,12 +1686,6 @@
       "artifactSha256": null,
       "runtimeSha256": null
     },
-    "attachedReceivePresentationVerifier": {
-      "address": null,
-      "immutables": {},
-      "artifactSha256": null,
-      "runtimeSha256": null
-    },
     "receivePresentationVerifierRouter": {
       "address": null,
       "immutables": {
@@ -1707,7 +1701,6 @@
         "DEEP_FAMILY": null,
         "AUTHORIZATION_STATE": null,
         "LETTER_VERIFIER": null,
-        "ATTACHMENT_VERIFIER": null,
         "POOL_FACTORY": null
       },
       "artifactSha256": null,

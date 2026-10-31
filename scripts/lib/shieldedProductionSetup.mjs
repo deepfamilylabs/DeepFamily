@@ -696,7 +696,7 @@ export async function verifyShieldedProductionCeremony({
   if (
     receive?.status !== "production" ||
     receive?.verification !== "passed" ||
-    receive?.circuitCount !== 3 ||
+    receive?.circuitCount !== 2 ||
     receive?.manifestSha256 !== inspected.manifestSha256
   ) {
     throw new Error("Receive linking verification does not match the verified shielded ceremony");

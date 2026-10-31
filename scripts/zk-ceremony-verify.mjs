@@ -328,7 +328,7 @@ export const verifyAllProductionCeremonies = async ({
   if (
     receive?.status !== "production" ||
     receive?.verification !== "passed" ||
-    receive?.circuitCount !== 3 ||
+    receive?.circuitCount !== 2 ||
     !/^[0-9a-f]{64}$/u.test(receive?.manifestSha256 ?? "")
   ) {
     throw new Error(
@@ -355,7 +355,7 @@ export const verifyAllProductionCeremonies = async ({
   if (
     finalReceive?.status !== "production" ||
     finalReceive?.verification !== "passed" ||
-    finalReceive?.circuitCount !== 3 ||
+    finalReceive?.circuitCount !== 2 ||
     finalReceive?.manifestSha256 !== receive.manifestSha256
   ) {
     throw new Error(

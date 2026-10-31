@@ -112,7 +112,6 @@ import {
   type ShieldedSpendReviewProps,
 } from "./ShieldedSpendReview";
 import { ShieldedFundComposer } from "./ShieldedFundComposer";
-import { useBudgetLetterDelivery } from "./useBudgetLetterDelivery";
 import {
   listShieldedFundingHeirs,
   shieldedFundingEntryLabelKey,
@@ -330,7 +329,6 @@ export function ShieldedInheritancePanel({
   const [verifiedRecipient, setVerifiedRecipient] = useState<VerifiedShieldedRecipient | null>(
     null,
   );
-  const [letterBudget, setLetterBudget] = useState("");
   const [ownCode, setOwnCode] = useState("");
   const [codeDisclosure, setCodeDisclosure] = useState<"anonymous" | "fund">("anonymous");
   const [codeExpiry, setCodeExpiry] = useState(() => {
@@ -527,14 +525,6 @@ export function ShieldedInheritancePanel({
       if (balance === 0n) fundingDeficit = "0";
     }
   }
-  const budgetLetter = useBudgetLetterDelivery({
-    context,
-    scope: JSON.stringify([ownerContextKey, account]),
-    signer: signer ?? null,
-    beginWalletRequest: () => latestSession.current.beginWalletRequest(),
-  });
-  const latestBudgetLetter = useRef(budgetLetter);
-  latestBudgetLetter.current = budgetLetter;
   const actionRequestKey = JSON.stringify([
     contextKey,
     session.credentials?.handle,
@@ -560,8 +550,6 @@ export function ShieldedInheritancePanel({
     recipientConfirmed,
     verifiedRecipient?.fingerprint,
     recipientInputMethod,
-    budgetLetter.enabled,
-    budgetLetter.body,
   ]);
   const currentRequestKey = useRef(actionRequestKey);
   currentRequestKey.current = actionRequestKey;
@@ -658,7 +646,6 @@ export function ShieldedInheritancePanel({
         latestSession.current.setBusy(false);
         setWalletSection("balances");
         setOwnCode("");
-        setLetterBudget("");
         setWalletScreen("workspace");
         setProgress(null);
         setExecutingReview(null);
@@ -932,12 +919,6 @@ export function ShieldedInheritancePanel({
           setWallet(null);
           setCandidates([]);
         }
-        const letters = latestBudgetLetter.current;
-        if (!successful) letters.cancelDeposit(tracked.id);
-        else if (letters.hasDeposit(tracked.id)) {
-          await run(walletCurrent => latestBudgetLetter.current.confirmDeposit(tracked.id, walletCurrent),
-            latestTranslations.current.t("shielded.privateLetters.sendingAfterFunding"), "wallet");
-        }
       } catch {
         // A transient RPC failure leaves the submission blocked and retries.
       } finally {
@@ -1085,7 +1066,6 @@ export function ShieldedInheritancePanel({
     latestSession.current.lock();
     setWalletSection("balances");
     setOwnCode("");
-    setLetterBudget("");
     setLetterView(null);
     setWalletScreen("workspace");
     setPlanCount(0);
@@ -1116,7 +1096,6 @@ export function ShieldedInheritancePanel({
   }
   function selectWallet(next: ShieldedKeySlot) {
     if (busy || submissionPending) return;
-    budgetLetter.clear();
     setSlot(next);
     if (next === "independent") setSelectedKeyFingerprint(session.independentKey?.keyFingerprint ?? "");
     draftPolicy.current = null;
@@ -1222,7 +1201,6 @@ export function ShieldedInheritancePanel({
     }, "");
   }
   function chooseAction(next: Action) {
-    budgetLetter.clear();
     setLetterView(null);
     clearSecretInputs();
     setTaskChosen(true);
@@ -1841,7 +1819,7 @@ export function ShieldedInheritancePanel({
    * After a consolidation receipt, rebuild and review the remaining plan.
    */
   async function prepare() {
-    if (submissionPending || !slotReady || budgetLetter.delivery) return;
+    if (submissionPending || !slotReady) return;
     if (action === "shield" && !allowanceReady) return approve();
     const chosen = signer,
       requested = actionRequestKey,
@@ -1870,10 +1848,6 @@ export function ShieldedInheritancePanel({
         await assertShieldedDepositBalance(modules.token, account, amountValue!);
         assertCurrent();
       }
-      const attachedDraft = action === "fund" && effectiveEntry !== "public"
-        ? await budgetLetter.preflight(code, effectiveEntry === "privateIndependent" ? 1 : 0, current)
-        : null;
-      assertCurrent();
       let stepCandidates =
         action === "fund"
           ? values.map((note) => note.commitment)
@@ -1949,9 +1923,6 @@ export function ShieldedInheritancePanel({
           assertCurrent();
           const txId = `shielded:${modules.chainId}:${Date.now()}:${planned.handle}`,
             label = `${modules.assetSymbol} · ${t(`shielded.actions.${result.action}`, { symbol: modules.assetSymbol })}`;
-          if (attachedDraft && result.action === "fund" && Number(result.data.budgetKind) === 0) {
-            budgetLetter.stageDeposit(attachedDraft, String(result.data.outputCommitments[0]), txId);
-          }
           const common = {
             pool: modules.pool,
             signer: chosen,
@@ -2035,7 +2006,6 @@ export function ShieldedInheritancePanel({
                         });
           } catch (cause) {
             clearFailedWalletRequest(cause, txId);
-            if (receiptTracking.current?.id !== txId) budgetLetter.cancelDeposit(txId);
             throw cause;
           }
           sent = true;
@@ -2046,15 +2016,8 @@ export function ShieldedInheritancePanel({
             setTransactionPending(false);
             setTransactionResult(submitted.receipt.status === 1 ? "done" : "failed");
           }
-          if (submitted.receipt.status !== 1) {
-            budgetLetter.cancelDeposit(txId);
+          if (submitted.receipt.status !== 1)
             throw new Error(t("shielded.transactionFailed", { hash: submitted.transactionHash }));
-          }
-          if (attachedDraft && result.action === "fund" && Number(result.data.budgetKind) === 0 && current()) {
-            setStage(t("shielded.privateLetters.sendingAfterFunding"));
-            setProgress(null);
-            await budgetLetter.confirmDeposit(txId, current);
-          }
           if (planned.steps.length <= 1) break;
           // The confirmed step stays listed, with its hash, above the plan rebuilt for the rest.
           if (current()) {
@@ -2162,27 +2125,13 @@ export function ShieldedInheritancePanel({
         </p>
       ) : null}
       {progressList ??
-        (stage && !budgetLetter.delivery && !executingReview && !readModeRefreshing ? (
+        (stage && !executingReview && !readModeRefreshing ? (
           <p role="status" className="text-sm text-ink-muted">
             {stage}
           </p>
         ) : null)}
       {errorNotice}
       {transactionStatus}
-      {!letterView && action === "fund" && budgetLetter.delivery ? (
-        <div className="space-y-3 rounded-xl bg-surface-alt p-4">
-          <p role={budgetLetter.delivery.status === "failed" ? "alert" : "status"} className="text-sm text-ink">{t(`shielded.privateLetters.delivery.${budgetLetter.delivery.status}`)}</p>
-          {budgetLetter.delivery.hash ? <p className="break-all text-xs text-ink-muted">{t("shielded.privateLetters.sent")}: {budgetLetter.delivery.hash}</p> : null}
-          {budgetLetter.delivery.status === "failed" ? <>
-            {budgetLetter.delivery.expired ? <p className="text-sm text-danger">{t("shielded.privateLetters.preparationExpired")}</p> : null}
-            {budgetLetter.delivery.canUpdateCode ? <FieldBlock label={t("shielded.privateLetters.replacementCode")}>
-              <textarea aria-label={t("shielded.privateLetters.replacementCode")} className={FIELD_TEXTAREA} rows={3} disabled={busy} value={budgetLetter.replacementCode} onChange={event => budgetLetter.setReplacementCode(event.target.value)} />
-            </FieldBlock> : null}
-            <PanelButton disabled={busy || submissionPending || !signer} onClick={() => void run(current => budgetLetter.retry(current), t("shielded.privateLetters.sendingAfterFunding"), "wallet")}>{t("shielded.privateLetters.retryLetter")}</PanelButton>
-          </> : null}
-          {budgetLetter.delivery.status !== "sending" && budgetLetter.delivery.status !== "awaitingDeposit" ? <PanelButton disabled={busy} size="compact" onClick={budgetLetter.clear}>{t(budgetLetter.delivery.status === "sent" ? "shielded.privateLetters.finish" : "shielded.privateLetters.later")}</PanelButton> : null}
-        </div>
-      ) : null}
     </>
   );
   const discoveryWarning = discovery && !discovery.complete ? (
@@ -2364,11 +2313,8 @@ export function ShieldedInheritancePanel({
           context={context}
           signer={signer ?? null}
           disabled={busy || submissionPending}
-          wallet={wallet}
           recoveryReady={!!session.identity || !!session.independentKey}
           sessionScope={JSON.stringify([session.credentials?.handle, session.identity?.handle, session.independentKey?.keyFingerprint])}
-          budgetCommitment={letterBudget}
-          onBudgetChange={setLetterBudget}
           onBusyChange={(value) => {
             letterOperationPending.current = value;
             acceptPublicSyncProgress.current = value;
@@ -2419,7 +2365,7 @@ export function ShieldedInheritancePanel({
         titleId={taskTitleId}
         symbol={symbol}
         decimals={decimals}
-        busy={busy || submissionPending || !!budgetLetter.delivery}
+        busy={busy || submissionPending}
         wallet={wallet}
         identityReady={!!session.identity}
         heirs={heirs}
@@ -2462,7 +2408,6 @@ export function ShieldedInheritancePanel({
         personHash={personHash}
         onPersonHashChange={(value) => {
           if (value.toLowerCase() === personHash.toLowerCase()) return;
-          budgetLetter.selectRecipient(value);
           setPersonHash(value);
           const original = wallet?.templates.find(
             (item) =>
@@ -2500,14 +2445,6 @@ export function ShieldedInheritancePanel({
         }}
         recipientFormRef={recipientForm}
         onGenerateRecipientCode={() => void generateConvenientCode()}
-        letterEnabled={budgetLetter.enabled}
-        onLetterEnabledChange={(enabled) => {
-          if (enabled && personHash) budgetLetter.selectRecipient(personHash);
-          budgetLetter.setEnabled(enabled);
-        }}
-        letterBody={budgetLetter.body}
-        onLetterBodyChange={budgetLetter.setBody}
-        lettersConfigured={!!context.lettersAddress}
         parentLabel={parentLabel}
       />
     );
@@ -2558,8 +2495,6 @@ export function ShieldedInheritancePanel({
               !slotReady ||
               !session.identity ||
               !signer ||
-              !!budgetLetter.delivery ||
-              (effectiveEntry !== "public" && budgetLetter.enabled && !budgetLetter.body.trim()) ||
               (wallet?.familyRecordsAvailable === false && !template) ||
               (needsCode && !recipientReady) ||
               fundingDeficit !== undefined ||

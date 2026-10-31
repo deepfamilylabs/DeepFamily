@@ -9,7 +9,6 @@ export const SHIELDED_CIRCUITS = Object.freeze({
   unshield: "shielded_unshield",
   anonymousReceivePresentation: "shielded_anonymous_receive_presentation",
   fundReceivePresentation: "shielded_fund_receive_presentation",
-  attachedReceivePresentation: "shielded_attached_receive_presentation",
   claim32: "shielded_claim_32",
   privateTransfer4: "shielded_private_transfer_4",
   unshield4: "shielded_unshield_4",
@@ -30,13 +29,6 @@ export const RECEIVE_PRESENTATION_CIRCUITS = Object.freeze({
     hiddenInputs: 12,
     publicInputs: 11,
     contractName: "FundReceivePresentationVerifier",
-  }),
-  attachedReceivePresentation: Object.freeze({
-    kind: "attachment",
-    issuer: "anonymousReceiveCredential",
-    hiddenInputs: 11,
-    publicInputs: 14,
-    contractName: "AttachedReceivePresentationVerifier",
   }),
 });
 

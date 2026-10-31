@@ -12,7 +12,7 @@ import {
 import { readArchiveBlob } from "../packages/protocol-core/archive.js";
 
 // These tests deliberately use exact-input mocks to isolate contract boundary checks.
-// They do not claim a mock authenticates a receipt, a canonical R, or a private Fund note.
+// They do not claim a mock authenticates a receipt or a canonical R.
 const abi = () => hre.ethers.AbiCoder.defaultAbiCoder();
 const encode = (inputs) => abi().encode([`uint256[${inputs.length}]`], [inputs]);
 const field = 21888242871839275222246405745257275088548364400416034343698204186575808495617n;
@@ -30,18 +30,14 @@ async function fixture() {
   const factory = await hre.ethers.deployContract("PrivateLetterPoolFactoryMock", [
     await state.getAddress(),
   ]);
-  const pool = await hre.ethers.deployContract("PrivateLetterPoolMock", [await state.getAddress()]);
-  await factory.registerPool(hre.ethers.ZeroAddress, await pool.getAddress());
-  await pool.setKnownNoteRoot(3n, 987n);
   const config = [
     await family.getAddress(),
     await state.getAddress(),
     await verifier.getAddress(),
-    await verifier.getAddress(),
     await factory.getAddress(),
   ];
   const archive = await hre.ethers.deployContract("PrivateLetterArchive", config);
-  return { state, counterVerifier, verifier, family, factory, pool, config, archive };
+  return { state, counterVerifier, verifier, family, factory, config, archive };
 }
 
 async function update(context, overrides = {}) {
@@ -84,13 +80,13 @@ async function delivery(context, overrides = {}) {
   };
 }
 
-async function proof(context, data, payload = ciphertext, attachment, overrides = {}) {
+async function proof(context, data, payload = ciphertext, overrides = {}) {
   const checkpoint = await context.state.getCheckpoint(data.checkpointId);
   const digest = BigInt(hre.ethers.keccak256(payload));
   const input = [
     overrides.chainId ?? (await hre.ethers.provider.getNetwork()).chainId,
     BigInt(overrides.archive ?? (await context.archive.getAddress())),
-    attachment ? 2n : 1n,
+    1n,
     data.messageId,
     digest & ((1n << 128n) - 1n),
     digest >> 128n,
@@ -100,9 +96,6 @@ async function proof(context, data, payload = ciphertext, attachment, overrides 
     data.deadline,
     data.recipientBinding,
   ];
-  if (attachment) {
-    input.push(BigInt(attachment.pool), attachment.noteRoot, attachment.relationCommitment);
-  }
   return encode(input);
 }
 
@@ -242,7 +235,7 @@ describe("Authenticated private letter archive boundaries", function () {
       context.archive,
       "InvalidLetterProof",
     );
-    const wrongChain = await proof(context, data, ciphertext, undefined, { chainId: 1n });
+    const wrongChain = await proof(context, data, ciphertext, { chainId: 1n });
     await expect(
       context.archive.registerLetter(data, ciphertext, wrongChain),
     ).to.be.revertedWithCustomError(context.archive, "InvalidLetterProof");
@@ -270,7 +263,6 @@ describe("Authenticated private letter archive boundaries", function () {
       const record = await context.archive.letterRecord(data.messageId);
       expect(record.blob.payloadHash).to.equal(hre.ethers.keccak256(payload));
       expect(record.blob.segmentCount).to.equal(length === 512 ? 1n : 2n);
-      expect(record.relationCommitment).to.equal(0n);
       const fetched = await readArchiveBlob({
         ...record.blob.toObject(),
         getCode: (address) => hre.ethers.provider.getCode(address),
@@ -315,72 +307,9 @@ describe("Authenticated private letter archive boundaries", function () {
     await context.archive.registerLetter(fresh, ciphertext, await proof(context, fresh));
   });
 
-  it("requires a canonical pool, its actual shared state, and a known root in the selected shard", async () => {
+  it("cannot store empty ciphertext or bypass the verified registration route", async () => {
     const context = await hre.networkHelpers.loadFixture(fixture);
     const data = await delivery(context);
-    const attachment = {
-      asset: hre.ethers.ZeroAddress,
-      pool: await context.pool.getAddress(),
-      shardId: 3n,
-      noteRoot: 987n,
-      relationCommitment: 654n,
-    };
-    const valid = await proof(context, data, ciphertext, attachment);
-    const [, account] = await hre.ethers.getSigners();
-    for (const changed of [
-      { ...attachment, asset: account.address },
-      { ...attachment, pool: account.address },
-      { ...attachment, shardId: 4n },
-      { ...attachment, noteRoot: 988n },
-    ]) {
-      await expect(
-        context.archive.registerAttachedLetter(data, changed, ciphertext, valid),
-      ).to.be.revertedWithCustomError(context.archive, "InvalidBudgetSource");
-    }
-    const wrongState = await hre.ethers.deployContract("PrivateLetterPoolMock", [account.address]);
-    await wrongState.setKnownNoteRoot(3n, 987n);
-    await context.factory.registerPool(account.address, await wrongState.getAddress());
-    await expect(
-      context.archive.registerAttachedLetter(
-        data,
-        { ...attachment, asset: account.address, pool: await wrongState.getAddress() },
-        ciphertext,
-        valid,
-      ),
-    ).to.be.revertedWithCustomError(context.archive, "InvalidBudgetSource");
-    await expect(
-      context.archive.registerAttachedLetter(
-        data,
-        { ...attachment, relationCommitment: 655n },
-        ciphertext,
-        valid,
-      ),
-    ).to.be.revertedWithCustomError(context.archive, "InvalidLetterProof");
-    await context.archive.registerAttachedLetter(data, attachment, ciphertext, valid);
-    expect((await context.archive.letterRecord(data.messageId)).relationCommitment).to.equal(654n);
-    await expect(
-      context.archive.registerLetter(data, ciphertext, await proof(context, data)),
-    ).to.be.revertedWithCustomError(context.archive, "MessageAlreadyRegistered");
-  });
-
-  it("cannot reuse the standalone proof route for an attachment or store empty ciphertext", async () => {
-    const context = await hre.networkHelpers.loadFixture(fixture);
-    const data = await delivery(context);
-    const attachment = {
-      asset: hre.ethers.ZeroAddress,
-      pool: await context.pool.getAddress(),
-      shardId: 3n,
-      noteRoot: 987n,
-      relationCommitment: 654n,
-    };
-    await expect(
-      context.archive.registerAttachedLetter(
-        data,
-        attachment,
-        ciphertext,
-        await proof(context, data),
-      ),
-    ).to.be.revertedWithCustomError(context.archive, "InvalidLetterProof");
     await expect(context.archive.registerLetter(data, "0x", "0x")).to.be.revertedWithCustomError(
       context.archive,
       "InvalidPayloadLength",

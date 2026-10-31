@@ -48,7 +48,6 @@ export const RECEIVE_DEPLOYMENT_CONTRACTS = Object.freeze([
   ["IdentityAuthorizationState", "identityAuthorizationState"],
   ["AnonymousReceivePresentationVerifier", "anonymousReceivePresentationVerifier"],
   ["FundReceivePresentationVerifier", "fundReceivePresentationVerifier"],
-  ["AttachedReceivePresentationVerifier", "attachedReceivePresentationVerifier"],
   ["ReceivePresentationVerifierRouter", "receivePresentationVerifierRouter"],
   ["PrivateLetterArchive", "privateLetterArchive"],
 ].map(([contractName, property]) => Object.freeze({ contractName, property })));
@@ -59,8 +58,7 @@ export const receiveDeploymentConstructorArgs = (property, addresses) => {
     case "identityAuthorizationState": return [addresses.identityAuthorizationVerifierAdapter];
     case "receivePresentationVerifierRouter": return [addresses.anonymousReceivePresentationVerifier, addresses.fundReceivePresentationVerifier];
     case "privateLetterArchive": return [addresses.deepFamily, addresses.identityAuthorizationState,
-      addresses.anonymousReceivePresentationVerifier, addresses.attachedReceivePresentationVerifier,
-      addresses.shieldedPoolFactory];
+      addresses.anonymousReceivePresentationVerifier, addresses.shieldedPoolFactory];
     default: return [];
   }
 };
@@ -78,9 +76,8 @@ export const RECEIVE_DEPLOYMENT_IMMUTABLES = Object.freeze({
   identityAuthorizationState: { VERIFIER: "identityAuthorizationVerifierAdapter" },
   anonymousReceivePresentationVerifier: {},
   fundReceivePresentationVerifier: {},
-  attachedReceivePresentationVerifier: {},
   receivePresentationVerifierRouter: { ANONYMOUS_VERIFIER: "anonymousReceivePresentationVerifier", FUND_VERIFIER: "fundReceivePresentationVerifier" },
-  privateLetterArchive: { DEEP_FAMILY: "deepFamily", AUTHORIZATION_STATE: "identityAuthorizationState", LETTER_VERIFIER: "anonymousReceivePresentationVerifier", ATTACHMENT_VERIFIER: "attachedReceivePresentationVerifier", POOL_FACTORY: "shieldedPoolFactory" },
+  privateLetterArchive: { DEEP_FAMILY: "deepFamily", AUTHORIZATION_STATE: "identityAuthorizationState", LETTER_VERIFIER: "anonymousReceivePresentationVerifier", POOL_FACTORY: "shieldedPoolFactory" },
 });
 
 export const INTEGRATED_DEPLOYMENT_RECORDS = Object.freeze(

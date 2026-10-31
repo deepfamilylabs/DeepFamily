@@ -50,7 +50,6 @@ const SOURCE_EXCLUSIONS = new Set([
   "contracts/ShieldedIdentityAuthorizationUpdateVerifier.sol",
   "contracts/AnonymousReceivePresentationVerifier.sol",
   "contracts/FundReceivePresentationVerifier.sol",
-  "contracts/AttachedReceivePresentationVerifier.sol",
   "frontend/public/zk/shielded/receive-link-keys.json",
   ...Object.values(SHIELDED_CIRCUITS).flatMap((source) => [
     `frontend/public/zk/shielded/${source}.wasm`,

@@ -63,6 +63,7 @@ test("presentation authenticates an operation without publishing its reusable cr
     result.publicSignals,
   );
   for (const patch of [
+    { action: 2 },
     { action: 3 },
     { salt: 0 },
     { checkpointId: 0 },

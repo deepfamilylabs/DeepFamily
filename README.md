@@ -148,8 +148,8 @@ check. Gas reports remain optional maintenance checks; see [ZK proofs](docs/zk-p
 
 ### ZK Artifact Workflow
 
-The same `zk:*` workflow covers 16 Circom circuits (two identity/disclosure and fourteen shielded,
-including three receive presentations). Receive credentials, letters and recovery use these
+The same `zk:*` workflow covers 15 Circom circuits (two identity/disclosure and thirteen shielded,
+including two receive presentations). Receive credentials, letters and recovery use these
 shared build, setup and verification commands:
 
 Run `npm run test:circuits` for shielded constraint tests. They compile the current sources into
@@ -162,21 +162,21 @@ temporary directories and require only npm dependencies and the pinned Circom co
 | `npm run zk:fetch`             | Install host-native and canonical audit-reference Circom compilers |
 | `npm run zk:assets:fetch`      | Download and decode the manifest-pinned browser WASM/zkey files from R2 |
 | `npm run zk:assets:publish`    | Compress and upload new browser WASM/zkey files to R2              |
-| `npm run zk:build`             | Compile all 16 Circom circuits                                     |
-| `npm run zk:setup`             | Generate the final keys, verifiers and evidence for all 16 circuits |
+| `npm run zk:build`             | Compile all 15 Circom circuits                                     |
+| `npm run zk:setup`             | Generate the final keys, verifiers and evidence for all 15 circuits |
 | `npm run zk:check`             | Rebuild and check artifacts, proofs and available ceremony evidence |
 
 Each Groth16 circuit has its own proving and verification keys. The single setup command handles
-the complete catalog and derives the shared receive-link parameters and three fixed Solidity
+the complete catalog and derives the shared receive-link parameters and two fixed Solidity
 verifiers from the matching keys. It records the single-operator ceremony and artifact evidence.
 Local development, CI and release use this same final artifact set. Generated browser files go
 under `frontend/public/zk/` and Solidity verifiers under `contracts/`.
 
 Receive presentations use LinkG16 to link two ordinary Circom proofs over the same hidden
 credential fields, without recursive pairing checks inside a circuit or a Go/WASM prover.
-The payer loads one presentation's WASM/zkey, with uncompressed sizes of about 13.56 MiB for anonymous receipts,
-13.69 MiB for Fund, or 20.97 MiB for attachments, plus a shared 26 KiB link-key file.
-The submitted proof is 1,184 bytes (anonymous/attachment) or 1,216 bytes (Fund), excluding
+The payer loads one presentation's WASM/zkey, with uncompressed sizes of about 13.56 MiB for anonymous receipts
+or 13.69 MiB for Fund, plus a shared 17 KiB link-key file.
+The submitted proof is 1,184 bytes (anonymous) or 1,216 bytes (Fund), excluding
 public signals and ciphertext. First use needs no recipient registration or transaction;
 credential creation and payment still read the latest authorization counter. See
 [private letters](docs/private-letters.md) for the exact flow and sizes.

@@ -1,8 +1,9 @@
 # Private letters and receive authorization
 
 The inheritance page uses two fresh-v1 receive credentials. Anonymous credentials
-(`dfrecv`) serve private transfers, standalone letters and private Fund attachments.
-Fund credentials (`dffund`) disclose the authenticated heir identity to the payer.
+(`dfrecv`) serve private transfers and letters. Fund credentials (`dffund`), shown as
+budget receive codes, disclose the authenticated heir identity to the payer and serve
+private budgets only.
 Both disclosures use version 1, with distinct fixed issuer verification keys;
 they cannot be converted by removing the identity field. The unpublished protocol
 defines one current format, without historical-format decoding or migration.
@@ -33,68 +34,37 @@ paths. Owner authorization is independent of tree depth. Distinct aliases with
 identical low 64 bits cannot both be inserted; this separate dictionary capacity
 limit rejects without modifying state.
 
-## Budget receive codes and inline letters
+## Budget receive codes
 
-The funding form uses one **Budget receive code** for an optional family letter in
-both private child-budget modes: identity credentials and an independent key. These
-are recipient key modes, not the distinction between a child budget and a private
-asset transfer. Public identity budgets remain ineligible for attached letters, and
-this change does not add authenticated attachments to ordinary private transfers.
+Identity credentials and the independent key each issue both receive code types: an
+anonymous receive code and a **Budget receive code**. A budget receive code is the single
+Fund credential. It discloses and authenticates the heir identity to the funder, which
+private funding needs to prove the parent-child relationship and trusted endorsement. Only
+private Fund accepts it; private transfers and letters require an anonymous receive code.
+The UI explains that sharing a budget receive code discloses the heir identity to the
+funder. Public identity budgets need no receive code.
 
-A budget receive code (`dfbudget`, transport version 1) packages two independently
-issued credentials: a Fund credential for funding and an anonymous credential for
-the letter. Both credentials
-must agree on their authorization alias, counter, expiry, owner commitment, complete
-viewing key, key mode and suite/version metadata. Decoding must reject mismatched
-pairs, and verification must authenticate both issuer proofs. A Fund proof cannot
-be converted into an anonymous proof by removing its identity field. The existing
-circuits and fixed verifiers continue to receive the credential for their own
-operation; the package does not extend a Fund credential's proof relation to letters.
-The UI explains that sharing a budget receive code discloses and authenticates the
-heir identity to the funder.
-
-The funding form includes an optional letter body before submission. It preflights
-the letter and receiving authorization, submits the budget, waits for a successful
-on-chain receipt, then prepares and submits the attached-letter proof for that
-authenticated budget. The user remains in one flow and reuses the supplied receiving
-package, without opening an empty composer or entering another code after a
-successful deposit. These remain two transactions, with separate wallet
-confirmations and fees. A failed or cancelled deposit sends no letter. A successful
-deposit followed by an unsuccessful or cancelled letter remains visibly marked as
-funded, with a letter-only retry. An uncertain submission reuses its prepared message
-and proof; only an irreversibly expired preparation may be replaced. If preparation
-failed before a reusable proof existed, the user may also update the receiving
-material for that letter-only retry. None of these retries resubmits the budget.
-
-Before requesting the funding transaction, the current session retains the draft,
-expected budget commitment and funding submission ID as an awaiting-deposit step.
-No letter proof or transaction starts while funding is unconfirmed or its result is
-unknown. The normal receipt or later submission reconciliation can confirm that
-exact ID and continue the letter once; duplicate confirmations cannot send another
-letter. A failed deposit cancels only its matching awaiting step and preserves the
-form draft for another funding attempt. Locking or changing the session clears this
-in-memory continuation, so a late receipt cannot send a previous session's letter.
-
-The standalone composer and existing-budget entry remain available for later
-letters. Letter plaintext and receive material stay in the active session and are
-cleared when its wallet, identity, key or deployment context is invalidated. They
-are not silently persisted as plaintext to support retry after reload.
+Budgets carry no letters: funding needs one code and one transaction, and letters are
+written separately to the recipient's anonymous receive code. Letter plaintext and receive
+material stay in the active session and are cleared when its wallet, identity, key or
+deployment context is invalidated. They are not silently persisted as plaintext to support
+retry after reload.
 
 ## Proof and contract flow
 
 The Circom issuer authenticates the canonical identity and R derived from the
 original identity secrets, counter, expiry, owner, key mode and the complete viewing
-key. The three Circom presentation circuits check a 64-level sparse state
-dictionary and bind the actual operation; attachments also check Fund-note
-membership. LinkG16 links an issuer proof and a presentation proof over the same
-hidden credential fields, then rerandomizes both proofs before submission. Neither
+key. The two Circom presentation circuits check a 64-level sparse state
+dictionary and bind the actual operation. LinkG16 links an issuer proof and a
+presentation proof over the same hidden credential fields, then rerandomizes both
+proofs before submission. Neither
 circuit evaluates pairing arithmetic or recursively verifies another proof.
 
 The fixed Solidity verifiers authenticate both keys and their shared hidden inputs.
 The caller cannot choose another issuer key. The shared
 `frontend/public/zk/shielded/receive-link-keys.json` contains the public linking
 parameters; `linkKeys` in the shielded artifact manifest pins that file, the shared
-verifier base and all three generated verifiers. The original identity preimage,
+verifier base and both generated verifiers. The original identity preimage,
 alias derivation and key-ownership requirements remain in the issuer circuits.
 
 Private Fund and PrivateTransfer submit both the existing business proof and a
@@ -108,24 +78,16 @@ is also the output owner; Shield remains a self-deposit operation.
 
 `PrivateLetterArchive` uses the same authorization state as the canonical pool
 factory. It authenticates ciphertext, message ID, recipient commitment and the proof
-deadline before writing immutable Archive segments. Attachments additionally prove
-membership of an actual private Fund note under an accepted canonical pool root,
-with the same owner, viewing key and mode. The attachment circuit supports the
-production 32-level note tree. It does not require the credential identity to equal
-the budget's heir identity. Public identity budgets cannot have attachments.
+deadline before writing immutable Archive segments.
 
 Letter bodies are plain text encrypted in the browser's secret-owning Worker with
 the existing receiving HPKE key. The message's chain, archive and ID are included in
-AAD. The structured budget reference is checked again after decryption against the
-authenticated relation commitment. The UI does not display a mismatching reference
-as a budget attachment. Funding and letter submission are separate transactions:
-retrying an attachment never repeats a successful deposit.
+AAD.
 
 The inheritance page places Private letters below Child budgets in the unlocked
 workspace's task rail. Write a letter and Inbox are separate entries; they use the
 same task area as deposits and claims. The inbox reads when selected and provides
-an explicit refresh action. To write for an existing budget, select it in the write task.
-The funding form has no navigation to a separate letter composer. A standalone letter proof requires a valid anonymous
+an explicit refresh action. A letter proof requires a valid anonymous
 receive credential and a transaction wallet; it does not require the sender's
 identity secrets. Reading an inbox requires the original receiving keys. Wallet
 or key-session changes invalidate pending submissions and clear locally displayed
@@ -146,12 +108,11 @@ WASM and zkey download sizes are:
 
 | Presentation                 |                  WASM + zkey | Linked proof | Public signals |
 | ---------------------------- | ---------------------------: | -----------: | -------------: |
-| Anonymous / private transfer | 14,216,109 bytes (13.56 MiB) |  1,184 bytes |             11 |
-| Fund                         | 14,355,369 bytes (13.69 MiB) |  1,216 bytes |             11 |
-| Attached letter              | 21,993,051 bytes (20.97 MiB) |  1,184 bytes |             14 |
+| Anonymous / private transfer | 14,216,094 bytes (13.56 MiB) |  1,184 bytes |             11 |
+| Fund                         | 14,355,354 bytes (13.69 MiB) |  1,216 bytes |             11 |
 
-Only the needed presentation is loaded. The roughly 26 KiB link-key file is shared
-by all three. Proof sizes exclude public signals, other transaction data and
+Only the needed presentation is loaded. The roughly 17 KiB link-key file is shared
+by both. Proof sizes exclude public signals, other transaction data and
 ciphertext. Issuing a receive credential uses its own small issuer WASM/zkey.
 
 ## Development
@@ -162,8 +123,8 @@ npm run dev:deploy
 npm run frontend:config
 ```
 
-Local development, CI and release reuse one pinned artifact set for all 13 Circom
-circuits, including the credential issuers, counter update and three presentations.
+Local development, CI and release reuse one pinned artifact set for all 15 Circom
+circuits, including the credential issuers, counter update and two presentations.
 The explicit `npm run zk:setup` command creates the final keys, shared linking parameters,
 fixed verifiers and single-operator ceremony evidence from a clean, reviewed commit on a
 controlled machine outside CI. Generated proving files stay out of Git. The shared circuit
@@ -188,8 +149,7 @@ npm test
 ```
 
 `npm test` includes both key modes with actual Fund business/receive proofs,
-standalone and shared-root attached letters, owner counter updates and Archive
-recovery. It requires the real artifacts and fails if they are missing or do not
+letters, owner counter updates and Archive recovery. It requires the real artifacts and fails if they are missing or do not
 match the manifests. It also runs the complete 64/32-depth business-proof check.
 Generate a replacement final artifact set explicitly with `npm run zk:setup` after reviewing
 and committing a circuit change; local deployment never regenerates keys automatically.

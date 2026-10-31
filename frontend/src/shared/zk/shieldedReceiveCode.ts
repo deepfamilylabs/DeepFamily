@@ -8,9 +8,6 @@ import {
   canonicalizeFullName,
   computeIdentityFromDerivedSecret,
   decodeShieldedReceiveCredential,
-  decodeShieldedBudgetReceiveCode,
-  encodeShieldedBudgetReceiveCode,
-  isShieldedBudgetReceiveCode,
   deriveIdentityMaterial,
   deriveShieldedHeirKeyMaterial,
   deriveShieldedViewPublicKey,
@@ -130,18 +127,10 @@ export async function createShieldedReceiveCode(input: ShieldedReceiveCodeIdenti
     },
     expectedPublicSignals: publicSignals.map(String),
   });
-  const credentialCode = encodeShieldedReceiveCredential({
+  const code = encodeShieldedReceiveCredential({
     ...statement,
     proof: proof as unknown as ShieldedReceiveCredentialProof,
   });
-  // Each disclosure has its own issuer proof. A budget package shares the exact
-  // authenticated receiving fields, never an anonymous copy of the Fund proof.
-  const code = disclosure === "fund"
-    ? encodeShieldedBudgetReceiveCode({
-        fundCode: credentialCode,
-        anonymousCode: (await createShieldedReceiveCode({ ...input, disclosure: "anonymous" })).code,
-      })
-    : credentialCode;
   return {
     code,
     personHash: material.personHash,
@@ -229,36 +218,24 @@ export async function isInG2Subgroup(pi_b: readonly (readonly string[])[]) {
  * Check a pasted code. A code that fails its checksum was copied incompletely; a well-formed
  * code whose contents or proof fail was altered and must not be paid.
  */
-export async function verifyShieldedReceiveCode(
-  code: string,
-  disclosure?: "anonymous" | "fund",
-): Promise<ShieldedReceiveCodeCheck> {
-  let decoded: ReturnType<typeof decodeShieldedReceiveCredential> | undefined;
-  let credentials: ReturnType<typeof decodeShieldedReceiveCredential>[];
+export async function verifyShieldedReceiveCode(code: string): Promise<ShieldedReceiveCodeCheck> {
+  let decoded;
   try {
-    const bundle = isShieldedBudgetReceiveCode(code) ? decodeShieldedBudgetReceiveCode(code) : null;
-    credentials = bundle
-      ? [decodeShieldedReceiveCredential(bundle.fundCode), decodeShieldedReceiveCredential(bundle.anonymousCode)]
-      : [decodeShieldedReceiveCredential(code)];
-    decoded = credentials.find(item => item.disclosure === (disclosure ?? credentials[0].disclosure));
-    if (!decoded) return { ok: false, reason: "invalid" };
+    decoded = decodeShieldedReceiveCredential(code);
   } catch (cause) {
     const malformed =
-      (cause as { code?: string } | null)?.code === "INVALID_SHIELDED_RECEIVE_CREDENTIAL_ENCODING" ||
-      (cause as { code?: string } | null)?.code === "INVALID_SHIELDED_BUDGET_RECEIVE_CODE_ENCODING";
+      (cause as { code?: string } | null)?.code === "INVALID_SHIELDED_RECEIVE_CREDENTIAL_ENCODING";
     return { ok: false, reason: malformed ? "malformed" : "invalid" };
   }
   try {
-    for (const credential of credentials) {
-      const verified =
-        (await isInG2Subgroup(credential.proof.pi_b)) &&
-        (await snarkjs.groth16.verify(
-          SHIELDED_RECEIVE_CREDENTIAL_VERIFICATION_KEYS[credential.disclosure],
-          credential.publicSignals.map(String),
-          credential.proof,
-        ));
-      if (!verified) return { ok: false, reason: "invalid" };
-    }
+    const verified =
+      (await isInG2Subgroup(decoded.proof.pi_b)) &&
+      (await snarkjs.groth16.verify(
+        SHIELDED_RECEIVE_CREDENTIAL_VERIFICATION_KEYS[decoded.disclosure],
+        decoded.publicSignals.map(String),
+        decoded.proof,
+      ));
+    if (!verified) return { ok: false, reason: "invalid" };
   } catch {
     return { ok: false, reason: "invalid" };
   }

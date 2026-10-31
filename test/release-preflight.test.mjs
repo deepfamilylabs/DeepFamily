@@ -45,7 +45,7 @@ const fixtureReleaseOptions = (options) => ({
   receiveArtifactInspector: () => ({
     status: "production",
     verification: "passed",
-    circuitCount: 3,
+    circuitCount: 2,
     manifestSha256: "ef".repeat(32),
   }),
   receiveCeremonyVerifier: async () => ({
@@ -53,7 +53,7 @@ const fixtureReleaseOptions = (options) => ({
     manifestSha256: "ef".repeat(32),
   }),
   gitToolResolver: async () => FIXTURE_GIT_EXECUTABLE,
-  shieldedReleaseInspector: async () => ({ manifestSha256: "ef".repeat(32), circuitCount: 14 }),
+  shieldedReleaseInspector: async () => ({ manifestSha256: "ef".repeat(32), circuitCount: 13 }),
   ...options,
 });
 const runReleasePreflight = (options) => runReleasePreflightRaw(fixtureReleaseOptions(options));
@@ -398,11 +398,11 @@ describe("production release preflight", function () {
     const fake = createFakeRunner();
     for (const evidence of [
       { status: "development", manifestSha256: "ef".repeat(32) },
-      { status: "production", circuitCount: 3, manifestSha256: "ef".repeat(32) },
+      { status: "production", circuitCount: 2, manifestSha256: "ef".repeat(32) },
       {
         status: "production",
         verification: "passed",
-        circuitCount: 2,
+        circuitCount: 1,
         manifestSha256: "ef".repeat(32),
       },
     ]) {
@@ -442,7 +442,7 @@ describe("production release preflight", function () {
         receiveArtifactInspector: () => ({
           status: "production",
           verification: "passed",
-          circuitCount: 3,
+          circuitCount: 2,
           manifestSha256: (++inspections === 1 ? "ef" : "ab").repeat(32),
         }),
       }),
@@ -992,7 +992,7 @@ describe("production release preflight", function () {
           return {
             status: "production",
             verification: "passed",
-            circuitCount: 3,
+            circuitCount: 2,
             manifestSha256: "ef".repeat(32),
           };
         },
@@ -1090,7 +1090,7 @@ describe("production release preflight", function () {
             receiveArtifactInspector: () => ({
               status: "production",
               verification: "passed",
-              circuitCount: 3,
+              circuitCount: 2,
               manifestSha256: (++receiveInspections === 2 && changedInput === "receive"
                 ? "ab"
                 : "ef"

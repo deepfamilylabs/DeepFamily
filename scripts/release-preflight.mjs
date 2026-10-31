@@ -181,7 +181,7 @@ const runReleaseValidation = async (
   if (
     initialReceiveEvidence?.status !== "production" ||
     initialReceiveEvidence?.verification !== "passed" ||
-    initialReceiveEvidence?.circuitCount !== 3 ||
+    initialReceiveEvidence?.circuitCount !== 2 ||
     !/^[0-9a-f]{64}$/u.test(initialReceiveEvidence?.manifestSha256 ?? "")
   ) {
     throw new Error("Release preflight requires production receive presentation evidence");
@@ -347,7 +347,7 @@ const runReleaseValidation = async (
     if (
       finalReceiveEvidence?.status !== "production" ||
       finalReceiveEvidence?.verification !== "passed" ||
-      finalReceiveEvidence?.circuitCount !== 3 ||
+      finalReceiveEvidence?.circuitCount !== 2 ||
       finalReceiveEvidence?.manifestSha256 !== initialReceiveEvidence.manifestSha256
     ) {
       throw new Error("Receive presentation manifest changed while release preflight was running");

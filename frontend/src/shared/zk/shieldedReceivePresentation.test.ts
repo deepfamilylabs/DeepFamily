@@ -41,9 +41,8 @@ const witness = { authorizationAlias: "900", siblings: Array(64).fill("0") };
 
 function prepare(kind = "anonymous") {
   const commonInputs = Array(kind === "fund" ? 12 : 11).fill("900");
-  const publicInputs = kind === "attachment" ? [...expected, "12", "13", "14"] : [...expected];
-  const circuit =
-    kind === "attachment" ? "attachedReceivePresentation" : `${kind}ReceivePresentation`;
+  const publicInputs = [...expected];
+  const circuit = `${kind}ReceivePresentation`;
   const prepared = { witness, commonInputs, publicInputs, circuit };
   mocks.prepare.mockReturnValue(prepared);
   return prepared;
@@ -54,7 +53,7 @@ describe("local receive presentation linking", () => {
     mocks.prepare.mockReset();
     mocks.prove.mockReset().mockResolvedValue({ proof: operationProof });
     mocks.link.mockReset().mockResolvedValue("0x1234");
-    for (const kind of ["anonymous", "fund", "attachment"]) {
+    for (const kind of ["anonymous", "fund"]) {
       mocks.linkKeys[kind] = {
         verificationKey: { name: `${kind} presentation` },
         deltaG1: ["15", "16", "1"],
@@ -64,7 +63,7 @@ describe("local receive presentation linking", () => {
     prepare();
   });
 
-  it.each(["anonymous", "fund", "attachment"])(
+  it.each(["anonymous", "fund"])(
     "links %s against fixed issuer and presentation keys, keeping shared values private",
     async (kind) => {
       const prepared = prepare(kind);
@@ -83,7 +82,7 @@ describe("local receive presentation linking", () => {
       expect(mocks.link).toHaveBeenCalledExactlyOnceWith({
         issuer: {
           proof: issuerProof,
-          verificationKey: mocks.issuerKeys[kind === "fund" ? "fund" : "anonymous"],
+          verificationKey: mocks.issuerKeys[kind as "anonymous" | "fund"],
           deltaG1: mocks.linkKeys[kind].issuerDeltaG1,
         },
         presentation: {

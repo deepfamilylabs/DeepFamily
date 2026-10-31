@@ -13,7 +13,6 @@ import {
   computeShieldedBudgetNoteCommitment,
   computeShieldedBudgetUseNullifier,
   computeShieldedEnrollmentCommitment,
-  computeShieldedLetterRelationCommitment,
   computeShieldedOwnerCommitment,
   computeShieldedSpendNullifier,
   computeShieldedValueNoteCommitment,
@@ -78,7 +77,7 @@ describe("Receive presentation real-proof canonical pool and letter integration"
   this.timeout(1_800_000);
 
   for (const keyMode of [0n, 1n]) {
-    it(`atomically authenticates Fund and transfer receipts and recovers shared-root budget letters with ${keyMode === 1n ? "independent" : "identity-derived"} keys (keyMode ${keyMode})`, async function () {
+    it(`atomically authenticates Fund and transfer receipts and recovers letters with ${keyMode === 1n ? "independent" : "identity-derived"} keys (keyMode ${keyMode})`, async function () {
       if (checkRealReceiveArtifacts().missing) this.skip();
       const snapshot = await hre.networkHelpers.takeSnapshot();
       const prover = realReceiveProver();
@@ -169,7 +168,6 @@ describe("Receive presentation real-proof canonical pool and letter integration"
           await family.getAddress(),
           await state.getAddress(),
           await generated.AnonymousReceivePresentationVerifier.getAddress(),
-          await generated.AttachedReceivePresentationVerifier.getAddress(),
           await factory.getAddress(),
         ]);
         const poolAddress = await pool.getAddress();
@@ -520,137 +518,61 @@ describe("Receive presentation real-proof canonical pool and letter integration"
         assert.equal(await pool.commitmentExists(external.commitment), true);
         assert.equal(await pool.commitmentExists(selfChange.commitment), true);
         assert.equal(await pool.totalShielded(), 1000n);
-        const sharedRoot = (await pool.noteShard(0)).root;
-        const records = [];
-        for (const [index, budget] of [undefined, ...budgets].entries()) {
-          const messageId = 700n + BigInt(index);
-          const salt = 800n + BigInt(index);
-          const attachment = budget
-            ? { chainId, poolAddress, budgetCommitment: budget.commitment }
-            : null;
-          const envelope = createShieldedLetterEnvelope({
-            body: `家书 ${index}\n落款：家人`,
-            salt,
-            attachment,
-          });
-          const ciphertext = hre.ethers.hexlify(
-            await encryptShieldedLetter({
-              chainId,
-              lettersAddress,
-              messageId,
-              recipientPublicKey: viewingKey,
-              envelope,
-            }),
-          );
-          const prepared = await prepare(
-            anonymous,
+        const messageId = 700n;
+        const envelope = createShieldedLetterEnvelope({ body: "家书\n落款：家人", salt: 800n });
+        const ciphertext = hre.ethers.hexlify(
+          await encryptShieldedLetter({
+            chainId,
             lettersAddress,
-            budget ? 2n : 1n,
             messageId,
-            hre.ethers.keccak256(ciphertext),
-            salt,
-          );
-          const relation = computeShieldedLetterRelationCommitment({
-            attachment,
-            salt,
-            binding: prepared.recipientBinding,
-          });
-          if (budget) {
-            prepared.publicSignals.push(BigInt(poolAddress), sharedRoot, relation);
-            prepared.request.attachment = {
-              budgetPool: String(BigInt(poolAddress)),
-              budgetRoot: String(sharedRoot),
-              relation: String(relation),
-              policy: String(budget.policyCommitment),
-              enrollment: String(budget.enrollmentCommitment),
-              rate: "100",
-              remaining: String(budget.remaining),
-              nonce: String(budget.nonce),
-              ciphertextHash: String(budget.ciphertextHashField),
-              ...membership(await pool.getNoteMerkleProof(0, budget.leaf)),
-            };
-          }
-          const proof = prover.presentation(prepared);
-          const delivery = {
-            messageId,
-            checkpointId: 1n,
-            asOf: BigInt(prepared.presentation.asOf),
-            deadline: BigInt(prepared.presentation.deadline),
-            recipientBinding: prepared.recipientBinding,
-          };
-          const attached = {
-            asset: hre.ethers.ZeroAddress,
-            pool: poolAddress,
-            shardId: 0n,
-            noteRoot: sharedRoot,
-            relationCommitment: relation,
-          };
-          if (budget) {
-            await expect(
-              letters.registerAttachedLetter(
-                delivery,
-                { ...attached, relationCommitment: relation + 1n },
-                ciphertext,
-                proof,
-              ),
-            ).to.be.revertedWithCustomError(letters, "InvalidLetterProof");
-            await expect(
-              letters.registerAttachedLetter(
-                delivery,
-                { ...attached, shardId: 1n },
-                ciphertext,
-                proof,
-              ),
-            ).to.be.revertedWithCustomError(letters, "InvalidBudgetSource");
-            await expect(
-              letters.registerAttachedLetter(
-                delivery,
-                { ...attached, noteRoot: budgets[0].acceptedRoot },
-                ciphertext,
-                proof,
-              ),
-            ).to.be.revertedWithCustomError(letters, "InvalidLetterProof");
-            await expect(
-              letters.registerLetter(delivery, ciphertext, proof),
-            ).to.be.revertedWithCustomError(letters, "InvalidLetterProof");
-            await recordTransaction(
-              `attachedLetter${index}`,
-              letters.registerAttachedLetter(delivery, attached, ciphertext, proof),
-            );
-          } else {
-            await expect(
-              letters.registerLetter(delivery, `${ciphertext}00`, proof),
-            ).to.be.revertedWithCustomError(letters, "InvalidLetterProof");
-            await recordTransaction(
-              "standaloneLetter",
-              letters.registerLetter(delivery, ciphertext, proof),
-            );
-          }
-          const record = await letters.letterRecord(messageId);
-          assert.equal(record.relationCommitment, relation);
-          const fetched = await readArchiveBlob({
-            ...record.blob.toObject(),
-            getCode: (address) => hre.ethers.provider.getCode(address),
-          });
-          assert.equal(hre.ethers.hexlify(fetched.payload), ciphertext);
-          assert.deepEqual(
-            await decryptShieldedLetter({
-              chainId,
-              lettersAddress,
-              messageId,
-              hpkeIkm: keys.hpkeIkm,
-              ciphertext: fetched.payload,
-              expectedCiphertextHash: record.blob.payloadHash,
-              expectedBinding: record.recipientBinding,
-              relationCommitment: record.relationCommitment,
-            }),
+            recipientPublicKey: viewingKey,
             envelope,
-          );
-          await expect(
-            letters.registerLetter(delivery, ciphertext, proof),
-          ).to.be.revertedWithCustomError(letters, "MessageAlreadyRegistered");
-          records.push({ messageId, record, envelope, ciphertext: fetched.payload });
-        }
+          }),
+        );
+        const prepared = await prepare(
+          anonymous,
+          lettersAddress,
+          1n,
+          messageId,
+          hre.ethers.keccak256(ciphertext),
+          envelope.salt,
+        );
+        const proof = prover.presentation(prepared);
+        const delivery = {
+          messageId,
+          checkpointId: 1n,
+          asOf: BigInt(prepared.presentation.asOf),
+          deadline: BigInt(prepared.presentation.deadline),
+          recipientBinding: prepared.recipientBinding,
+        };
+        await expect(
+          letters.registerLetter(delivery, `${ciphertext}00`, proof),
+        ).to.be.revertedWithCustomError(letters, "InvalidLetterProof");
+        await recordTransaction(
+          "standaloneLetter",
+          letters.registerLetter(delivery, ciphertext, proof),
+        );
+        const record = await letters.letterRecord(messageId);
+        const fetched = await readArchiveBlob({
+          ...record.blob.toObject(),
+          getCode: (address) => hre.ethers.provider.getCode(address),
+        });
+        assert.equal(hre.ethers.hexlify(fetched.payload), ciphertext);
+        assert.deepEqual(
+          await decryptShieldedLetter({
+            chainId,
+            lettersAddress,
+            messageId,
+            hpkeIkm: keys.hpkeIkm,
+            ciphertext: fetched.payload,
+            expectedCiphertextHash: record.blob.payloadHash,
+          }),
+          envelope,
+        );
+        await expect(
+          letters.registerLetter(delivery, ciphertext, proof),
+        ).to.be.revertedWithCustomError(letters, "MessageAlreadyRegistered");
+        const records = [{ messageId, record, envelope, ciphertext: fetched.payload }];
         const pendingId = 799n;
         const pendingEnvelope = createShieldedLetterEnvelope({ body: "撤销窗口检查", salt: 899n });
         const pendingCiphertext = hre.ethers.hexlify(
@@ -920,8 +842,6 @@ describe("Receive presentation real-proof canonical pool and letter integration"
                 hpkeIkm: restored.hpkeIkm,
                 ciphertext,
                 expectedCiphertextHash: record.blob.payloadHash,
-                expectedBinding: record.recipientBinding,
-                relationCommitment: record.relationCommitment,
               }),
               envelope,
             );
@@ -952,8 +872,6 @@ describe("Receive presentation real-proof canonical pool and letter integration"
                 hpkeIkm: identityDerivedKeys.hpkeIkm,
                 ciphertext,
                 expectedCiphertextHash: record.blob.payloadHash,
-                expectedBinding: record.recipientBinding,
-                relationCommitment: record.relationCommitment,
               }),
               { code: "SHIELDED_LETTER_DECRYPTION_FAILED" },
             );

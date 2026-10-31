@@ -17,7 +17,6 @@ const sources = {
   fundIssuer: "shielded_fund_receive_credential",
   anonymous: "shielded_anonymous_receive_presentation",
   fund: "shielded_fund_receive_presentation",
-  attachment: "shielded_attached_receive_presentation",
   owner: "shielded_identity_authorization_update",
 };
 
@@ -71,7 +70,7 @@ describe("Receive circuit real-proof public bindings", function () {
         issuerDirectory: directory,
       });
       requests = Object.fromEntries(
-        ["anonymous", "fund", "attachment"].map((kind) => [
+        ["anonymous", "fund"].map((kind) => [
           kind,
           JSON.parse(fs.readFileSync(path.join(temporary, `${kind}.input.json`), "utf8")),
         ]),
@@ -89,7 +88,6 @@ describe("Receive circuit real-proof public bindings", function () {
   for (const [kind, count] of [
     ["anonymous", 22],
     ["fund", 23],
-    ["attachment", 25],
   ]) {
     it(`${kind}: rejects mutation of all ${count} credential and operation signals`, async function () {
       const prepared = prepareReceivePresentationWitness(requests[kind]);
