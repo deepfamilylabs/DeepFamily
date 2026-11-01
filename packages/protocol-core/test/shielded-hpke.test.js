@@ -8,6 +8,7 @@ import {
   computeShieldedCiphertextHashField,
   decryptShieldedNote,
   deriveShieldedHeirKeyMaterial,
+  deriveShieldedReceivePublicKey,
   deriveShieldedViewPublicKey,
   encryptShieldedNote,
   splitShieldedViewPublicKey,
@@ -55,6 +56,29 @@ test("HPKE note round-trips with fixed length and randomized ciphertext", async 
     computeShieldedCiphertextHashField(first),
     computeShieldedCiphertextHashField(second),
   );
+});
+
+test("one restored view root scans both self/budget HPKE and diversified receive notes", async () => {
+  const { hpkeIkm } = deriveShieldedHeirKeyMaterial(13n);
+  const keys = [
+    await deriveShieldedViewPublicKey(hpkeIkm),
+    await deriveShieldedReceivePublicKey(hpkeIkm),
+    await deriveShieldedReceivePublicKey(hpkeIkm),
+  ];
+  const ciphertexts = [];
+  for (let index = 0; index < keys.length; index++) {
+    ciphertexts.push(await encryptShieldedNote({
+      ...context,
+      recipientPublicKey: keys[index],
+      payload: Uint8Array.of(index),
+    }));
+  }
+  for (let index = 0; index < ciphertexts.length; index++) {
+    assert.deepEqual(
+      await decryptShieldedNote({ ...context, hpkeIkm: getBytes(hpkeIkm), ciphertext: ciphertexts[index] }),
+      Uint8Array.of(index),
+    );
+  }
 });
 
 test("wrong identity, AAD, ciphertext mutation and truncation fail closed", async () => {

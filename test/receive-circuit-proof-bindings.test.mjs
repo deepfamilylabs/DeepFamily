@@ -123,7 +123,9 @@ describe("Receive circuit real-proof public bindings", function () {
       );
     }
     const stripped = proofs.fund.publicSignals.filter((_, index) => index !== 3);
-    assert.deepEqual(stripped, proofs.receive.publicSignals);
+    // Ordinary receive now binds its diversified address, while Fund binds its
+    // fixed X25519 key. Neither stripping identity nor reusing a proof changes purpose.
+    assert.notDeepEqual(stripped, proofs.receive.publicSignals);
     assert.equal(
       await snarkjs.groth16.verify(proofs.receive.key, stripped, proofs.fund.proof),
       false,

@@ -15,6 +15,7 @@ import {
   deriveShieldedIndependentKeyIdentitySecret,
   deriveShieldedIndependentKeyMaterial,
   deriveShieldedViewPublicKey,
+  deriveShieldedReceivePublicKey,
   encodeShieldedIndependentKeyMnemonic,
   splitShieldedViewPublicKey,
 } from "../packages/protocol-core/index.js";
@@ -33,6 +34,7 @@ const sourceNames = {
 const json = (file, value) => fs.writeFileSync(file, `${JSON.stringify(value, null, 2)}\n`);
 
 // Public synthetic recovery credentials for proving tests, never user material.
+export const RECEIVE_PROOF_DIVERSIFIER = `0x${"33".repeat(32)}`;
 const independentFixtureKey = "0x000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f";
 export const RECEIVE_PROOF_INDEPENDENT_RECOVERY = Object.freeze({
   identity: Object.freeze({
@@ -84,8 +86,10 @@ export async function prepareReceiveProofFixtures(
     const identity = buildShieldedClaimFixture().heirIdentityCommitment;
     const keys = await receiveProofFixtureKeyMaterial(keyMode);
     keyMode = Number(BigInt(keyMode));
-    const viewingKey = await deriveShieldedViewPublicKey(keys.hpkeIkm);
-    const view = splitShieldedViewPublicKey(viewingKey);
+    const viewingKeys = {
+      receive: await deriveShieldedReceivePublicKey(keys.hpkeIkm, RECEIVE_PROOF_DIVERSIFIER),
+      fund: await deriveShieldedViewPublicKey(keys.hpkeIkm),
+    };
     const alias = poseidon3([202610210001n, identity, BigInt(lineage.derivedSecretField)]);
     const witness = {
       ...Object.fromEntries(
@@ -104,8 +108,6 @@ export async function prepareReceiveProofFixtures(
       authorizationCounter: String(authorizationCounter),
       expiresAt: "1900000000",
       ownerCommitment: String(keys.ownerCommitment),
-      viewKeyLo: String(view.viewKeyLo),
-      viewKeyHi: String(view.viewKeyHi),
       keyMode: String(keyMode),
       identitySuiteId: "1",
       independentKeySuiteId: "1",
@@ -115,9 +117,11 @@ export async function prepareReceiveProofFixtures(
     };
     const credentials = {};
     for (const [purpose, source] of Object.entries(sourceNames)) {
+      const viewingKey = viewingKeys[purpose];
+      const view = splitShieldedViewPublicKey(viewingKey);
       const vk = JSON.parse(fs.readFileSync(path.join(issuerDir, `${source}.vkey.json`), "utf8"));
       const proof = await snarkjs.groth16.fullProve(
-        witness,
+        { ...witness, viewKeyLo: String(view.viewKeyLo), viewKeyHi: String(view.viewKeyHi) },
         path.join(issuerDir, `${source}.wasm`),
         path.join(issuerDir, `${source}_final.zkey`),
         undefined,

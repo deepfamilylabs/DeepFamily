@@ -4,6 +4,7 @@ import { bigintFrom } from "./bytes.js";
 import { MAX_UINT64, MAX_UINT128, SNARK_SCALAR_FIELD } from "./constants.js";
 import { protocolAssert } from "./errors.js";
 import { buildShieldedReceiveCredentialPublicSignals } from "./shielded-receive-credential.js";
+import { splitShieldedViewPublicKey } from "./shielded-hpke.js";
 import {
   buildShieldedIdentityAuthorizationState,
   getShieldedIdentityAuthorizationWitness,
@@ -26,15 +27,45 @@ const field = (value, label) => bigintFrom(value, label, SNARK_SCALAR_FIELD - 1n
 const check = (condition, message) =>
   protocolAssert(condition, "INVALID_SHIELDED_RECEIVE_PRESENTATION", message);
 
+function recipientBinding(alias, owner, mode, viewKeyLo, viewKeyHi, randomizer) {
+  check(randomizer !== 0n, "A receive presentation requires a nonzero randomizer");
+  let binding = poseidon3([SHIELDED_RECEIVE_BINDING_DOMAIN, alias, owner]);
+  binding = poseidon3([binding, mode, viewKeyLo]);
+  return poseidon3([binding, viewKeyHi, randomizer]);
+}
+
+/** Reconstruct a recipient binding from an opening, without an expired credential or saved code. */
+export function computeShieldedReceiveRecipientBinding(input) {
+  const alias = field(input.authorizationAlias, "authorizationAlias");
+  const owner = field(input.ownerCommitment, "ownerCommitment");
+  const mode = bigintFrom(input.keyMode, "keyMode", 1n);
+  const { viewKeyLo, viewKeyHi } = splitShieldedViewPublicKey(input.viewingKey);
+  check(alias !== 0n && owner !== 0n, "A receive binding requires a nonzero alias and owner");
+  check(viewKeyLo !== 0n || viewKeyHi !== 0n, "A receive binding requires a nonzero viewing key");
+  const binding = recipientBinding(
+    alias,
+    owner,
+    mode,
+    viewKeyLo,
+    viewKeyHi,
+    field(input.salt, "salt"),
+  );
+  check(binding !== 0n, "A receive binding must be nonzero");
+  return binding;
+}
+
 /** Shared by the presentation circuit and the money circuit's private receiver witness. */
 export function computeShieldedReceiveCredentialBinding({ credential, salt }) {
   const signals = buildShieldedReceiveCredentialPublicSignals(credential);
   const offset = credential.purpose === "fund" ? 1 : 0;
-  const randomizer = field(salt, "salt");
-  check(randomizer !== 0n, "A receive presentation requires a nonzero randomizer");
-  let binding = poseidon3([SHIELDED_RECEIVE_BINDING_DOMAIN, signals[0], signals[3 + offset]]);
-  binding = poseidon3([binding, signals[6 + offset], signals[4 + offset]]);
-  binding = poseidon3([binding, signals[5 + offset], randomizer]);
+  let binding = recipientBinding(
+    signals[0],
+    signals[3 + offset],
+    signals[6 + offset],
+    signals[4 + offset],
+    signals[5 + offset],
+    field(salt, "salt"),
+  );
   if (offset) binding = poseidon3([SHIELDED_FUND_RECEIVE_BINDING_DOMAIN, binding, signals[3]]);
   check(binding !== 0n, "A receive binding must be nonzero");
   return binding;

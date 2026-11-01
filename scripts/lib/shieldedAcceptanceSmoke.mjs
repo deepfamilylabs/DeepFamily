@@ -39,6 +39,7 @@ import {
   deriveIdentityMaterial,
   deriveShieldedHeirKeyMaterial,
   deriveShieldedViewPublicKey,
+  deriveShieldedReceivePublicKey,
   splitShieldedViewPublicKey,
   encodeShieldedBudgetNotePayload,
   encodeShieldedReceiveCredential,
@@ -267,6 +268,9 @@ export async function runShieldedAcceptanceSmoke({
     const files = candidate.circuits[action];
     const alias = computeShieldedAuthorizationAlias(material);
     const checkpoint = await loadAuthorizationWitness(alias);
+    const viewingKey = purpose === "receive"
+      ? await deriveShieldedReceivePublicKey(keys.hpkeIkm)
+      : keys.viewingKey;
     const statement = {
       purpose,
       ...(purpose === "fund" ? { identityCommitment: material.identityCommitment } : {}),
@@ -274,10 +278,10 @@ export async function runShieldedAcceptanceSmoke({
       authorizationCounter: checkpoint.authorizationWitness.authorizationCounter,
       expiresAt: checkpoint.asOf + 86400n,
       ownerCommitment: keys.ownerCommitment,
-      viewingKey: keys.viewingKey,
+      viewingKey,
     };
     const signals = buildShieldedReceiveCredentialPublicSignals(statement);
-    const view = splitShieldedViewPublicKey(keys.viewingKey);
+    const view = splitShieldedViewPublicKey(viewingKey);
     const generated = generateProof(
       root,
       files,
@@ -1207,13 +1211,13 @@ export async function runShieldedAcceptanceSmoke({
       }, inputs.signals, { execution: "verifier-call" });
     };
 
+    const transferCredentials = [await receiveCodeFor(childMaterial, childKeys, "receive"), null];
     const transferOutputs = await Promise.all([
-      valueNote(heirKeys, 400n),
+      valueNote({ ...heirKeys, viewingKey: transferCredentials[0].viewingKey }, 400n),
       valueNote(donorKeys, 100n),
     ]);
     const transferPath = await notePath(publicFundChange);
     const transferData = valueData(publicFundChange, transferPath, transferOutputs);
-    const transferCredentials = [await receiveCodeFor(childMaterial, childKeys, "receive"), null];
     const transferReceiverWitness = await authorizeReceivers("privateTransfer", transferData, transferCredentials);
     const transferInputs = publicInputsFor("privateTransfer", transferData);
     const transferProof = await prove(

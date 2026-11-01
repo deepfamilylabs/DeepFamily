@@ -9,6 +9,11 @@ import {
   deriveShieldedHeirKeyMaterial,
   deriveShieldedIndependentKeyMaterial,
   deriveShieldedViewPublicKey,
+  createShieldedLetterEnvelope,
+  decryptShieldedLetter,
+  decryptShieldedNote,
+  encryptShieldedLetter,
+  encryptShieldedNote,
   encodeShieldedReceiveCredential,
   wrapIdentityCommitmentAsPersonHash,
 } from "@deepfamily/protocol-core";
@@ -201,6 +206,51 @@ describe("receive code proofs", () => {
       fingerprint: decodeShieldedReceiveCredential(code).fingerprint,
     });
   }, 60_000);
+
+  it.each([0, 1] as const)("issues different receiving public keys and recovers both codes with the original mode-%s secret", async keyMode => {
+    const root = new Uint8Array(32).fill(23);
+    const credentialSecret = new Uint8Array(32).fill(91);
+    const restore = () => keyMode === 0
+      ? Promise.resolve(deriveShieldedHeirKeyMaterial(identity.derivedSecretField))
+      : deriveShieldedIndependentKeyMaterial({
+          independentKeyRoot: root.slice(),
+          independentKeyIdentitySecret: credentialSecret.slice(),
+        });
+    const material = await restore();
+    const first = await createShieldedReceiveCode({
+      ...identity, purpose: "receive", keyMode, keyMaterial: material, expiresAt: 1n,
+    });
+    const second = await createShieldedReceiveCode({
+      ...identity, purpose: "receive", keyMode, keyMaterial: material, expiresAt: 1n,
+    });
+    const credentials = [first, second].map(item => decodeShieldedReceiveCredential(item.code));
+    expect(credentials[0].viewingKey).toHaveLength(64);
+    expect(credentials[1].viewingKey).toHaveLength(64);
+    expect(credentials[0].viewingKey.slice(32)).not.toEqual(credentials[1].viewingKey.slice(32));
+    expect(credentials[0].ownerCommitment).toBe(credentials[1].ownerCommitment);
+    expect(credentials[0].authorizationAlias).toBe(credentials[1].authorizationAlias);
+    const changedDiversifier = credentials[0].viewingKey.slice();
+    changedDiversifier[0] ^= 1;
+    const alteredCode = encodeShieldedReceiveCredential({ ...credentials[0], viewingKey: changedDiversifier });
+    await expect(verifyShieldedReceiveCode(alteredCode)).resolves.toEqual({ ok: false, reason: "invalid" });
+    const restored = await restore();
+    const noteScope = { chainId: 31337n, poolAddress: "0x1111111111111111111111111111111111111111" };
+    const letterScope = { chainId: 31337n, lettersAddress: "0x2222222222222222222222222222222222222222", messageId: 7n };
+    for (const [index, item] of [first, second].entries()) {
+      await expect(verifyShieldedReceiveCode(item.code)).resolves.toMatchObject({ ok: true, purpose: "receive", keyMode });
+      const recipientPublicKey = credentials[index].viewingKey;
+      const payload = Uint8Array.of(1, 2, index);
+      const ciphertext = await encryptShieldedNote({ ...noteScope, recipientPublicKey, payload });
+      await expect(decryptShieldedNote({ ...noteScope, hpkeIkm: restored.hpkeIkm, ciphertext })).resolves.toEqual(payload);
+      const envelope = createShieldedLetterEnvelope({
+        body: `Restored letter ${index}`,
+        salt: 9n,
+        authorizationAlias: credentials[index].authorizationAlias,
+      });
+      const letter = await encryptShieldedLetter({ ...letterScope, recipientPublicKey, envelope });
+      await expect(decryptShieldedLetter({ ...letterScope, hpkeIkm: restored.hpkeIkm, ciphertext: letter })).resolves.toEqual(envelope);
+    }
+  }, 120_000);
 
   it("creates a recipient code using the current nonzero chain counter", async () => {
     const material = computeIdentityFromDerivedSecret(identity);

@@ -6,7 +6,7 @@ import {
   createLineageTree,
   decryptShieldedNote,
   deriveShieldedHeirKeyMaterial,
-  deriveShieldedViewPublicKey,
+  deriveShieldedReceivePublicKey,
   planShieldedValueSpend,
   verifyShieldedNotePayload,
   wrapIdentityCommitmentAsPersonHash,
@@ -125,7 +125,7 @@ async function recipientFixture(): Promise<VerifiedShieldedRecipient> {
   return {
     identityCommitment: recipientIdentityCommitment,
     ownerCommitment: keys.ownerCommitment,
-    viewingKey: hexlify(await deriveShieldedViewPublicKey(keys.hpkeIkm)),
+    viewingKey: hexlify(await deriveShieldedReceivePublicKey(keys.hpkeIkm)),
     personHash: wrapIdentityCommitmentAsPersonHash(recipientIdentityCommitment),
   } as VerifiedShieldedRecipient;
 }
@@ -597,7 +597,7 @@ describe("local private transfer and unshield preparation", () => {
     const { input0, input1 } = await walletFixture();
     const receiver = await recipientFixture();
     const otherKey = hexlify(
-      await deriveShieldedViewPublicKey(deriveShieldedHeirKeyMaterial(secondSecret).hpkeIkm),
+      await deriveShieldedReceivePublicKey(deriveShieldedHeirKeyMaterial(secondSecret).hpkeIkm),
     );
     const prepared = await prepareShieldedPrivateTransfer({
       chainId,

@@ -25,8 +25,10 @@ import {
   deriveShieldedIndependentKeyIdentitySecret,
   deriveShieldedIndependentKeyMaterial,
   deriveShieldedViewPublicKey,
+  deriveShieldedReceivePublicKey,
   emptyShieldedReceiveAuthorizations,
   encodeShieldedBudgetNotePayload,
+  encodeShieldedValueNotePayload,
   encryptShieldedLetter,
   encryptShieldedNote,
   prepareShieldedReceivePresentation,
@@ -38,6 +40,7 @@ import { buildShieldedFundingFixtures } from "../circuits/test/generate_shielded
 import { buildLineageFixture } from "../circuits/test/generate_lineage_fixture.mjs";
 import {
   prepareReceiveProofFixtures,
+  RECEIVE_PROOF_DIVERSIFIER,
   receiveProofFixtureKeyMaterial,
   RECEIVE_PROOF_INDEPENDENT_RECOVERY,
 } from "../scripts/receive-proof-smoke.mjs";
@@ -104,6 +107,10 @@ describe("Receive presentation real-proof canonical pool and letter integration"
         let keys = await receiveProofFixtureKeyMaterial(keyMode);
         const heirOwnerCommitment = keys.ownerCommitment;
         const viewingKey = await deriveShieldedViewPublicKey(keys.hpkeIkm);
+        const receiveViewingKey = await deriveShieldedReceivePublicKey(
+          keys.hpkeIkm,
+          RECEIVE_PROOF_DIVERSIFIER,
+        );
         const commonCredential = {
           authorizationAlias: BigInt(raw.credentialPublicSignals[0]),
           authorizationCounter: 0n,
@@ -115,6 +122,7 @@ describe("Receive presentation real-proof canonical pool and letter integration"
         const receive = {
           ...commonCredential,
           purpose: "receive",
+          viewingKey: receiveViewingKey,
           proof: raw.credentialProof,
         };
         const fundCredential = {
@@ -434,7 +442,33 @@ describe("Receive presentation real-proof canonical pool and letter integration"
         assert.equal(await pool.totalShielded(), 1000n);
         const transferRoot = (await pool.noteShard(0)).root;
         const transferPath = membership(await pool.getNoteMerkleProof(0, donorLeaf));
-        const external = value(100n, 201n, "d1", keys.ownerCommitment);
+        const externalPayload = encodeShieldedValueNotePayload(
+          { ownerCommitment: heirOwnerCommitment, amount: 100n, nonce: 201n },
+          scope,
+        );
+        const externalCiphertext = hre.ethers.hexlify(
+          await encryptShieldedNote({
+            ...scope,
+            recipientPublicKey: receiveViewingKey,
+            payload: externalPayload,
+          }),
+        );
+        externalPayload.fill(0);
+        const external = {
+          amount: 100n,
+          nonce: 201n,
+          ciphertext: externalCiphertext,
+          ciphertextHashField: hashField(externalCiphertext),
+          commitment: computeShieldedValueNoteCommitment(
+            {
+              ownerCommitment: heirOwnerCommitment,
+              amount: 100n,
+              nonce: 201n,
+              ciphertextHashField: hashField(externalCiphertext),
+            },
+            scope,
+          ),
+        };
         const selfChange = value(donor.amount - 100n, 202n, "d2");
         const transfer = {
           ...zeroData(),
@@ -519,13 +553,17 @@ describe("Receive presentation real-proof canonical pool and letter integration"
         assert.equal(await pool.commitmentExists(selfChange.commitment), true);
         assert.equal(await pool.totalShielded(), 1000n);
         const messageId = 700n;
-        const envelope = createShieldedLetterEnvelope({ body: "家书\n落款：家人", salt: 800n });
+        const envelope = createShieldedLetterEnvelope({
+          body: "家书\n落款：家人",
+          salt: 800n,
+          authorizationAlias: receive.authorizationAlias,
+        });
         const ciphertext = hre.ethers.hexlify(
           await encryptShieldedLetter({
             chainId,
             lettersAddress,
             messageId,
-            recipientPublicKey: viewingKey,
+            recipientPublicKey: receiveViewingKey,
             envelope,
           }),
         );
@@ -566,21 +604,96 @@ describe("Receive presentation real-proof canonical pool and letter integration"
             hpkeIkm: keys.hpkeIkm,
             ciphertext: fetched.payload,
             expectedCiphertextHash: record.blob.payloadHash,
+            expectedRecipient: {
+              authorizationAlias: receive.authorizationAlias,
+              ownerCommitment: keys.ownerCommitment,
+              keyMode,
+              recipientBinding: record.recipientBinding,
+            },
           }),
           envelope,
         );
         await expect(
           letters.registerLetter(delivery, ciphertext, proof),
         ).to.be.revertedWithCustomError(letters, "MessageAlreadyRegistered");
+        // The archive authenticates a credential and the ciphertext hash. The receiver must
+        // also verify that the credential names the actual decryption recipient.
+        const otherRecipient = deriveShieldedHeirKeyMaterial(999n);
+        const mismatchedId = 701n;
+        const mismatchedEnvelope = createShieldedLetterEnvelope({
+          body: "Recipient consistency regression",
+          salt: 801n,
+          authorizationAlias: receive.authorizationAlias,
+        });
+        const mismatchedCiphertext = hre.ethers.hexlify(
+          await encryptShieldedLetter({
+            chainId,
+            lettersAddress,
+            messageId: mismatchedId,
+            recipientPublicKey: await deriveShieldedReceivePublicKey(otherRecipient.hpkeIkm),
+            envelope: mismatchedEnvelope,
+          }),
+        );
+        const mismatchedPresentation = await prepare(
+          receive,
+          lettersAddress,
+          1n,
+          mismatchedId,
+          hre.ethers.keccak256(mismatchedCiphertext),
+          mismatchedEnvelope.salt,
+        );
+        await letters.registerLetter(
+          {
+            messageId: mismatchedId,
+            checkpointId: 1n,
+            asOf: BigInt(mismatchedPresentation.presentation.asOf),
+            deadline: mismatchedPresentation.deadline,
+            recipientBinding: mismatchedPresentation.recipientBinding,
+          },
+          mismatchedCiphertext,
+          prover.presentation(mismatchedPresentation),
+        );
+        const mismatchedRecord = await letters.letterRecord(mismatchedId);
+        assert.deepEqual(
+          await decryptShieldedLetter({
+            chainId,
+            lettersAddress,
+            messageId: mismatchedId,
+            hpkeIkm: otherRecipient.hpkeIkm,
+            ciphertext: mismatchedCiphertext,
+            expectedCiphertextHash: mismatchedRecord.blob.payloadHash,
+          }),
+          mismatchedEnvelope,
+        );
+        await assert.rejects(
+          decryptShieldedLetter({
+            chainId,
+            lettersAddress,
+            messageId: mismatchedId,
+            hpkeIkm: otherRecipient.hpkeIkm,
+            ciphertext: mismatchedCiphertext,
+            expectedCiphertextHash: mismatchedRecord.blob.payloadHash,
+            expectedRecipient: {
+              ownerCommitment: otherRecipient.ownerCommitment,
+              keyMode: 0,
+              recipientBinding: mismatchedRecord.recipientBinding,
+            },
+          }),
+          { code: "SHIELDED_LETTER_DECRYPTION_FAILED" },
+        );
         const records = [{ messageId, record, envelope, ciphertext: fetched.payload }];
         const pendingId = 799n;
-        const pendingEnvelope = createShieldedLetterEnvelope({ body: "撤销窗口检查", salt: 899n });
+        const pendingEnvelope = createShieldedLetterEnvelope({
+          body: "撤销窗口检查",
+          salt: 899n,
+          authorizationAlias: receive.authorizationAlias,
+        });
         const pendingCiphertext = hre.ethers.hexlify(
           await encryptShieldedLetter({
             chainId,
             lettersAddress,
             messageId: pendingId,
-            recipientPublicKey: viewingKey,
+            recipientPublicKey: receiveViewingKey,
             envelope: pendingEnvelope,
           }),
         );
@@ -746,13 +859,17 @@ describe("Receive presentation real-proof canonical pool and letter integration"
         // deadline. Once the code has expired no new proof can be prepared, while every
         // previously authenticated immutable blob still recovers below.
         const lastId = 801n;
-        const lastEnvelope = createShieldedLetterEnvelope({ body: "到期前一分钟", salt: 901n });
+        const lastEnvelope = createShieldedLetterEnvelope({
+          body: "到期前一分钟",
+          salt: 901n,
+          authorizationAlias: receive.authorizationAlias,
+        });
         const lastCiphertext = hre.ethers.hexlify(
           await encryptShieldedLetter({
             chainId,
             lettersAddress,
             messageId: lastId,
-            recipientPublicKey: viewingKey,
+            recipientPublicKey: receiveViewingKey,
             envelope: lastEnvelope,
           }),
         );
@@ -801,6 +918,33 @@ describe("Receive presentation real-proof canonical pool and letter integration"
         const noteEvents = await pool.queryFilter(pool.filters.NoteAppended());
         assert.equal(new Set(budgets.map((budget) => budget.commitment)).size, 2);
         for (const restored of restoredKeys) {
+          // No issued code, diversifier or per-code private key is needed to find
+          // and decrypt the actual transfer after restoring the original backup.
+          const transferEvent = noteEvents.find(
+            (entry) => entry.args.commitment === external.commitment,
+          );
+          assert.ok(transferEvent);
+          const transferCiphertext = hre.ethers.getBytes(transferEvent.args.ciphertext);
+          const transferPayload = await decryptShieldedNote({
+            ...scope,
+            hpkeIkm: restored.hpkeIkm,
+            ciphertext: transferCiphertext,
+          });
+          try {
+            const recoveredTransfer = verifyShieldedNotePayload(
+              {
+                payload: transferPayload,
+                ciphertext: transferCiphertext,
+                noteCommitment: external.commitment,
+              },
+              scope,
+            );
+            assert.equal(recoveredTransfer.note.kind, "value");
+            assert.equal(recoveredTransfer.note.amount, 100n);
+            assert.equal(recoveredTransfer.note.ownerCommitment, heirOwnerCommitment);
+          } finally {
+            transferPayload.fill(0);
+          }
           const restoredViewingKey = await deriveShieldedViewPublicKey(restored.hpkeIkm);
           for (const budget of budgets) {
             const event = noteEvents.find((entry) => entry.args.commitment === budget.commitment);
@@ -842,6 +986,11 @@ describe("Receive presentation real-proof canonical pool and letter integration"
                 hpkeIkm: restored.hpkeIkm,
                 ciphertext,
                 expectedCiphertextHash: record.blob.payloadHash,
+                expectedRecipient: {
+                  ownerCommitment: restored.ownerCommitment,
+                  keyMode,
+                  recipientBinding: record.recipientBinding,
+                },
               }),
               envelope,
             );

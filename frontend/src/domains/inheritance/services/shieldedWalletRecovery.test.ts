@@ -9,6 +9,7 @@ import {
   createLineageTree,
   deriveShieldedHeirKeyMaterial,
   deriveShieldedIndependentKeyMaterial,
+  deriveShieldedReceivePublicKey,
   deriveShieldedViewPublicKey,
   encodeShieldedBudgetNotePayload,
   encodePublicShieldedBudgetEnvelope,
@@ -245,6 +246,34 @@ async function fixture() {
 }
 
 describe("local shielded wallet recovery", () => {
+  it.each([0, 1] as const)("recovers transfers to multiple code public keys using only the restored mode-%s secret", async keyMode => {
+    const derive = () => keyMode === 0
+      ? Promise.resolve(identityKeyMaterial(13n))
+      : deriveShieldedIndependentKeyMaterial({
+          independentKeyRoot: new Uint8Array(32).fill(31),
+          independentKeyIdentitySecret: new Uint8Array(32).fill(47),
+        });
+    const keys = await derive();
+    const receivingKeys = await Promise.all([
+      deriveShieldedReceivePublicKey(keys.hpkeIkm),
+      deriveShieldedReceivePublicKey(keys.hpkeIkm),
+    ]);
+    expect(receivingKeys[0].slice(32)).not.toEqual(receivingKeys[1].slice(32));
+    const records = await Promise.all(receivingKeys.map(async (recipientPublicKey, index) => {
+      const payload = encodeShieldedValueNotePayload({
+        ownerCommitment: keys.ownerCommitment,
+        amount: BigInt(index + 1),
+        nonce: BigInt(index + 11),
+      }, context);
+      return { payload, ciphertext: await encryptShieldedNote({ ...context, recipientPublicKey, payload }) };
+    }));
+    const { pool, commitments } = await poolFromCiphertexts(records);
+    const restored = await derive();
+    const recovered = await recoverLocalShieldedWallet(pool, { keyMaterial: restored });
+    expect([...recovered.ownedNotes.keys()]).toEqual(commitments);
+    expect(listUnspentRecoveredShieldedNotes(recovered, restored).map(item => item.note.kind === "value" ? item.note.amount : 0n)).toEqual([1n, 2n]);
+  });
+
   it("requires explicit key material with an owner, HPKE input, and key mode", async () => {
     const { pool } = await fixture();
     const incompleteInputs = [

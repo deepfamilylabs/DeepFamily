@@ -1,4 +1,3 @@
-import { Aes128Gcm, CipherSuite, DhkemX25519HkdfSha256, HkdfSha256 } from "@hpke/core";
 import { getBytes, keccak256, solidityPacked, toUtf8Bytes } from "ethers";
 import {
   asUint8Array,
@@ -16,6 +15,13 @@ import { MAX_UINT64, SNARK_SCALAR_FIELD } from "./constants.js";
 import { ProtocolError, protocolAssert } from "./errors.js";
 import { assertAddress } from "./identity.js";
 import { generateShieldedRandomField } from "./shielded-inheritance.js";
+import {
+  assertShieldedReceivePublicKey,
+  encryptShieldedReceivePayload,
+  decryptShieldedReceivePayload,
+  SHIELDED_RECEIVE_METADATA_BYTES,
+} from "./shielded-receive-encryption.js";
+import { computeShieldedReceiveRecipientBinding } from "./shielded-receive-presentation.js";
 
 export const SHIELDED_LETTER_ENVELOPE_VERSION = 1;
 export const SHIELDED_LETTER_HPKE_ENCAPSULATED_BYTES = 32;
@@ -23,17 +29,12 @@ export const SHIELDED_LETTER_HPKE_ENCAPSULATED_BYTES = 32;
 const MAX_FIELD = SNARK_SCALAR_FIELD - 1n;
 const ENVELOPE_MAGIC = Uint8Array.of(0x44, 0x46, 0x4c, 0x45); // DFLE
 const CIPHERTEXT_PREFIX = Uint8Array.of(0x44, 0x46, 0x4c, 0x43, 1); // DFLC, version 1
-const ENVELOPE_HEADER_BYTES = 48;
+const ENVELOPE_HEADER_BYTES = 80;
 const AEAD_TAG_BYTES = 16;
 const ENCAPSULATED_OFFSET = CIPHERTEXT_PREFIX.length;
 const SEALED_OFFSET = ENCAPSULATED_OFFSET + SHIELDED_LETTER_HPKE_ENCAPSULATED_BYTES;
 const AAD_DOMAIN = keccak256(toUtf8Bytes("DeepFamily:PrivateLetterHPKE:v1"));
 const HPKE_INFO = toUtf8Bytes("DeepFamily:PrivateLetterHPKE:v1");
-const suite = new CipherSuite({
-  kem: new DhkemX25519HkdfSha256(),
-  kdf: new HkdfSha256(),
-  aead: new Aes128Gcm(),
-});
 
 function field(value, label, nonzero = false) {
   const result = bigintFrom(value, label, MAX_FIELD);
@@ -126,6 +127,7 @@ function normalizeEnvelope(input, generateSalt = false) {
       generateSalt && input.salt === undefined
         ? generateShieldedRandomField()
         : field(input.salt, "salt", true),
+    authorizationAlias: field(input.authorizationAlias, "authorizationAlias", true),
   };
 }
 
@@ -152,7 +154,7 @@ export function createShieldedLetterEnvelope(input) {
 
 /**
  * Canonical binary envelope: DFLE, version, three zero reserved bytes, 32-byte
- * salt, uint64 UTF-8 length, then the exact UTF-8 body. No application-level
+ * salt, 32-byte authorization alias, uint64 UTF-8 length, then the exact UTF-8 body. No application-level
  * text size cap.
  */
 export function encodeShieldedLetterEnvelope(input) {
@@ -163,7 +165,8 @@ export function encodeShieldedLetterEnvelope(input) {
     bytes.set(ENVELOPE_MAGIC);
     bytes[4] = SHIELDED_LETTER_ENVELOPE_VERSION;
     writeField(bytes, 8, envelope.salt);
-    writeUint64BE(bytes, 40, BigInt(body.length));
+    writeField(bytes, 40, envelope.authorizationAlias);
+    writeUint64BE(bytes, 72, BigInt(body.length));
     bytes.set(body, ENVELOPE_HEADER_BYTES);
     return bytes;
   } finally {
@@ -191,13 +194,14 @@ export function decodeShieldedLetterEnvelope(value) {
     "Letter envelope has invalid reserved bytes",
   );
   protocolAssert(
-    readUint64BE(bytes, 40) === BigInt(bytes.length - ENVELOPE_HEADER_BYTES),
+    readUint64BE(bytes, 72) === BigInt(bytes.length - ENVELOPE_HEADER_BYTES),
     "INVALID_SHIELDED_LETTER_ENVELOPE",
     "Letter envelope has an invalid body length",
   );
   return normalizeEnvelope({
     version: bytes[4],
     salt: BigInt(bytesToHex(bytes.subarray(8, 40))),
+    authorizationAlias: BigInt(bytesToHex(bytes.subarray(40, 72))),
     body: decodeBody(bytes.subarray(ENVELOPE_HEADER_BYTES)),
   });
 }
@@ -217,7 +221,12 @@ export function buildShieldedLetterHpkeAad(input) {
 function assertCiphertext(value) {
   const bytes = asUint8Array(value, "ciphertext");
   protocolAssert(
-    bytes.length >= SEALED_OFFSET + ENVELOPE_HEADER_BYTES + 1 + AEAD_TAG_BYTES &&
+    bytes.length >=
+      SEALED_OFFSET +
+        SHIELDED_RECEIVE_METADATA_BYTES +
+        ENVELOPE_HEADER_BYTES +
+        1 +
+        AEAD_TAG_BYTES &&
       equalBytesConstantTime(bytes.subarray(0, CIPHERTEXT_PREFIX.length), CIPHERTEXT_PREFIX),
     "INVALID_SHIELDED_LETTER_CIPHERTEXT",
     "Letter ciphertext is incomplete or has an unsupported format",
@@ -246,22 +255,28 @@ export function splitShieldedLetterCiphertextHash(ciphertext) {
  * Archive segmentation is applied to the resulting authenticated bytes.
  */
 export async function encryptShieldedLetter(input) {
-  const scope = normalizeShieldedLetterScope(input);
+  normalizeShieldedLetterScope(input);
   const envelope = normalizeEnvelope(input.envelope);
   const aad = buildShieldedLetterHpkeAad(input);
-  const publicKey = bytes32(input.recipientPublicKey, "recipientPublicKey");
+  const publicKey = assertShieldedReceivePublicKey(input.recipientPublicKey);
   const plaintext = encodeShieldedLetterEnvelope(envelope);
   try {
-    const recipientPublicKey = await suite.kem.deserializePublicKey(publicKey);
-    const sender = await suite.createSenderContext({ recipientPublicKey, info: HPKE_INFO });
-    const body = new Uint8Array(await sender.seal(plaintext, aad));
+    const body = await encryptShieldedReceivePayload({
+      recipientPublicKey: publicKey,
+      plaintext,
+      aad,
+      info: HPKE_INFO,
+    });
     protocolAssert(
-      sender.enc.byteLength === SHIELDED_LETTER_HPKE_ENCAPSULATED_BYTES &&
-        body.length === plaintext.length + AEAD_TAG_BYTES,
+      body.length ===
+        SHIELDED_LETTER_HPKE_ENCAPSULATED_BYTES +
+          SHIELDED_RECEIVE_METADATA_BYTES +
+          plaintext.length +
+          AEAD_TAG_BYTES,
       "INVALID_SHIELDED_LETTER_CIPHERTEXT",
       "HPKE produced an unexpected letter ciphertext length",
     );
-    return concatBytes(CIPHERTEXT_PREFIX, new Uint8Array(sender.enc), body);
+    return concatBytes(CIPHERTEXT_PREFIX, body);
   } finally {
     wipeBytes(plaintext);
     wipeBytes(publicKey);
@@ -290,16 +305,60 @@ export async function decryptShieldedLetter(input) {
     );
   }
   const ikm = bytes32(input.hpkeIkm, "hpkeIkm");
-  let plaintext;
+  let plaintext, recipientPublicKey;
   try {
-    const pair = await suite.kem.deriveKeyPair(ikm);
-    const recipient = await suite.createRecipientContext({
-      recipientKey: pair.privateKey,
-      enc: ciphertext.subarray(ENCAPSULATED_OFFSET, SEALED_OFFSET),
+    // Snapshot trusted expectations before asynchronous crypto. Payload aliases
+    // alone are not authority: the binding must also open to the local owner,
+    // key mode and public key reconstructed from this wallet's viewing seed.
+    const expected =
+      input.expectedRecipient === undefined
+        ? undefined
+        : {
+            ownerCommitment: field(
+              input.expectedRecipient.ownerCommitment,
+              "ownerCommitment",
+              true,
+            ),
+            keyMode: bigintFrom(input.expectedRecipient.keyMode, "keyMode", 1n),
+            recipientBinding: field(
+              input.expectedRecipient.recipientBinding,
+              "recipientBinding",
+              true,
+            ),
+            ...(input.expectedRecipient.authorizationAlias === undefined
+              ? {}
+              : {
+                  authorizationAlias: field(
+                    input.expectedRecipient.authorizationAlias,
+                    "authorizationAlias",
+                    true,
+                  ),
+                }),
+          };
+    ({ plaintext, recipientPublicKey } = await decryptShieldedReceivePayload({
+      viewIkm: ikm,
+      ciphertext: ciphertext.subarray(ENCAPSULATED_OFFSET),
+      aad,
       info: HPKE_INFO,
-    });
-    plaintext = new Uint8Array(await recipient.open(ciphertext.subarray(SEALED_OFFSET), aad));
-    return decodeShieldedLetterEnvelope(plaintext);
+    }));
+    const envelope = decodeShieldedLetterEnvelope(plaintext);
+    if (expected) {
+      const binding = computeShieldedReceiveRecipientBinding({
+        authorizationAlias: envelope.authorizationAlias,
+        ownerCommitment: expected.ownerCommitment,
+        keyMode: expected.keyMode,
+        viewingKey: recipientPublicKey,
+        salt: envelope.salt,
+      });
+      protocolAssert(
+        binding === expected.recipientBinding &&
+          (expected.authorizationAlias === undefined ||
+            expected.authorizationAlias === envelope.authorizationAlias),
+        "SHIELDED_LETTER_RECIPIENT_BINDING_MISMATCH",
+        "Letter authorization does not match the receiving wallet",
+      );
+    }
+    return envelope;
   } catch {
     // Do not propagate library or decoder details that could contain plaintext.
     throw new ProtocolError(
@@ -309,5 +368,6 @@ export async function decryptShieldedLetter(input) {
   } finally {
     wipeBytes(ikm);
     wipeBytes(plaintext);
+    wipeBytes(recipientPublicKey);
   }
 }

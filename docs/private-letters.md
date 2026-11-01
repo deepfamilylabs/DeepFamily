@@ -34,6 +34,72 @@ paths. Owner authorization is independent of tree depth. Distinct aliases with
 identical low 64 bits cannot both be inserted; this separate dictionary capacity
 limit rejects without modifying state.
 
+## Diversified ordinary receive keys
+
+Each newly generated `dfrecv` code carries a fresh 64-byte receive address:
+`diversifier[32] || publicKey[32]`. The public point uses the Ristretto255
+prime-order group and a domain-separated hash-to-group base for that diversifier.
+The selected wallet's original viewing input deterministically recreates one
+viewing scalar; different bases produce different receiving public points for the
+same scalar. `dffund` continues to carry its fixed 32-byte X25519 key for budget
+funding and recovery. These are separate current purposes, not historical formats.
+Both credential packets are 405 bytes before Bech32m encoding.
+
+The two receive-circuit key limbs authenticate a domain-separated SHA-256 digest
+of the complete 64-byte ordinary receive address. Thus changing its diversifier
+or point changes the issuer statement and operation binding. Fund key limbs retain
+the raw X25519 encoding. Spending secrets, owner commitments, identity aliases,
+authorization counters and budget recipient keys keep their existing semantics.
+In particular, changing the public receiving point alone does not make complete
+codes unlinkable: their owner commitment and identity authorization alias remain
+stable as described above.
+
+Ordinary transfer notes and private letters encrypt with the diversified receiving
+address. Their ephemeral group point allows the recipient to derive the shared
+secret using its original viewing scalar before knowing the diversifier. The
+address diversifier and encryption randomness are authenticated inside the
+encrypted plaintext, and recovery verifies the reconstructed ephemeral point
+before returning any payload. Recovery needs the original wallet credentials and,
+for independent mode, the original independent root; it does not require saved
+codes, per-code private keys, diversifiers or an address index. Expiry and counter
+revocation do not participate in historical decryption.
+
+The ordinary receive suite is specified by the following domain-separated steps
+(`||` denotes concatenation, all seeds and diversifiers are 32 bytes):
+
+- `v = LEOS2IP(SHA-512(ViewDomain || viewIkm || counterByte)) mod L`, retrying the
+  counter only if the scalar is zero. `L` is the Ristretto255 scalar order.
+- `G_d = hash_to_ristretto255(d, DST)`, using the RFC 9380 Ristretto mapping and
+  rejecting the identity point; `P_d = v G_d`. Address encodings are canonical and
+  the identity point is rejected.
+- Draw `rseed` from the OS/browser CSPRNG, derive `e` by the same nonzero-scalar
+  procedure under `EphemeralDomain`, then form `epk = e G_d` and `ss = Encode(e P_d)`.
+- `context = SHA-256(KdfDomain || epk || SHA-256(info) || SHA-256(aad))`.
+  Derive the 32-byte AES key and 12-byte nonce with HKDF-SHA256 using `ss` as IKM,
+  `context` as salt and distinct `KeyLabel` / `NonceLabel` values.
+- AES-256-GCM authenticates `d || rseed || payload` with the caller's AAD.
+  A receiver computes `ss = Encode(v epk)`, opens the ciphertext, and rejects unless
+  `epk = e G_d` reconstructs from the authenticated `d` and `rseed`.
+
+The exact domain strings and DST are frozen in
+`packages/protocol-core/shielded-receive-encryption.js`. They separate view-scalar,
+ephemeral-scalar, group-base, key and nonce derivation. The ciphertext reveals only
+its fresh ephemeral point and authenticated ciphertext, not the reusable address
+or its diversifier. Ordinary money notes still occupy 512 bytes: 32-byte ephemeral
+point, 464 bytes of sealed plaintext including 64 bytes of hidden metadata, and a
+16-byte GCM tag. Their payload capacity is 397 bytes after the 3-byte note header.
+Private letters add the same 64 encrypted metadata bytes without a fixed-size cap.
+
+Budgets, self outputs and donor backup memos retain their X25519 HPKE encryption.
+The common wallet scan recognizes recoverable current-purpose outputs using the
+same restored viewing input. Ordinary transfer payloads use the diversified
+fixed-size envelope; budget and donor memo payloads use the HPKE envelope. Private
+letters use the diversified envelope and retain their chain, archive and message-ID
+AAD. The diversified construction reuses standardized Ristretto255, hash-to-group,
+HKDF and authenticated-encryption primitives, but the composed application scheme
+has not received an independent cryptographic audit; it is not a claim that the
+application implements the complete Zcash protocol or inherits its security proof.
+
 ## Budget receiving credentials
 
 Identity credentials and the independent key each issue a receive code and a
@@ -88,7 +154,7 @@ factory. It authenticates ciphertext, message ID, recipient commitment and the p
 deadline before writing immutable Archive segments.
 
 Letter bodies are plain text encrypted in the browser's secret-owning Worker with
-the existing receiving HPKE key. The message's chain, archive and ID are included in
+the selected diversified receive address. The message's chain, archive and ID are included in
 AAD.
 
 The inheritance page places Private letters below Child budgets in the unlocked
@@ -106,6 +172,20 @@ Independent-key mode still needs its original mnemonic or Shielded Key. Credenti
 expiry or revocation does not prevent recovery of an already sent letter. Plaintext
 and secrets are not persisted in ordinary application storage or sent to a prover
 service.
+
+Before displaying a decrypted letter, recovery recomputes the on-chain recipient
+binding using the session's owner commitment and key mode, the public receiving
+key reconstructed during decryption, and the encrypted authorization alias and
+salt. A known session identity must also match that alias. Successful decryption
+alone does not establish that the presentation authorized this recipient; a
+mismatched binding is rejected. The encrypted alias lets an independent-key backup
+perform the same check without requiring the identity-derived key branch.
+
+The canonical encrypted letter envelope is `DFLE[4] || version[1] || reserved[3] ||
+salt[32] || authorizationAlias[32] || utf8Length[8] || body`. Its header is 80 bytes;
+the complete diversified ciphertext adds 197 bytes to the UTF-8 body. Neither alias
+nor salt is exposed outside the authenticated ciphertext. This receiving check
+uses no current counter or code expiry, so historical letters remain readable.
 
 ## Browser artifacts
 

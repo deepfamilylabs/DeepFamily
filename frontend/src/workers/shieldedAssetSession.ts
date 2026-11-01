@@ -722,7 +722,7 @@ export class ShieldedAssetSession {
     const messageId = BigInt(hexlify(randomBytes(16))) || 1n;
     const salt = generateShieldedRandomField();
     const binding = computeShieldedReceiveCredentialBinding({ credential, salt });
-    const envelope = createShieldedLetterEnvelope({ body: params.body, salt });
+    const envelope = createShieldedLetterEnvelope({ body: params.body, salt, authorizationAlias: credential.authorizationAlias });
     const ciphertext = await encryptShieldedLetter({ chainId: ctx.chainId, lettersAddress: ctx.lettersAddress, messageId,
       recipientPublicKey: getBytes(verified.viewingKey), envelope });
     const state = await loadShieldedIdentityAuthorizationWitnessForMode(createIdentityAuthorizationContract(authorizationAddress, env.provider), credential.authorizationAlias, ctx.stateReadMode, { chainId: ctx.chainId, authorizationStateAddress: authorizationAddress });
@@ -746,6 +746,7 @@ export class ShieldedAssetSession {
       getAddress(await archive.AUTHORIZATION_STATE()) === getAddress(await env.pool.AUTHORIZATION_STATE()), "Letter archive belongs to another protocol deployment.");
     const records = await readPrivateLetters(archive);
     const letters: ShieldedAssetWorkerCallMap["recoverLetters"]["result"]["letters"] = [];
+    const authorizationAlias = this.identity ? computeShieldedAuthorizationAlias(this.identity) : undefined;
     for (const record of records) {
       for (const slot of ["identity", "independent"] as const) {
         if (slot === "identity" ? !this.identity : !this.independentKeyMaterial) continue;
@@ -753,7 +754,9 @@ export class ShieldedAssetSession {
         const keys = this.keys(slot, false);
         try {
           const envelope = await decryptShieldedLetter({ chainId: ctx.chainId, lettersAddress: ctx.lettersAddress, messageId: record.messageId,
-            hpkeIkm: keys.hpkeIkm, ciphertext: record.ciphertext, expectedCiphertextHash: record.ciphertextHash });
+            hpkeIkm: keys.hpkeIkm, ciphertext: record.ciphertext, expectedCiphertextHash: record.ciphertextHash,
+            expectedRecipient: { ownerCommitment: keys.ownerCommitment, keyMode: keys.keyMode,
+              recipientBinding: record.recipientBinding, ...(authorizationAlias !== undefined ? { authorizationAlias } : {}) } });
           letters.push({ messageId: record.messageId, body: envelope.body, registeredAt: record.registeredAt, transactionHash: record.transactionHash, slot });
           break;
         } catch { /* All archived candidates are tried locally; unrelated recipients stay private. */ }

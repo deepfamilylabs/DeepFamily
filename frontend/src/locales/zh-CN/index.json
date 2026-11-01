@@ -1653,7 +1653,7 @@
       "customPeriodDays": "自定义天数"
     },
     "receiveCodeLabel": "我的收款码",
-    "receiveCodeShareHint": "请私下交给付款人或寄信人；重复使用接收密钥可能关联不同收款。",
+    "receiveCodeShareHint": "请私下交给付款人或寄信人。",
     "receiveCodeInputLabel": "收款人收款码",
     "receiveCodeInputHint": "收款码须属于所选子女。",
     "generateReceiveCode": "生成收款码",
@@ -1929,7 +1929,7 @@
       "revokeHint": "使本链该身份两种密钥模式的全部旧码作废，最长 15 分钟生效。既有余额、预算领取和家书仍可使用；已经获知的身份关联不会消失。",
       "revokeAll": "作废该身份全部旧收款码",
       "revoking": "正在证明身份授权计数递增…",
-      "receivePrivacy": "用于接收转账和家书。码内隐藏身份承诺；固定标识或接收密钥可关联不同码，持有预算接收凭证的人可据此识别身份关联。"
+      "receivePrivacy": "用于接收转账和家书。每次生成不同的接收公钥，码内隐藏身份承诺；固定授权标识仍可关联不同码，持有预算接收凭证的人可据此识别身份关联。"
     },
     "copyReceiveCode": "复制收款码",
     "fundReceiveCredentialLabel": "我的预算接收凭证",

@@ -10,6 +10,7 @@ import {
   decodeShieldedReceiveCredential,
   deriveIdentityMaterial,
   deriveShieldedHeirKeyMaterial,
+  deriveShieldedReceivePublicKey,
   deriveShieldedViewPublicKey,
   encodeShieldedReceiveCredential,
   wipeBytes,
@@ -87,8 +88,10 @@ export async function createShieldedReceiveCode(input: ShieldedReceiveCodeIdenti
       keys.hpkeIkm.toLowerCase() !== identityKeys.hpkeIkm.toLowerCase())
   )
     throw new Error("Identity receive mode requires canonical identity keys");
-  const viewingKey = await deriveShieldedViewPublicKey(keys.hpkeIkm);
   const purpose = input.purpose ?? "receive";
+  const viewingKey = purpose === "receive"
+    ? await deriveShieldedReceivePublicKey(keys.hpkeIkm)
+    : await deriveShieldedViewPublicKey(keys.hpkeIkm);
   const statement = {
     purpose,
     authorizationAlias: computeShieldedAuthorizationAlias(material),

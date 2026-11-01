@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   deriveShieldedIndependentKeyMaterial,
   deriveShieldedHeirKeyMaterial,
+  deriveShieldedReceivePublicKey,
   encodeShieldedIndependentKey,
   encodePublicShieldedBudgetEnvelope,
 } from "@deepfamily/protocol-core";
@@ -143,10 +144,11 @@ const context: ShieldedWorkerContext = {
   assetKind: "native",
 };
 const secretKeys = deriveShieldedHeirKeyMaterial(13n);
+const receivingKey = hexlify(await deriveShieldedReceivePublicKey(secretKeys.hpkeIkm, new Uint8Array(32).fill(7)));
 function receiveCredential(purpose: "receive" | "fund" = "receive", overrides: { expiresAt?: bigint; authorizationCounter?: bigint } = {}) {
   return { purpose, authorizationAlias: 17n, authorizationCounter: 0n, expiresAt: 2000000000n,
     ...(purpose === "fund" ? { identityCommitment: 31n } : {}),
-    ownerCommitment: 29n, viewingKey: `0x${"01".repeat(32)}`, keyMode: 0, identitySuiteId: 1, independentKeySuiteId: 1, independentKeyDerivationVersion: 1,
+    ownerCommitment: 29n, viewingKey: purpose === "receive" ? receivingKey : `0x${"01".repeat(32)}`, keyMode: 0, identitySuiteId: 1, independentKeySuiteId: 1, independentKeyDerivationVersion: 1,
     proof: { protocol: "groth16", curve: "bn128", pi_a: ["1", "2", "1"], pi_b: [["1", "2"], ["3", "4"], ["1", "0"]], pi_c: ["1", "2", "1"] },
     ...overrides,
   };

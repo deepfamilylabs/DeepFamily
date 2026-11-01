@@ -830,6 +830,14 @@ export function splitShieldedViewPublicKey(publicKey: BytesLike): {
   viewKeyLo: bigint;
 };
 export function deriveShieldedViewPublicKey(hpkeIkm: BytesLike): Promise<Uint8Array>;
+/** Diversified ordinary receive address: 32-byte diversifier and canonical Ristretto public key. */
+export const SHIELDED_RECEIVE_PUBLIC_KEY_BYTES: 64;
+export const SHIELDED_RECEIVE_MAX_PAYLOAD_BYTES: 397;
+export function assertShieldedReceivePublicKey(publicKey: BytesLike): Uint8Array;
+export function deriveShieldedReceivePublicKey(
+  hpkeIkm: BytesLike,
+  diversifier?: BytesLike,
+): Promise<Uint8Array>;
 export function buildShieldedHpkeAad(input: {
   chainId: BigNumberish;
   poolAddress: string;
@@ -1200,11 +1208,13 @@ export interface ShieldedLetterEnvelopeInput {
   version?: 1;
   body: string;
   salt?: BigNumberish;
+  authorizationAlias: BigNumberish;
 }
 export interface ShieldedLetterEnvelope {
   version: 1;
   body: string;
   salt: bigint;
+  authorizationAlias: bigint;
 }
 export function normalizeShieldedLetterScope(input: ShieldedLetterScope): {
   chainId: bigint;
@@ -1240,6 +1250,14 @@ export function decryptShieldedLetter(
     hpkeIkm: BytesLike;
     ciphertext: BytesLike;
     expectedCiphertextHash?: BytesLike;
+    /** Inbox recovery must bind the decrypted opening to the verified archive record and local wallet. */
+    expectedRecipient?: {
+      ownerCommitment: BigNumberish;
+      keyMode: BigNumberish;
+      recipientBinding: BigNumberish;
+      /** Optional additional check when the original identity is available. */
+      authorizationAlias?: BigNumberish;
+    };
   },
 ): Promise<ShieldedLetterEnvelope>;
 
@@ -1267,6 +1285,7 @@ export interface ShieldedReceiveCredentialStatement {
   /** Present only in a Fund credential; omitted from a receive credential. */
   identityCommitment?: BigNumberish;
   ownerCommitment: BigNumberish;
+  /** 64-byte diversified address for receive; 32-byte X25519 public key for fund. */
   viewingKey: BytesLike;
   keyMode?: BigNumberish;
   identitySuiteId?: BigNumberish;
@@ -1410,6 +1429,13 @@ export interface ShieldedReceiveAuthorization {
 }
 export function computeShieldedReceiveCredentialBinding(input: {
   credential: ShieldedReceiveCredentialStatement;
+  salt: BigNumberish;
+}): bigint;
+export function computeShieldedReceiveRecipientBinding(input: {
+  authorizationAlias: BigNumberish;
+  ownerCommitment: BigNumberish;
+  keyMode: BigNumberish;
+  viewingKey: BytesLike;
   salt: BigNumberish;
 }): bigint;
 export function computeShieldedReceiveActionHash(

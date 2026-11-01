@@ -5,6 +5,7 @@ import {
   buildShieldedIndependentKeySigningMessage,
   deriveShieldedIndependentKeyMaterial,
   deriveShieldedHeirKeyMaterial,
+  deriveShieldedReceivePublicKey,
   deriveShieldedViewPublicKey,
   deriveShieldedIndependentKeyRootFromSignature,
   encodeShieldedIndependentKey,
@@ -20,6 +21,7 @@ import {
   encryptShieldedLetter,
   computeShieldedLetterCiphertextHash,
   computeShieldedAuthorizationAlias,
+  computeShieldedReceiveCredentialBinding,
   buildShieldedIdentityAuthorizationState,
 } from "@deepfamily/protocol-core";
 import { ShieldedAssetSession, shieldedAssetErrorMessage } from "./shieldedAssetSession";
@@ -630,10 +632,24 @@ async function signatureCandidate(session: ShieldedAssetSession) {
 
 describe("private letter recovery with original keys", () => {
   const letterContext = { ...context, lettersAddress: "0x6666666666666666666666666666666666666666" };
-  async function archivedLetter(hpkeIkm: string, messageId: string) {
-    const envelope = createShieldedLetterEnvelope({ body: "Original private letter", salt: 17n });
-    const ciphertext = await encryptShieldedLetter({ ...letterContext, messageId, recipientPublicKey: getBytes(await deriveShieldedViewPublicKey(hpkeIkm)), envelope });
-    return { messageId, ciphertext, ciphertextHash: computeShieldedLetterCiphertextHash(ciphertext), recipientBinding: "9",
+  const originalAlias = computeShieldedAuthorizationAlias({ derivedSecretField: 13n, identityCommitment: 31n });
+  async function archivedLetter(
+    keys: { hpkeIkm: string; ownerCommitment: bigint },
+    keyMode: 0 | 1,
+    messageId: string,
+    options: {
+      authorizationAlias?: bigint;
+      binding?: { authorizationAlias?: bigint; ownerCommitment?: bigint; viewingKey?: Uint8Array; keyMode?: 0 | 1 };
+    } = {},
+  ) {
+    const authorizationAlias = options.authorizationAlias ?? originalAlias;
+    const envelope = createShieldedLetterEnvelope({ body: "Original private letter", salt: 17n, authorizationAlias });
+    const viewingKey = await deriveShieldedReceivePublicKey(keys.hpkeIkm);
+    const ciphertext = await encryptShieldedLetter({ ...letterContext, messageId, recipientPublicKey: viewingKey, envelope });
+    const credential = { purpose: "receive" as const, authorizationAlias, ownerCommitment: keys.ownerCommitment,
+      viewingKey, keyMode, authorizationCounter: 0n, expiresAt: 1n, ...options.binding };
+    const recipientBinding = String(computeShieldedReceiveCredentialBinding({ credential, salt: envelope.salt }));
+    return { messageId, ciphertext, ciphertextHash: computeShieldedLetterCiphertextHash(ciphertext), recipientBinding,
       registeredAt: "700", deadline: "800", transactionHash: "0xletter" };
   }
   it("decrypts expired-code letters with the original identity and skips other recipients", async () => {
@@ -641,7 +657,7 @@ describe("private letter recovery with original keys", () => {
     await session.call("unlockIdentity", identityParams());
     const keys = deriveShieldedHeirKeyMaterial(13n);
     const other = deriveShieldedHeirKeyMaterial(14n);
-    mocks.readLetters.mockResolvedValue([await archivedLetter(keys.hpkeIkm, "7"), await archivedLetter(other.hpkeIkm, "8")]);
+    mocks.readLetters.mockResolvedValue([await archivedLetter(keys, 0, "7"), await archivedLetter(other, 0, "8")]);
     const result = await session.call("recoverLetters", { context: letterContext });
     expect(result.letters).toMatchObject([{ messageId: "7", body: "Original private letter", slot: "identity" }]);
     expect(result.letters).toHaveLength(1);
@@ -650,9 +666,42 @@ describe("private letter recovery with original keys", () => {
     const session = await unlockedSession();
     const restored = await signatureCandidate(session);
     expect(session.state().independentKey?.recoveryVerified).toBe(false);
-    mocks.readLetters.mockResolvedValue([await archivedLetter(restored.keys.hpkeIkm, "9")]);
+    mocks.readLetters.mockResolvedValue([await archivedLetter(restored.keys, 1, "9")]);
     const result = await session.call("recoverLetters", { context: letterContext });
     expect(result.letters).toMatchObject([{ messageId: "9", body: "Original private letter", slot: "independent" }]);
+  });
+  it.each([0, 1] as const)("rejects a letter encrypted to key mode %i but authorized for another recipient", async (keyMode) => {
+    const session = keyMode === 0 ? new ShieldedAssetSession() : await unlockedSession();
+    if (keyMode === 0) await session.call("unlockIdentity", identityParams());
+    const keys = keyMode === 0 ? deriveShieldedHeirKeyMaterial(13n) : (await signatureCandidate(session)).keys;
+    const other = deriveShieldedHeirKeyMaterial(14n);
+    const otherAlias = computeShieldedAuthorizationAlias({ derivedSecretField: 14n, identityCommitment: 32n });
+    const record = await archivedLetter(keys, keyMode, "10", {
+      authorizationAlias: otherAlias,
+      binding: { authorizationAlias: otherAlias, ownerCommitment: other.ownerCommitment,
+        viewingKey: await deriveShieldedReceivePublicKey(other.hpkeIkm), keyMode: 0 },
+    });
+    mocks.readLetters.mockResolvedValue([record]);
+    const result = await session.call("recoverLetters", { context: letterContext });
+    expect(result.letters).toEqual([]);
+  });
+  it("rejects a forged archive binding even when the ciphertext decrypts for the current wallet", async () => {
+    const session = new ShieldedAssetSession();
+    await session.call("unlockIdentity", identityParams());
+    const record = await archivedLetter(deriveShieldedHeirKeyMaterial(13n), 0, "11");
+    record.recipientBinding = String(BigInt(record.recipientBinding) + 1n);
+    mocks.readLetters.mockResolvedValue([record]);
+    const result = await session.call("recoverLetters", { context: letterContext });
+    expect(result.letters).toEqual([]);
+  });
+  it("checks an available identity alias when restoring the independent key", async () => {
+    const session = new ShieldedAssetSession();
+    await session.call("unlockIdentity", identityParams());
+    const restored = await signatureCandidate(session);
+    const otherAlias = computeShieldedAuthorizationAlias({ derivedSecretField: 14n, identityCommitment: 32n });
+    mocks.readLetters.mockResolvedValue([await archivedLetter(restored.keys, 1, "12", { authorizationAlias: otherAlias })]);
+    const result = await session.call("recoverLetters", { context: letterContext });
+    expect(result.letters).toEqual([]);
   });
 });
 

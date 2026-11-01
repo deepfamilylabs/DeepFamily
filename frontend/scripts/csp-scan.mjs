@@ -265,7 +265,11 @@ const runWorkerFlows = async (page) => {
         assetIdentitySuiteId: assetState.identity.identitySuiteId,
         assetReceiveCodeVerified: assetCheck.ok,
         assetKeyMode: assetCheck.keyMode,
-        assetReceivingFieldsMatch: publicCheckFields.every(field => assetCheck[field] === check[field]),
+        assetReceivingFieldsMatch: publicCheckFields.filter(field => field !== 'viewingKey' && field !== 'fingerprint')
+          .every(field => assetCheck[field] === check[field]),
+        receivePublicKeysDiversified: /^0x[0-9a-f]{128}$/iu.test(check.viewingKey) &&
+          /^0x[0-9a-f]{128}$/iu.test(assetCheck.viewingKey) &&
+          check.viewingKey.slice(66) !== assetCheck.viewingKey.slice(66),
         receivePurposeValidated: check.purpose === 'receive' && check.expiresAt === input.expiresAt &&
           check.authorizationCounter === '0',
         assetPublicDtoValidated: true,
@@ -299,7 +303,8 @@ const runWorkerFlows = async (page) => {
       result.assetIdentitySuiteId === Number(input.identitySuiteId) && result.assetKeyMode === 0,
     ],
     ['receive verification exposes only the expected public fields', result.receivePurposeValidated === true],
-    ['both proving workers bind the same receiving keys and credential fields', result.assetReceivingFieldsMatch === true],
+    ['both proving workers bind the same receiving owner and authorization fields', result.assetReceivingFieldsMatch === true],
+    ['independently generated codes use different receiving public keys', result.receivePublicKeysDiversified === true],
   ]
   const broken = checks.find(([, ok]) => !ok)
   if (broken) throw new Error(`worker flows: ${broken[0]} failed`)

@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { AbiCoder, keccak256 } from "ethers";
 import {
   buildShieldedIdentityAuthorizationState,
+  deriveShieldedReceivePublicKey,
   computeShieldedReceiveActionHash,
   computeShieldedReceiveCredentialBinding,
   emptyShieldedReceiveAuthorizations,
@@ -18,7 +19,10 @@ const credential = {
   authorizationCounter: 0n,
   expiresAt: 1900000000n,
   ownerCommitment: 23n,
-  viewingKey: new Uint8Array(32).fill(17),
+  viewingKey: await deriveShieldedReceivePublicKey(
+    new Uint8Array(32).fill(17),
+    new Uint8Array(32).fill(1),
+  ),
   // Transport fixture only: real issuer and presentation verification run in the prover tests.
   proof: {
     pi_a: ["1", "2", "1"],
@@ -79,7 +83,10 @@ test("a code unexpired at asOf keeps its deadline even when that deadline passes
   assert.equal(last.deadline, credential.expiresAt - 1n + SHIELDED_RECEIVE_PROOF_LIFETIME);
   assert.ok(last.deadline > credential.expiresAt);
   const later = prepareShieldedReceivePresentation({ ...request, asOf: request.asOf + 600n });
-  assert.notEqual(later.publicSignals[9], prepareShieldedReceivePresentation(request).publicSignals[9]);
+  assert.notEqual(
+    later.publicSignals[9],
+    prepareShieldedReceivePresentation(request).publicSignals[9],
+  );
 });
 
 test("current state rejects revoked code and renewed code retains original recipient keys", () => {
@@ -93,7 +100,12 @@ test("current state rejects revoked code and renewed code retains original recip
   });
   assert.equal(renewed.presentation.absent, "0");
   assert.equal(renewed.recipientBinding, computeShieldedReceiveCredentialBinding(request));
-  const fund = { ...credential, purpose: "fund", identityCommitment: 101n };
+  const fund = {
+    ...credential,
+    purpose: "fund",
+    identityCommitment: 101n,
+    viewingKey: new Uint8Array(32).fill(17),
+  };
   const original = computeShieldedReceiveCredentialBinding({ credential: fund, salt: 37n });
   for (const patch of [
     { identityCommitment: 102n },

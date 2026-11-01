@@ -149,8 +149,10 @@ check. Gas reports remain optional maintenance checks; see [ZK proofs](docs/zk-p
 ### ZK Artifact Workflow
 
 The same `zk:*` workflow covers 15 Circom circuits (two identity/disclosure and thirteen shielded,
-including two receive presentations). Receive credentials, letters and recovery use these
-shared build, setup and verification commands:
+including two receive presentations). Ordinary receive codes generate diversified public keys while
+the original viewing secrets still recover their transfers and letters; budget receiving credentials
+retain their fixed X25519 keys. Receive credentials, letters and recovery use these shared build,
+setup and verification commands:
 
 Run `npm run test:circuits` for shielded constraint tests. They compile the current sources into
 temporary directories and require only npm dependencies and the pinned Circom compiler

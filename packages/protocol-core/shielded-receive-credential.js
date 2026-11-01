@@ -4,7 +4,7 @@ import { poseidon3 } from "poseidon-lite";
 import { bigintFrom, bytesToHex } from "./bytes.js";
 import { MAX_UINT64, SNARK_SCALAR_FIELD } from "./constants.js";
 import { protocolAssert } from "./errors.js";
-import { splitShieldedViewPublicKey } from "./shielded-hpke.js";
+import { SHIELDED_RECEIVE_PUBLIC_KEY_BYTES, splitShieldedViewPublicKey } from "./shielded-hpke.js";
 import { receiveProofFromWords, receiveProofWords } from "./shielded-receive-proof-codec.js";
 
 export const SHIELDED_RECEIVE_CREDENTIAL_VERSION = 1;
@@ -58,7 +58,12 @@ export function buildShieldedReceiveCredentialPublicSignals(input) {
   const expiry = bigintFrom(input.expiresAt, "expiresAt", MAX_UINT64);
   invalid(expiry > 0n, "expiresAt must be nonzero");
   const owner = nonzeroField(input.ownerCommitment, "ownerCommitment");
-  const { viewKeyLo, viewKeyHi } = splitShieldedViewPublicKey(input.viewingKey);
+  const viewingKey = getBytes(input.viewingKey);
+  invalid(
+    viewingKey.length === (purpose === "receive" ? SHIELDED_RECEIVE_PUBLIC_KEY_BYTES : 32),
+    "Viewing key does not match the credential purpose",
+  );
+  const { viewKeyLo, viewKeyHi } = splitShieldedViewPublicKey(viewingKey);
   invalid(viewKeyLo !== 0n || viewKeyHi !== 0n, "Viewing key must be nonzero");
   const mode = bigintFrom(input.keyMode ?? 0, "keyMode", 1n);
   const metadata = [
@@ -68,7 +73,9 @@ export function buildShieldedReceiveCredentialPublicSignals(input) {
     input.receiveCodeVersion ?? SHIELDED_RECEIVE_CREDENTIAL_VERSION,
   ].map((value, index) => bigintFrom(value, `credentialMetadata[${index}]`, 255n));
   invalid(
-    metadata.every((value, index) => value === (index === 3 ? BigInt(SHIELDED_RECEIVE_CREDENTIAL_VERSION) : 1n)),
+    metadata.every(
+      (value, index) => value === (index === 3 ? BigInt(SHIELDED_RECEIVE_CREDENTIAL_VERSION) : 1n),
+    ),
     "Unsupported credential suite",
   );
   const identity =
@@ -84,7 +91,9 @@ export function computeShieldedReceiveCredentialFingerprint(input) {
   const purpose = purposeOf(input.purpose);
   return sha256(
     concat([
-      toUtf8Bytes(`DeepFamily:ReceiveCredential:${purpose}:v${SHIELDED_RECEIVE_CREDENTIAL_VERSION}`),
+      toUtf8Bytes(
+        `DeepFamily:ReceiveCredential:${purpose}:v${SHIELDED_RECEIVE_CREDENTIAL_VERSION}`,
+      ),
       ...buildShieldedReceiveCredentialPublicSignals(input).map((value) => fixed(value, 32)),
     ]),
   );
@@ -117,7 +126,7 @@ export function decodeShieldedReceiveCredential(code) {
     const decoded = bech32m.decode(code.replace(/\s+/gu, ""), false);
     purpose = Object.keys(PREFIX).find((key) => PREFIX[key] === decoded.prefix);
     bytes = bech32m.fromWords(decoded.words);
-    if (!purpose || bytes[0] !== SHIELDED_RECEIVE_CREDENTIAL_VERSION || bytes.length !== (purpose === "fund" ? 405 : 373))
+    if (!purpose || bytes[0] !== SHIELDED_RECEIVE_CREDENTIAL_VERSION || bytes.length !== 405)
       throw new Error();
   } catch {
     protocolAssert(
@@ -132,6 +141,7 @@ export function decodeShieldedReceiveCredential(code) {
     offset += width;
     return value;
   };
+  const viewingKeyBytes = purpose === "receive" ? SHIELDED_RECEIVE_PUBLIC_KEY_BYTES : 32;
   const statement = {
     purpose,
     authorizationAlias: read(32),
@@ -139,14 +149,14 @@ export function decodeShieldedReceiveCredential(code) {
     expiresAt: read(8),
     ...(purpose === "fund" ? { identityCommitment: read(32) } : {}),
     ownerCommitment: read(32),
-    viewingKey: bytes.slice(offset, offset + 32),
+    viewingKey: bytes.slice(offset, offset + viewingKeyBytes),
     keyMode: bytes[1],
     identitySuiteId: bytes[2],
     independentKeySuiteId: bytes[3],
     independentKeyDerivationVersion: bytes[4],
     receiveCodeVersion: SHIELDED_RECEIVE_CREDENTIAL_VERSION,
   };
-  offset += 32;
+  offset += viewingKeyBytes;
   const proof = receiveProofFromWords(Array.from({ length: 8 }, () => read(32)));
   receiveProofWords(proof);
   const publicSignals = buildShieldedReceiveCredentialPublicSignals(statement);
