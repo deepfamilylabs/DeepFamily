@@ -64,7 +64,10 @@ for independent mode, the original independent root; it does not require saved
 codes, per-code private keys, diversifiers or an address index. Expiry and counter
 revocation do not participate in historical decryption.
 
-The ordinary receive suite is specified by the following domain-separated steps
+The complete byte-level specification, threat model, application acceptance rules
+and remaining security proof obligations are in
+[Diversified receive encryption](receive-encryption-protocol.md). The ordinary
+receive suite uses the following domain-separated steps
 (`||` denotes concatenation, all seeds and diversifiers are 32 bytes):
 
 - `v = LEOS2IP(SHA-512(ViewDomain || viewIkm || counterByte)) mod L`, retrying the
@@ -90,6 +93,15 @@ point, 464 bytes of sealed plaintext including 64 bytes of hidden metadata, and 
 16-byte GCM tag. Their payload capacity is 397 bytes after the 3-byte note header.
 Private letters add the same 64 encrypted metadata bytes without a fixed-size cap.
 
+Secret scalar reduction and point multiplication use the pinned libsodium WASM
+backend in the browser's existing secret-owning Worker. Initialization verifies
+that the secret operations use WASM and fails rather than selecting the former
+BigInt or an asm.js fallback. Public address validation may still use noble.
+This replaces the secret computation backend without changing derivation bytes,
+the address format or backup requirements; it introduces no server-side key
+processing. A WASM implementation does not establish end-to-end constant-time
+behavior in every browser or replace evaluation of the complete protocol.
+
 Budgets, self outputs and donor backup memos retain their X25519 HPKE encryption.
 The common wallet scan recognizes recoverable current-purpose outputs using the
 same restored viewing input. Ordinary transfer payloads use the diversified
@@ -99,6 +111,10 @@ AAD. The diversified construction reuses standardized Ristretto255, hash-to-grou
 HKDF and authenticated-encryption primitives, but the composed application scheme
 has not received an independent cryptographic audit; it is not a claim that the
 application implements the complete Zcash protocol or inherits its security proof.
+The shared viewing secret intentionally decrypts all associated diversified
+addresses. Disclosure of it exposes their past and future encrypted data; this
+construction provides no forward secrecy. Expiry and revocation do not protect
+published ciphertexts from a subsequently disclosed viewing secret.
 
 ## Budget receiving credentials
 
@@ -193,10 +209,10 @@ All proving uses Circom WASM and snarkjs in the existing Worker. There is no Go
 prover, separate receive runtime or browser R1CS download. The current presentation
 WASM and zkey download sizes are:
 
-| Presentation                 |                  WASM + zkey | Linked proof | Public signals |
-| ---------------------------- | ---------------------------: | -----------: | -------------: |
+| Presentation               |                  WASM + zkey | Linked proof | Public signals |
+| -------------------------- | ---------------------------: | -----------: | -------------: |
 | Receive / private transfer | 14,216,094 bytes (13.56 MiB) |  1,184 bytes |             11 |
-| Fund                         | 14,355,354 bytes (13.69 MiB) |  1,216 bytes |             11 |
+| Fund                       | 14,355,354 bytes (13.69 MiB) |  1,216 bytes |             11 |
 
 Only the needed presentation is loaded. The roughly 17 KiB link-key file is shared
 by both. Proof sizes exclude public signals, other transaction data and

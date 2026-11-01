@@ -61,6 +61,9 @@ jobs:
       - name: Install dependencies
         run: npm ci --no-audit --no-fund
 
+      - name: Check receive encryption vectors and security properties
+        run: npm run test:receive-security --workspace @deepfamily/protocol-core
+
       - name: Install Circom compiler
         run: npm run zk:fetch
 

@@ -377,33 +377,39 @@ const main = async () => {
     throw err
   }
 
-  const { chromium } = playwright
+  const browserName = process.env.CSP_SCAN_BROWSER || 'chromium'
+  if (!['chromium', 'firefox', 'webkit'].includes(browserName)) {
+    throw new Error('CSP_SCAN_BROWSER must be chromium, firefox or webkit')
+  }
+  const browserType = playwright[browserName]
   const headless = process.env.CSP_SCAN_HEADLESS === '0' ? false : true
   // The Google Chrome installed in its standard location, unless another binary or channel is named.
   const executablePath = process.env.CSP_SCAN_EXECUTABLE_PATH
-  const channel = process.env.CSP_SCAN_CHROME_CHANNEL || 'chrome'
+  const channel = browserName === 'chromium' ? (process.env.CSP_SCAN_CHROME_CHANNEL || 'chrome') : undefined
 
   const buildLaunchOptions = () =>
     executablePath ? { headless, executablePath } : { headless, channel }
 
   const withLaunchHints = async () => {
     try {
-      return await chromium.launch(buildLaunchOptions())
+      return await browserType.launch(buildLaunchOptions())
     } catch (err) {
       const hintLines = [
-        '[csp-scan] failed to launch the browser.',
+        `[csp-scan] failed to launch ${browserName}.`,
         '',
         'The scan runs the Google Chrome installed on this machine. Otherwise:',
         '  - another binary:       CSP_SCAN_EXECUTABLE_PATH=/path/to/chrome npm run csp:scan',
         "  - Playwright's Chromium: npx playwright install --with-deps chromium",
         '                          CSP_SCAN_CHROME_CHANNEL=chromium npm run csp:scan',
+        '  - other engines:        npx playwright install firefox webkit',
+        '                          CSP_SCAN_BROWSER=firefox npm run csp:scan',
       ]
       console.error(hintLines.join('\n'))
       throw err
     }
   }
 
-  console.log(`[csp-scan] mode=${mode} baseUrl=${baseUrl}`)
+  console.log(`[csp-scan] mode=${mode} browser=${browserName} baseUrl=${baseUrl}`)
   console.log(`[csp-scan] reportFile=${reportFile}`)
 
   // Preflight: verify Playwright can launch a browser before starting the server.

@@ -19,7 +19,8 @@
     "UNICODE-LICENSE.txt"
   ],
   "scripts": {
-    "test": "node --test test/*.test.js"
+    "test": "node --test test/*.test.js",
+    "test:receive-security": "node --test test/shielded-receive-encryption*.test.js test/shielded-receive-wasm.test.js test/shielded-letters.test.js"
   },
   "dependencies": {
     "@hpke/core": "1.9.0",
@@ -30,6 +31,7 @@
     "ffjavascript": "0.3.1",
     "fflate": "0.8.3",
     "hash-wasm": "4.12.0",
+    "libsodium-sumo": "0.8.4",
     "poseidon-lite": "0.3.0"
   },
   "engines": {

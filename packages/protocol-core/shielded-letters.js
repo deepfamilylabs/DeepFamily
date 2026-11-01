@@ -63,7 +63,15 @@ function chainId(value) {
 }
 
 function bytes32(value, label) {
-  const result = copyBytes(value, label);
+  let result;
+  try {
+    result = copyBytes(value, label);
+  } catch (error) {
+    throw new ProtocolError(
+      error instanceof ProtocolError ? error.code : "INVALID_BYTES",
+      `${label} must be bytes or 0x-prefixed hex`,
+    );
+  }
   if (result.length !== 32) {
     wipeBytes(result);
     throw new ProtocolError("INVALID_SHIELDED_KEY_LENGTH", `${label} must be 32 bytes`);
@@ -359,7 +367,9 @@ export async function decryptShieldedLetter(input) {
       );
     }
     return envelope;
-  } catch {
+  } catch (error) {
+    if (error instanceof ProtocolError && error.code === "SHIELDED_RECEIVE_WASM_UNAVAILABLE")
+      throw error;
     // Do not propagate library or decoder details that could contain plaintext.
     throw new ProtocolError(
       "SHIELDED_LETTER_DECRYPTION_FAILED",

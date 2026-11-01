@@ -45,6 +45,7 @@
     "frontend:check": "npm run frontend:lint && npm run frontend:source-rules && npm run frontend:typecheck && npm run locales:check --workspace deepfamily-frontend && npm run security:xss-scan && npm run frontend:build && npm run frontend:test",
     "check": "npm run test:circuits && npm run contracts:check && npm run frontend:check",
     "security:audit": "node scripts/check-npm-audit.mjs",
+    "security:receive:timing": "node scripts/receive-encryption-timing.mjs",
     "security:xss-scan": "node scripts/check-xss-sinks.mjs",
     "release:preflight": "node scripts/release-preflight.mjs",
     "dev:node": "hardhat --config hardhat.config.mjs node --hostname 127.0.0.1 --port 8545",

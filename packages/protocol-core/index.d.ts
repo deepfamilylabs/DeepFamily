@@ -830,6 +830,8 @@ export function splitShieldedViewPublicKey(publicKey: BytesLike): {
   viewKeyLo: bigint;
 };
 export function deriveShieldedViewPublicKey(hpkeIkm: BytesLike): Promise<Uint8Array>;
+/** Initialize local receive encryption before scanning; rejects if its WASM runtime is unavailable. */
+export function initializeShieldedReceiveEncryption(): Promise<void>;
 /** Diversified ordinary receive address: 32-byte diversifier and canonical Ristretto public key. */
 export const SHIELDED_RECEIVE_PUBLIC_KEY_BYTES: 64;
 export const SHIELDED_RECEIVE_MAX_PAYLOAD_BYTES: 397;

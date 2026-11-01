@@ -2,6 +2,7 @@ import {
   ProtocolError,
   buildShieldedHpkeAad,
   decryptShieldedNote,
+  initializeShieldedReceiveEncryption,
   deriveShieldedViewPublicKey,
   computeShieldedOwnerCommitment,
   computeShieldedSpendNullifier,
@@ -131,6 +132,7 @@ export async function recoverLocalShieldedWallet(
     new Map<bigint, OwnedShieldedNote<DecodedShieldedNotePayload>>();
   let precedingPublicNote: PublicShieldedNote | undefined;
   try {
+    await initializeShieldedReceiveEncryption();
     const chainId = (await provider.getNetwork()).chainId;
     const poolAddress = await pool.getAddress();
     const viewingKey = await deriveShieldedViewPublicKey(hpkeIkm);
@@ -164,6 +166,8 @@ export async function recoverLocalShieldedWallet(
             });
           }
         } catch (error) {
+          if (error instanceof ProtocolError && error.code === "SHIELDED_RECEIVE_WASM_UNAVAILABLE")
+            throw error;
           if (error instanceof ProtocolError) return null;
           throw error;
         }

@@ -632,6 +632,22 @@ async function signatureCandidate(session: ShieldedAssetSession) {
 
 describe("private letter recovery with original keys", () => {
   const letterContext = { ...context, lettersAddress: "0x6666666666666666666666666666666666666666" };
+  it("stops inbox recovery when WASM is unavailable instead of treating every letter as unrelated", async () => {
+    const session = new ShieldedAssetSession();
+    await session.call("unlockIdentity", identityParams());
+    const descriptor = Object.getOwnPropertyDescriptor(globalThis, "WebAssembly");
+    try {
+      Object.defineProperty(globalThis, "WebAssembly", { configurable: true, value: undefined });
+      await expect(session.call("recoverLetters", { context: letterContext })).rejects.toMatchObject({
+        code: "SHIELDED_RECEIVE_WASM_UNAVAILABLE",
+      });
+      expect(mocks.readLetters).not.toHaveBeenCalled();
+    } finally {
+      if (descriptor) Object.defineProperty(globalThis, "WebAssembly", descriptor);
+      else Reflect.deleteProperty(globalThis, "WebAssembly");
+    }
+  });
+
   const originalAlias = computeShieldedAuthorizationAlias({ derivedSecretField: 13n, identityCommitment: 31n });
   async function archivedLetter(
     keys: { hpkeIkm: string; ownerCommitment: bigint },

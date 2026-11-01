@@ -2,6 +2,8 @@ import {
   IDENTITY_SUITE_CANDIDATE_1,
   SHIELDED_POOL_PROTOCOL_VERSION,
   SHIELDED_POOL_ACTION,
+  ProtocolError,
+  initializeShieldedReceiveEncryption,
   buildShieldedPoolPublicSignals,
   canonicalizeFullName,
   computeShieldedAllocationKeyCommitment,
@@ -738,6 +740,7 @@ export class ShieldedAssetSession {
   async recoverLetters(params: ShieldedAssetWorkerCallMap["recoverLetters"]["params"]): Promise<ShieldedAssetWorkerCallMap["recoverLetters"]["result"]> {
     const current = this.sessionGuard();
     requireValue(this.identity || this.independentKeyMaterial, "Unlock the original identity credentials or restore the original independent key before reading letters.");
+    await initializeShieldedReceiveEncryption();
     const ctx = params.context;
     requireValue(ctx.lettersAddress, "The private letter archive is not configured for this chain.");
     const env = await this.context(ctx);
@@ -759,7 +762,10 @@ export class ShieldedAssetSession {
               recipientBinding: record.recipientBinding, ...(authorizationAlias !== undefined ? { authorizationAlias } : {}) } });
           letters.push({ messageId: record.messageId, body: envelope.body, registeredAt: record.registeredAt, transactionHash: record.transactionHash, slot });
           break;
-        } catch { /* All archived candidates are tried locally; unrelated recipients stay private. */ }
+        } catch (error) {
+          if (error instanceof ProtocolError && error.code === "SHIELDED_RECEIVE_WASM_UNAVAILABLE") throw error;
+          /* All archived candidates are tried locally; unrelated recipients stay private. */
+        }
       }
     }
     current();

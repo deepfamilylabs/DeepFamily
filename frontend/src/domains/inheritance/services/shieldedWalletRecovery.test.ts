@@ -246,6 +246,20 @@ async function fixture() {
 }
 
 describe("local shielded wallet recovery", () => {
+  it("stops recovery when the receive WASM runtime is unavailable instead of returning an empty wallet", async () => {
+    const { pool } = await poolFromCiphertexts([]);
+    const descriptor = Object.getOwnPropertyDescriptor(globalThis, "WebAssembly");
+    try {
+      Object.defineProperty(globalThis, "WebAssembly", { configurable: true, value: undefined });
+      await expect(recoverLocalShieldedWallet(pool, identity)).rejects.toMatchObject({
+        code: "SHIELDED_RECEIVE_WASM_UNAVAILABLE",
+      });
+    } finally {
+      if (descriptor) Object.defineProperty(globalThis, "WebAssembly", descriptor);
+      else Reflect.deleteProperty(globalThis, "WebAssembly");
+    }
+  });
+
   it.each([0, 1] as const)("recovers transfers to multiple code public keys using only the restored mode-%s secret", async keyMode => {
     const derive = () => keyMode === 0
       ? Promise.resolve(identityKeyMaterial(13n))

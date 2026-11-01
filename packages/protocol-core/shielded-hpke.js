@@ -20,6 +20,7 @@ import {
   SHIELDED_RECEIVE_METADATA_BYTES,
 } from "./shielded-receive-encryption.js";
 export {
+  initializeShieldedReceiveEncryption,
   deriveShieldedReceivePublicKey,
   assertShieldedReceivePublicKey,
   SHIELDED_RECEIVE_PUBLIC_KEY_BYTES,
@@ -42,8 +43,19 @@ const suite = new CipherSuite({
 });
 
 function bytes32(value, label) {
-  const result = copyBytes(value, label);
-  protocolAssert(result.length === 32, "INVALID_SHIELDED_KEY_LENGTH", `${label} must be 32 bytes`);
+  let result;
+  try {
+    result = copyBytes(value, label);
+  } catch (error) {
+    throw new ProtocolError(
+      error instanceof ProtocolError ? error.code : "INVALID_BYTES",
+      `${label} must be bytes or 0x-prefixed hex`,
+    );
+  }
+  if (result.length !== 32) {
+    wipeBytes(result);
+    throw new ProtocolError("INVALID_SHIELDED_KEY_LENGTH", `${label} must be 32 bytes`);
+  }
   return result;
 }
 
@@ -195,7 +207,9 @@ export async function decryptShieldedNote(input) {
       "Decrypted note has an invalid payload length",
     );
     return plaintext.slice(3, 3 + length);
-  } catch {
+  } catch (error) {
+    if (error instanceof ProtocolError && error.code === "SHIELDED_RECEIVE_WASM_UNAVAILABLE")
+      throw error;
     throw new ProtocolError("SHIELDED_DECRYPTION_FAILED", "Could not decrypt shielded note");
   } finally {
     wipeBytes(ikm);
