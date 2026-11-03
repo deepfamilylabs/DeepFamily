@@ -94,11 +94,14 @@ export function verifyDevelopmentArtifacts(actions = Object.keys(SHIELDED_CIRCUI
 }
 
 /** Repeatable, development-key-only real Groth16 proof smoke; never release evidence. */
-export function smokeDevelopmentProofs(actions = Object.keys(fixtures)) {
-  const manifest = verifyDevelopmentArtifacts();
+export function smokeDevelopmentProofs(actions) {
+  // An omitted selection checks all configured artifacts, including circuits without a smoke
+  // fixture. Focused checks need only the selected artifacts before exercising their proofs.
+  const manifest = verifyDevelopmentArtifacts(actions);
+  const proofActions = actions ?? Object.keys(fixtures);
   const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "deepfamily-shielded-proof-"));
   try {
-    for (const action of actions) {
+    for (const action of proofActions) {
       const source = sources[action];
       if (!source) throw new Error(`Unknown smoke action: ${action}`);
       const item = manifest.circuits?.[action];

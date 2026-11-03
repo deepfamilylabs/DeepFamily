@@ -184,6 +184,7 @@ temporary directories and require only npm dependencies and the pinned Circom co
 | `npm run zk:assets:fetch`      | Install the pinned browser WASM/zkey files from the committed copies, downloading the rest from R2 |
 | `npm run zk:assets:publish`    | Compress and upload new browser WASM/zkey files to R2              |
 | `npm run zk:build`             | Compile all 15 Circom circuits                                     |
+| `npm run zk:setup:dev`         | Regenerate all 15 development artifact sets                        |
 | `npm run zk:setup`             | Generate the final keys, verifiers and evidence for all 15 circuits |
 | `npm run zk:check`             | Rebuild and check artifacts, proofs and available ceremony evidence |
 
@@ -193,6 +194,10 @@ verifiers from the matching keys. It records the single-operator ceremony and ar
 Local development, CI and release use this same final artifact set. Generated browser files go
 under `frontend/public/zk/identity/` and `frontend/public/zk/shielded/`, and Solidity verifiers
 under `contracts/verifiers/`.
+
+Use `npm run zk:setup:dev` when regenerating development keys and `npm run zk:setup` when
+generating production keys from a clean reviewed checkout. Daily development reuses the current
+keys; `npm run zk:check` validates them.
 
 Receive presentations use LinkG16 to link two ordinary Circom proofs over the same hidden
 credential fields, without recursive pairing checks inside a circuit or a Go/WASM prover.
@@ -238,7 +243,7 @@ execute it as a foreign-platform binary.
 
 | Host/runtime         | Compiler installed by `zk:fetch`    | Additional requirement                      |
 | -------------------- | ----------------------------------- | ------------------------------------------- |
-| Linux x64 with glibc | Pinned official release asset       | None                                        |
+| Linux x64           | Pinned official release asset       | glibc >= 2.34                               |
 | macOS arm64          | Build from the pinned source commit | `git`, Rust/Cargo, Xcode Command Line Tools |
 | Windows x64          | Pinned official release asset       | Visual C++ 2015–2022 Redistributable        |
 
@@ -246,8 +251,9 @@ Upstream publishes no official macOS arm64 binary for the pinned Circom version,
 Silicon target is built from the repository-pinned source commit with locked Cargo dependencies.
 
 These are the only supported host/runtime pairs. Linux libc is detected from Node's process report;
-musl is rejected explicitly, as are all unsupported platform and architecture combinations. Windows
-ARM64 hosts are unsupported even when running x64 Node.js under emulation. CI uses GitHub's
+the pinned official compiler requires glibc 2.34 or newer. Older glibc versions and musl are rejected
+before downloading or installing a compiler, as are all unsupported platform and architecture
+combinations. Windows ARM64 hosts are unsupported even when running x64 Node.js under emulation. CI uses GitHub's
 `ubuntu-latest` x64/glibc runner and separately exercises macOS arm64 and Windows x64.
 
 Every selected compiler must report the repository-pinned Circom version and pass its
@@ -266,7 +272,7 @@ sources and compiles every circuit to establish fresh R1CS/WASM hashes. It reche
 compiled outputs and pTau immediately before each Groth16 setup and before installation.
 Review the generated artifact bundle before committing it. Rotation compares sources and compiled
 outputs with the existing final manifest; `release:preflight` independently rebuilds and compares
-them with the reviewed final artifact hashes. Both commands support Linux x64 with glibc, macOS
+them with the reviewed final artifact hashes. Both commands support Linux x64 with glibc >= 2.34, macOS
 arm64, and Windows x64.
 
 Release-only staging is permission-checked: POSIX roots must be owned by the current user with mode

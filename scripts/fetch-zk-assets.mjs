@@ -80,13 +80,24 @@ export async function fetchZkAssets({
       // Resolved on first use, so a checkout whose copies are all current needs no asset host.
       baseUrl = (baseUrl ?? configuredZkAssetBaseUrl(root)).replace(/\/+$/, "");
       const url = `${baseUrl}/${asset.key}`;
-      const response = await fetchWithRetry(fetchImpl, url, { redirect: "error" });
+      const download = await fetchWithRetry(
+        fetchImpl,
+        url,
+        { redirect: "error" },
+        {
+          readResponse: async (response) => ({
+            response,
+            bytes: response.ok ? Buffer.from(await response.arrayBuffer()) : null,
+          }),
+        },
+      );
+      const { response } = download;
       if (!response.ok) {
         throw new Error(
           `ZK asset download failed: HTTP ${response.status} ${url} (run npm run zk:assets:publish after setup)`,
         );
       }
-      bytes = Buffer.from(await response.arrayBuffer());
+      bytes = download.bytes;
       if (sha256(bytes) !== asset.sha256) throw new Error(`ZK asset SHA-256 mismatch: ${url}`);
     }
     await fs.mkdir(path.dirname(destination), { recursive: true });

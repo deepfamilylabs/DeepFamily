@@ -62,6 +62,7 @@
     "zk:assets:fetch": "node scripts/fetch-zk-assets.mjs",
     "zk:assets:publish": "node scripts/publish-zk-assets.mjs",
     "zk:build": "node scripts/zk-build.mjs",
+    "zk:setup:dev": "node scripts/zk-setup.mjs --informal",
     "zk:setup": "node scripts/zk-setup.mjs",
     "zk:check": "node scripts/zk-check.mjs"
   },

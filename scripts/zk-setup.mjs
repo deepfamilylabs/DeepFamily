@@ -7,9 +7,11 @@ import { runSingleOperatorProductionSetup } from "./lib/zkProductionSetup.mjs";
 
 const usage = () => {
   console.log(`Usage:
-  npm run zk:setup
+  npm run zk:setup:dev  (development keys)
+  npm run zk:setup      (production keys, clean reviewed checkout)
+
+Advanced options:
   npm run zk:setup -- --ceremony-id <stable-audit-id>
-  npm run zk:setup -- --informal
   npm run zk:setup -- --rotate \\
     --expected-current-manifest-sha256 <current-production-manifest-sha256> \\
     --expected-current-shielded-manifest-sha256 <current-shielded-manifest-sha256> \\
@@ -41,8 +43,8 @@ production security trusts the operator to destroy every Phase 2 secret.
 The same final keys, verification/link keys and Solidity verifiers are used in local development,
 CI and releases. Build, fetch and check commands reuse them without generating new keys.
 
---informal runs the same compilation, contribution, beacon and export steps, but installs the
-keys as development artifacts: development manifests that claim no ceremony and bind no
+zk:setup:dev passes --informal, running the same compilation, contribution, beacon and export steps,
+and installing development keys. Development manifests claim no ceremony and bind no
 transcript, so release:preflight rejects them. It skips the full Phase 1 "powersoftau verify",
 every "zkey verify" and the clean Git working tree requirement, and it cannot be combined with
 --rotate or --shielded-release-criteria.`);

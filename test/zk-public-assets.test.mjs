@@ -255,17 +255,19 @@ describe("ZK public proving assets", function () {
 
   it("rejects downloaded bytes that differ from the manifest digest", async function () {
     let error;
+    const requests = [];
     try {
       await fetchZkAssets({
         root,
         baseUrl: "https://assets.example",
-        fetchImpl: serve([], () => Buffer.from("tampered")),
+        fetchImpl: serve(requests, () => Buffer.from("tampered")),
         log: () => {},
       });
     } catch (caught) {
       error = caught;
     }
     expect(error?.message).to.contain("ZK asset SHA-256 mismatch");
+    expect(requests).to.have.length(1);
     expect(
       fs.existsSync(path.join(root, "frontend/public/zk/identity/person_commitment.wasm")),
     ).to.equal(false);
@@ -273,11 +275,15 @@ describe("ZK public proving assets", function () {
 
   it("names the publish step when the asset host lacks a pinned file", async function () {
     let error;
+    let requests = 0;
     try {
       await fetchZkAssets({
         root,
         baseUrl: "https://assets.example",
-        fetchImpl: async () => new Response("missing", { status: 404 }),
+        fetchImpl: async () => {
+          requests += 1;
+          return new Response("missing", { status: 404 });
+        },
         log: () => {},
       });
     } catch (caught) {
@@ -285,6 +291,7 @@ describe("ZK public proving assets", function () {
     }
     expect(error?.message).to.contain("HTTP 404");
     expect(error?.message).to.contain("npm run zk:assets:publish");
+    expect(requests).to.equal(1);
   });
 
   it("uploads only objects the bucket lacks, signing each payload digest", async function () {
@@ -423,6 +430,40 @@ describe("ZK public proving assets", function () {
     }
   });
 
+  it("retries an HTTP download interrupted after its successful headers", async function () {
+    this.timeout(5_000);
+    const asset = listZkPublicAssets(root)[0];
+    for (const file of Object.keys(BYTES)) if (file !== asset.file) writeLocal(file);
+    let requests = 0;
+    const server = createServer((_request, response) => {
+      requests += 1;
+      const bytes = BYTES[asset.file];
+      response.writeHead(200, { "content-length": bytes.length });
+      if (requests === 1) {
+        response.write(bytes.subarray(0, 2));
+        setTimeout(() => response.destroy(), 20);
+      } else {
+        response.end(bytes);
+      }
+    });
+    try {
+      await new Promise((resolve, reject) => {
+        server.once("error", reject);
+        server.listen(0, "127.0.0.1", resolve);
+      });
+      const result = await fetchZkAssets({
+        root,
+        baseUrl: `http://127.0.0.1:${server.address().port}`,
+        log: () => {},
+      });
+      expect(requests).to.equal(2);
+      expect(result).to.deep.equal({ assetCount: 4, restored: 0, downloaded: 1 });
+      expect(fs.readFileSync(path.join(root, asset.file))).to.deep.equal(BYTES[asset.file]);
+    } finally {
+      await new Promise((resolve) => server.close(resolve));
+    }
+  });
+
   it("refuses to publish local files that differ from the manifest", async function () {
     for (const file of Object.keys(BYTES)) writeLocal(file);
     writeLocal(
@@ -475,6 +516,66 @@ describe("ZK public proving assets", function () {
     }
     expect(error?.message).to.equal("PUT https://x/d failed after 3 attempts");
     expect(error?.cause).to.equal(reset);
+  });
+
+  it("keeps body reads inside each attempt's timeout and retries with a fresh signal", async function () {
+    const signals = [];
+    const fetched = await fetchWithRetry(
+      async (_url, { signal }) => {
+        signals.push(signal);
+        if (signals.length > 1) return new Response("complete");
+        return new Response(
+          new ReadableStream({
+            start(controller) {
+              controller.enqueue(Uint8Array.of(1));
+              signal.addEventListener("abort", () => controller.error(signal.reason), {
+                once: true,
+              });
+            },
+          }),
+        );
+      },
+      "https://assets.example/slow",
+      {},
+      {
+        delayMs: 0,
+        timeoutMs: 20,
+        readResponse: (response) => response.text(),
+      },
+    );
+    expect(fetched).to.equal("complete");
+    expect(signals).to.have.length(2);
+    expect(signals[0].aborted).to.equal(true);
+    expect(signals[1]).not.to.equal(signals[0]);
+    expect(signals[1].aborted).to.equal(false);
+  });
+
+  it("releases retried response bodies and leaves the final response readable", async function () {
+    const cancelled = [];
+    const statuses = [503, 429, 200];
+    const response = await fetchWithRetry(
+      async () => {
+        const status = statuses.shift();
+        return new Response(
+          new ReadableStream({
+            start(controller) {
+              controller.enqueue(new TextEncoder().encode("response"));
+              controller.close();
+            },
+            cancel() {
+              cancelled.push(status);
+            },
+          }),
+          { status },
+        );
+      },
+      "https://assets.example/retry",
+      {},
+      { delayMs: 0 },
+    );
+    expect(cancelled).to.deep.equal([503, 429]);
+    expect(response.status).to.equal(200);
+    expect(await response.text()).to.equal("response");
   });
 
   it("names every missing R2 credential", async function () {

@@ -25,6 +25,7 @@ import {
   circomTargetKey,
   detectLinuxLibcEvidence,
   localCircomBinaryPath,
+  resolveCircomTargetPolicy,
   resolveLocalCircomTarget,
 } from "../scripts/lib/circomToolchain.mjs";
 import { expectRegularFileWithPosixMode } from "./helpers/fileMode.mjs";
@@ -113,6 +114,82 @@ describe("pinned Circom installer", function () {
         report: { header: {} },
       }),
     ).to.throw("Unsupported Linux libc musl; the supported Linux runtime is x64 with glibc");
+  });
+
+  it("rejects known glibc versions older than the pinned Linux compiler requires", function () {
+    for (const version of ["2.31", "2.33"]) {
+      const runtime = {
+        platform: "linux",
+        arch: "x64",
+        report: { header: { glibcVersionRuntime: version } },
+      };
+      const message = `Unsupported Linux glibc ${version}; the pinned Circom compiler requires glibc >= 2.34`;
+      expect(() => circomTargetKey(runtime)).to.throw(message);
+      expect(() => resolveLocalCircomTarget(runtime)).to.throw(message);
+      expect(() => resolveCircomTargetPolicy({ version: CIRCOM_VERSION, ...runtime })).to.throw(
+        message,
+      );
+      expect(() => resolveLocalCircomTarget({ ...runtime, libc: "glibc" })).to.throw(message);
+    }
+  });
+
+  it("compares glibc versions numerically and accepts the minimum supported version", function () {
+    for (const version of ["2.34", "2.34.0", "2.39", "2.100", "3.0"]) {
+      const target = resolveLocalCircomTarget({
+        platform: "linux",
+        arch: "x64",
+        report: { header: { glibcVersionRuntime: version } },
+      });
+      expect(target.id).to.equal("linux-x64");
+      expect(target.libcEvidence.version).to.equal(version);
+    }
+    expect(
+      resolveLocalCircomTarget({
+        platform: "linux",
+        arch: "x64",
+        libc: "glibc",
+        report: { header: { glibcVersionRuntime: "2.34" } },
+      }).libcEvidence,
+    ).to.deep.equal({ family: "glibc", version: null, source: "explicit-libc" });
+  });
+
+  it("does not let an explicit glibc family hide an incompatible native host version", function () {
+    if (process.platform !== "linux") this.skip();
+    const getReport = process.report.getReport;
+    process.report.getReport = () => ({ header: { glibcVersionRuntime: "2.31" } });
+    try {
+      expect(() => resolveLocalCircomTarget({ libc: "glibc" })).to.throw(
+        "Unsupported Linux glibc 2.31",
+      );
+    } finally {
+      process.report.getReport = getReport;
+    }
+  });
+
+  it("rejects incompatible glibc before downloading or installing either compiler", async function () {
+    let downloads = 0;
+    let installs = 0;
+    for (const version of ["2.31", "2.33"]) {
+      const error = await captureError(() =>
+        installCircomToolchains({
+          projectRoot: root,
+          platform: "linux",
+          arch: "x64",
+          report: { header: { glibcVersionRuntime: version } },
+          download: async () => {
+            downloads += 1;
+          },
+          installer: async () => {
+            installs += 1;
+          },
+        }),
+      );
+      expect(error).to.be.an("error");
+      expect(error.message).to.include(`Unsupported Linux glibc ${version}`);
+    }
+    expect(downloads).to.equal(0);
+    expect(installs).to.equal(0);
+    expect(await fs.readdir(root)).to.deep.equal([]);
   });
 
   it("resolves every supported target and rejects unsupported hosts or libc families", function () {

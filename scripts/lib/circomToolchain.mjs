@@ -98,6 +98,23 @@ export const CIRCOM_CANONICAL_POLICY = Object.freeze({
 
 export const CIRCOM_LINUX_X64_SHA256 = CIRCOM_CANONICAL_POLICY.target.sha256;
 export const CIRCOM_LINUX_X64_URL = CIRCOM_CANONICAL_POLICY.target.url;
+// The pinned official Linux binary imports symbols introduced in GLIBC_2.34.
+export const CIRCOM_LINUX_MIN_GLIBC_VERSION = "2.34";
+
+const assertSupportedGlibcVersion = (version) => {
+  if (version === null) return;
+  const parts = /^(\d+)\.(\d+)(?:\.\d+)*$/u.exec(version);
+  const [minimumMajor, minimumMinor] = CIRCOM_LINUX_MIN_GLIBC_VERSION.split(".").map(BigInt);
+  if (
+    parts === null ||
+    BigInt(parts[1]) < minimumMajor ||
+    (BigInt(parts[1]) === minimumMajor && BigInt(parts[2]) < minimumMinor)
+  ) {
+    throw new Error(
+      `Unsupported Linux glibc ${version}; the pinned Circom compiler requires glibc >= ${CIRCOM_LINUX_MIN_GLIBC_VERSION}`,
+    );
+  }
+};
 
 const createLibcEvidence = ({ family, version, source }) =>
   Object.freeze({
@@ -142,7 +159,16 @@ const resolveLinuxLibcEvidence = ({ platform, libc, report }) => {
     }
     return null;
   }
-  if (libc !== undefined) return injectedLinuxLibcEvidence(libc);
+  if (libc !== undefined) {
+    const evidence = injectedLinuxLibcEvidence(libc);
+    // Keep explicit family evidence for policy simulations, while still rejecting a known
+    // incompatible version from the supplied report or the actual Linux host.
+    if (libc === "glibc" && (report !== undefined || process.platform === "linux")) {
+      const detected = detectLinuxLibcEvidence({ report: report ?? process.report });
+      if (detected.family === "glibc") assertSupportedGlibcVersion(detected.version);
+    }
+    return evidence;
+  }
   if (report !== undefined || process.platform === "linux") {
     return detectLinuxLibcEvidence({ report: report ?? process.report });
   }
@@ -159,6 +185,7 @@ const assertSupportedLinuxLibc = ({ platform, libcEvidence }) => {
       `Unsupported Linux libc ${libcEvidence.family}; the supported Linux runtime is x64 with glibc`,
     );
   }
+  if (platform === "linux") assertSupportedGlibcVersion(libcEvidence.version);
 };
 
 const assertRuntimeTargetAllowed = ({ platform, arch, key }) => {

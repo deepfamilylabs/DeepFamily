@@ -43,10 +43,18 @@ describe("public ZK command surface", function () {
         "zk:assets:fetch",
         "zk:assets:publish",
         "zk:build",
+        "zk:setup:dev",
         "zk:setup",
         "zk:check",
       ],
     );
+  });
+
+  it("selects development keys through the shortcut and keeps the default setup formal", function () {
+    const { scripts } = JSON.parse(fs.readFileSync("package.json", "utf8"));
+    const options = (name) => parseSetupArguments(scripts[name].split(" ").slice(2));
+    expect(options("zk:setup:dev")).to.include({ informal: true, rotate: false });
+    expect(options("zk:setup")).to.include({ informal: false, rotate: false });
   });
 
   it("uses one local deploy command for every verifier and the pool", function () {
@@ -483,6 +491,16 @@ describe("parameterized ZK command wrappers", function () {
         path.join(fixtureRoot, "scripts", "zk-shielded-development-proof-smoke.mjs"),
         "--artifact",
         "unshield",
+      ]);
+    });
+
+    it("runs the existing Claim32 proof fixture in a focused development check", function () {
+      const commands = buildZkCheckCommands({ root: fixtureRoot, circuit: "shielded:claim32" });
+      expect(commands).to.have.length(1);
+      expect(commands[0].check).to.equal("development-proof-smoke");
+      expect(commands[0].args).to.deep.equal([
+        path.join(fixtureRoot, "scripts", "zk-shielded-development-proof-smoke.mjs"),
+        "claim32",
       ]);
     });
 

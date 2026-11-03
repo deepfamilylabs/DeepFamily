@@ -124,7 +124,7 @@ The compiler support matrix is:
 
 | Host/runtime         | Installation strategy          | Prerequisites                               | May run release gates |
 | -------------------- | ------------------------------ | ------------------------------------------- | --------------------- |
-| Linux x64 with glibc | Pinned official release asset  | None                                        | Yes                   |
+| Linux x64           | Pinned official release asset  | glibc >= 2.34                               | Yes                   |
 | macOS arm64          | Build the pinned source commit | `git`, Rust/Cargo, Xcode Command Line Tools | Yes                   |
 | Windows x64          | Pinned official release asset  | Visual C++ 2015–2022 Redistributable        | Yes                   |
 
@@ -139,9 +139,10 @@ suitable for development only until its output has passed those comparisons; mat
 string alone is not release evidence.
 
 Both `zk:setup` and `release:preflight` support the three release-gate runtimes above.
-Linux libc is detected from Node's process report: Linux x64 with glibc uses the pinned official
-asset, while musl is rejected explicitly. Windows ARM64 hosts remain unsupported even with x64 Node
-emulation. The macOS arm64 release gates never execute the reusable
+Linux libc is detected from Node's process report: Linux x64 with glibc 2.34 or newer uses the pinned
+official asset. Older glibc versions and musl are rejected before downloading or installing a compiler.
+Windows ARM64 hosts remain unsupported even with x64 Node emulation. The macOS arm64 release gates
+never execute the reusable
 source-built compiler from `bin/`: they perform a fresh locked build of the pinned commit in the
 current user's protected build directory and bind its binary hash, source commit, Cargo, and Rust
 versions into the evidence. The source builder rejects external ancestor Cargo configuration,
@@ -225,14 +226,15 @@ npm run zk:setup -- \
   --ceremony-id deepfamily-production-2026-001
 ```
 
-For day-to-day key regeneration, add `--informal`:
+For development key regeneration, use the dedicated shortcut:
 
 ```bash
-npm run zk:setup -- --informal
+npm run zk:setup:dev
 ```
 
-It runs the same compilation, Phase 2 contribution, beacon and export steps, so the proving keys,
-link keys and Solidity verifiers are produced exactly as in a formal setup. It installs them as
+The shortcut passes `--informal`. It runs the same compilation, Phase 2 contribution, beacon and
+export steps, so the proving keys, link keys and Solidity verifiers are produced exactly as in a
+formal setup. It installs them as
 development artifacts: `circuits/zk-artifacts-manifest.json` with development status and
 `circuits/shielded-development-manifest.json`. Development records attest no ceremony step, so they
 claim no beacon, bind no transcript and are rejected by `npm run release:preflight`; a release needs
