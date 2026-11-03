@@ -23,7 +23,7 @@ describe("zkey MPC metadata reader", function () {
         ),
       );
       const metadata = await readZkeyMpcMetadata(
-        path.join(PROJECT_ROOT, "frontend", "public", "zk", `${name}_final.zkey`),
+        path.join(PROJECT_ROOT, "frontend", "public", "zk", "identity", `${name}_final.zkey`),
       );
       expect(metadata.circuitHash).to.match(/^[0-9a-f]{128}$/u);
       if (manifest.trustedSetup.status === "development") {

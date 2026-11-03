@@ -10,7 +10,7 @@ import { fileURLToPath } from "node:url";
 import { SHIELDED_POOL_PUBLIC_INPUTS } from "@deepfamily/protocol-core";
 import { buildShieldedClaimFixture } from "../circuits/test/generate_shielded_claim_input.mjs";
 import { buildShieldedFundingFixtures } from "../circuits/test/generate_shielded_funding_input.mjs";
-import { SHIELDED_CIRCUITS } from "./lib/zkCircuitSelection.mjs";
+import { SHIELDED_CIRCUITS, shieldedCircuitSource } from "./lib/zkCircuitSelection.mjs";
 import { SHIELDED_DEPLOYMENT_CIRCUITS } from "./lib/zkDeploymentCatalog.mjs";
 import { SHIELDED_SETUP_CIRCUITS } from "./lib/shieldedProductionSetup.mjs";
 
@@ -72,7 +72,7 @@ export function verifyDevelopmentArtifacts(actions = Object.keys(SHIELDED_CIRCUI
       `${action} verifier name mismatch`,
     );
     for (const [file, digest] of [
-      [path.join(root, "circuits", `${source}.circom`), item.sourceSha256],
+      [path.join(root, shieldedCircuitSource(source)), item.sourceSha256],
       [path.join(artifacts, `${source}.r1cs`), item.r1csSha256],
       [path.join(root, `frontend/public/zk/shielded/${source}.wasm`), item.wasmSha256],
       [path.join(root, `frontend/public/zk/shielded/${source}_final.zkey`), item.zkeySha256],

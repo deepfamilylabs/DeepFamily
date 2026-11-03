@@ -5,6 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { encodeGroth16AbcProofData, normalizeGroth16Proof } from "@deepfamily/protocol-core";
+import { verifierSource } from "../../lib/contractSources.js";
 import {
   inspectLinkedReceiveArtifacts,
   RECEIVE_LINK_KEYS_PATH,
@@ -47,7 +48,7 @@ export function checkRealReceiveArtifacts() {
     );
   }
   for (const contractName of Object.values(verifiers))
-    required.push(path.join(root, "contracts", `${contractName}.sol`));
+    required.push(path.join(root, verifierSource(contractName)));
   const missing = required.filter((file) => !fs.existsSync(file));
   if (process.env.REQUIRE_REAL_RECEIVE_PROOFS === "1") {
     assert.deepEqual(missing, [], "Run npm run zk:setup before this required integration test");
@@ -81,7 +82,7 @@ export async function deployRealReceiveVerifiers(hre) {
       "ShieldedPrivateTransferVerifier",
     ].map((name) => [
       `${name}.sol`,
-      { content: fs.readFileSync(path.join(root, "contracts", `${name}.sol`), "utf8") },
+      { content: fs.readFileSync(path.join(root, verifierSource(name)), "utf8") },
     ]),
   );
   const compiled = await compiler.compile({

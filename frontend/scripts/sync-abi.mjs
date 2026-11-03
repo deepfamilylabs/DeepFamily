@@ -1,6 +1,7 @@
 import { promises as fs } from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+import { contractArtifact, contractSource } from "../../lib/contractSources.js";
 
 async function fileExists(p) {
   try {
@@ -39,7 +40,7 @@ export function normalizeFrontendArtifact(artifact) {
 
 export async function syncAbi(contractName, { cwd = process.cwd() } = {}) {
   const candidates = [
-    path.resolve(cwd, `../artifacts/contracts/${contractName}.sol/${contractName}.json`), // hardhat
+    path.resolve(cwd, `../${contractArtifact(contractSource(contractName), contractName)}`), // hardhat
     path.resolve(cwd, `../out/${contractName}.sol/${contractName}.json`), // foundry flat
     path.resolve(cwd, `../contracts/out/${contractName}.sol/${contractName}.json`), // alternate
   ];

@@ -4,7 +4,7 @@ pragma solidity ^0.8.24;
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {IProofVerifierAdapter} from "../interfaces/IProofVerifierAdapter.sol";
 import {IDeepFamilyLineageIndex} from "../interfaces/IDeepFamilyLineageIndex.sol";
-import {ShieldedErc20Pool} from "../ShieldedErc20Pool.sol";
+import {ShieldedErc20Pool} from "../shielded/ShieldedErc20Pool.sol";
 
 /**
  * @dev Test only. This is deliberately not a ZK verifier and must never secure real funds.

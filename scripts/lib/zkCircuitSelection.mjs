@@ -45,6 +45,13 @@ export const hasShieldedSolidityVerifier = (action) =>
   !SHIELDED_CLIENT_ONLY_CIRCUITS.includes(action);
 
 export const CORE_CIRCUITS = Object.freeze(["person", "disclosure"]);
+
+// Circuit sources by architecture layer. Shielded templates shared by several entries live in
+// circuits/shielded/common; circuits/lib holds templates shared across layers.
+export const IDENTITY_CIRCUIT_DIRECTORY = "circuits/identity";
+export const SHIELDED_CIRCUIT_DIRECTORY = "circuits/shielded";
+export const identityCircuitSource = (name) => `${IDENTITY_CIRCUIT_DIRECTORY}/${name}.circom`;
+export const shieldedCircuitSource = (name) => `${SHIELDED_CIRCUIT_DIRECTORY}/${name}.circom`;
 export const SHIELDED_CIRCUIT_NAMES = Object.freeze(
   Object.keys(SHIELDED_CIRCUITS).map((action) => `shielded:${action}`),
 );

@@ -51,9 +51,10 @@ import {
 } from "@deepfamily/protocol-core";
 import { buildShieldedClaimFixture } from "../circuits/test/generate_shielded_claim_input.mjs";
 import { buildShieldedFundingFixtures } from "../circuits/test/generate_shielded_funding_input.mjs";
-import { SHIELDED_CIRCUITS } from "../scripts/lib/zkCircuitSelection.mjs";
+import { SHIELDED_CIRCUITS, shieldedCircuitSource } from "../scripts/lib/zkCircuitSelection.mjs";
 import { currentShieldedCandidateManifest } from "../scripts/lib/shieldedArtifacts.mjs";
 import { SHIELDED_SETUP_CIRCUITS } from "../scripts/lib/shieldedProductionSetup.mjs";
+import { verifierSource } from "../lib/contractSources.js";
 import {
   authorizeMockReceive,
   deployMockReceiveAuthorization,
@@ -178,7 +179,7 @@ function circuitFiles(action, manifest) {
   return {
     source,
     contractName: manifest.circuits[action].verifierContractName,
-    circuit: path.join(ROOT, "circuits", `${source}.circom`),
+    circuit: path.join(ROOT, shieldedCircuitSource(source)),
     wasm: path.join(PUBLIC_ARTIFACTS, `${source}.wasm`),
     zkey: path.join(PUBLIC_ARTIFACTS, `${source}_final.zkey`),
     vkey: path.join(PUBLIC_ARTIFACTS, `${source}.vkey.json`),
@@ -213,7 +214,7 @@ function checkedCurrentArtifacts(actions) {
     const contractName = SHIELDED_SETUP_CIRCUITS[action].verifierContractName;
     assert.equal(item.source, SHIELDED_CIRCUITS[action]);
     assert.equal(item.verifierContractName, contractName);
-    assert.equal(item.verifierPath, `contracts/${contractName}.sol`);
+    assert.equal(item.verifierPath, verifierSource(contractName));
   }
   const paths = [
     manifestFile,

@@ -1,7 +1,7 @@
 {
   "_format": "hh3-artifact-1",
   "contractName": "DeepFamilyLineageIndex",
-  "sourceName": "contracts/DeepFamilyLineageIndex.sol",
+  "sourceName": "contracts/family/DeepFamilyLineageIndex.sol",
   "abi": [
     {
       "inputs": [
@@ -917,5 +917,5 @@
       "type": "function"
     }
   ],
-  "inputSourceName": "project/contracts/DeepFamilyLineageIndex.sol"
+  "inputSourceName": "project/contracts/family/DeepFamilyLineageIndex.sol"
 }

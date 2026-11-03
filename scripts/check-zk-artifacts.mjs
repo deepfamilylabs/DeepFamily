@@ -21,7 +21,8 @@ import {
 import { inspectZkReleaseArtifacts } from "./lib/zkArtifactTrust.mjs";
 import { verifyLinkedReceiveArtifacts } from "./lib/linkedReceiveArtifacts.mjs";
 import { renameZkVerifierSource } from "./rename-zk-verifier.mjs";
-import { SHIELDED_CIRCUITS } from "./lib/zkCircuitSelection.mjs";
+import { SHIELDED_CIRCUITS, shieldedCircuitSource } from "./lib/zkCircuitSelection.mjs";
+import { verifierSource } from "../lib/contractSources.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const projectRoot = path.resolve(path.dirname(__filename), "..");
@@ -32,20 +33,20 @@ const circuits = [
     name: "person_commitment",
     builtR1cs: "zk-artifacts/circuits/person_commitment.r1cs",
     builtWasm: "zk-artifacts/circuits/person_commitment_js/person_commitment.wasm",
-    committedWasm: "frontend/public/zk/person_commitment.wasm",
-    committedZkey: "frontend/public/zk/person_commitment_final.zkey",
-    committedVkey: "frontend/public/zk/person_commitment.vkey.json",
-    verifier: "contracts/PersonCommitmentVerifier.sol",
+    committedWasm: "frontend/public/zk/identity/person_commitment.wasm",
+    committedZkey: "frontend/public/zk/identity/person_commitment_final.zkey",
+    committedVkey: "frontend/public/zk/identity/person_commitment.vkey.json",
+    verifier: verifierSource("PersonCommitmentVerifier"),
     verifierContractName: "PersonCommitmentVerifier",
   },
   {
     name: "disclosure_binding",
     builtR1cs: "zk-artifacts/circuits/disclosure_binding.r1cs",
     builtWasm: "zk-artifacts/circuits/disclosure_binding_js/disclosure_binding.wasm",
-    committedWasm: "frontend/public/zk/disclosure_binding.wasm",
-    committedZkey: "frontend/public/zk/disclosure_binding_final.zkey",
-    committedVkey: "frontend/public/zk/disclosure_binding.vkey.json",
-    verifier: "contracts/DisclosureBindingVerifier.sol",
+    committedWasm: "frontend/public/zk/identity/disclosure_binding.wasm",
+    committedZkey: "frontend/public/zk/identity/disclosure_binding_final.zkey",
+    committedVkey: "frontend/public/zk/identity/disclosure_binding.vkey.json",
+    verifier: verifierSource("DisclosureBindingVerifier"),
     verifierContractName: "DisclosureBindingVerifier",
   },
 ];
@@ -230,7 +231,7 @@ export function checkShieldedDevelopmentArtifacts({
       const prefix = `zk-artifacts/shielded/${name}`;
       const browser = `frontend/public/zk/shielded/${name}`;
       const paths = {
-        sourceSha256: `circuits/${name}.circom`,
+        sourceSha256: shieldedCircuitSource(name),
         r1csSha256: `${prefix}.r1cs`,
         wasmSha256: `${prefix}_js/${name}.wasm`,
         zkeySha256: `${browser}_final.zkey`,

@@ -245,7 +245,7 @@ describe("eSpace acceptance safety helpers", function () {
       record({
         file: "artifacts/build-info/project.json",
         viaIR: true,
-        sources: ["project/contracts/DeepFamily.sol"],
+        sources: ["project/contracts/family/DeepFamily.sol"],
       });
     const poseidonRecord = () =>
       record({

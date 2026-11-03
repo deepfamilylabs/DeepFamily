@@ -16,7 +16,10 @@ import {
   CIRCOM_VERSION,
   localCircomBinaryPath,
   resolveLocalCircomTarget,
+  circomIncludeArguments,
+  circomIncludeDirectories,
 } from "./circomToolchain.mjs";
+import { shieldedCircuitSource } from "./zkCircuitSelection.mjs";
 import {
   buildCircomOverrideEnvironment,
   withoutCircomOverrideEnvironment,
@@ -90,7 +93,7 @@ const SHIELDED_CIRCUITS_BY_SOURCE = Object.freeze(
     Object.values(SHIELDED_SETUP_CIRCUITS).map((spec) => [
       spec.source,
       Object.freeze({
-        source: `circuits/${spec.source}.circom`,
+        source: shieldedCircuitSource(spec.source),
         contractName: spec.verifierContractName,
       }),
     ]),
@@ -841,10 +844,7 @@ export const buildProductionCircuitCompileCommand = ({
     args: Object.freeze([
       path.join(resolvedRoot, circuit.source),
       ...CIRCOM_ARTIFACT_FLAGS,
-      "-l",
-      path.join(resolvedRoot, "node_modules"),
-      "-l",
-      path.join(resolvedRoot, "node_modules", "circomlib", "circuits"),
+      ...circomIncludeArguments(resolvedRoot),
       "-o",
       stageBuild,
     ]),
@@ -953,12 +953,13 @@ export const snapshotProductionSetupSources = ({ root, includeShielded = true })
     ...Object.values(SETUP_CIRCUITS).map(({ source }) => path.join(root, source)),
     ...(includeShielded
       ? Object.values(SHIELDED_SETUP_CIRCUITS).map(({ source }) =>
-          path.join(root, "circuits", `${source}.circom`),
+          path.join(root, shieldedCircuitSource(source)),
         )
       : []),
   ];
   const circuits = new Map();
-  // Mirror the compiler's local include search and both reviewed -l directories.
+  const libraries = circomIncludeDirectories(root);
+  // Mirror the compiler's search: beside the including file, then each -l root in order.
   // These dependencies include installed package files that Git does not track.
   while (pending.length > 0) {
     const file = pending.pop();
@@ -981,11 +982,7 @@ export const snapshotProductionSetupSources = ({ root, includeShielded = true })
       (token) => (token.startsWith('"') ? token : " "),
     );
     for (const match of uncommented.matchAll(/\binclude\s+"([^"]+)"\s*;/gu)) {
-      const include = [
-        path.dirname(file),
-        path.join(root, "node_modules"),
-        path.join(root, "node_modules", "circomlib", "circuits"),
-      ]
+      const include = [path.dirname(file), ...libraries]
         .map((directory) => path.resolve(directory, match[1]))
         .find((candidate) => fs.existsSync(candidate) && fs.statSync(candidate).isFile());
       if (include === undefined) {

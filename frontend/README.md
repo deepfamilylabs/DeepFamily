@@ -12,7 +12,7 @@ The local deploy command binds the shielded pool to the same DeepFamily token
 and lineage index. `npm run frontend:config` writes their addresses and deployment blocks to
 `.env.local` from the integrated deployment records.
 The setup command records the single-operator ceremony evidence and synchronizes browser
-WASM/zkey/vkey files to `public/zk/shielded/` and generated verifiers to `contracts/`, following
+WASM/zkey/vkey files to `public/zk/shielded/` and generated verifiers to `contracts/verifiers/`, following
 the identity/disclosure flow. Only the `.vkey.json` files are
 committed; publish new WASM/zkey files with `npm run zk:assets:publish` from the repository root.
 The dev server serves the local copies at `/zk/`. Builds load WASM/zkey from
@@ -87,7 +87,7 @@ Configure the Pages project as a monorepo build:
 - Environment variables (Production and Preview, plain text): `SKIP_DEPENDENCY_INSTALL=1`, and
   `VITE_ZK_ASSET_BASE_URL` set to the proving-file host. The build fails without the second.
 - Build watch paths (include): `frontend/*`, `packages/protocol-core/*`,
-  `circuits/*`, `functions/*`, `lib/zkPublicAssets.js`, `lib/cspReport.js`, `package.json`,
+  `circuits/*`, `functions/*`, `lib/zkPublicAssets.js`, `lib/contractSources.js`, `lib/cspReport.js`, `package.json`,
   `package-lock.json`, `.node-version`. Each directory needs its trailing `*`, and a lone `*`
   would match every file in the repository.
 

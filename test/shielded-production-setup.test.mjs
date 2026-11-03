@@ -1,3 +1,4 @@
+import { shieldedCircuitSource } from "../scripts/lib/zkCircuitSelection.mjs";
 import { expect } from "chai";
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
@@ -78,7 +79,7 @@ function createFixture() {
   const finalized = {};
   const initialManifest = { circuits: {} };
   for (const [action, spec] of Object.entries(SHIELDED_SETUP_CIRCUITS)) {
-    const source = write(root, `circuits/${spec.source}.circom`, `${action} reviewed source\n`);
+    const source = write(root, shieldedCircuitSource(spec.source), `${action} reviewed source\n`);
     const r1cs = write(stageBuild, `${spec.source}.r1cs`, `${action} reviewed constraint system\n`);
     const wasm = write(
       stageBuild,
@@ -121,7 +122,7 @@ function createFixture() {
       "--",
       ".gitignore",
       "package-lock.json",
-      ...Object.values(SHIELDED_SETUP_CIRCUITS).map(({ source }) => `circuits/${source}.circom`),
+      ...Object.values(SHIELDED_SETUP_CIRCUITS).map(({ source }) => shieldedCircuitSource(source)),
     ],
     { cwd: root },
   );
@@ -218,8 +219,8 @@ describe("shielded production setup artifacts", function () {
   it("installs linker keys and both fixed verifiers with their production manifest", async function () {
     const generated = [
       "frontend/public/zk/shielded/receive-link-keys.json",
-      "contracts/ReceivePresentationVerifier.sol",
-      "contracts/FundReceivePresentationVerifier.sol",
+      "contracts/verifiers/ReceivePresentationVerifier.sol",
+      "contracts/verifiers/FundReceivePresentationVerifier.sol",
     ];
     const records = await fixture.createRecords({
       linkSynchronizer: async ({ outputRoot, circuitFiles, manifest }) => {
@@ -262,8 +263,8 @@ describe("shielded production setup artifacts", function () {
   it("records informal keys and their link keys in the development manifest only", async function () {
     const generated = [
       "frontend/public/zk/shielded/receive-link-keys.json",
-      "contracts/ReceivePresentationVerifier.sol",
-      "contracts/FundReceivePresentationVerifier.sol",
+      "contracts/verifiers/ReceivePresentationVerifier.sol",
+      "contracts/verifiers/FundReceivePresentationVerifier.sol",
     ];
     const recordStage = fs.mkdtempSync(path.join(fixture.stageRoot, "records-"));
     fs.mkdirSync(path.join(recordStage, "release"));
@@ -323,9 +324,9 @@ describe("shielded production setup artifacts", function () {
 
   it("keeps issuer source evidence stable when generated receive keys and verifiers change", function () {
     const generated = [
-      "contracts/ShieldedIdentityAuthorizationUpdateVerifier.sol",
-      "contracts/ReceivePresentationVerifier.sol",
-      "contracts/FundReceivePresentationVerifier.sol",
+      "contracts/verifiers/ShieldedIdentityAuthorizationUpdateVerifier.sol",
+      "contracts/verifiers/ReceivePresentationVerifier.sol",
+      "contracts/verifiers/FundReceivePresentationVerifier.sol",
       "frontend/public/zk/shielded/receive-link-keys.json",
     ];
     const original = sourceBundleSha256(fixture.root);

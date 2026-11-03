@@ -7,24 +7,25 @@ import { fileURLToPath } from "node:url";
 
 import { assertLocalCircomInstallation } from "./fetch-circom.mjs";
 import { inspectCircomCompilerOverride } from "./lib/circomCompilerOverride.mjs";
-import { CIRCOM_ARTIFACT_FLAGS, localCircomBinaryPath } from "./lib/circomToolchain.mjs";
+import {
+  CIRCOM_ARTIFACT_FLAGS,
+  circomIncludeArguments,
+  localCircomBinaryPath,
+} from "./lib/circomToolchain.mjs";
 import {
   SHIELDED_CIRCUITS,
   parseCircuitArguments,
   selectCircuitNames,
+  identityCircuitSource,
+  shieldedCircuitSource,
 } from "./lib/zkCircuitSelection.mjs";
 
 const CORE_OUTPUT_DIRECTORY = path.join("zk-artifacts", "circuits");
 const SHIELDED_OUTPUT_DIRECTORY = path.join("zk-artifacts", "shielded");
-const INCLUDE_ARGUMENTS = Object.freeze([
-  "-l",
-  "node_modules",
-  "-l",
-  path.join("node_modules", "circomlib", "circuits"),
-]);
+const INCLUDE_ARGUMENTS = Object.freeze(circomIncludeArguments());
 const CIRCUIT_SOURCES = Object.freeze({
-  person: path.join("circuits", "person_commitment.circom"),
-  disclosure: path.join("circuits", "disclosure_binding.circom"),
+  person: identityCircuitSource("person_commitment"),
+  disclosure: identityCircuitSource("disclosure_binding"),
 });
 
 const defaultRunner = ({ executable, args, cwd }) =>
@@ -54,7 +55,7 @@ export const buildZkBuildCommands = ({
     ...selectCircuitNames(circuit).map((name) => {
       const shieldedAction = name.startsWith("shielded:") ? name.slice("shielded:".length) : null;
       const source = shieldedAction
-        ? path.join("circuits", `${SHIELDED_CIRCUITS[shieldedAction]}.circom`)
+        ? shieldedCircuitSource(SHIELDED_CIRCUITS[shieldedAction])
         : CIRCUIT_SOURCES[name];
       const outputDirectory = shieldedAction ? SHIELDED_OUTPUT_DIRECTORY : CORE_OUTPUT_DIRECTORY;
       return Object.freeze({

@@ -7,6 +7,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
+import { circomIncludeArguments } from "../../scripts/lib/circomToolchain.mjs";
 import { WitnessCalculatorBuilder } from "circom_runtime";
 import { poseidon2, poseidon3, poseidon5, poseidon8 } from "poseidon-lite";
 import {
@@ -49,12 +50,7 @@ async function compile(directory, name, source) {
       "--O2",
       "--sanity_check",
       "2",
-      "-l",
-      "circuits",
-      "-l",
-      "node_modules",
-      "-l",
-      "node_modules/circomlib/circuits",
+      ...circomIncludeArguments(),
       "-o",
       directory,
     ],
@@ -74,7 +70,7 @@ async function compile(directory, name, source) {
 
 function merkleSource(maxDepth, gated = false) {
   return `pragma circom 2.2.3;
-include "shielded_merkle_common.circom";
+include "shielded/common/shielded_merkle_common.circom";
 template MembershipCheck() {
     signal input leaf;
     signal input root;
@@ -113,7 +109,7 @@ function membershipWitness(maxDepth, index, depth = maxDepth) {
 
 function budgetBindingSource() {
   return `pragma circom 2.2.3;
-include "shielded_funding_common.circom";
+include "shielded/common/shielded_funding_common.circom";
 template BudgetBindingCheck() {
     signal input chainId;
     signal input pool;
@@ -209,7 +205,7 @@ test("shielded shared domain and Merkle constraints", async (t) => {
       directory,
       "pool_domain",
       `pragma circom 2.2.3;
-include "shielded_scope_common.circom";
+include "shielded/common/shielded_scope_common.circom";
 template DomainCheck() {
     signal input chainId;
     signal input pool;

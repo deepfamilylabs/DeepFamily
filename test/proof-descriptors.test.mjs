@@ -80,10 +80,10 @@ describe("proof descriptors", function () {
     );
 
     expect(wasmCandidates[0]).to.equal(
-      path.resolve(__dirname, "../frontend/public/zk/person_commitment.wasm"),
+      path.resolve(__dirname, "../frontend/public/zk/identity/person_commitment.wasm"),
     );
     expect(vkeyCandidates[0]).to.equal(
-      path.resolve(__dirname, "../frontend/public/zk/disclosure_binding.vkey.json"),
+      path.resolve(__dirname, "../frontend/public/zk/identity/disclosure_binding.vkey.json"),
     );
   });
 });

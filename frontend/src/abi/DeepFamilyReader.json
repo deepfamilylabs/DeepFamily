@@ -1,7 +1,7 @@
 {
   "_format": "hh3-artifact-1",
   "contractName": "DeepFamilyReader",
-  "sourceName": "contracts/DeepFamilyReader.sol",
+  "sourceName": "contracts/family/DeepFamilyReader.sol",
   "abi": [
     {
       "inputs": [
@@ -1037,5 +1037,5 @@
       "type": "function"
     }
   ],
-  "inputSourceName": "project/contracts/DeepFamilyReader.sol"
+  "inputSourceName": "project/contracts/family/DeepFamilyReader.sol"
 }

@@ -12,7 +12,7 @@ import {
   main as checkZkArtifacts,
 } from "../scripts/check-zk-artifacts.mjs";
 import { verifyAllProductionCeremonies } from "../scripts/zk-ceremony-verify.mjs";
-import { SHIELDED_CIRCUITS } from "../scripts/lib/zkCircuitSelection.mjs";
+import { SHIELDED_CIRCUITS, shieldedCircuitSource } from "../scripts/lib/zkCircuitSelection.mjs";
 import { SHIELDED_SETUP_CIRCUITS } from "../scripts/lib/shieldedProductionSetup.mjs";
 import { PRODUCTION_PTAU_RELATIVE_PATH } from "../scripts/lib/productionPtau.mjs";
 import { hasShieldedSolidityVerifier } from "../scripts/lib/zkCircuitSelection.mjs";
@@ -48,7 +48,7 @@ async function developmentFixture() {
   for (const [action, name] of Object.entries(SHIELDED_CIRCUITS)) {
     const prefix = `zk-artifacts/shielded/${name}`;
     const files = {
-      sourceSha256: write(root, `circuits/${name}.circom`, `${name} source\n`),
+      sourceSha256: write(root, shieldedCircuitSource(name), `${name} source\n`),
       r1csSha256: write(root, `${prefix}.r1cs`, `${name} r1cs\n`),
       wasmSha256: write(root, `${prefix}_js/${name}.wasm`, `${name} wasm\n`),
       zkeySha256: write(root, `${prefix}_dev_final.zkey`, `${name} zkey\n`),

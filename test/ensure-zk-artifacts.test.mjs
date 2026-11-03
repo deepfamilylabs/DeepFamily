@@ -11,9 +11,9 @@ const circuitCount = 2 + Object.keys(SHIELDED_CIRCUITS).length;
 function writePinnedArtifacts(root, status) {
   const files = {
     "circuits/zk-artifacts-manifest.json": JSON.stringify({ trustedSetup: { status } }),
-    "frontend/public/zk/person_commitment_final.zkey": "pinned proving key",
-    "frontend/public/zk/person_commitment.vkey.json": "pinned verification key",
-    "contracts/PersonCommitmentVerifier.sol": "pinned verifier",
+    "frontend/public/zk/identity/person_commitment_final.zkey": "pinned proving key",
+    "frontend/public/zk/identity/person_commitment.vkey.json": "pinned verification key",
+    "contracts/verifiers/PersonCommitmentVerifier.sol": "pinned verifier",
   };
   const shieldedManifest =
     status === "production"

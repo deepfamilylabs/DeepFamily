@@ -13,7 +13,7 @@ import {
 
 const PROJECT_BUILD_ID = "solc-0_8_28-project-fixture";
 const POSEIDON_BUILD_ID = "solc-0_8_28-poseidon-fixture";
-const PROJECT_SOURCE_NAME = "project/contracts/DeepFamily.sol";
+const PROJECT_SOURCE_NAME = "project/contracts/family/DeepFamily.sol";
 const SCOPED_SOURCE_NAME = "npm/@scope/library@1.2.3/src/Library.sol";
 const POSEIDON_SOURCE_NAME = "npm/poseidon-solidity@0.0.5/PoseidonT5.sol";
 
@@ -93,7 +93,7 @@ const createFixture = async () => {
   const projectSource = "pragma solidity 0.8.28; contract DeepFamily {}\n";
   const scopedSource = "pragma solidity 0.8.28; library Library {}\n";
   const poseidonSource = "pragma solidity 0.8.28; library PoseidonT5 {}\n";
-  await writeFile(root, "contracts/DeepFamily.sol", projectSource);
+  await writeFile(root, "contracts/family/DeepFamily.sol", projectSource);
   await writeFile(root, "node_modules/@scope/library/src/Library.sol", scopedSource);
   await writeFile(root, "node_modules/poseidon-solidity/PoseidonT5.sol", poseidonSource);
 
@@ -107,7 +107,7 @@ const createFixture = async () => {
       },
       viaIR: true,
       userSourceNameMap: {
-        "contracts/DeepFamily.sol": PROJECT_SOURCE_NAME,
+        "contracts/family/DeepFamily.sol": PROJECT_SOURCE_NAME,
         "@scope/library/src/Library.sol": SCOPED_SOURCE_NAME,
       },
     }),
@@ -137,7 +137,7 @@ const createFixture = async () => {
   const artifact = {
     _format: "hh3-artifact-1",
     contractName: "DeepFamily",
-    sourceName: "contracts/DeepFamily.sol",
+    sourceName: "contracts/family/DeepFamily.sol",
     inputSourceName: PROJECT_SOURCE_NAME,
     buildInfoId: PROJECT_BUILD_ID,
     abi: structuredClone(contractOutput.abi),

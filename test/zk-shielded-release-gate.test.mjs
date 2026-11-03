@@ -336,8 +336,8 @@ describe("shielded release source digest", function () {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "shielded-source-removal-"));
     try {
       execFileSync("git", ["init", "-q", root]);
-      fs.mkdirSync(path.join(root, "circuits"));
-      const active = path.join(root, "circuits/shielded_private_transfer.circom");
+      fs.mkdirSync(path.join(root, "circuits", "shielded"), { recursive: true });
+      const active = path.join(root, "circuits/shielded/shielded_private_transfer.circom");
       const obsolete = path.join(root, "circuits/obsolete.circom");
       fs.writeFileSync(active, "active source");
       fs.writeFileSync(obsolete, "obsolete source");
@@ -365,12 +365,12 @@ describe("shielded release source digest", function () {
       "frontend/public/zk/shielded/unexpected-file.js",
     ];
     const generated = [
-      "frontend/public/zk/person_commitment.wasm",
-      "frontend/public/zk/disclosure_binding_final.zkey",
+      "frontend/public/zk/identity/person_commitment.wasm",
+      "frontend/public/zk/identity/disclosure_binding_final.zkey",
       "frontend/public/zk/shielded/shielded_shield.wasm",
-      "contracts/PersonCommitmentVerifier.sol",
-      "contracts/DisclosureBindingVerifier.sol",
-      "contracts/ShieldedShieldVerifier.sol",
+      "contracts/verifiers/PersonCommitmentVerifier.sol",
+      "contracts/verifiers/DisclosureBindingVerifier.sol",
+      "contracts/verifiers/ShieldedShieldVerifier.sol",
     ];
     try {
       execFileSync("git", ["init", "-q", root]);

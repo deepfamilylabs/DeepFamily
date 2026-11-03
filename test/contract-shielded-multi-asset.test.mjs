@@ -65,7 +65,7 @@ async function setup({ native = false, precision = 18 } = {}) {
   const verifier = await hre.ethers.deployContract("ShieldedPoolVerifierMock");
   const counterVerifier = await hre.ethers.deployContract("IdentityCounterVerifierMock");
   const authorizationState = await deployIdentityAuthorizationState(hre, await counterVerifier.getAddress());
-  const receiveVerifier = await hre.ethers.deployContract("PrivateLetterVerifierMock");
+  const receiveVerifier = await hre.ethers.deployContract("ReceivePresentationVerifierMock");
   const poseidon = await hre.ethers.deployContract("PoseidonT3");
   await Promise.all([token, lineage, verifier, poseidon].map((c) => c.waitForDeployment()));
   const libraries = { PoseidonT3: await poseidon.getAddress() };
@@ -481,7 +481,7 @@ describe("immutable multi-asset shielded pool boundaries", function () {
     const Factory = await hre.ethers.getContractFactory("ShieldedPoolFactory", { libraries });
     const counterVerifier = await hre.ethers.deployContract("IdentityCounterVerifierMock");
     const otherState = await deployIdentityAuthorizationState(hre, await counterVerifier.getAddress());
-    const otherVerifier = await hre.ethers.deployContract("PrivateLetterVerifierMock");
+    const otherVerifier = await hre.ethers.deployContract("ReceivePresentationVerifierMock");
     const args = [
       await token.getAddress(),
       await lineage.getAddress(),

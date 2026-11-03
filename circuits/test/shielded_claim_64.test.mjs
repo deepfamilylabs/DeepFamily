@@ -7,6 +7,8 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
+import { circomIncludeArguments } from "../../scripts/lib/circomToolchain.mjs";
+import { shieldedCircuitSource } from "../../scripts/lib/zkCircuitSelection.mjs";
 import { WitnessCalculatorBuilder } from "circom_runtime";
 import { poseidon2, poseidon3, poseidon4, poseidon5, poseidon7, poseidon8 } from "poseidon-lite";
 import {
@@ -76,17 +78,14 @@ test("shielded claim constraints", async (t) => {
     execFileSync(
       path.join(repoRoot, "bin/circom"),
       [
-        "circuits/shielded_claim_64.circom",
+        shieldedCircuitSource("shielded_claim_64"),
         "--r1cs",
         "--wasm",
         "--sym",
         "--O2",
         "--sanity_check",
         "2",
-        "-l",
-        "node_modules",
-        "-l",
-        "node_modules/circomlib/circuits",
+        ...circomIncludeArguments(),
         "-o",
         output,
       ],

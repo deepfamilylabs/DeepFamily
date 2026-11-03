@@ -15,9 +15,9 @@ describe("browser proof descriptors", () => {
       publicSignalSpec: "person-relation-v1",
       files: {
         browser: {
-          wasm: "/zk/person_commitment.wasm",
-          zkey: "/zk/person_commitment_final.zkey",
-          vkey: "/zk/person_commitment.vkey.json",
+          wasm: "/zk/identity/person_commitment.wasm",
+          zkey: "/zk/identity/person_commitment_final.zkey",
+          vkey: "/zk/identity/person_commitment.vkey.json",
         },
       },
     });

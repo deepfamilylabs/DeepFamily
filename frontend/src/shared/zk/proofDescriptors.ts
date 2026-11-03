@@ -31,18 +31,18 @@ function defineBrowserDescriptor(
 export const PERSON_RELATION_PROOF_DESCRIPTOR = defineBrowserDescriptor(
   PERSON_RELATION_PROOF_DEFINITION,
   {
-    wasm: "/zk/person_commitment.wasm",
-    zkey: "/zk/person_commitment_final.zkey",
-    vkey: "/zk/person_commitment.vkey.json",
+    wasm: "/zk/identity/person_commitment.wasm",
+    zkey: "/zk/identity/person_commitment_final.zkey",
+    vkey: "/zk/identity/person_commitment.vkey.json",
   },
 );
 
 export const DISCLOSURE_BINDING_PROOF_DESCRIPTOR = defineBrowserDescriptor(
   DISCLOSURE_BINDING_PROOF_DEFINITION,
   {
-    wasm: "/zk/disclosure_binding.wasm",
-    zkey: "/zk/disclosure_binding_final.zkey",
-    vkey: "/zk/disclosure_binding.vkey.json",
+    wasm: "/zk/identity/disclosure_binding.wasm",
+    zkey: "/zk/identity/disclosure_binding_final.zkey",
+    vkey: "/zk/identity/disclosure_binding.vkey.json",
   },
 );
 

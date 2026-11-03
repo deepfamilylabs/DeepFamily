@@ -3,9 +3,10 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
+import { shieldedCircuitSource } from "../../scripts/lib/zkCircuitSelection.mjs";
 import { WitnessCalculatorBuilder } from "circom_runtime";
 import { poseidon2 } from "poseidon-lite";
-import { CIRCOM_ARTIFACT_FLAGS } from "../../scripts/lib/circomToolchain.mjs";
+import { CIRCOM_ARTIFACT_FLAGS, circomIncludeArguments } from "../../scripts/lib/circomToolchain.mjs";
 import { assertConstraintViolation } from "./constraint_assertions.mjs";
 import {
   computeShieldedOwnerCommitment,
@@ -92,12 +93,9 @@ test("four-input VALUE constraints and canonical nullifiers", async (t) => {
     execFileSync(
       path.join(root, "bin/circom"),
       [
-        `circuits/${circuit}.circom`,
+        shieldedCircuitSource(circuit),
         ...CIRCOM_ARTIFACT_FLAGS,
-        "-l",
-        "node_modules",
-        "-l",
-        "node_modules/circomlib/circuits",
+        ...circomIncludeArguments(),
         "-o",
         output,
       ],

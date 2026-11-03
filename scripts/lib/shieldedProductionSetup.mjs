@@ -16,10 +16,12 @@ import {
 } from "./productionPtau.mjs";
 import { checkedFile, sourceBundleSha256 } from "./shieldedSourceBundle.mjs";
 import { sha256File } from "./zkArtifactTrust.mjs";
+import { verifierSource } from "../../lib/contractSources.js";
 import {
   SHIELDED_CIRCUITS,
   hasShieldedSolidityVerifier,
   RECEIVE_PRESENTATION_CIRCUITS,
+  shieldedCircuitSource,
 } from "./zkCircuitSelection.mjs";
 import { assertSnarkjsRuntimeHash } from "./snarkjsToolchain.mjs";
 import { verifyShieldedCeremonyArtifacts } from "./shieldedCeremonyVerification.mjs";
@@ -82,7 +84,7 @@ export const SHIELDED_SETUP_CIRCUITS = Object.freeze(
           source,
           publicSignals: publicSignalCount(action),
           verifierContractName,
-          verifierPath: verifierContractName && `contracts/${verifierContractName}.sol`,
+          verifierPath: verifierContractName && verifierSource(verifierContractName),
         }),
       ];
     }),
@@ -165,7 +167,7 @@ export function snapshotShieldedCompilation({ root, stageBuild, expectedManifest
   }
   const circuits = {};
   for (const [action, spec] of Object.entries(SHIELDED_SETUP_CIRCUITS)) {
-    const sourcePath = path.join(root, "circuits", `${spec.source}.circom`);
+    const sourcePath = path.join(root, shieldedCircuitSource(spec.source));
     const r1cs = path.join(stageBuild, `${spec.source}.r1cs`);
     const wasm = path.join(stageBuild, `${spec.source}_js`, `${spec.source}.wasm`);
     circuits[action] = Object.freeze({
@@ -414,7 +416,7 @@ const shieldedArtifactInstallEntries = ({ compiled, finalized, records }) => {
       ? [
           RECEIVE_LINK_KEYS_PATH,
           ...Object.values(RECEIVE_PRESENTATION_CIRCUITS).map(
-            (spec) => `contracts/${spec.contractName}.sol`,
+            (spec) => verifierSource(spec.contractName),
           ),
         ].map((file) => {
           const source = path.join(records.linkedRoot, file);
@@ -571,7 +573,7 @@ export function inspectShieldedProductionArtifacts({
     const browser = `frontend/public/zk/shielded/${spec.source}`;
     const sourcePath = requireHashedFile(
       root,
-      `circuits/${spec.source}.circom`,
+      shieldedCircuitSource(spec.source),
       item.sourceSha256,
       `${action} source`,
       "circuits/",

@@ -1,7 +1,7 @@
 {
   "_format": "hh3-artifact-1",
   "contractName": "DeepFamily",
-  "sourceName": "contracts/DeepFamily.sol",
+  "sourceName": "contracts/family/DeepFamily.sol",
   "abi": [
     {
       "inputs": [],
@@ -2571,5 +2571,5 @@
       "type": "receive"
     }
   ],
-  "inputSourceName": "project/contracts/DeepFamily.sol"
+  "inputSourceName": "project/contracts/family/DeepFamily.sol"
 }

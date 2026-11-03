@@ -31,7 +31,7 @@ describe("ShieldedErc20Pool contract boundaries", function () {
       hre,
       await counterVerifier.getAddress(),
     );
-    const receiveVerifier = await hre.ethers.deployContract("PrivateLetterVerifierMock");
+    const receiveVerifier = await hre.ethers.deployContract("ReceivePresentationVerifierMock");
     const poseidon = await hre.ethers.deployContract("PoseidonT3");
     await Promise.all([
       token.waitForDeployment(),

@@ -1,7 +1,7 @@
 {
   "_format": "hh3-artifact-1",
   "contractName": "IdentityAuthorizationState",
-  "sourceName": "contracts/IdentityAuthorizationState.sol",
+  "sourceName": "contracts/receive/IdentityAuthorizationState.sol",
   "abi": [
     {
       "inputs": [
@@ -525,5 +525,5 @@
       "type": "function"
     }
   ],
-  "inputSourceName": "project/contracts/IdentityAuthorizationState.sol"
+  "inputSourceName": "project/contracts/receive/IdentityAuthorizationState.sol"
 }

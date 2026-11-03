@@ -3,8 +3,13 @@ import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { SHIELDED_CIRCUITS } from "./zkCircuitSelection.mjs";
+import {
+  SHIELDED_CIRCUITS,
+  identityCircuitSource,
+  shieldedCircuitSource,
+} from "./zkCircuitSelection.mjs";
 import { sanitizeReleaseEnvironment } from "./portableCommand.mjs";
+import { VERIFIER_DIRECTORY } from "../../lib/contractSources.js";
 
 const DEFAULT_ROOT = path.resolve(fileURLToPath(new URL("../..", import.meta.url)));
 const SOURCE_ROOTS = [
@@ -22,34 +27,23 @@ const SOURCE_ROOTS = [
 const SOURCE_SINGLETONS = new Set(["package.json", "package-lock.json", "hardhat.config.mjs"]);
 const REQUIRED_SOURCES = new Set([
   ...SOURCE_SINGLETONS,
-  "circuits/person_commitment.circom",
-  "circuits/disclosure_binding.circom",
-  ...Object.values(SHIELDED_CIRCUITS).map((source) => `circuits/${source}.circom`),
+  identityCircuitSource("person_commitment"),
+  identityCircuitSource("disclosure_binding"),
+  ...Object.values(SHIELDED_CIRCUITS).map(shieldedCircuitSource),
 ]);
+// Setup outputs, which the source bundle cannot bind. Every generated verifier lives in
+// VERIFIER_DIRECTORY and is excluded with it.
 const SOURCE_EXCLUSIONS = new Set([
   "circuits/shielded-production-manifest.json",
   "circuits/shielded-development-manifest.json",
   "circuits/zk-artifacts-manifest.json",
   "circuits/zk-ceremony-transcript.json",
-  "contracts/PersonCommitmentVerifier.sol",
-  "contracts/DisclosureBindingVerifier.sol",
-  "frontend/public/zk/person_commitment.wasm",
-  "frontend/public/zk/person_commitment_final.zkey",
-  "frontend/public/zk/person_commitment.vkey.json",
-  "frontend/public/zk/disclosure_binding.wasm",
-  "frontend/public/zk/disclosure_binding_final.zkey",
-  "frontend/public/zk/disclosure_binding.vkey.json",
-  "contracts/ShieldedShieldVerifier.sol",
-  "contracts/ShieldedFundVerifier.sol",
-  "contracts/ShieldedClaim64Verifier.sol",
-  "contracts/ShieldedClaim32Verifier.sol",
-  "contracts/ShieldedPrivateTransferVerifier.sol",
-  "contracts/ShieldedUnshieldVerifier.sol",
-  "contracts/ShieldedPrivateTransfer4Verifier.sol",
-  "contracts/ShieldedUnshield4Verifier.sol",
-  "contracts/ShieldedIdentityAuthorizationUpdateVerifier.sol",
-  "contracts/ReceivePresentationVerifier.sol",
-  "contracts/FundReceivePresentationVerifier.sol",
+  "frontend/public/zk/identity/person_commitment.wasm",
+  "frontend/public/zk/identity/person_commitment_final.zkey",
+  "frontend/public/zk/identity/person_commitment.vkey.json",
+  "frontend/public/zk/identity/disclosure_binding.wasm",
+  "frontend/public/zk/identity/disclosure_binding_final.zkey",
+  "frontend/public/zk/identity/disclosure_binding.vkey.json",
   "frontend/public/zk/shielded/receive-link-keys.json",
   ...Object.values(SHIELDED_CIRCUITS).flatMap((source) => [
     `frontend/public/zk/shielded/${source}.wasm`,
@@ -110,6 +104,7 @@ export function sourceBundleSha256(root = DEFAULT_ROOT, { env = process.env } = 
       (file) =>
         (!deleted.has(file) || REQUIRED_SOURCES.has(file)) &&
         !SOURCE_EXCLUSIONS.has(file) &&
+        !file.startsWith(`${VERIFIER_DIRECTORY}/`) &&
         !file.startsWith("release-evidence/") &&
         (SOURCE_SINGLETONS.has(file) || SOURCE_ROOTS.some((prefix) => file.startsWith(prefix))),
     )

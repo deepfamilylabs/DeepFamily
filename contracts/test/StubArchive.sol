@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {DeepFamilyArchive} from "../DeepFamilyArchive.sol";
+import {DeepFamilyArchive} from "../family/DeepFamilyArchive.sol";
 
 contract StubArchive is DeepFamilyArchive {
   error StoreFailed();

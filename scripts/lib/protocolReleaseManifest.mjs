@@ -61,6 +61,7 @@ import {
 } from "./kdfReleaseEvidence.mjs";
 import { inspectZkReleaseArtifacts, readCanonicalJsonFile } from "./zkArtifactTrust.mjs";
 import { SHIELDED_DEPLOYMENT_CIRCUITS, RECEIVE_DEPLOYMENT_CONTRACTS, RECEIVE_DEPLOYMENT_IMMUTABLES, receiveDeploymentLibraries } from "./zkDeploymentCatalog.mjs";
+import { contractArtifact, contractSource } from "../../lib/contractSources.js";
 
 export const GROTH16_ADAPTER_VERIFIER_BINDINGS = Object.freeze({
   personVerifier: "personCommitmentVerifier",
@@ -96,79 +97,65 @@ export const PROTOCOL_DEPLOYMENT_EVIDENCE_SCHEMA_VERSION = 1;
 const PROTOCOL_IDENTIFIER = "deepfamily/onchain-biography-unified-passphrase-v1";
 const PROTOCOL_GENERATION = PROTOCOL_CORE_GENERATION;
 
+// Each artifact is the Hardhat output of its registered source.
+const artifactSpec = (contractName) => {
+  const sourceName = contractSource(contractName);
+  return { path: contractArtifact(sourceName, contractName), contractName, sourceName };
+};
+
 export const PROTOCOL_DEPLOYMENT_ARTIFACTS = Object.freeze({
   groth16VerifierAdapter: Object.freeze({
-    path: "artifacts/contracts/adapters/Groth16VerifierAdapter.sol/Groth16VerifierAdapter.json",
-    contractName: "Groth16VerifierAdapter",
-    sourceName: "contracts/adapters/Groth16VerifierAdapter.sol",
+    ...artifactSpec("Groth16VerifierAdapter"),
     immutableFields: GROTH16_ADAPTER_IMMUTABLE_FIELDS,
   }),
   deepFamilyArchive: Object.freeze({
-    path: "artifacts/contracts/DeepFamilyArchive.sol/DeepFamilyArchive.json",
-    contractName: "DeepFamilyArchive",
-    sourceName: "contracts/DeepFamilyArchive.sol",
+    ...artifactSpec("DeepFamilyArchive"),
     immutableFields: Object.freeze(["DEEP_FAMILY"]),
   }),
   deepFamilyReader: Object.freeze({
-    path: "artifacts/contracts/DeepFamilyReader.sol/DeepFamilyReader.json",
-    contractName: "DeepFamilyReader",
-    sourceName: "contracts/DeepFamilyReader.sol",
+    ...artifactSpec("DeepFamilyReader"),
     immutableFields: Object.freeze(["DEEP_FAMILY", "ARCHIVE"]),
   }),
   ...Object.fromEntries(
     Object.values(SHIELDED_DEPLOYMENT_CIRCUITS).map((spec) => [
       spec.verifierLabel,
       Object.freeze({
-        path: `artifacts/contracts/${spec.verifierContractName}.sol/${spec.verifierContractName}.json`,
-        contractName: spec.verifierContractName,
-        sourceName: `contracts/${spec.verifierContractName}.sol`,
+        ...artifactSpec(spec.verifierContractName),
         immutableFields: Object.freeze([]),
       }),
     ]),
   ),
   shieldedErc20Pool: Object.freeze({
-    path: "artifacts/contracts/ShieldedErc20Pool.sol/ShieldedErc20Pool.json",
-    contractName: "ShieldedErc20Pool",
-    sourceName: "contracts/ShieldedErc20Pool.sol",
+    ...artifactSpec("ShieldedErc20Pool"),
     immutableFields: Object.freeze(["TOKEN", "LINEAGE_INDEX", "VERIFIER", "AUTHORIZATION_STATE", "RECEIVE_VERIFIER"]),
     libraryFields: Object.freeze(["PoseidonT3"]),
   }),
   shieldedNativePool: Object.freeze({
-    path: "artifacts/contracts/ShieldedNativePool.sol/ShieldedNativePool.json",
-    contractName: "ShieldedNativePool",
-    sourceName: "contracts/ShieldedNativePool.sol",
+    ...artifactSpec("ShieldedNativePool"),
     immutableFields: Object.freeze(["LINEAGE_INDEX", "VERIFIER", "AUTHORIZATION_STATE", "RECEIVE_VERIFIER"]),
     libraryFields: Object.freeze(["PoseidonT3"]),
   }),
   shieldedPoolFactory: Object.freeze({
-    path: "artifacts/contracts/ShieldedPoolFactory.sol/ShieldedPoolFactory.json",
-    contractName: "ShieldedPoolFactory",
-    sourceName: "contracts/ShieldedPoolFactory.sol",
+    ...artifactSpec("ShieldedPoolFactory"),
     immutableFields: Object.freeze(["DEEP_TOKEN", "LINEAGE_INDEX", "VERIFIER", "NATIVE_POOL", "AUTHORIZATION_STATE", "RECEIVE_VERIFIER"]),
     libraryFields: Object.freeze(["PoseidonT3"]),
   }),
   ...Object.fromEntries(RECEIVE_DEPLOYMENT_CONTRACTS.map(({ contractName, property }) => [property, Object.freeze({
-    path: `artifacts/contracts/${contractName}.sol/${contractName}.json`, contractName,
-    sourceName: `contracts/${contractName}.sol`, immutableFields: Object.freeze(Object.keys(RECEIVE_DEPLOYMENT_IMMUTABLES[property])),
+    ...artifactSpec(contractName),
+    immutableFields: Object.freeze(Object.keys(RECEIVE_DEPLOYMENT_IMMUTABLES[property])),
     libraryFields: Object.freeze(Object.keys(receiveDeploymentLibraries(property, {}))),
   })])),
 });
 
 export const PROTOCOL_CONTRACT_INTERFACE_ARTIFACTS = Object.freeze({
   deepFamilyArchive: Object.freeze({
-    path: "artifacts/contracts/DeepFamilyArchive.sol/DeepFamilyArchive.json",
-    contractName: "DeepFamilyArchive",
-    sourceName: "contracts/DeepFamilyArchive.sol",
+    ...artifactSpec("DeepFamilyArchive"),
   }),
   deepFamilyReader: Object.freeze({
-    path: "artifacts/contracts/DeepFamilyReader.sol/DeepFamilyReader.json",
-    contractName: "DeepFamilyReader",
-    sourceName: "contracts/DeepFamilyReader.sol",
+    ...artifactSpec("DeepFamilyReader"),
   }),
   deepFamily: Object.freeze({
-    path: "artifacts/contracts/DeepFamily.sol/DeepFamily.json",
-    contractName: "DeepFamily",
-    sourceName: "contracts/DeepFamily.sol",
+    ...artifactSpec("DeepFamily"),
   }),
 });
 

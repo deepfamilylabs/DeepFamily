@@ -3,6 +3,7 @@ import { ethers } from "ethers";
 
 import { ESPACE_CHAIN_PROFILE, ETHEREUM_CHAIN_PROFILE } from "./chainProfiles.mjs";
 import { MAINNET_MIN_DELAY_FLOOR_SECONDS } from "./mainnetReleaseSafety.mjs";
+import { contractSource } from "../../lib/contractSources.js";
 
 export const ESPACE_TESTNET_NAME = ESPACE_CHAIN_PROFILE.acceptance.networkName;
 export const ESPACE_TESTNET_CHAIN_ID = ESPACE_CHAIN_PROFILE.acceptance.chainId;
@@ -270,7 +271,7 @@ export const summarizeProductionBuildInfo = (records) => {
       sourceNames.length === 1 &&
       (sourceNames[0] === "npm/poseidon-solidity@0.0.5/PoseidonT5.sol" ||
         sourceNames[0].endsWith("/poseidon-solidity/PoseidonT5.sol"));
-    const projectBuild = sourceNames.includes("project/contracts/DeepFamily.sol");
+    const projectBuild = sourceNames.includes(`project/${contractSource("DeepFamily")}`);
     const optimizer = {
       enabled: settings.optimizer?.enabled === true,
       runs: settings.optimizer?.runs,

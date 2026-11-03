@@ -34,7 +34,7 @@ describe("ProofConstants consistency tests", () => {
     "utf8",
   );
   const deepFamilySource = readFileSync(
-    path.resolve(__dirname, "../contracts/DeepFamily.sol"),
+    path.resolve(__dirname, "../contracts/family/DeepFamily.sol"),
     "utf8",
   );
 

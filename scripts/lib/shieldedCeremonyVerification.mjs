@@ -9,6 +9,7 @@ import {
   CIRCOM_ARTIFACT_FLAGS,
   CIRCOM_VERSION,
   resolveLocalCircomTarget,
+  circomIncludeArguments,
 } from "./circomToolchain.mjs";
 import {
   assertReleaseRuntimeCompatibility,
@@ -267,10 +268,7 @@ export async function verifyShieldedCeremonyArtifacts({
         args: [
           source,
           ...CIRCOM_ARTIFACT_FLAGS,
-          "-l",
-          path.join(resolvedRoot, "node_modules"),
-          "-l",
-          path.join(resolvedRoot, "node_modules/circomlib/circuits"),
+          ...circomIncludeArguments(resolvedRoot),
           "-o",
           build,
         ],

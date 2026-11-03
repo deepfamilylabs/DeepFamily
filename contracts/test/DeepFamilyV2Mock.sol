@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import {DeepFamily} from "../DeepFamily.sol";
+import {DeepFamily} from "../family/DeepFamily.sol";
 
 /**
  * @title DeepFamilyV2Mock

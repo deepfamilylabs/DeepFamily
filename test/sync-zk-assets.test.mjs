@@ -3,7 +3,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
-import { FILES_TO_COPY, syncZkAssets } from "../circuits/sync-zk-assets.mjs";
+import { FILES_TO_COPY, syncZkAssets } from "../scripts/sync-zk-assets.mjs";
 
 const createOutput = () => {
   const stdout = [];

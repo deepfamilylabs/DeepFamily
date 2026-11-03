@@ -401,10 +401,7 @@ git diff -- \
   circuits/zk-ceremony-transcript.json \
   circuits/shielded-production-manifest.json \
   release-evidence/shielded/phase2-transcript.json \
-  contracts/PersonCommitmentVerifier.sol \
-  contracts/DisclosureBindingVerifier.sol \
-  contracts/Shielded*Verifier.sol \
-  contracts/*ReceivePresentationVerifier.sol \
+  contracts/verifiers/ \
   contracts/libraries/LinkedGroth16Verifier.sol \
   frontend/public/zk/shielded/receive-link-keys.json
 
@@ -424,15 +421,12 @@ git add \
   circuits/zk-ceremony-transcript.json \
   circuits/shielded-production-manifest.json \
   release-evidence/shielded/phase2-transcript.json \
-  contracts/PersonCommitmentVerifier.sol \
-  contracts/DisclosureBindingVerifier.sol \
-  contracts/Shielded*Verifier.sol \
-  contracts/*ReceivePresentationVerifier.sol \
+  contracts/verifiers/ \
   contracts/libraries/LinkedGroth16Verifier.sol \
   frontend/public/zk/shielded/receive-link-keys.json \
-  'frontend/public/zk/*.vkey.json' \
+  'frontend/public/zk/identity/*.vkey.json' \
   'frontend/public/zk/shielded/*.vkey.json' \
-  'frontend/public/zk/*.br' \
+  'frontend/public/zk/identity/*.br' \
   'frontend/public/zk/shielded/*.br'
 
 git commit -m "chore: install production zk artifacts"

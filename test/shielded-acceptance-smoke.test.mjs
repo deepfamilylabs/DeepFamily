@@ -51,8 +51,8 @@ describe("integrated shielded acceptance smoke", function () {
       gender: 2,
     };
     const proofArtifacts = {
-      wasm: path.resolve("frontend/public/zk/person_commitment.wasm"),
-      zkey: path.resolve("frontend/public/zk/person_commitment_final.zkey"),
+      wasm: path.resolve("frontend/public/zk/identity/person_commitment.wasm"),
+      zkey: path.resolve("frontend/public/zk/identity/person_commitment_final.zkey"),
     };
     const recordTx = async (_label, tx) => tx.wait();
     const personResult = await addPersonVersion({

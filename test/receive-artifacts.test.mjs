@@ -13,6 +13,7 @@ import {
   RECEIVE_PRESENTATION_CIRCUITS,
   SHIELDED_CIRCUITS,
 } from "../scripts/lib/zkCircuitSelection.mjs";
+import { verifierSource } from "../lib/contractSources.js";
 
 const repository = path.resolve(import.meta.dirname, "..");
 const hash = (bytes) => createHash("sha256").update(bytes).digest("hex");
@@ -117,7 +118,7 @@ describe("Circom receive linking artifacts", function () {
       files.push(
         `frontend/public/zk/shielded/${SHIELDED_CIRCUITS[action]}.vkey.json`,
         `frontend/public/zk/shielded/${SHIELDED_CIRCUITS[spec.issuer]}.vkey.json`,
-        `contracts/${spec.contractName}.sol`,
+        verifierSource(spec.contractName),
       );
     for (const file of new Set(files)) write(file, fs.readFileSync(path.join(repository, file)));
   });
@@ -136,7 +137,7 @@ describe("Circom receive linking artifacts", function () {
   for (const file of [
     RECEIVE_LINK_KEYS_PATH,
     "contracts/libraries/LinkedGroth16Verifier.sol",
-    "contracts/FundReceivePresentationVerifier.sol",
+    "contracts/verifiers/FundReceivePresentationVerifier.sol",
     "frontend/public/zk/shielded/shielded_receive_credential.vkey.json",
     "frontend/public/zk/shielded/shielded_fund_receive_presentation.vkey.json",
   ]) {
@@ -245,7 +246,7 @@ assert.equal(globalThis.curve_bn128, pool);`,
 
   for (const spec of Object.values(RECEIVE_PRESENTATION_CIRCUITS)) {
     it(`rejects an empty ${spec.kind} verifier even after its manifest hash is refreshed`, async function () {
-      const file = `contracts/${spec.contractName}.sol`;
+      const file = verifierSource(spec.contractName);
       const source = `// SPDX-License-Identifier: MIT\npragma solidity ^0.8.28;\ncontract ${spec.contractName} {\n    function verifyProof(bytes calldata, uint256[${spec.publicInputs}] calldata) external view {}\n}\n`;
       write(file, source);
       writeManifest((manifest) => {
@@ -276,7 +277,7 @@ assert.equal(globalThis.curve_bn128, pool);`,
 
   for (const file of [
     RECEIVE_LINK_KEYS_PATH,
-    "contracts/ReceivePresentationVerifier.sol",
+    "contracts/verifiers/ReceivePresentationVerifier.sol",
     `frontend/public/zk/shielded/${SHIELDED_CIRCUITS.receivePresentation}_final.zkey`,
   ]) {
     it(`rejects a symbolic link in place of ${file}`, async function () {
@@ -299,7 +300,7 @@ assert.equal(globalThis.curve_bn128, pool);`,
           privateDirectoryFactory: ({ prefix }) => {
             temporaryDirectory = fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()), prefix));
             fs.chmodSync(temporaryDirectory, 0o700);
-            const file = "contracts/ReceivePresentationVerifier.sol";
+            const file = "contracts/verifiers/ReceivePresentationVerifier.sol";
             write(file, `${read(file)} `);
             return temporaryDirectory;
           },

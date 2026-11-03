@@ -2,6 +2,8 @@ import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { ethers } from "ethers";
+import { verifierSource } from "../../lib/contractSources.js";
+import { identityCircuitSource } from "./zkCircuitSelection.mjs";
 
 import {
   CIRCOM_CANONICAL_BINARY_PATH,
@@ -40,20 +42,20 @@ export const ZK_TOOLCHAIN_PATHS = Object.freeze({
 
 export const ZK_RELEASE_ARTIFACTS = Object.freeze({
   person_commitment: Object.freeze({
-    source: "circuits/person_commitment.circom",
+    source: identityCircuitSource("person_commitment"),
     builtR1cs: "zk-artifacts/circuits/person_commitment.r1cs",
-    wasm: "frontend/public/zk/person_commitment.wasm",
-    zkey: "frontend/public/zk/person_commitment_final.zkey",
-    verificationKey: "frontend/public/zk/person_commitment.vkey.json",
-    solidityVerifier: "contracts/PersonCommitmentVerifier.sol",
+    wasm: "frontend/public/zk/identity/person_commitment.wasm",
+    zkey: "frontend/public/zk/identity/person_commitment_final.zkey",
+    verificationKey: "frontend/public/zk/identity/person_commitment.vkey.json",
+    solidityVerifier: verifierSource("PersonCommitmentVerifier"),
   }),
   disclosure_binding: Object.freeze({
-    source: "circuits/disclosure_binding.circom",
+    source: identityCircuitSource("disclosure_binding"),
     builtR1cs: "zk-artifacts/circuits/disclosure_binding.r1cs",
-    wasm: "frontend/public/zk/disclosure_binding.wasm",
-    zkey: "frontend/public/zk/disclosure_binding_final.zkey",
-    verificationKey: "frontend/public/zk/disclosure_binding.vkey.json",
-    solidityVerifier: "contracts/DisclosureBindingVerifier.sol",
+    wasm: "frontend/public/zk/identity/disclosure_binding.wasm",
+    zkey: "frontend/public/zk/identity/disclosure_binding_final.zkey",
+    verificationKey: "frontend/public/zk/identity/disclosure_binding.vkey.json",
+    solidityVerifier: verifierSource("DisclosureBindingVerifier"),
   }),
 });
 

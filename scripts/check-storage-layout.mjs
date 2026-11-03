@@ -2,21 +2,21 @@
 import fs from "node:fs";
 import path from "node:path";
 import { BASELINE_DIR, loadStorageLayout, diffLayouts } from "./lib/storageLayout.mjs";
+import { contractArtifact, contractSource } from "../lib/contractSources.js";
 
 const PROJECT_ROOT = process.cwd();
+const DEEP_FAMILY_ARTIFACT = contractArtifact(contractSource("DeepFamily"), "DeepFamily");
 const UPDATE = process.argv.includes("--update") || process.env.STORAGE_BASELINE_UPDATE === "1";
 
 // Upgradeable (proxy) contracts. Their storage layout must stay append-only across
 // versions, so each build is diffed against a committed baseline snapshot.
-const PROXY_CONTRACTS = [
-  { name: "DeepFamily", artifact: "artifacts/contracts/DeepFamily.sol/DeepFamily.json" },
-];
+const PROXY_CONTRACTS = [{ name: "DeepFamily", artifact: DEEP_FAMILY_ARTIFACT }];
 
 // Positive: the canonical upgrade target must be a safe extension of the base.
 const POSITIVE_MOCK_CHECKS = [
   {
     label: "DeepFamily -> DeepFamilyV2Mock",
-    from: "artifacts/contracts/DeepFamily.sol/DeepFamily.json",
+    from: DEEP_FAMILY_ARTIFACT,
     to: "artifacts/contracts/test/DeepFamilyV2Mock.sol/DeepFamilyV2Mock.json",
   },
 ];
@@ -27,7 +27,7 @@ const POSITIVE_MOCK_CHECKS = [
 const NEGATIVE_MOCK_CHECKS = [
   {
     label: "DeepFamily -/-> UnsafeUpgradeMock (must error)",
-    from: "artifacts/contracts/DeepFamily.sol/DeepFamily.json",
+    from: DEEP_FAMILY_ARTIFACT,
     to: "artifacts/contracts/test/UnsafeUpgradeMock.sol/UnsafeUpgradeMock.json",
   },
 ];

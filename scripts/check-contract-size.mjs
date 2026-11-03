@@ -1,51 +1,41 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { SHIELDED_DEPLOYMENT_CIRCUITS, RECEIVE_DEPLOYMENT_CONTRACTS } from "./lib/zkDeploymentCatalog.mjs";
+import { contractArtifact, contractSource } from "../lib/contractSources.js";
 
 // Keep the stricter Ethereum EIP-170 ceiling so one artifact remains deployable on every
 // supported network. Conflux eSpace currently permits up to 49,152 deployed bytes.
 const CROSS_CHAIN_MAX_DEPLOYED_BYTES = 24_576;
 const MAX_SEGMENT_RUNTIME_BYTES = 16_385;
 const MAX_MANIFEST_RUNTIME_BYTES = 20_566;
+// `declaredIn` names the registered contract whose source file declares `contractName`.
+const artifactOf = (contractName, declaredIn = contractName) => [
+  contractName,
+  contractArtifact(contractSource(declaredIn), contractName),
+];
 const ARTIFACTS = [
-  ...RECEIVE_DEPLOYMENT_CONTRACTS.map(({contractName}) => [contractName, `artifacts/contracts/${contractName}.sol/${contractName}.json`]),
-  ...Object.values(SHIELDED_DEPLOYMENT_CIRCUITS).map(({ verifierContractName }) => [
-    verifierContractName,
-    `artifacts/contracts/${verifierContractName}.sol/${verifierContractName}.json`,
-  ]),
-  ["DeepFamily", "artifacts/contracts/DeepFamily.sol/DeepFamily.json"],
-  ["DeepFamilyArchive", "artifacts/contracts/DeepFamilyArchive.sol/DeepFamilyArchive.json"],
-  ["ArchiveData", "artifacts/contracts/DeepFamilyArchive.sol/ArchiveData.json"],
-  ["DeepFamilyReader", "artifacts/contracts/DeepFamilyReader.sol/DeepFamilyReader.json"],
-  ["AdultAgeGate", "artifacts/contracts/libraries/AdultAgeGate.sol/AdultAgeGate.json"],
+  ...RECEIVE_DEPLOYMENT_CONTRACTS.map(({ contractName }) => artifactOf(contractName)),
+  ...Object.values(SHIELDED_DEPLOYMENT_CIRCUITS).map(({ verifierContractName }) =>
+    artifactOf(verifierContractName),
+  ),
+  artifactOf("DeepFamily"),
+  artifactOf("DeepFamilyArchive"),
+  artifactOf("ArchiveData", "DeepFamilyArchive"),
+  artifactOf("DeepFamilyReader"),
+  artifactOf("AdultAgeGate"),
   ["PoseidonT3", "artifacts/poseidon-solidity/PoseidonT3.sol/PoseidonT3.json"],
   ["PoseidonT4", "artifacts/poseidon-solidity/PoseidonT4.sol/PoseidonT4.json"],
   ["PoseidonT5", "artifacts/poseidon-solidity/PoseidonT5.sol/PoseidonT5.json"],
   ["PoseidonT6", "artifacts/poseidon-solidity/PoseidonT6.sol/PoseidonT6.json"],
-  [
-    "DeepFamilyLineageIndex",
-    "artifacts/contracts/DeepFamilyLineageIndex.sol/DeepFamilyLineageIndex.json",
-  ],
-  ["ShieldedErc20Pool", "artifacts/contracts/ShieldedErc20Pool.sol/ShieldedErc20Pool.json"],
-  ["ShieldedNativePool", "artifacts/contracts/ShieldedNativePool.sol/ShieldedNativePool.json"],
-  ["ShieldedPoolFactory", "artifacts/contracts/ShieldedPoolFactory.sol/ShieldedPoolFactory.json"],
-  ["DeepFamilyToken", "artifacts/contracts/DeepFamilyToken.sol/DeepFamilyToken.json"],
-  [
-    "GovernanceTimelock",
-    "artifacts/contracts/governance/GovernanceTimelock.sol/GovernanceTimelock.json",
-  ],
-  [
-    "Groth16VerifierAdapter",
-    "artifacts/contracts/adapters/Groth16VerifierAdapter.sol/Groth16VerifierAdapter.json",
-  ],
-  [
-    "PersonCommitmentVerifier",
-    "artifacts/contracts/PersonCommitmentVerifier.sol/PersonCommitmentVerifier.json",
-  ],
-  [
-    "DisclosureBindingVerifier",
-    "artifacts/contracts/DisclosureBindingVerifier.sol/DisclosureBindingVerifier.json",
-  ],
+  artifactOf("DeepFamilyLineageIndex"),
+  artifactOf("ShieldedErc20Pool"),
+  artifactOf("ShieldedNativePool"),
+  artifactOf("ShieldedPoolFactory"),
+  artifactOf("DeepFamilyToken"),
+  artifactOf("GovernanceTimelock"),
+  artifactOf("Groth16VerifierAdapter"),
+  artifactOf("PersonCommitmentVerifier"),
+  artifactOf("DisclosureBindingVerifier"),
 ];
 
 function getDeployedBytecodeSize(artifact) {

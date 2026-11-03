@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { shieldedCircuitSource } from "./zkCircuitSelection.mjs";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -97,7 +98,7 @@ export function loadCandidateArtifacts({
         development ? item.solidityVerifierSha256 : item.verifierSha256,
         `${action} verifier`,
       );
-    checkedHash(root, `circuits/${source}.circom`, item.sourceSha256, `${action} source`);
+    checkedHash(root, shieldedCircuitSource(source), item.sourceSha256, `${action} source`);
     const r1cs = checkedHash(
       root,
       `zk-artifacts/shielded/${source}.r1cs`,

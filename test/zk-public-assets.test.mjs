@@ -17,8 +17,8 @@ import { compressZkAssets } from "../scripts/compress-zk-assets.mjs";
 
 const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
 const BYTES = {
-  "frontend/public/zk/person_commitment.wasm": Buffer.from("core-wasm"),
-  "frontend/public/zk/person_commitment_final.zkey": Buffer.from("core-zkey"),
+  "frontend/public/zk/identity/person_commitment.wasm": Buffer.from("core-wasm"),
+  "frontend/public/zk/identity/person_commitment_final.zkey": Buffer.from("core-zkey"),
   "frontend/public/zk/shielded/shielded_claim_64.wasm": Buffer.from("claim-wasm"),
   "frontend/public/zk/shielded/shielded_claim_64_final.zkey": Buffer.from("claim-zkey"),
 };
@@ -40,8 +40,8 @@ describe("ZK public proving assets", function () {
       JSON.stringify({
         circuits: {
           person_commitment: {
-            wasmSha256: digest("person_commitment.wasm"),
-            zkeySha256: digest("person_commitment_final.zkey"),
+            wasmSha256: digest("identity/person_commitment.wasm"),
+            zkeySha256: digest("identity/person_commitment_final.zkey"),
           },
         },
       }),
@@ -78,16 +78,16 @@ describe("ZK public proving assets", function () {
   it("lists the WASM and zkey of every manifest circuit by content-addressed key", function () {
     expect(listZkPublicAssets(root)).to.deep.equal([
       {
-        path: "/zk/person_commitment.wasm",
-        file: "frontend/public/zk/person_commitment.wasm",
-        key: `${digest("person_commitment.wasm")}/person_commitment.wasm.br`,
-        sha256: digest("person_commitment.wasm"),
+        path: "/zk/identity/person_commitment.wasm",
+        file: "frontend/public/zk/identity/person_commitment.wasm",
+        key: `${digest("identity/person_commitment.wasm")}/person_commitment.wasm.br`,
+        sha256: digest("identity/person_commitment.wasm"),
       },
       {
-        path: "/zk/person_commitment_final.zkey",
-        file: "frontend/public/zk/person_commitment_final.zkey",
-        key: `${digest("person_commitment_final.zkey")}/person_commitment_final.zkey.br`,
-        sha256: digest("person_commitment_final.zkey"),
+        path: "/zk/identity/person_commitment_final.zkey",
+        file: "frontend/public/zk/identity/person_commitment_final.zkey",
+        key: `${digest("identity/person_commitment_final.zkey")}/person_commitment_final.zkey.br`,
+        sha256: digest("identity/person_commitment_final.zkey"),
       },
       {
         path: "/zk/shielded/shielded_claim_64.wasm",
@@ -137,8 +137,8 @@ describe("ZK public proving assets", function () {
   });
 
   it("downloads only missing or stale files and verifies their digests", async function () {
-    writeLocal("frontend/public/zk/person_commitment.wasm");
-    writeLocal("frontend/public/zk/person_commitment_final.zkey", Buffer.from("stale"));
+    writeLocal("frontend/public/zk/identity/person_commitment.wasm");
+    writeLocal("frontend/public/zk/identity/person_commitment_final.zkey", Buffer.from("stale"));
     const requests = [];
     const result = await fetchZkAssets({
       root,
@@ -148,7 +148,7 @@ describe("ZK public proving assets", function () {
     });
     expect(result).to.deep.equal({ assetCount: 4, restored: 0, downloaded: 3 });
     expect(requests).to.deep.equal([
-      `https://assets.example/${digest("person_commitment_final.zkey")}/person_commitment_final.zkey.br`,
+      `https://assets.example/${digest("identity/person_commitment_final.zkey")}/person_commitment_final.zkey.br`,
       `https://assets.example/${digest("shielded/shielded_claim_64.wasm")}/shielded_claim_64.wasm.br`,
       `https://assets.example/${digest("shielded/shielded_claim_64_final.zkey")}/shielded_claim_64_final.zkey.br`,
     ]);
@@ -159,12 +159,12 @@ describe("ZK public proving assets", function () {
 
   it("restores files from committed Brotli copies and downloads only the rest", async function () {
     writeLocal(
-      "frontend/public/zk/person_commitment.wasm.br",
-      brotliCompressSync(BYTES["frontend/public/zk/person_commitment.wasm"]),
+      "frontend/public/zk/identity/person_commitment.wasm.br",
+      brotliCompressSync(BYTES["frontend/public/zk/identity/person_commitment.wasm"]),
     );
     // A stale copy decodes to other bytes and must not be installed.
     writeLocal(
-      "frontend/public/zk/person_commitment_final.zkey.br",
+      "frontend/public/zk/identity/person_commitment_final.zkey.br",
       brotliCompressSync(Buffer.from("stale")),
     );
     const requests = [];
@@ -184,19 +184,19 @@ describe("ZK public proving assets", function () {
   it("serves only committed copies that decode to their digest within the asset limit", function () {
     const claimZkey = "frontend/public/zk/shielded/shielded_claim_64_final.zkey";
     writeLocal(
-      "frontend/public/zk/person_commitment.wasm.br",
-      brotliCompressSync(BYTES["frontend/public/zk/person_commitment.wasm"]),
+      "frontend/public/zk/identity/person_commitment.wasm.br",
+      brotliCompressSync(BYTES["frontend/public/zk/identity/person_commitment.wasm"]),
     );
     writeLocal(
-      "frontend/public/zk/person_commitment_final.zkey.br",
+      "frontend/public/zk/identity/person_commitment_final.zkey.br",
       brotliCompressSync(Buffer.from("stale")),
     );
     writeLocal("frontend/public/zk/shielded/shielded_claim_64.wasm.br", Buffer.from("not brotli"));
     writeLocal(`${claimZkey}.br`, brotliCompressSync(BYTES[claimZkey]));
     expect(listServableBrotliAssets(root)).to.deep.equal({
-      served: ["/zk/person_commitment.wasm", "/zk/shielded/shielded_claim_64_final.zkey"],
+      served: ["/zk/identity/person_commitment.wasm", "/zk/shielded/shielded_claim_64_final.zkey"],
       unusable: [
-        "frontend/public/zk/person_commitment_final.zkey.br",
+        "frontend/public/zk/identity/person_commitment_final.zkey.br",
         "frontend/public/zk/shielded/shielded_claim_64.wasm.br",
       ],
     });
@@ -266,9 +266,9 @@ describe("ZK public proving assets", function () {
       error = caught;
     }
     expect(error?.message).to.contain("ZK asset SHA-256 mismatch");
-    expect(fs.existsSync(path.join(root, "frontend/public/zk/person_commitment.wasm"))).to.equal(
-      false,
-    );
+    expect(
+      fs.existsSync(path.join(root, "frontend/public/zk/identity/person_commitment.wasm")),
+    ).to.equal(false);
   });
 
   it("names the publish step when the asset host lacks a pinned file", async function () {
@@ -289,7 +289,7 @@ describe("ZK public proving assets", function () {
 
   it("uploads only objects the bucket lacks, signing each payload digest", async function () {
     for (const file of Object.keys(BYTES)) writeLocal(file);
-    const existingKey = `${digest("person_commitment.wasm")}/person_commitment.wasm.br`;
+    const existingKey = `${digest("identity/person_commitment.wasm")}/person_commitment.wasm.br`;
     const requests = [];
     const result = await publishZkAssets({
       root,

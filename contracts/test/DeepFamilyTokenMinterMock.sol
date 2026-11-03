@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "../DeepFamilyToken.sol";
+import "../family/DeepFamilyToken.sol";
 
 contract DeepFamilyTokenMinterMock {
   // solhint-disable-next-line immutable-vars-naming

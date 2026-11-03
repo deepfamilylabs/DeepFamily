@@ -1,7 +1,7 @@
 {
   "_format": "hh3-artifact-1",
   "contractName": "ShieldedErc20Pool",
-  "sourceName": "contracts/ShieldedErc20Pool.sol",
+  "sourceName": "contracts/shielded/ShieldedErc20Pool.sol",
   "abi": [
     {
       "inputs": [
@@ -298,7 +298,7 @@
       "name": "RECEIVE_VERIFIER",
       "outputs": [
         {
-          "internalType": "contract IPrivateLetterVerifier",
+          "internalType": "contract IReceivePresentationVerifier",
           "name": "",
           "type": "address"
         }
@@ -1247,5 +1247,5 @@
       "type": "function"
     }
   ],
-  "inputSourceName": "project/contracts/ShieldedErc20Pool.sol"
+  "inputSourceName": "project/contracts/shielded/ShieldedErc20Pool.sol"
 }

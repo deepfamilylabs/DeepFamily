@@ -8,6 +8,7 @@ import {
   readZkeyLinkParameters,
 } from "./linkedVerifierSource.mjs";
 import { createPrivateTemporaryDirectory } from "./privateTemporaryDirectory.mjs";
+import { contractSource, verifierSource } from "../../lib/contractSources.js";
 import {
   assertSnarkjsRuntimeHash,
   inspectSnarkjsRuntime,
@@ -15,7 +16,7 @@ import {
 } from "./snarkjsToolchain.mjs";
 
 export const RECEIVE_LINK_KEYS_PATH = "frontend/public/zk/shielded/receive-link-keys.json";
-const BASE_PATH = "contracts/libraries/LinkedGroth16Verifier.sol";
+const BASE_PATH = contractSource("LinkedGroth16Verifier");
 const sha256 = (value) => createHash("sha256").update(value).digest("hex");
 const read = (root, file) => fs.readFileSync(path.join(root, file));
 const json = (root, file) => JSON.parse(read(root, file));
@@ -71,7 +72,7 @@ async function writeLinkedReceiveArtifacts({ root, outputRoot, key, manifest }) 
       presentationDeltaG1: presentation.deltaG1,
       publicSignals: spec.publicInputs,
     });
-    const file = `contracts/${spec.contractName}.sol`;
+    const file = verifierSource(spec.contractName);
     fs.mkdirSync(path.dirname(path.join(outputRoot, file)), { recursive: true });
     fs.writeFileSync(path.join(outputRoot, file), source);
     verifiers[spec.kind] = { path: file, sha256: sha256(source) };
@@ -141,7 +142,7 @@ export function inspectLinkedReceiveArtifacts({
     }
     const verifier = binding.verifiers?.[spec.kind];
     if (
-      verifier?.path !== `contracts/${spec.contractName}.sol` ||
+      verifier?.path !== verifierSource(spec.contractName) ||
       sha256(read(root, verifier.path)) !== verifier.sha256
     ) {
       throw new Error(`${spec.kind} receive Solidity verifier is stale`);
@@ -196,7 +197,7 @@ export async function verifyLinkedReceiveArtifacts({
   pin(BASE_PATH, manifest.linkKeys.verifierBaseSha256);
   pin(RECEIVE_LINK_KEYS_PATH, manifest.linkKeys.sha256);
   for (const spec of Object.values(RECEIVE_PRESENTATION_CIRCUITS)) {
-    pin(`contracts/${spec.contractName}.sol`, manifest.linkKeys.verifiers[spec.kind].sha256);
+    pin(verifierSource(spec.contractName), manifest.linkKeys.verifiers[spec.kind].sha256);
   }
   const actions = new Set(Object.keys(RECEIVE_PRESENTATION_CIRCUITS));
   for (const spec of Object.values(RECEIVE_PRESENTATION_CIRCUITS)) actions.add(spec.issuer);
@@ -267,8 +268,8 @@ export async function verifyLinkedReceiveArtifacts({
     });
     for (const relative of [
       RECEIVE_LINK_KEYS_PATH,
-      ...Object.values(RECEIVE_PRESENTATION_CIRCUITS).map(
-        (spec) => `contracts/${spec.contractName}.sol`,
+      ...Object.values(RECEIVE_PRESENTATION_CIRCUITS).map((spec) =>
+        verifierSource(spec.contractName),
       ),
     ]) {
       if (!read(outputRoot, relative).equals(read(inputRoot, relative))) {

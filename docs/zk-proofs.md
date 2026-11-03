@@ -4,10 +4,10 @@
 
 DeepFamily has two frozen proof purposes:
 
-| Purpose ordinal | Purpose             | Circuit source                       | Contract entrypoint    |
-| --------------: | ------------------- | ------------------------------------ | ---------------------- |
-|             `0` | `PersonRelation`    | `circuits/person_commitment.circom`  | `addPersonVersion`     |
-|             `1` | `DisclosureBinding` | `circuits/disclosure_binding.circom` | `mintPersonVersionNFT` |
+| Purpose ordinal | Purpose             | Circuit source                                | Contract entrypoint    |
+| --------------: | ------------------- | --------------------------------------------- | ---------------------- |
+|             `0` | `PersonRelation`    | `circuits/identity/person_commitment.circom`  | `addPersonVersion`     |
+|             `1` | `DisclosureBinding` | `circuits/identity/disclosure_binding.circom` | `mintPersonVersionNFT` |
 
 The purpose is fixed by the entrypoint; callers do not supply it. A caller supplies a `circuitId`
 inside `ProofEnvelope`, and the contract resolves exactly
@@ -384,8 +384,8 @@ struct ProofEnvelope {
 
 Current generated verifiers are:
 
-- `contracts/PersonCommitmentVerifier.sol` for 5 person-relation public signals;
-- `contracts/DisclosureBindingVerifier.sol` for 4 disclosure public signals;
+- `contracts/verifiers/PersonCommitmentVerifier.sol` for 5 person-relation public signals;
+- `contracts/verifiers/DisclosureBindingVerifier.sol` for 4 disclosure public signals;
 - eight shielded verifier targets for five action routes, with 7 to 29 public signals.
 
 These ten verifier contracts share one `contracts/adapters/Groth16VerifierAdapter.sol` instance. The

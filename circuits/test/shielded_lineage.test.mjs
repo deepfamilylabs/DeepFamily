@@ -7,6 +7,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
+import { circomIncludeArguments } from "../../scripts/lib/circomToolchain.mjs";
 import { WitnessCalculatorBuilder } from "circom_runtime";
 import { poseidon3, poseidon4, poseidon5 } from "poseidon-lite";
 import {
@@ -81,7 +82,7 @@ test("current direct-child lineage constraints with independently rebuilt roots"
     fs.writeFileSync(
       source,
       `pragma circom 2.2.3;
-include "shielded_lineage_common.circom";
+include "shielded/common/shielded_lineage_common.circom";
 component main = ShieldedDirectChildCurrent();
 `,
     );
@@ -94,12 +95,7 @@ component main = ShieldedDirectChildCurrent();
         "--O2",
         "--sanity_check",
         "2",
-        "-l",
-        "circuits",
-        "-l",
-        "node_modules",
-        "-l",
-        "node_modules/circomlib/circuits",
+        ...circomIncludeArguments(),
         "-o",
         directory,
       ],

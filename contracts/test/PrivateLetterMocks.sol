@@ -2,7 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {IIdentityCounterUpdateVerifier} from "../interfaces/IIdentityAuthorizationState.sol";
-import {IPrivateLetterVerifier} from "../interfaces/IPrivateLetterVerifiers.sol";
+import {IReceivePresentationVerifier} from "../interfaces/IReceivePresentationVerifier.sol";
 
 /** @dev TEST ONLY. Exact-public-input transport checks; no cryptographic authentication. */
 contract IdentityCounterVerifierMock is IIdentityCounterUpdateVerifier {
@@ -15,7 +15,7 @@ contract IdentityCounterVerifierMock is IIdentityCounterUpdateVerifier {
 }
 
 /** @dev TEST ONLY. A fabricated proof cannot authenticate any receipt. */
-contract PrivateLetterVerifierMock is IPrivateLetterVerifier {
+contract ReceivePresentationVerifierMock is IReceivePresentationVerifier {
   error InvalidZKProof();
 
   function verifyProof(bytes calldata proof, uint256[11] calldata inputs) external pure {

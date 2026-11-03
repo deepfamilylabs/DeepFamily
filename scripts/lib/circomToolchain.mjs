@@ -1,3 +1,5 @@
+import path from "node:path";
+
 export const CIRCOM_VERSION = "2.2.3";
 const CIRCOM_2_2_3_SOURCE = Object.freeze({
   repository: "https://github.com/iden3/circom.git",
@@ -14,6 +16,20 @@ export const CIRCOM_ARTIFACT_FLAGS = Object.freeze([
   "--sanity_check",
   "2",
 ]);
+
+/**
+ * Library roots for every compile, in search order: npm packages, circomlib and the circuits
+ * tree. Circom looks beside the including file first. Identity sources include the shared
+ * `lib/identity.circom` through the last root, so their bytes stay unchanged wherever they live.
+ */
+export const circomIncludeDirectories = (root = "") => [
+  path.join(root, "node_modules"),
+  path.join(root, "node_modules", "circomlib", "circuits"),
+  path.join(root, "circuits"),
+];
+
+export const circomIncludeArguments = (root = "") =>
+  circomIncludeDirectories(root).flatMap((directory) => ["-l", directory]);
 
 const releaseAssetUrl = (version, asset) =>
   `https://github.com/iden3/circom/releases/download/v${version}/${asset}`;

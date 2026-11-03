@@ -1,3 +1,4 @@
+import { shieldedCircuitSource } from "../scripts/lib/zkCircuitSelection.mjs";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import fs from "node:fs";
@@ -35,7 +36,7 @@ function writeFixture(root, { production = false } = {}) {
     manifest.circuits[action] = {
       source,
       publicSignals: spec.publicSignals,
-      sourceSha256: write(`circuits/${source}.circom`, `source-${action}`),
+      sourceSha256: write(shieldedCircuitSource(source), `source-${action}`),
       r1csSha256: write(`zk-artifacts/shielded/${source}.r1cs`, `r1cs-${action}`),
       wasmSha256: write(`zk-artifacts/shielded/${source}_js/${source}.wasm`, `wasm-${action}`),
       zkeySha256: write(`frontend/public/zk/shielded/${source}_final.zkey`, `zkey-${action}`),

@@ -1,3 +1,4 @@
+import { shieldedCircuitSource } from "../scripts/lib/zkCircuitSelection.mjs";
 import { expect } from "chai";
 import fs from "node:fs";
 import os from "node:os";
@@ -9,6 +10,7 @@ import { verifyShieldedCeremonyArtifacts } from "../scripts/lib/shieldedCeremony
 import { inspectSnarkjsRuntime } from "../scripts/lib/snarkjsToolchain.mjs";
 import { SHIELDED_SETUP_CIRCUITS } from "../scripts/lib/shieldedProductionSetup.mjs";
 import { sha256File } from "../scripts/lib/zkArtifactTrust.mjs";
+import { verifierSource } from "../lib/contractSources.js";
 
 const write = (root, relativePath, contents) => {
   const file = path.join(root, relativePath);
@@ -46,7 +48,7 @@ async function createFixture() {
   for (const [action, spec] of Object.entries(SHIELDED_SETUP_CIRCUITS)) {
     const { source, verifierContractName } = spec;
     const files = {
-      sourcePath: write(root, `circuits/${source}.circom`, `${source} source\n`),
+      sourcePath: write(root, shieldedCircuitSource(source), `${source} source\n`),
       r1cs: write(root, `compiled/${source}.r1cs`, `${source} reviewed R1CS\n`),
       wasm: write(root, `compiled/${source}.wasm`, `${source} reviewed WASM\n`),
       zkey: write(root, `public/${source}.zkey`, `${source} reviewed zkey\n`),
@@ -57,11 +59,7 @@ async function createFixture() {
       ),
       verifier:
         verifierContractName &&
-        write(
-          root,
-          `contracts/${verifierContractName}.sol`,
-          `contract ${verifierContractName} { }\n`,
-        ),
+        write(root, verifierSource(verifierContractName), `contract ${verifierContractName} { }\n`),
     };
     const ceremony = {
       contributions: [

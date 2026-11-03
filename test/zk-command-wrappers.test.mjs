@@ -168,7 +168,7 @@ describe("parameterized ZK command wrappers", function () {
           circuit: "person",
           executable: path.join(fixtureRoot, "bin", "circom"),
           args: [
-            path.join("circuits", "person_commitment.circom"),
+            path.join("circuits", "identity", "person_commitment.circom"),
             "--r1cs",
             "--wasm",
             "--sym",
@@ -179,6 +179,8 @@ describe("parameterized ZK command wrappers", function () {
             "node_modules",
             "-l",
             path.join("node_modules", "circomlib", "circuits"),
+            "-l",
+            "circuits",
             "-o",
             path.join("zk-artifacts", "circuits"),
           ],
@@ -249,12 +251,16 @@ describe("parameterized ZK command wrappers", function () {
         ["run", "shielded:privateTransfer4"],
         ["run", "shielded:unshield4"],
       ]);
-      expect(commands[1].args[0]).to.equal(path.join("circuits", "disclosure_binding.circom"));
+      expect(commands[1].args[0]).to.equal(
+        path.join("circuits", "identity", "disclosure_binding.circom"),
+      );
       expect(commands[2].args[0]).to.equal(
-        path.join("circuits", "shielded_receive_credential.circom"),
+        path.join("circuits", "shielded", "shielded_receive_credential.circom"),
       );
       expect(commands[2].args.at(-1)).to.equal(path.join("zk-artifacts", "shielded"));
-      expect(commands.at(-1).args[0]).to.equal(path.join("circuits", "shielded_unshield_4.circom"));
+      expect(commands.at(-1).args[0]).to.equal(
+        path.join("circuits", "shielded", "shielded_unshield_4.circom"),
+      );
       expect(
         commands.every(({ executable }) => executable === path.join(fixtureRoot, "bin", "circom")),
       ).to.equal(true);
@@ -270,7 +276,9 @@ describe("parameterized ZK command wrappers", function () {
         runner: () => {},
       });
       expect(commands).to.have.length(1);
-      expect(commands[0].args[0]).to.equal(path.join("circuits", "shielded_claim_64.circom"));
+      expect(commands[0].args[0]).to.equal(
+        path.join("circuits", "shielded", "shielded_claim_64.circom"),
+      );
       expect(commands[0].args.at(-1)).to.equal(path.join("zk-artifacts", "shielded"));
     });
 
@@ -395,9 +403,9 @@ describe("parameterized ZK command wrappers", function () {
             path.join(fixtureRoot, "tasks", "zk-person-hash-check.mjs"),
             "--prove",
             "--wasm",
-            "./frontend/public/zk/person_commitment.wasm",
+            "./frontend/public/zk/identity/person_commitment.wasm",
             "--zkey",
-            "./frontend/public/zk/person_commitment_final.zkey",
+            "./frontend/public/zk/identity/person_commitment_final.zkey",
             "--input",
             "./circuits/test/proof/person_commitment_input.json",
             "--submitter",
@@ -431,9 +439,9 @@ describe("parameterized ZK command wrappers", function () {
             path.join(fixtureRoot, "tasks", "zk-disclosure-binding-check.mjs"),
             "--prove",
             "--wasm",
-            "./frontend/public/zk/disclosure_binding.wasm",
+            "./frontend/public/zk/identity/disclosure_binding.wasm",
             "--zkey",
-            "./frontend/public/zk/disclosure_binding_final.zkey",
+            "./frontend/public/zk/identity/disclosure_binding_final.zkey",
             "--input",
             "./circuits/test/proof/disclosure_binding_input.json",
           ],

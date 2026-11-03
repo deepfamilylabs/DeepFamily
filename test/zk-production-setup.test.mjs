@@ -1,3 +1,7 @@
+import {
+  identityCircuitSource,
+  shieldedCircuitSource,
+} from "../scripts/lib/zkCircuitSelection.mjs";
 import { expect } from "chai";
 import { execFileSync, spawn } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -145,9 +149,10 @@ const installFirstSetupFixture = async (root) => {
   await fs.writeFile(path.join(root, ZK_ARTIFACT_MANIFEST_PATH), manifestRaw);
   await installContributionHelperFixture(root);
   const sourcePaths = ["person_commitment", "disclosure_binding"].map((name) =>
-    path.join(root, "circuits", `${name}.circom`),
+    path.join(root, identityCircuitSource(name)),
   );
   for (const sourcePath of sourcePaths) {
+    await fs.mkdir(path.dirname(sourcePath), { recursive: true });
     await fs.writeFile(sourcePath, `${path.basename(sourcePath)} changed reviewed source\n`);
   }
   const sourceSnapshotter = () =>
@@ -202,7 +207,7 @@ const installFirstSetupFixture = async (root) => {
 
 const createCoreRecordFixture = async ({ root, stage }) => {
   await fs.mkdir(path.join(stage, "release"), { recursive: true });
-  await fs.mkdir(path.join(root, "circuits"), { recursive: true });
+  await fs.mkdir(path.join(root, "circuits", "identity"), { recursive: true });
 
   const circuits = {};
   const reviewedCircuits = {};
@@ -212,7 +217,7 @@ const createCoreRecordFixture = async ({ root, stage }) => {
     await fs.mkdir(circuitDirectory, { recursive: true });
     await fs.mkdir(path.join(stageBuild, `${circuitName}_js`), { recursive: true });
     await fs.writeFile(
-      path.join(root, "circuits", `${circuitName}.circom`),
+      path.join(root, identityCircuitSource(circuitName)),
       `${circuitName} source\n`,
     );
     const circuit = {
@@ -500,7 +505,7 @@ describe("single-operator production ZK setup safety", function () {
       expect(command.executable).to.equal(compilerPath);
       expect(command.args).to.include("--O2");
       expect(command.args[command.args.indexOf("--sanity_check") + 1]).to.equal("2");
-      expect(command.args).to.include(path.join(root, "circuits", "person_commitment.circom"));
+      expect(command.args).to.include(path.join(root, identityCircuitSource("person_commitment")));
       expect(command.cwd).to.equal(root);
     }
   });
@@ -922,13 +927,27 @@ describe("single-operator production ZK setup safety", function () {
     expect(entropyRequested).to.equal(false);
   });
 
+  it("follows identity includes through the circuits library root", async function () {
+    const fixture = await installFirstSetupFixture(root);
+    const shared = path.join(root, "circuits", "lib", "shared.circom");
+    await fs.mkdir(path.dirname(shared), { recursive: true });
+    await fs.writeFile(shared, "reviewed shared template\n");
+    await fs.appendFile(fixture.sourcePaths[0], 'include "lib/shared.circom";\n');
+    execFileSync("git", ["init", "--quiet"], { cwd: root });
+    execFileSync("git", ["add", "--", ...fixture.sourcePaths, shared], { cwd: root });
+    const before = snapshotProductionSetupSources({ root, includeShielded: false });
+    await fs.appendFile(shared, "changed shared template\n");
+    const after = snapshotProductionSetupSources({ root, includeShielded: false });
+    expect(after.compilationSourceDigest).not.to.equal(before.compilationSourceDigest);
+  });
+
   it("snapshots all fresh shielded compilations without a development manifest", async function () {
     const stageBuild = path.join(stage, "build");
     for (const spec of Object.values(SHIELDED_SETUP_CIRCUITS)) {
       await fs.mkdir(path.join(stageBuild, `${spec.source}_js`), { recursive: true });
-      await fs.mkdir(path.join(root, "circuits"), { recursive: true });
+      await fs.mkdir(path.join(root, "circuits", "shielded"), { recursive: true });
       await fs.writeFile(
-        path.join(root, "circuits", `${spec.source}.circom`),
+        path.join(root, shieldedCircuitSource(spec.source)),
         "new reviewed source",
       );
       await fs.writeFile(path.join(stageBuild, `${spec.source}.r1cs`), "new reviewed R1CS");
@@ -1121,9 +1140,10 @@ describe("single-operator production ZK setup safety", function () {
     await fs.mkdir(path.dirname(manifestPath), { recursive: true });
     await fs.writeFile(manifestPath, manifestRaw);
     const workspaceHelper = await installContributionHelperFixture(root);
+    await fs.mkdir(path.join(root, "circuits", "identity"), { recursive: true });
     for (const circuitName of Object.keys(compiledBytes)) {
       await fs.writeFile(
-        path.join(root, "circuits", `${circuitName}.circom`),
+        path.join(root, identityCircuitSource(circuitName)),
         `${circuitName} source\n`,
       );
     }

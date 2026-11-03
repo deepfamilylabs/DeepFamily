@@ -1,7 +1,7 @@
 {
   "_format": "hh3-artifact-1",
   "contractName": "ShieldedNativePool",
-  "sourceName": "contracts/ShieldedNativePool.sol",
+  "sourceName": "contracts/shielded/ShieldedNativePool.sol",
   "abi": [
     {
       "inputs": [
@@ -292,7 +292,7 @@
       "name": "RECEIVE_VERIFIER",
       "outputs": [
         {
-          "internalType": "contract IPrivateLetterVerifier",
+          "internalType": "contract IReceivePresentationVerifier",
           "name": "",
           "type": "address"
         }
@@ -1228,5 +1228,5 @@
       "type": "function"
     }
   ],
-  "inputSourceName": "project/contracts/ShieldedNativePool.sol"
+  "inputSourceName": "project/contracts/shielded/ShieldedNativePool.sol"
 }

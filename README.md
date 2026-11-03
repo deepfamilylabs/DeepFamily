@@ -88,6 +88,24 @@ DeepFamily creates the decentralized family tree infrastructure, using zero-know
 | **ShieldedNativePool.sol**        | Direct native-currency pool with exact deposit value and reverting payouts                                          |
 | **ShieldedPoolFactory.sol**       | Permissionless canonical pool creation for gas only, with no administrator                                          |
 
+### Source Layout
+
+Contracts, circuits and browser proving files are grouped by the same architecture layers:
+
+| Layer                 | Contracts             | Circuits                                                 | Proving files                  |
+| --------------------- | --------------------- | -------------------------------------------------------- | ------------------------------ |
+| Family and identity   | `contracts/family/`   | `circuits/identity/`                                     | `frontend/public/zk/identity/` |
+| Shielded pools        | `contracts/shielded/` | `circuits/shielded/`, shared templates in `common/`      | `frontend/public/zk/shielded/` |
+| Receive authorization | `contracts/receive/`  | issuer and presentation circuits in `circuits/shielded/` | `frontend/public/zk/shielded/` |
+| Private letters       | `contracts/letters/`  | —                                                        | —                              |
+
+`contracts/verifiers/` holds only generated Groth16 verifiers, which `npm run zk:setup` rewrites as
+one set; proof verifier adapters live in `contracts/adapters/`, and `contracts/interfaces/`,
+`contracts/libraries/`, `contracts/governance/` and `contracts/proxy/` hold the shared pieces.
+`circuits/lib/` keeps the templates shared across layers. Scripts resolve contract sources through
+`lib/contractSources.js` and circuit sources through `scripts/lib/zkCircuitSelection.mjs`, so a
+later move changes one place.
+
 ## Quick Start
 
 ### Prerequisites
@@ -173,7 +191,8 @@ Each Groth16 circuit has its own proving and verification keys. The single setup
 the complete catalog and derives the shared receive-link parameters and two fixed Solidity
 verifiers from the matching keys. It records the single-operator ceremony and artifact evidence.
 Local development, CI and release use this same final artifact set. Generated browser files go
-under `frontend/public/zk/` and Solidity verifiers under `contracts/`.
+under `frontend/public/zk/identity/` and `frontend/public/zk/shielded/`, and Solidity verifiers
+under `contracts/verifiers/`.
 
 Receive presentations use LinkG16 to link two ordinary Circom proofs over the same hidden
 credential fields, without recursive pairing checks inside a circuit or a Go/WASM prover.

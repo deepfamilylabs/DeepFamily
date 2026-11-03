@@ -124,7 +124,7 @@ export async function linkedVerifierSource({
 pragma solidity ^0.8.28;
 
 // Generated from the fixed Circom issuer and presentation keys. Do not edit.
-import {LinkedGroth16Verifier} from "./libraries/LinkedGroth16Verifier.sol";
+import {LinkedGroth16Verifier} from "../libraries/LinkedGroth16Verifier.sol";
 
 contract ${contractName} is LinkedGroth16Verifier {
     function verifyProof(bytes calldata proof, uint256[${publicSignals}] calldata input) external view {

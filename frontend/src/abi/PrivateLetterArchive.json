@@ -1,7 +1,7 @@
 {
   "_format": "hh3-artifact-1",
   "contractName": "PrivateLetterArchive",
-  "sourceName": "contracts/PrivateLetterArchive.sol",
+  "sourceName": "contracts/letters/PrivateLetterArchive.sol",
   "abi": [
     {
       "inputs": [
@@ -394,7 +394,7 @@
       "name": "LETTER_VERIFIER",
       "outputs": [
         {
-          "internalType": "contract IPrivateLetterVerifier",
+          "internalType": "contract IReceivePresentationVerifier",
           "name": "",
           "type": "address"
         }
@@ -1041,5 +1041,5 @@
       "type": "function"
     }
   ],
-  "inputSourceName": "project/contracts/PrivateLetterArchive.sol"
+  "inputSourceName": "project/contracts/letters/PrivateLetterArchive.sol"
 }

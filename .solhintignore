@@ -1,5 +1,1 @@
-contracts/DisclosureBindingVerifier.sol
-contracts/PersonCommitmentVerifier.sol
-contracts/Shielded*Verifier.sol
-contracts/ReceivePresentationVerifier.sol
-contracts/FundReceivePresentationVerifier.sol
+contracts/verifiers/

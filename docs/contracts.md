@@ -2,7 +2,7 @@
 
 ## DeepFamily.sol - Core Protocol Contract
 
-**Location**: `contracts/DeepFamily.sol`
+**Location**: `contracts/family/DeepFamily.sol`
 **Description**: Main family tree protocol implementing multi-version person management, ZK-proof verification, community endorsement, NFT minting, and the canonical Archive binding.
 **Upgradeability**: Deployed behind a UUPS (ERC-1967) proxy. State is wired via `initialize(...)` rather than a constructor; upgrades are gated by `_authorizeUpgrade` (`onlyOwner`, intended owner = `TimelockController`). See [Upgradeability & Governance (UUPS)](#upgradeability--governance-uups).
 
@@ -234,7 +234,7 @@ action.
 
 `DeepFamilyArchive` exposes `storeMetadata`, `metadataRef`, `appendStoryRecord`, `sealStory`, `storyRecordRef` and `storyState`. Metadata keys are write-once and only DeepFamily may store them. Story append/seal requires the current NFT owner and matching expected index/count plus head. Nonempty payloads are segmented into 16 KiB bytecode contracts and paged manifests atomically; the Archive has no business total-length cap. DFM1 format-1 alone retains its 16 KiB envelope limit.
 
-The [Archive contract](../contracts/DeepFamilyArchive.sol) defines the API, events and authorization; the [shared Story codec](../packages/protocol-core/story.js) defines the DFS1 text encoding. Contract and interface names have no version suffix. `archiveKind()` and `apiVersion()` identify the supported protocol, while payload formats and compression codecs carry their own version identifiers.
+The [Archive contract](../contracts/family/DeepFamilyArchive.sol) defines the API, events and authorization; the [shared Story codec](../packages/protocol-core/story.js) defines the DFS1 text encoding. Contract and interface names have no version suffix. `archiveKind()` and `apiVersion()` identify the supported protocol, while payload formats and compression codecs carry their own version identifiers.
 
 A **story record** is one logical entry with a schema, author, timestamp and payload reference.
 Each payload may occupy multiple physical **segments**, indexed by manifest **pages**.
@@ -1020,7 +1020,7 @@ Ethereum deployment is unlimited.
 
 ## DeepFamilyToken.sol - DEEP ERC20 Utility Point
 
-**Location**: `contracts/DeepFamilyToken.sol`
+**Location**: `contracts/family/DeepFamilyToken.sol`
 **Description**: Standard ERC20 utility point with progressive halving issuance mechanics for family tree protocol incentives.
 
 > Disclaimer: The DEEP token is solely a platform utility point used to access and operate DeepFamily functionality. It carries no investment attributes, makes no promise of profit or returns, and must not be used to initiate fundraising, wealth‑management, investment plans, or speculative trading of any kind.
@@ -1137,7 +1137,7 @@ event MiningReward(address indexed miner, uint256 reward, uint256 totalAdditions
 
 ## DeepFamilyLineageIndex.sol - Lineage Merkle Index
 
-**Location**: `contracts/DeepFamilyLineageIndex.sol`
+**Location**: `contracts/family/DeepFamilyLineageIndex.sol`
 **Description**: Immutable companion of the DeepFamily proxy. It mirrors endorsements and trusted
 endorsers (recommended sources) into two Poseidon LeanIMTs so that a shielded claim can prove
 membership without naming the record. Both trees mirror public DeepFamily state in full, so being
@@ -1371,7 +1371,7 @@ Localhost, testnet acceptance and guarded Mainnet release use the same integrate
 
 ### Shielded action verifiers
 
-The pool uses five action routes with eight verifier targets and 7 to 29 public signals, as listed above. They receive encoding-1, 256-byte ABC proof payloads through the same `Groth16VerifierAdapter` used for identity and disclosure. The single `zk:setup` command generates `contracts/Shielded*Verifier.sol` for all five pool routes. It also synchronizes the matching browser assets, including the receive-credential proving and verification keys, to `frontend/public/zk/shielded/` alongside the identity/disclosure workflow.
+The pool uses five action routes with eight verifier targets and 7 to 29 public signals, as listed above. They receive encoding-1, 256-byte ABC proof payloads through the same `Groth16VerifierAdapter` used for identity and disclosure. The single `zk:setup` command generates `contracts/verifiers/Shielded*Verifier.sol` for all five pool routes. It also synchronizes the matching browser assets, including the receive-credential proving and verification keys, to `frontend/public/zk/shielded/` alongside the identity/disclosure workflow.
 
 The person and disclosure verifiers are generated from their Circom circuits by snarkjs. DeepFamily selects them through the permanent `(purpose,circuitId)` route and an `IProofVerifierAdapter`. Encoding ID `1`
 requires a 256-byte ABI encoding of Groth16 `a/b/c`, and the adapter forwards to the typed verifier:

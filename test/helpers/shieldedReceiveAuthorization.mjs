@@ -20,7 +20,7 @@ export async function deployIdentityAuthorizationState(hre, verifier) {
 export async function deployMockReceiveAuthorization(hre) {
   const counterVerifier = await hre.ethers.deployContract("IdentityCounterVerifierMock");
   const authorizationState = await deployIdentityAuthorizationState(hre, await counterVerifier.getAddress());
-  const receiveVerifier = await hre.ethers.deployContract("PrivateLetterVerifierMock");
+  const receiveVerifier = await hre.ethers.deployContract("ReceivePresentationVerifierMock");
   return {
     authorizationState,
     receiveVerifier,

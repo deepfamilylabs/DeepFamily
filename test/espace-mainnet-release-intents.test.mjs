@@ -13,6 +13,7 @@ import {
   assertCompleteMainnetSourceVerification,
 } from "../scripts/lib/mainnetReleaseSafety.mjs";
 import { deriveMainnetPlannedAddresses } from "../scripts/lib/protocolDeploymentProjection.mjs";
+import { contractArtifact, contractSource } from "../lib/contractSources.js";
 import {
   INTEGRATED_DEPLOYMENT_RECORDS,
   SHIELDED_DEPLOYMENT_CIRCUITS,
@@ -25,37 +26,41 @@ const STARTING_NONCE = 41;
 const CHAIN_ID = 1030n;
 const MIN_DELAY = 604_800;
 
+// `declaredIn` names the registered contract whose source file declares `contractName`.
+const artifactOf = (contractName, declaredIn = contractName) =>
+  contractArtifact(contractSource(declaredIn), contractName);
 const artifactPaths = {
-  ...Object.fromEntries(RECEIVE_DEPLOYMENT_CONTRACTS.map(({contractName}) => [contractName, `artifacts/contracts/${contractName}.sol/${contractName}.json`])),
+  ...Object.fromEntries(
+    RECEIVE_DEPLOYMENT_CONTRACTS.map(({ contractName }) => [contractName, artifactOf(contractName)]),
+  ),
   ...Object.fromEntries(
     Object.values(SHIELDED_DEPLOYMENT_CIRCUITS).map((spec) => [
       spec.verifierContractName,
-      `artifacts/contracts/${spec.verifierContractName}.sol/${spec.verifierContractName}.json`,
+      artifactOf(spec.verifierContractName),
     ]),
   ),
-  ShieldedNativePool: "artifacts/contracts/ShieldedNativePool.sol/ShieldedNativePool.json",
-  ShieldedPoolFactory: "artifacts/contracts/ShieldedPoolFactory.sol/ShieldedPoolFactory.json",
-  ShieldedErc20Pool: "artifacts/contracts/ShieldedErc20Pool.sol/ShieldedErc20Pool.json",
-  GovernanceTimelock:
-    "artifacts/contracts/governance/GovernanceTimelock.sol/GovernanceTimelock.json",
-  DeepFamilyToken: "artifacts/contracts/DeepFamilyToken.sol/DeepFamilyToken.json",
-  PoseidonT5: "artifacts/poseidon-solidity/PoseidonT5.sol/PoseidonT5.json",
-  AdultAgeGate: "artifacts/contracts/libraries/AdultAgeGate.sol/AdultAgeGate.json",
-  PersonCommitmentVerifier:
-    "artifacts/contracts/PersonCommitmentVerifier.sol/PersonCommitmentVerifier.json",
-  DisclosureBindingVerifier:
-    "artifacts/contracts/DisclosureBindingVerifier.sol/DisclosureBindingVerifier.json",
-  Groth16VerifierAdapter:
-    "artifacts/contracts/adapters/Groth16VerifierAdapter.sol/Groth16VerifierAdapter.json",
-  DeepFamily: "artifacts/contracts/DeepFamily.sol/DeepFamily.json",
-  UUPSProxy: "artifacts/contracts/proxy/UUPSProxy.sol/UUPSProxy.json",
-  DeepFamilyArchive: "artifacts/contracts/DeepFamilyArchive.sol/DeepFamilyArchive.json",
-  DeepFamilyReader: "artifacts/contracts/DeepFamilyReader.sol/DeepFamilyReader.json",
+  ...Object.fromEntries(
+    [
+      "ShieldedNativePool",
+      "ShieldedPoolFactory",
+      "ShieldedErc20Pool",
+      "GovernanceTimelock",
+      "DeepFamilyToken",
+      "AdultAgeGate",
+      "PersonCommitmentVerifier",
+      "DisclosureBindingVerifier",
+      "Groth16VerifierAdapter",
+      "DeepFamily",
+      "UUPSProxy",
+      "DeepFamilyArchive",
+      "DeepFamilyReader",
+      "DeepFamilyLineageIndex",
+    ].map((contractName) => [contractName, artifactOf(contractName)]),
+  ),
   PoseidonT3: "artifacts/poseidon-solidity/PoseidonT3.sol/PoseidonT3.json",
   PoseidonT4: "artifacts/poseidon-solidity/PoseidonT4.sol/PoseidonT4.json",
+  PoseidonT5: "artifacts/poseidon-solidity/PoseidonT5.sol/PoseidonT5.json",
   PoseidonT6: "artifacts/poseidon-solidity/PoseidonT6.sol/PoseidonT6.json",
-  DeepFamilyLineageIndex:
-    "artifacts/contracts/DeepFamilyLineageIndex.sol/DeepFamilyLineageIndex.json",
 };
 
 const artifacts = {

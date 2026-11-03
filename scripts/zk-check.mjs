@@ -20,9 +20,9 @@ const CHECKS = Object.freeze({
       args: Object.freeze([
         "--prove",
         "--wasm",
-        "./frontend/public/zk/person_commitment.wasm",
+        "./frontend/public/zk/identity/person_commitment.wasm",
         "--zkey",
-        "./frontend/public/zk/person_commitment_final.zkey",
+        "./frontend/public/zk/identity/person_commitment_final.zkey",
         "--input",
         "./circuits/test/proof/person_commitment_input.json",
         "--submitter",
@@ -47,9 +47,9 @@ const CHECKS = Object.freeze({
       args: Object.freeze([
         "--prove",
         "--wasm",
-        "./frontend/public/zk/disclosure_binding.wasm",
+        "./frontend/public/zk/identity/disclosure_binding.wasm",
         "--zkey",
-        "./frontend/public/zk/disclosure_binding_final.zkey",
+        "./frontend/public/zk/identity/disclosure_binding_final.zkey",
         "--input",
         "./circuits/test/proof/disclosure_binding_input.json",
       ]),

@@ -6,7 +6,7 @@ import * as snarkjs from "snarkjs";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export async function calculateCircuitProofIsolated(inputData, circuitName) {
-  const artifactDirectory = path.resolve(__dirname, "../../frontend/public/zk");
+  const artifactDirectory = path.resolve(__dirname, "../../frontend/public/zk/identity");
   const wasmPath = path.join(artifactDirectory, `${circuitName}.wasm`);
   const zkeyPath = path.join(artifactDirectory, `${circuitName}_final.zkey`);
   const verificationKeyPath = path.join(artifactDirectory, `${circuitName}.vkey.json`);

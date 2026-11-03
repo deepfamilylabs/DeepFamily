@@ -25,7 +25,7 @@ async function now() {
 async function fixture() {
   const counterVerifier = await hre.ethers.deployContract("IdentityCounterVerifierMock");
   const state = await deployIdentityAuthorizationState(hre, await counterVerifier.getAddress());
-  const verifier = await hre.ethers.deployContract("PrivateLetterVerifierMock");
+  const verifier = await hre.ethers.deployContract("ReceivePresentationVerifierMock");
   const family = await hre.ethers.deployContract("ArchiveCallerHarness");
   const factory = await hre.ethers.deployContract("PrivateLetterPoolFactoryMock", [
     await state.getAddress(),

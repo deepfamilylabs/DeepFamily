@@ -5,6 +5,8 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
+import { circomIncludeArguments } from "../../scripts/lib/circomToolchain.mjs";
+import { shieldedCircuitSource } from "../../scripts/lib/zkCircuitSelection.mjs";
 import { WitnessCalculatorBuilder } from "circom_runtime";
 import { poseidon2 } from "poseidon-lite";
 import {
@@ -153,17 +155,14 @@ async function compile(directory, name) {
   execFileSync(
     path.join(repoRoot, "bin/circom"),
     [
-      `circuits/${name}.circom`,
+      shieldedCircuitSource(name),
       "--r1cs",
       "--wasm",
       "--sym",
       "--O2",
       "--sanity_check",
       "2",
-      "-l",
-      "node_modules",
-      "-l",
-      "node_modules/circomlib/circuits",
+      ...circomIncludeArguments(),
       "-o",
       directory,
     ],
