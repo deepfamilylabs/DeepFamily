@@ -4,7 +4,7 @@ pragma solidity ^0.8.24;
 import {DeepFamilyArchive} from "../family/DeepFamilyArchive.sol";
 import {IIdentityAuthorizationState} from "../interfaces/IIdentityAuthorizationState.sol";
 import {IReceivePresentationVerifier} from "../interfaces/IReceivePresentationVerifier.sol";
-import {ICanonicalLetterPoolFactory} from "../interfaces/ICanonicalLetterPool.sol";
+import {ICanonicalLetterPoolFactory} from "../interfaces/ICanonicalLetterPoolFactory.sol";
 
 /**
  * @notice Authenticated private letters, stored as immutable encrypted archive blobs.

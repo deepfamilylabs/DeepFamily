@@ -70,7 +70,7 @@ describe("shielded proof public inputs", () => {
       ["fundReceiveCredential", 12],
       ["receivePresentation", 22],
       ["fundReceivePresentation", 23],
-      ["identityAuthorizationUpdate", 6],
+      ["identityCounterUpdate", 6],
       ["shield", 7],
       ["fund", 29],
       ["claim", 15],

@@ -20,16 +20,16 @@
       "zkeySha256": "dd3aa086513b688a3aead8b092498302e5bb9d1fdc64dcbb8da0d36f283f05ed",
       "verificationKeySha256": "36904701fb680b4067e1842fd6866e59c21418131969341eb2a3b3f7702db445"
     },
-    "identityAuthorizationUpdate": {
-      "source": "shielded_identity_authorization_update",
-      "sourceSha256": "cf0fadfb6af4b4bb7f3245885468a038ec3f697ee671234c028f956000053e0e",
+    "identityCounterUpdate": {
+      "source": "shielded_identity_counter_update",
+      "sourceSha256": "113d28b6c86d6cd1df6b50d87a6e91471f71dd7948a9f65868206ed76941346a",
       "r1csSha256": "a1fa11e0cb60f5611b1f6f0ab6fa1bb9438fc714ca97100e8c301ee027cada1c",
-      "wasmSha256": "79dbc697117e232e3133ee8f5aca5948fea0a8789addca9cddae9f211479ead2",
+      "wasmSha256": "30bf3da0dcb4592e071caf609d293c4474448c2792a51e50bf8ab84682e82819",
       "zkeySha256": "0f1f3287ee5f08040900e783d91a45af03da753ce1ae9aad74e259dd2f404c33",
       "verificationKeySha256": "760c2d4f7f4e977b91e5d5e6fc6ffc964f68a6b766af64bfe5235cd1c0f6c178",
-      "verifierPath": "contracts/verifiers/ShieldedIdentityAuthorizationUpdateVerifier.sol",
-      "verifierContractName": "ShieldedIdentityAuthorizationUpdateVerifier",
-      "solidityVerifierSha256": "254b4bb5a9b5410388ce26d67065a2b6b58ac2bfdf1f47d68912bb66cea6eb3a"
+      "verifierPath": "contracts/verifiers/ShieldedIdentityCounterUpdateVerifier.sol",
+      "verifierContractName": "ShieldedIdentityCounterUpdateVerifier",
+      "solidityVerifierSha256": "f0390711808eef18026e2936bad76d90835d9ec99cd5079a381ac84a7449ccd5"
     },
     "shield": {
       "source": "shielded_shield",

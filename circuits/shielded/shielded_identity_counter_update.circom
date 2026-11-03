@@ -4,7 +4,7 @@ pragma circom 2.2.3;
 // counter and updates its own dictionary; the proof never carries a tree path.
 include "../lib/identity.circom";
 
-template ShieldedIdentityAuthorizationUpdate() {
+template ShieldedIdentityCounterUpdate() {
     signal output authNullifier;
     signal input chainId;
     signal input consumer;
@@ -79,4 +79,4 @@ template ShieldedIdentityAuthorizationUpdate() {
 
 component main {
     public [chainId, consumer, aliasR, oldCounter, newCounter]
-} = ShieldedIdentityAuthorizationUpdate();
+} = ShieldedIdentityCounterUpdate();

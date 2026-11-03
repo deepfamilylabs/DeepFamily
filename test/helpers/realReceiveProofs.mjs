@@ -35,7 +35,7 @@ export function checkRealReceiveArtifacts() {
     ...presentationSources,
     "shielded_shield",
     "shielded_fund",
-    "shielded_identity_authorization_update",
+    "shielded_identity_counter_update",
     "shielded_private_transfer",
   ]) {
     required.push(
@@ -78,7 +78,7 @@ export async function deployRealReceiveVerifiers(hre) {
     [
       "ShieldedShieldVerifier",
       "ShieldedFundVerifier",
-      "ShieldedIdentityAuthorizationUpdateVerifier",
+      "ShieldedIdentityCounterUpdateVerifier",
       "ShieldedPrivateTransferVerifier",
     ].map((name) => [
       `${name}.sol`,

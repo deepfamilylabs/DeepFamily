@@ -249,7 +249,7 @@ describe("receive-code current authorization state", () => {
     } });
     const result = await session.authorizeIdentityCounter({ context });
     const input = mocks.ownerProof.mock.calls[0][0];
-    expect(input.circuit).toBe("identityAuthorizationUpdate");
+    expect(input.circuit).toBe("identityCounterUpdate");
     expect(input.expectedPublicSignals).toHaveLength(6);
     expect(input.witness.oldCounter).toBe("2");
     expect(input.witness.newCounter).toBe("3");

@@ -1537,7 +1537,7 @@ describe("schema v1 initial-mainnet-release rehearsal evidence", function () {
         /shieldedArtifacts\.circuits must contain exactly/iu,
       ],
       [
-        (report) => delete report.shieldedArtifacts.circuits.identityAuthorizationUpdate,
+        (report) => delete report.shieldedArtifacts.circuits.identityCounterUpdate,
         /shieldedArtifacts\.circuits must contain exactly/iu,
       ],
       [

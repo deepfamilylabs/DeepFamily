@@ -64,7 +64,7 @@ const publicSignalCount = (action) => {
       ? 11
       : action === "fundReceiveCredential"
         ? 12
-        : action === "identityAuthorizationUpdate"
+        : action === "identityCounterUpdate"
           ? 6
           : SHIELDED_POOL_PUBLIC_SIGNAL_COUNTS[SHIELDED_POOL_ACTION[suffix(action)]];
 };

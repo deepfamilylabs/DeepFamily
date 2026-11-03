@@ -24,7 +24,7 @@ test("owner counter authorization proves identity, scope and exact increments wi
     execFileSync(
       path.join(root, "bin/circom"),
       [
-        shieldedCircuitSource("shielded_identity_authorization_update"),
+        shieldedCircuitSource("shielded_identity_counter_update"),
         "--wasm",
         "--O2",
         "--sanity_check",
@@ -37,7 +37,7 @@ test("owner counter authorization proves identity, scope and exact increments wi
     );
     const wasm = path.join(
       out,
-      "shielded_identity_authorization_update_js/shielded_identity_authorization_update.wasm",
+      "shielded_identity_counter_update_js/shielded_identity_counter_update.wasm",
     );
     const calc = await WitnessCalculatorBuilder(fs.readFileSync(wasm), { singleThread: true });
     const lineage = buildLineageFixture().witness;

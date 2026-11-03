@@ -1,7 +1,7 @@
 export const SHIELDED_CIRCUITS = Object.freeze({
   receiveCredential: "shielded_receive_credential",
   fundReceiveCredential: "shielded_fund_receive_credential",
-  identityAuthorizationUpdate: "shielded_identity_authorization_update",
+  identityCounterUpdate: "shielded_identity_counter_update",
   shield: "shielded_shield",
   fund: "shielded_fund",
   claim: "shielded_claim_64",

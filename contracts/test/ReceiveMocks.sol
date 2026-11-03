@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {IIdentityCounterUpdateVerifier} from "../interfaces/IIdentityAuthorizationState.sol";
+import {IIdentityCounterUpdateVerifier} from "../interfaces/IIdentityCounterUpdateVerifier.sol";
 import {IReceivePresentationVerifier} from "../interfaces/IReceivePresentationVerifier.sol";
 
 /** @dev TEST ONLY. Exact-public-input transport checks; no cryptographic authentication. */

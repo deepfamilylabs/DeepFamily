@@ -1652,13 +1652,13 @@
       "authorizationStateImmutable": null,
       "receiveVerifierImmutable": null
     },
-    "identityAuthorizationUpdateVerifier": {
+    "identityCounterUpdateVerifier": {
       "address": null,
       "immutables": {},
       "artifactSha256": null,
       "runtimeSha256": null
     },
-    "identityAuthorizationVerifierAdapter": {
+    "identityCounterVerifierAdapter": {
       "address": null,
       "immutables": {
         "VERIFIER": null

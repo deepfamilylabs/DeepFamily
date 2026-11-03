@@ -143,11 +143,10 @@ describe("Receive presentation real-proof canonical pool and letter integration"
           await generated.FundReceivePresentationVerifier.getAddress(),
         ]);
         // A genuine empty-state absence proof authenticates zero before revocation below.
-        const counterVerifier = generated.ShieldedIdentityAuthorizationUpdateVerifier;
-        const counterAdapter = await hre.ethers.deployContract(
-          "IdentityAuthorizationVerifierAdapter",
-          [await counterVerifier.getAddress()],
-        );
+        const counterVerifier = generated.ShieldedIdentityCounterUpdateVerifier;
+        const counterAdapter = await hre.ethers.deployContract("IdentityCounterVerifierAdapter", [
+          await counterVerifier.getAddress(),
+        ]);
         const state = await deployIdentityAuthorizationState(
           hre,
           await counterAdapter.getAddress(),
@@ -749,7 +748,7 @@ describe("Receive presentation real-proof canonical pool and letter integration"
           ].map((name) => [name, identity[name]]),
         );
         const incrementProof = prover.circom(
-          "shielded_identity_authorization_update",
+          "shielded_identity_counter_update",
           {
             ...privateIdentity,
             ...authorization.witness,

@@ -43,8 +43,8 @@ export const SHIELDED_DEPLOYMENT_CIRCUITS = Object.freeze(
 
 /** Immutable shared receive state and the fixed credential-presentation statements. */
 export const RECEIVE_DEPLOYMENT_CONTRACTS = Object.freeze([
-  ["ShieldedIdentityAuthorizationUpdateVerifier", "identityAuthorizationUpdateVerifier"],
-  ["IdentityAuthorizationVerifierAdapter", "identityAuthorizationVerifierAdapter"],
+  ["ShieldedIdentityCounterUpdateVerifier", "identityCounterUpdateVerifier"],
+  ["IdentityCounterVerifierAdapter", "identityCounterVerifierAdapter"],
   ["IdentityAuthorizationState", "identityAuthorizationState"],
   ["ReceivePresentationVerifier", "receivePresentationVerifier"],
   ["FundReceivePresentationVerifier", "fundReceivePresentationVerifier"],
@@ -54,8 +54,8 @@ export const RECEIVE_DEPLOYMENT_CONTRACTS = Object.freeze([
 
 export const receiveDeploymentConstructorArgs = (property, addresses) => {
   switch (property) {
-    case "identityAuthorizationVerifierAdapter": return [addresses.identityAuthorizationUpdateVerifier];
-    case "identityAuthorizationState": return [addresses.identityAuthorizationVerifierAdapter];
+    case "identityCounterVerifierAdapter": return [addresses.identityCounterUpdateVerifier];
+    case "identityAuthorizationState": return [addresses.identityCounterVerifierAdapter];
     case "receivePresentationVerifierRouter": return [addresses.receivePresentationVerifier, addresses.fundReceivePresentationVerifier];
     case "privateLetterArchive": return [addresses.deepFamily, addresses.identityAuthorizationState,
       addresses.receivePresentationVerifier, addresses.shieldedPoolFactory];
@@ -71,9 +71,9 @@ export const receiveDeploymentLibraries = (property, addresses) =>
 
 /** Runtime immutables and their canonical deployment address keys. */
 export const RECEIVE_DEPLOYMENT_IMMUTABLES = Object.freeze({
-  identityAuthorizationUpdateVerifier: {},
-  identityAuthorizationVerifierAdapter: { VERIFIER: "identityAuthorizationUpdateVerifier" },
-  identityAuthorizationState: { VERIFIER: "identityAuthorizationVerifierAdapter" },
+  identityCounterUpdateVerifier: {},
+  identityCounterVerifierAdapter: { VERIFIER: "identityCounterUpdateVerifier" },
+  identityAuthorizationState: { VERIFIER: "identityCounterVerifierAdapter" },
   receivePresentationVerifier: {},
   fundReceivePresentationVerifier: {},
   receivePresentationVerifierRouter: { RECEIVE_VERIFIER: "receivePresentationVerifier", FUND_VERIFIER: "fundReceivePresentationVerifier" },

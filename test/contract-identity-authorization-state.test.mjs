@@ -158,8 +158,8 @@ describe("On-chain identity counter dictionary", function () {
   });
 
   it("accepts real independent owner authorizations and full-depth updates with every signal bound", async function () {
-    const verifier = await hre.ethers.deployContract("ShieldedIdentityAuthorizationUpdateVerifier");
-    const adapter = await hre.ethers.deployContract("IdentityAuthorizationVerifierAdapter", [
+    const verifier = await hre.ethers.deployContract("ShieldedIdentityCounterUpdateVerifier");
+    const adapter = await hre.ethers.deployContract("IdentityCounterVerifierAdapter", [
       await verifier.getAddress(),
     ]);
     const state = await deployState(adapter);
@@ -205,8 +205,8 @@ describe("On-chain identity counter dictionary", function () {
           ),
           ...transition.witness,
         },
-        path.join(directory, "shielded_identity_authorization_update.wasm"),
-        path.join(directory, "shielded_identity_authorization_update_final.zkey"),
+        path.join(directory, "shielded_identity_counter_update.wasm"),
+        path.join(directory, "shielded_identity_counter_update_final.zkey"),
         undefined,
         { singleThread: true },
         { singleThread: true },

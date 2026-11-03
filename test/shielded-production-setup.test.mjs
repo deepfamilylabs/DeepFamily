@@ -324,7 +324,7 @@ describe("shielded production setup artifacts", function () {
 
   it("keeps issuer source evidence stable when generated receive keys and verifiers change", function () {
     const generated = [
-      "contracts/verifiers/ShieldedIdentityAuthorizationUpdateVerifier.sol",
+      "contracts/verifiers/ShieldedIdentityCounterUpdateVerifier.sol",
       "contracts/verifiers/ReceivePresentationVerifier.sol",
       "contracts/verifiers/FundReceivePresentationVerifier.sol",
       "frontend/public/zk/shielded/receive-link-keys.json",

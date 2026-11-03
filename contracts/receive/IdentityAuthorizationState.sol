@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {IIdentityAuthorizationState, IIdentityCounterUpdateVerifier} from "../interfaces/IIdentityAuthorizationState.sol";
+import {IIdentityAuthorizationState} from "../interfaces/IIdentityAuthorizationState.sol";
+import {IIdentityCounterUpdateVerifier} from "../interfaces/IIdentityCounterUpdateVerifier.sol";
 import {PoseidonT3} from "poseidon-solidity/PoseidonT3.sol";
 import {PoseidonT4} from "poseidon-solidity/PoseidonT4.sol";
 

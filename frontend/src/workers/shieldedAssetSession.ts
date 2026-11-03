@@ -798,7 +798,7 @@ export class ShieldedAssetSession {
     const snapshot = await loadShieldedIdentityAuthorizationWitnessForMode(createIdentityAuthorizationContract(address, provider), computeShieldedAuthorizationAlias(this.identity), params.context.stateReadMode, { chainId: params.context.chainId, authorizationStateAddress: address });
     const transition = prepareShieldedIdentityCounterAuthorization({ ...this.identity, authorizationCounter: snapshot.witness.authorizationCounter, chainId: params.context.chainId, authorizationStateAddress: address });
     const identity = this.identity;
-    const { proof } = await generateShieldedProof({ circuit: "identityAuthorizationUpdate", expectedPublicSignals: transition.publicSignals.map(String), witness: {
+    const { proof } = await generateShieldedProof({ circuit: "identityCounterUpdate", expectedPublicSignals: transition.publicSignals.map(String), witness: {
       ...transition.witness,
       nameField: String(identity.nameField), derivedSecretField: String(identity.derivedSecretField),
       isBirthBC: Number(identity.identity.isBirthBC), birthYear: identity.identity.birthYear, birthMonth: identity.identity.birthMonth,

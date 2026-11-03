@@ -176,7 +176,7 @@ describe("planned production protocol deployment projection", function () {
     ]);
     const wrongStateLibrary = inspectProtocolDeploymentArtifact({
       artifactName: "identityAuthorizationState",
-      immutableValues: { VERIFIER: plannedAddresses.identityAuthorizationVerifierAdapter },
+      immutableValues: { VERIFIER: plannedAddresses.identityCounterVerifierAdapter },
       libraries: { PoseidonT3: plannedAddresses.poseidonT3, PoseidonT4: plannedAddresses.poseidonT6 },
     });
     expect(wrongStateLibrary.runtimeSha256).not.to.equal(inspected.artifacts.identityAuthorizationState.runtimeSha256);

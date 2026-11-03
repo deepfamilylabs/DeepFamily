@@ -17,7 +17,7 @@ const sources = {
   fundIssuer: "shielded_fund_receive_credential",
   receive: "shielded_receive_presentation",
   fund: "shielded_fund_receive_presentation",
-  owner: "shielded_identity_authorization_update",
+  owner: "shielded_identity_counter_update",
 };
 
 // Constraint tests compile sources without proving artifacts. These separate

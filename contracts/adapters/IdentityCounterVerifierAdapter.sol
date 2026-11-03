@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {IIdentityCounterUpdateVerifier} from "../interfaces/IIdentityAuthorizationState.sol";
+import {IIdentityCounterUpdateVerifier} from "../interfaces/IIdentityCounterUpdateVerifier.sol";
 
-interface IIdentityAuthorizationGroth16Verifier {
+interface IIdentityCounterGroth16Verifier {
   function verifyProof(
     uint256[2] calldata a,
     uint256[2][2] calldata b,
@@ -13,13 +13,13 @@ interface IIdentityAuthorizationGroth16Verifier {
 }
 
 /** @notice Adapts the fixed six-signal Circom counter authorization to shared state transport. */
-contract IdentityAuthorizationVerifierAdapter is IIdentityCounterUpdateVerifier {
+contract IdentityCounterVerifierAdapter is IIdentityCounterUpdateVerifier {
   error InvalidVerifier();
-  IIdentityAuthorizationGroth16Verifier public immutable VERIFIER;
+  IIdentityCounterGroth16Verifier public immutable VERIFIER;
 
   constructor(address verifier) {
     if (verifier.code.length == 0) revert InvalidVerifier();
-    VERIFIER = IIdentityAuthorizationGroth16Verifier(verifier);
+    VERIFIER = IIdentityCounterGroth16Verifier(verifier);
   }
 
   function verifyProof(
