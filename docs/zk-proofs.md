@@ -438,19 +438,23 @@ files or a separate prover runtime. Linked proofs are 1,184 bytes for receive op
 ciphertext are additional.
 
 The final shielded artifacts use the same logical `/zk/shielded/` paths in every environment and are installed in
-`frontend/public/zk/shielded/` by `zk:setup` with the manifest recording their ceremony evidence. Only the
-verification-key metadata is committed. The WASM/zkey files are pinned by the manifests' `wasmSha256`
-and `zkeySha256` of the original bytes. R2 hosts Brotli copies at
-`<VITE_ZK_ASSET_BASE_URL>/<sha256>/<file name>.br`, with `Content-Encoding: br`, the original
-content type and immutable caching. The `.br` suffix gives compressed objects separate URLs
+`frontend/public/zk/shielded/` by `zk:setup` with the manifest recording their ceremony evidence. The
+verification-key metadata and the adjacent Brotli copies (`<file>.br`) are committed; the raw WASM/zkey
+files are not. They are pinned by the manifests' `wasmSha256` and `zkeySha256` of the original bytes.
+Every copy fits Cloudflare Pages' 25 MiB asset limit, so a remote build serves each committed copy that
+decodes to its pin from its own `/zk` with `Content-Encoding: br` declared in `_headers`. R2 hosts
+every file at `<VITE_ZK_ASSET_BASE_URL>/<sha256>/<file name>.br`, with `Content-Encoding: br`, the
+original content type and immutable caching, for files without a valid copy and for same-origin
+copies that arrive still encoded or stale. The `.br` suffix gives compressed objects separate URLs
 from previously published uncompressed objects.
 
-`npm run zk:assets:publish` validates the pinned files, automatically creates adjacent ignored
-`.br` files at Brotli quality 5, reports their sizes and uploads the new objects.
-Publish once before deploying the Brotli loader, even when no
-circuit or key changed. Browser and Node fetch decompress the HTTP response automatically;
+`npm run zk:assets:compress` validates the pinned files and writes the adjacent `.br` copies at
+Brotli quality 5; commit them after any setup that changes a key. `npm run zk:assets:publish`
+compresses the same way, reports sizes and uploads the new objects.
+Browser and Node fetch decompress the HTTP response automatically;
 the loader checks the decoded bytes against the original manifest digest. `zk:assets:fetch`
-installs these decoded files in a checkout. The Vite dev server serves the original local files.
+installs the decoded files in a checkout from the committed copies and downloads only the files they
+do not cover. The Vite dev server serves the original local files.
 Compression changes transfer size, while proving-key contents, prover memory, constraints and
 submitted proofs remain unchanged. Business metadata keeps its existing gzip format.
 

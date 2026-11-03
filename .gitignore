@@ -6,8 +6,9 @@ node_modules/
 artifacts/
 zk-artifacts/
 /circuits/ptau/*.ptau
-# Browser proving files are pinned by the circuit manifests and hosted on R2
-# (npm run zk:assets:fetch / zk:assets:publish); only their .vkey.json stay in Git.
+# Raw browser proving files are pinned by the circuit manifests and stay out of Git. Their Brotli
+# copies (npm run zk:assets:compress) are committed and served by Pages; R2 keeps every file for
+# copies a checkout lacks (npm run zk:assets:fetch / zk:assets:publish).
 frontend/public/zk/**/*.wasm
 frontend/public/zk/**/*.zkey
 frontend/public/zk/**/*.br

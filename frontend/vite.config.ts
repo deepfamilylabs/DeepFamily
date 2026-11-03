@@ -9,7 +9,7 @@ import {
   renderPagesHeaders,
 } from './src/shared/config/contentSecurityPolicy'
 import { handleCspReportRequest } from '../lib/cspReport.js'
-import { listZkPublicAssets } from '../lib/zkPublicAssets.js'
+import { listServableBrotliAssets, listZkPublicAssets } from '../lib/zkPublicAssets.js'
 import { createHash } from 'node:crypto'
 import fs from 'node:fs'
 import type { IncomingMessage, ServerResponse } from 'node:http'
@@ -75,10 +75,17 @@ const readReceiveLinkKeys = (required: boolean) => {
   return keys
 }
 
-// Proving WASM/zkey files are not in Git; the browser checks each download against these digests.
+// Raw proving WASM/zkey files are not in Git; the browser checks each load against these digests.
 const zkAssetDigests = Object.fromEntries(
   listZkPublicAssets(fileURLToPath(new URL('..', import.meta.url))).map(asset => [asset.path, asset.sha256])
 )
+
+// Committed Brotli copies that decode to their pinned digest and fit the Pages asset limit.
+const servableZkCopies = (): string[] => {
+  const { served, unusable } = listServableBrotliAssets(fileURLToPath(new URL('..', import.meta.url)))
+  for (const file of unusable) console.warn(`[zk] ${file} is stale or over the Pages limit; the asset host serves it`)
+  return served
+}
 
 const getManualChunk = (id: string): string | undefined => {
   const normalized = id.replace(/\\/g, '/')
@@ -190,11 +197,13 @@ const cspReportPlugin = (opts: { reportFile?: string }): Plugin => {
 // What Cloudflare Pages serves next to the bundle: `_headers`, holding the headers `vite preview`
 // sends, and the Unicode notice for the normalization tables @deepfamily/protocol-core bundles.
 // Emitted by the build itself so the headers come from exactly this build's env and mode.
-const pagesOutputPlugin = (headers: Record<string, string>): Plugin => ({
+const pagesOutputPlugin = (headers: Record<string, string>, brotliAssets: readonly string[]): Plugin => ({
   name: 'deepfamily:pages-output',
   apply: 'build',
   generateBundle() {
-    this.emitFile({ type: 'asset', fileName: '_headers', source: renderPagesHeaders(headers) })
+    // Declaring the encoding of each served proving copy lets fetch decode it to the pinned bytes.
+    const encodings = Object.fromEntries(brotliAssets.map(asset => [`${asset}.br`, { 'Content-Encoding': 'br' }]))
+    this.emitFile({ type: 'asset', fileName: '_headers', source: renderPagesHeaders(headers, encodings) })
 
     const license = fs.readFileSync(
       fileURLToPath(new URL('../packages/protocol-core/UNICODE-LICENSE.txt', import.meta.url))
@@ -206,24 +215,28 @@ const pagesOutputPlugin = (headers: Record<string, string>): Plugin => ({
   }
 })
 
-// Vite copies public/ before writing the bundle. Remote builds only need the small verification
-// and linking keys; raw proving files remain available for builds using same-origin /zk.
-const zkOutputPlugin = (remoteAssets: boolean): Plugin => ({
+// Vite copies public/ before writing the bundle. Remote builds ship the small verification and
+// linking keys plus the Brotli copies this site serves; raw proving files remain available for
+// builds using same-origin /zk.
+const zkOutputPlugin = (remoteAssets: boolean, brotliAssets: readonly string[]): Plugin => ({
   name: 'deepfamily:zk-output',
   apply: 'build',
   writeBundle(options) {
-    if (!options.dir) return
+    const outDir = options.dir
+    if (!outDir) return
+    const served = new Set(brotliAssets.map(asset => `${asset}.br`))
     const prune = (directory: string) => {
       if (!fs.existsSync(directory)) return
       for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
         const file = path.join(directory, entry.name)
         if (entry.isDirectory()) prune(file)
-        else if (/\.(wasm|zkey)(\.br)?$/.test(entry.name) && (remoteAssets || entry.name.endsWith('.br'))) {
-          fs.rmSync(file)
+        else if (/\.(wasm|zkey)(\.br)?$/.test(entry.name)) {
+          const urlPath = `/${path.relative(outDir, file).split(path.sep).join('/')}`
+          if (entry.name.endsWith('.br') ? !served.has(urlPath) : remoteAssets) fs.rmSync(file)
         }
       }
     }
-    prune(path.join(options.dir, 'zk'))
+    prune(path.join(outDir, 'zk'))
   }
 })
 
@@ -241,6 +254,9 @@ export default defineConfig(({ command, mode }) => {
   }
   const zkAssetBuildBaseUrl = (zkAssetBaseUrlFromEnv ?? '').replace(/\/+$/, '')
   const zkAssetBaseUrl = command === 'build' ? zkAssetBuildBaseUrl : ''
+  // A remote build serves each valid committed Brotli copy from this site before the asset host;
+  // same-origin builds and the dev server keep serving raw files.
+  const zkSameOriginAssets = zkAssetBaseUrl ? servableZkCopies() : []
   const zkAssetOrigin = cspOriginOf('VITE_ZK_ASSET_BASE_URL', zkAssetBuildBaseUrl)
 
   const policyOptions = { env: getEnv, connectOrigins: zkAssetOrigin ? [zkAssetOrigin] : [] }
@@ -255,12 +271,13 @@ export default defineConfig(({ command, mode }) => {
       __RECEIVE_LINK_KEYS__: JSON.stringify(readReceiveLinkKeys(command === 'build')),
       __ZK_ASSET_BASE_URL__: JSON.stringify(zkAssetBaseUrl),
       __ZK_ASSET_DIGESTS__: JSON.stringify(zkAssetDigests),
+      __ZK_SAME_ORIGIN_ASSETS__: JSON.stringify(zkSameOriginAssets),
     },
     plugins: [
       react(),
       cspReportPlugin({ reportFile }),
-      pagesOutputPlugin(securityHeaders),
-      zkOutputPlugin(Boolean(zkAssetBaseUrl)),
+      pagesOutputPlugin(securityHeaders, zkSameOriginAssets),
+      zkOutputPlugin(Boolean(zkAssetBaseUrl), zkSameOriginAssets),
     ],
     resolve: {
       alias: {

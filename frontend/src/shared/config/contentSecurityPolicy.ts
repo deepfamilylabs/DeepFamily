@@ -163,14 +163,26 @@ export function buildSecurityHeaders(options: PolicyOptions): Record<string, str
   };
 }
 
-/** A Cloudflare Pages `_headers` file applying `headers` to every path. */
-export function renderPagesHeaders(headers: Record<string, string>): string {
-  const lines = Object.entries(headers).map(([name, value]) => `  ${name}: ${value}`);
-  const tooLong = lines.find((line) => line.length > PAGES_HEADER_LINE_LIMIT);
-  if (tooLong) {
-    throw new Error(
-      `_headers line exceeds ${PAGES_HEADER_LINE_LIMIT} characters: ${tooLong.trim().slice(0, 60)}…`,
-    );
-  }
-  return `/*\n${lines.join("\n")}\n`;
+/**
+ * A Cloudflare Pages `_headers` file applying `headers` to every path, then `pathHeaders` to
+ * single paths; Pages combines every rule that matches a request.
+ */
+export function renderPagesHeaders(
+  headers: Record<string, string>,
+  pathHeaders: Record<string, Record<string, string>> = {},
+): string {
+  const rule = (pattern: string, values: Record<string, string>) => {
+    const lines = Object.entries(values).map(([name, value]) => `  ${name}: ${value}`);
+    const tooLong = lines.find((line) => line.length > PAGES_HEADER_LINE_LIMIT);
+    if (tooLong) {
+      throw new Error(
+        `_headers line exceeds ${PAGES_HEADER_LINE_LIMIT} characters: ${tooLong.trim().slice(0, 60)}…`,
+      );
+    }
+    return `${pattern}\n${lines.join("\n")}\n`;
+  };
+  return [
+    rule("/*", headers),
+    ...Object.entries(pathHeaders).map(([pattern, values]) => rule(pattern, values)),
+  ].join("");
 }

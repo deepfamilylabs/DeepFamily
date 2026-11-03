@@ -39,6 +39,7 @@ describe("public ZK command surface", function () {
       [
         "zk:fetch",
         "zk:ptau:fetch",
+        "zk:assets:compress",
         "zk:assets:fetch",
         "zk:assets:publish",
         "zk:build",

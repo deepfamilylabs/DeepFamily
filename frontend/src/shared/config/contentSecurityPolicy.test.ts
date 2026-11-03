@@ -174,6 +174,9 @@ describe("buildSecurityHeaders", () => {
 describe("renderPagesHeaders", () => {
   it("applies every header to every path", () => {
     expect(renderPagesHeaders({ A: "1", B: "2" })).toBe("/*\n  A: 1\n  B: 2\n");
+    expect(
+      renderPagesHeaders({ A: "1" }, { "/zk/a.zkey.br": { "Content-Encoding": "br" } }),
+    ).toBe("/*\n  A: 1\n/zk/a.zkey.br\n  Content-Encoding: br\n");
   });
 
   it("refuses a line longer than Pages accepts, which the default headers stay within", () => {

@@ -91,6 +91,42 @@ describe("ZK proving asset loading", () => {
       `Failed to load https://zk.example/${UNSERVED_DIGEST}/person_commitment.wasm.br: 404`,
     );
   });
+
+  describe("same-origin Brotli copies", () => {
+    const PATH = "/zk/shielded/shielded_claim_64_final.zkey";
+    const host = async () => ({
+      baseUrl: "https://zk.example",
+      digests: { [PATH]: await sha256Hex(BYTES) },
+      sameOrigin: [PATH],
+    });
+
+    it("loads a copy the site served with Content-Encoding: br without the asset host", async () => {
+      const fetchMock = stubFetch(BYTES);
+      await expect(fetchZkAsset(PATH, await host())).resolves.toEqual(BYTES);
+      expect(fetchMock.mock.calls).toEqual([[`${PATH}.br`, { cache: "no-cache" }]]);
+    });
+
+    it("falls back to the asset host when the copy is still encoded, stale or missing", async () => {
+      const { brotliCompressSync } = await import("node:zlib");
+      const resolvedHost = await host();
+      const digest = resolvedHost.digests[PATH];
+      for (const sameOrigin of [
+        new Response(new Uint8Array(brotliCompressSync(BYTES))),
+        new Response(new TextEncoder().encode("stale")),
+        new Response(null, { status: 404 }),
+      ]) {
+        const fetchMock = vi.fn(async (url: string) =>
+          url.startsWith("https://zk.example/") ? new Response(BYTES) : sameOrigin,
+        );
+        vi.stubGlobal("fetch", fetchMock);
+        await expect(fetchZkAsset(PATH, resolvedHost)).resolves.toEqual(BYTES);
+        expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
+          `${PATH}.br`,
+          `https://zk.example/${digest}/shielded_claim_64_final.zkey.br`,
+        ]);
+      }
+    });
+  });
 });
 
 async function sha256Hex(bytes: Uint8Array<ArrayBuffer>) {

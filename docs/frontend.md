@@ -732,13 +732,13 @@ Translations live under `frontend/src/locales/`.
 Proof workflows load public artifacts at runtime:
 
 - Inputs: `.wasm`, `.zkey`, `.vkey.json`, and the shared `shielded/receive-link-keys.json` for receive presentations
-- Local location: `frontend/public/zk/` (served as `/zk/…` by the dev server); verification keys and the small receive-link key file are committed, `npm run zk:assets:fetch` installs proving files
-- Builds: `.wasm`/`.zkey` come from `<VITE_ZK_ASSET_BASE_URL>/<sha256>/<file name>.br` with `Content-Encoding: br`; native fetch decompresses them before checking the original manifest digests embedded at build time (`shared/zk/zkAssets.ts`); `.vkey.json` stays same-origin
-- Compression: `npm run zk:assets:publish` automatically creates adjacent, ignored `.br` files at Brotli quality 5 and reports sizes before uploading
+- Local location: `frontend/public/zk/` (served as `/zk/…` by the dev server); verification keys, the small receive-link key file and the Brotli copies of the proving files are committed, and `npm run zk:assets:fetch` installs the raw proving files from those copies
+- Builds: each committed `.br` copy that decodes to its pinned digest is served from the site's own `/zk` with `Content-Encoding: br` declared in `_headers`; the rest, and copies that arrive still encoded or stale, come from `<VITE_ZK_ASSET_BASE_URL>/<sha256>/<file name>.br`. Native fetch decompresses either before the loader checks the original manifest digests embedded at build time (`shared/zk/zkAssets.ts`); `.vkey.json` stays same-origin
+- Compression: `npm run zk:assets:compress` writes the adjacent `.br` copies at Brotli quality 5 for committing; `npm run zk:assets:publish` does the same and reports sizes before uploading
 - Circuit catalog: 2 identity/disclosure circuits plus 13 shielded circuits, 15 in total
 - Generation and verification details: see [zk-proofs.md](zk-proofs.md)
 
-If proof generation or verification fails in dev, first confirm the expected files exist in `public/zk/` (run `npm run zk:assets:fetch`). For a remote build, publish the `.br` objects before deployment, including when first adopting Brotli with unchanged proving keys. On HTTP 404, run `npm run zk:assets:publish` for the current manifests. On a digest mismatch, check the served bytes and ensure the object has `Content-Encoding: br` and the original WASM or binary content type.
+If proof generation or verification fails in dev, first confirm the expected files exist in `public/zk/` (run `npm run zk:assets:fetch`). For a remote build, commit the refreshed `.br` copies and publish them before deployment. If the site's `/zk/*.br` responses lack `Content-Encoding: br`, every proving file is downloaded twice: once from the site and again from R2. On HTTP 404, run `npm run zk:assets:publish` for the current manifests. On a digest mismatch, check the served bytes and ensure the object has `Content-Encoding: br` and the original WASM or binary content type.
 
 The payer loads one presentation's WASM and zkey, with uncompressed sizes of 13.56 MiB for receive operations
 or 13.69 MiB for Fund. The roughly 17 KiB linking key file is shared; its digest and

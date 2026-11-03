@@ -23,6 +23,9 @@ declare const __ZK_ASSET_BASE_URL__: string;
 /** SHA-256 of each proving file by its /zk path, from the circuit manifests. */
 declare const __ZK_ASSET_DIGESTS__: Readonly<Record<string, string>>;
 
+/** /zk paths whose Brotli copies this build serves itself, tried before the asset host. */
+declare const __ZK_SAME_ORIGIN_ASSETS__: readonly string[];
+
 declare module "*.svg" {
   const content: string;
   export default content;

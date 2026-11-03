@@ -413,7 +413,8 @@ npm run zk:check
 
 Review the large binary assets by comparing their hashes with the manifest rather than attempting
 to render their bytes. Publish the browser WASM/zkey files to R2, then commit the manifest,
-transcript, verifiers, and verification keys together:
+transcript, verifiers, verification keys and the refreshed Brotli copies (`frontend/public/zk/**/*.br`)
+together:
 
 ```bash
 npm run zk:assets:publish
@@ -430,7 +431,9 @@ git add \
   contracts/libraries/LinkedGroth16Verifier.sol \
   frontend/public/zk/shielded/receive-link-keys.json \
   'frontend/public/zk/*.vkey.json' \
-  'frontend/public/zk/shielded/*.vkey.json'
+  'frontend/public/zk/shielded/*.vkey.json' \
+  'frontend/public/zk/*.br' \
+  'frontend/public/zk/shielded/*.br'
 
 git commit -m "chore: install production zk artifacts"
 ```

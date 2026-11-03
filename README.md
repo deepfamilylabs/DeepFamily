@@ -162,7 +162,8 @@ temporary directories and require only npm dependencies and the pinned Circom co
 | Command                        | Purpose                                                            |
 | ------------------------------ | ------------------------------------------------------------------ |
 | `npm run zk:fetch`             | Install host-native and canonical audit-reference Circom compilers |
-| `npm run zk:assets:fetch`      | Download and decode the manifest-pinned browser WASM/zkey files from R2 |
+| `npm run zk:assets:compress`   | Write the committed Brotli copies of the browser WASM/zkey files   |
+| `npm run zk:assets:fetch`      | Install the pinned browser WASM/zkey files from the committed copies, downloading the rest from R2 |
 | `npm run zk:assets:publish`    | Compress and upload new browser WASM/zkey files to R2              |
 | `npm run zk:build`             | Compile all 15 Circom circuits                                     |
 | `npm run zk:setup`             | Generate the final keys, verifiers and evidence for all 15 circuits |
@@ -187,19 +188,22 @@ Current checked-in keys remain development-only and unattested until the final s
 run and its outputs reviewed. Local functionality and real-proof acceptance can reuse the current
 pinned files; the setup command creates their final replacement for every environment.
 
-The browser `.wasm` and `.zkey` files are not committed; their `.vkey.json` files and the
-small shared `shielded/receive-link-keys.json` are committed. The
-circuit manifests pin each uncompressed file's SHA-256, and Brotli copies are hosted on R2 at
+The raw browser `.wasm` and `.zkey` files are not committed; their `.vkey.json` files, the
+small shared `shielded/receive-link-keys.json` and their adjacent Brotli copies (`<file>.br`) are.
+The circuit manifests pin each uncompressed file's SHA-256. Several raw files exceed Cloudflare
+Pages' 25 MiB asset limit, but every copy fits: a remote build serves each committed copy that
+decodes to its pin from the site's own `/zk`, declaring `Content-Encoding: br` in `_headers`.
+Files without a valid copy, and copies that arrive still encoded or stale, load from R2 at
 `<VITE_ZK_ASSET_BASE_URL>/<sha256>/<file name>.br`. Objects carry `Content-Encoding: br`
 and the original file's content type, so native browser and Node fetch decode them before the
 unchanged manifest digest is checked. The repository names no host: set the variable
 in `frontend/.env.local`, in the GitHub repository variables for CI, and in Cloudflare Pages.
-`npm run zk:assets:fetch` installs the decoded files in a fresh checkout (`dev:all` and CI do this automatically).
-The publish command generates adjacent, ignored `.br` files using Brotli quality 5 and reports
-their sizes before uploading. Run it once when adopting Brotli,
-and after any setup that changes a key:
-`npm run zk:assets:publish` (with `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` and
-`R2_BUCKET` in `.env`), before deploying a build that uses the new URLs. Compression reduces
+`npm run zk:assets:fetch` installs the decoded files in a fresh checkout from the committed copies
+and downloads only what they do not cover (`dev:all` and CI do this automatically).
+After any setup that changes a key, run `npm run zk:assets:compress` (Brotli quality 5) and commit
+the refreshed copies. Keep R2 complete with `npm run zk:assets:publish` (with `R2_ACCOUNT_ID`,
+`R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` and `R2_BUCKET` in `.env`), which also compresses
+and reports sizes before uploading, before deploying a build that uses the new URLs. Compression reduces
 download size; decoded proving-key size, prover memory, circuit constraints and proof bytes
 remain unchanged. Local development serves the original files. Daily build, fetch and check commands reuse
 the pinned keys. `dev:all` stops if a circuit change makes them stale or a required pinned file

@@ -6,7 +6,11 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-import { fetchWithRetry, listZkPublicAssets } from "../lib/zkPublicAssets.js";
+import {
+  fetchWithRetry,
+  listServableBrotliAssets,
+  listZkPublicAssets,
+} from "../lib/zkPublicAssets.js";
 import { configuredZkAssetBaseUrl, fetchZkAssets } from "../scripts/fetch-zk-assets.mjs";
 import { publishZkAssets } from "../scripts/publish-zk-assets.mjs";
 import { compressZkAssets } from "../scripts/compress-zk-assets.mjs";
@@ -142,7 +146,7 @@ describe("ZK public proving assets", function () {
       fetchImpl: serve(requests),
       log: () => {},
     });
-    expect(result).to.deep.equal({ assetCount: 4, downloaded: 3 });
+    expect(result).to.deep.equal({ assetCount: 4, restored: 0, downloaded: 3 });
     expect(requests).to.deep.equal([
       `https://assets.example/${digest("person_commitment_final.zkey")}/person_commitment_final.zkey.br`,
       `https://assets.example/${digest("shielded/shielded_claim_64.wasm")}/shielded_claim_64.wasm.br`,
@@ -151,6 +155,53 @@ describe("ZK public proving assets", function () {
     for (const [file, bytes] of Object.entries(BYTES)) {
       expect(fs.readFileSync(path.join(root, file))).to.deep.equal(bytes);
     }
+  });
+
+  it("restores files from committed Brotli copies and downloads only the rest", async function () {
+    writeLocal(
+      "frontend/public/zk/person_commitment.wasm.br",
+      brotliCompressSync(BYTES["frontend/public/zk/person_commitment.wasm"]),
+    );
+    // A stale copy decodes to other bytes and must not be installed.
+    writeLocal(
+      "frontend/public/zk/person_commitment_final.zkey.br",
+      brotliCompressSync(Buffer.from("stale")),
+    );
+    const requests = [];
+    const result = await fetchZkAssets({
+      root,
+      baseUrl: "https://assets.example",
+      fetchImpl: serve(requests),
+      log: () => {},
+    });
+    expect(result).to.deep.equal({ assetCount: 4, restored: 1, downloaded: 3 });
+    expect(requests.some((url) => url.endsWith("/person_commitment.wasm.br"))).to.equal(false);
+    for (const [file, bytes] of Object.entries(BYTES)) {
+      expect(fs.readFileSync(path.join(root, file))).to.deep.equal(bytes);
+    }
+  });
+
+  it("serves only committed copies that decode to their digest within the asset limit", function () {
+    const claimZkey = "frontend/public/zk/shielded/shielded_claim_64_final.zkey";
+    writeLocal(
+      "frontend/public/zk/person_commitment.wasm.br",
+      brotliCompressSync(BYTES["frontend/public/zk/person_commitment.wasm"]),
+    );
+    writeLocal(
+      "frontend/public/zk/person_commitment_final.zkey.br",
+      brotliCompressSync(Buffer.from("stale")),
+    );
+    writeLocal("frontend/public/zk/shielded/shielded_claim_64.wasm.br", Buffer.from("not brotli"));
+    writeLocal(`${claimZkey}.br`, brotliCompressSync(BYTES[claimZkey]));
+    expect(listServableBrotliAssets(root)).to.deep.equal({
+      served: ["/zk/person_commitment.wasm", "/zk/shielded/shielded_claim_64_final.zkey"],
+      unusable: [
+        "frontend/public/zk/person_commitment_final.zkey.br",
+        "frontend/public/zk/shielded/shielded_claim_64.wasm.br",
+      ],
+    });
+    // The Pages asset limit applies to each committed copy itself.
+    expect(listServableBrotliAssets(root, 0).served).to.deep.equal([]);
   });
 
   describe("asset host", function () {
@@ -185,6 +236,20 @@ describe("ZK public proving assets", function () {
         error = caught;
       }
       expect(error?.message).to.match(/VITE_ZK_ASSET_BASE_URL is not set/);
+    });
+
+    it("needs no asset host when every committed copy is current", async function () {
+      for (const [file, bytes] of Object.entries(BYTES))
+        writeLocal(`${file}.br`, brotliCompressSync(bytes));
+      const result = await fetchZkAssets({
+        root,
+        fetchImpl: async () => expect.fail("nothing to fetch from"),
+        log: () => {},
+      });
+      expect(result).to.deep.equal({ assetCount: 4, restored: 4, downloaded: 0 });
+      for (const [file, bytes] of Object.entries(BYTES)) {
+        expect(fs.readFileSync(path.join(root, file))).to.deep.equal(bytes);
+      }
     });
   });
 
@@ -348,7 +413,7 @@ describe("ZK public proving assets", function () {
         baseUrl: `http://127.0.0.1:${server.address().port}`,
         log: () => {},
       });
-      expect(result).to.deep.equal({ assetCount: 4, downloaded: 4 });
+      expect(result).to.deep.equal({ assetCount: 4, restored: 0, downloaded: 4 });
       expect(requests).to.deep.equal(assets.map((asset) => `/${asset.key}`));
       for (const [file, bytes] of Object.entries(BYTES)) {
         expect(fs.readFileSync(path.join(root, file))).to.deep.equal(bytes);
