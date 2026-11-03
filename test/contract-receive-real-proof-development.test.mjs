@@ -14,6 +14,7 @@ import {
   computeShieldedBudgetUseNullifier,
   computeShieldedEnrollmentCommitment,
   computeShieldedOwnerCommitment,
+  computeShieldedReceiveRecipientBinding,
   computeShieldedSpendNullifier,
   computeShieldedValueNoteCommitment,
   createShieldedLetterEnvelope,
@@ -625,12 +626,13 @@ describe("Receive presentation real-proof canonical pool and letter integration"
           salt: 801n,
           authorizationAlias: receive.authorizationAlias,
         });
+        const otherAddress = await deriveShieldedReceivePublicKey(otherRecipient.hpkeIkm);
         const mismatchedCiphertext = hre.ethers.hexlify(
           await encryptShieldedLetter({
             chainId,
             lettersAddress,
             messageId: mismatchedId,
-            recipientPublicKey: await deriveShieldedReceivePublicKey(otherRecipient.hpkeIkm),
+            recipientPublicKey: otherAddress,
             envelope: mismatchedEnvelope,
           }),
         );
@@ -654,6 +656,8 @@ describe("Receive presentation real-proof canonical pool and letter integration"
           prover.presentation(mismatchedPresentation),
         );
         const mismatchedRecord = await letters.letterRecord(mismatchedId);
+        // The ciphertext opens for its actual recipient under that recipient's own binding,
+        // but the archived binding names the credential holder, so the inbox rejects it.
         assert.deepEqual(
           await decryptShieldedLetter({
             chainId,
@@ -662,6 +666,17 @@ describe("Receive presentation real-proof canonical pool and letter integration"
             hpkeIkm: otherRecipient.hpkeIkm,
             ciphertext: mismatchedCiphertext,
             expectedCiphertextHash: mismatchedRecord.blob.payloadHash,
+            expectedRecipient: {
+              ownerCommitment: otherRecipient.ownerCommitment,
+              keyMode: 0,
+              recipientBinding: computeShieldedReceiveRecipientBinding({
+                authorizationAlias: mismatchedEnvelope.authorizationAlias,
+                ownerCommitment: otherRecipient.ownerCommitment,
+                keyMode: 0,
+                viewingKey: otherAddress,
+                salt: mismatchedEnvelope.salt,
+              }),
+            },
           }),
           mismatchedEnvelope,
         );
@@ -1021,6 +1036,11 @@ describe("Receive presentation real-proof canonical pool and letter integration"
                 hpkeIkm: identityDerivedKeys.hpkeIkm,
                 ciphertext,
                 expectedCiphertextHash: record.blob.payloadHash,
+                expectedRecipient: {
+                  ownerCommitment: identityDerivedKeys.ownerCommitment,
+                  keyMode: 0,
+                  recipientBinding: record.recipientBinding,
+                },
               }),
               { code: "SHIELDED_LETTER_DECRYPTION_FAILED" },
             );

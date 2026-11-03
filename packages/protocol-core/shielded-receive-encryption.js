@@ -18,10 +18,26 @@ const KDF_DOMAIN = toUtf8Bytes(
 );
 const KEY_LABEL = toUtf8Bytes("DeepFamily:ReceiveEncryption:Key:v1");
 const NONCE_LABEL = toUtf8Bytes("DeepFamily:ReceiveEncryption:Nonce:v1");
+// Every caller already propagates this fixed code; it also covers missing WebCrypto AES-GCM.
+const RUNTIME_UNAVAILABLE = "SHIELDED_RECEIVE_WASM_UNAVAILABLE";
 
-/** Initialize before a wallet scan so an unavailable local backend cannot look like an empty wallet. */
+/** The WASM curve backend and WebCrypto AES-GCM are both required; neither has a fallback. */
+async function getReceiveRuntime() {
+  // Browsers expose WebCrypto only in secure contexts. Its absence must not read as a foreign record.
+  const subtle = globalThis.crypto?.subtle;
+  protocolAssert(
+    typeof subtle?.importKey === "function" &&
+      typeof subtle.encrypt === "function" &&
+      typeof subtle.decrypt === "function",
+    RUNTIME_UNAVAILABLE,
+    "WebCrypto AES-GCM is unavailable",
+  );
+  return { backend: await getReceiveWasmBackend(), subtle };
+}
+
+/** Initialize before a wallet scan so an unavailable local runtime cannot look like an empty wallet. */
 export async function initializeShieldedReceiveEncryption() {
-  await getReceiveWasmBackend();
+  await getReceiveRuntime();
 }
 
 function bytes32(value, label) {
@@ -170,14 +186,14 @@ export async function encryptShieldedReceivePayload(input) {
     aad = copyBytes(input.aad, "aad");
     info = copyBytes(input.info, "info");
     rseed = random32();
-    const backend = await getReceiveWasmBackend();
+    const { backend, subtle } = await getReceiveRuntime();
     ephemeralScalar = scalar(backend, EPHEMERAL_DOMAIN, rseed);
     const ephemeral = backend.multiply(ephemeralScalar, base(backend, address.subarray(0, 32)));
     shared = backend.multiply(ephemeralScalar, address.subarray(32));
     ({ key, nonce } = keyMaterial(shared, ephemeral, aad, info));
     framed = concatBytes(address.subarray(0, 32), rseed, plaintext);
-    const aes = await crypto.subtle.importKey("raw", key, "AES-GCM", false, ["encrypt"]);
-    const sealed = await crypto.subtle.encrypt(
+    const aes = await subtle.importKey("raw", key, "AES-GCM", false, ["encrypt"]);
+    const sealed = await subtle.encrypt(
       { name: "AES-GCM", iv: nonce, additionalData: aad, tagLength: 128 },
       aes,
       framed,
@@ -215,13 +231,13 @@ export async function decryptShieldedReceivePayload(input) {
     );
     const ephemeral = ciphertext.subarray(0, 32);
     decodePoint(ephemeral);
-    const backend = await getReceiveWasmBackend();
+    const { backend, subtle } = await getReceiveRuntime();
     viewScalar = scalar(backend, VIEW_DOMAIN, seed);
     shared = backend.multiply(viewScalar, ephemeral);
     ({ key, nonce } = keyMaterial(shared, ephemeral, aad, info));
-    const aes = await crypto.subtle.importKey("raw", key, "AES-GCM", false, ["decrypt"]);
+    const aes = await subtle.importKey("raw", key, "AES-GCM", false, ["decrypt"]);
     framed = new Uint8Array(
-      await crypto.subtle.decrypt(
+      await subtle.decrypt(
         { name: "AES-GCM", iv: nonce, additionalData: aad, tagLength: 128 },
         aes,
         ciphertext.subarray(32),
@@ -243,11 +259,8 @@ export async function decryptShieldedReceivePayload(input) {
     };
   } catch (error) {
     // Never serialize AEAD/library diagnostics, plaintext, seed or nested causes.
-    if (error instanceof ProtocolError && error.code === "SHIELDED_RECEIVE_WASM_UNAVAILABLE") {
-      throw new ProtocolError(
-        "SHIELDED_RECEIVE_WASM_UNAVAILABLE",
-        "The receive encryption WebAssembly backend is unavailable",
-      );
+    if (error instanceof ProtocolError && error.code === RUNTIME_UNAVAILABLE) {
+      throw new ProtocolError(RUNTIME_UNAVAILABLE, "The receive encryption runtime is unavailable");
     }
     throw new ProtocolError(
       "SHIELDED_RECEIVE_DECRYPTION_FAILED",

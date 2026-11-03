@@ -88,7 +88,10 @@ The exact domain strings and DST are frozen in
 `packages/protocol-core/shielded-receive-encryption.js`. They separate view-scalar,
 ephemeral-scalar, group-base, key and nonce derivation. The ciphertext reveals only
 its fresh ephemeral point and authenticated ciphertext, not the reusable address
-or its diversifier. Ordinary money notes still occupy 512 bytes: 32-byte ephemeral
+or its diversifier. That point is always a canonical Ristretto encoding, which sets
+these outputs apart from X25519 HPKE outputs; see the
+[threat model](receive-encryption-protocol.md#threat-model-and-conditional-analysis).
+Ordinary money notes still occupy 512 bytes: 32-byte ephemeral
 point, 464 bytes of sealed plaintext including 64 bytes of hidden metadata, and a
 16-byte GCM tag. Their payload capacity is 397 bytes after the 3-byte note header.
 Private letters add the same 64 encrypted metadata bytes without a fixed-size cap.

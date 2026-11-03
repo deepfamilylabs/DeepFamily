@@ -293,9 +293,15 @@ export async function encryptShieldedLetter(input) {
 
 /**
  * Decrypt using either existing key mode's hpkeIkm. Code expiry/counters
- * deliberately do not participate in historical recovery.
+ * deliberately do not participate in historical recovery. Decryptability alone
+ * never admits a letter: every call opens the archived recipient binding.
  */
 export async function decryptShieldedLetter(input) {
+  protocolAssert(
+    typeof input.expectedRecipient === "object" && input.expectedRecipient !== null,
+    "SHIELDED_LETTER_RECIPIENT_REQUIRED",
+    "Letter decryption requires the expected recipient binding",
+  );
   // Snapshot before the first await: hash checking and HPKE must use the same
   // bytes even if the caller reuses its archive download buffer concurrently.
   const ciphertext = copyBytes(assertCiphertext(input.ciphertext));
@@ -318,31 +324,20 @@ export async function decryptShieldedLetter(input) {
     // Snapshot trusted expectations before asynchronous crypto. Payload aliases
     // alone are not authority: the binding must also open to the local owner,
     // key mode and public key reconstructed from this wallet's viewing seed.
-    const expected =
-      input.expectedRecipient === undefined
-        ? undefined
+    const expected = {
+      ownerCommitment: field(input.expectedRecipient.ownerCommitment, "ownerCommitment", true),
+      keyMode: bigintFrom(input.expectedRecipient.keyMode, "keyMode", 1n),
+      recipientBinding: field(input.expectedRecipient.recipientBinding, "recipientBinding", true),
+      ...(input.expectedRecipient.authorizationAlias === undefined
+        ? {}
         : {
-            ownerCommitment: field(
-              input.expectedRecipient.ownerCommitment,
-              "ownerCommitment",
+            authorizationAlias: field(
+              input.expectedRecipient.authorizationAlias,
+              "authorizationAlias",
               true,
             ),
-            keyMode: bigintFrom(input.expectedRecipient.keyMode, "keyMode", 1n),
-            recipientBinding: field(
-              input.expectedRecipient.recipientBinding,
-              "recipientBinding",
-              true,
-            ),
-            ...(input.expectedRecipient.authorizationAlias === undefined
-              ? {}
-              : {
-                  authorizationAlias: field(
-                    input.expectedRecipient.authorizationAlias,
-                    "authorizationAlias",
-                    true,
-                  ),
-                }),
-          };
+          }),
+    };
     ({ plaintext, recipientPublicKey } = await decryptShieldedReceivePayload({
       viewIkm: ikm,
       ciphertext: ciphertext.subarray(ENCAPSULATED_OFFSET),
@@ -350,22 +345,20 @@ export async function decryptShieldedLetter(input) {
       info: HPKE_INFO,
     }));
     const envelope = decodeShieldedLetterEnvelope(plaintext);
-    if (expected) {
-      const binding = computeShieldedReceiveRecipientBinding({
-        authorizationAlias: envelope.authorizationAlias,
-        ownerCommitment: expected.ownerCommitment,
-        keyMode: expected.keyMode,
-        viewingKey: recipientPublicKey,
-        salt: envelope.salt,
-      });
-      protocolAssert(
-        binding === expected.recipientBinding &&
-          (expected.authorizationAlias === undefined ||
-            expected.authorizationAlias === envelope.authorizationAlias),
-        "SHIELDED_LETTER_RECIPIENT_BINDING_MISMATCH",
-        "Letter authorization does not match the receiving wallet",
-      );
-    }
+    const binding = computeShieldedReceiveRecipientBinding({
+      authorizationAlias: envelope.authorizationAlias,
+      ownerCommitment: expected.ownerCommitment,
+      keyMode: expected.keyMode,
+      viewingKey: recipientPublicKey,
+      salt: envelope.salt,
+    });
+    protocolAssert(
+      binding === expected.recipientBinding &&
+        (expected.authorizationAlias === undefined ||
+          expected.authorizationAlias === envelope.authorizationAlias),
+      "SHIELDED_LETTER_RECIPIENT_BINDING_MISMATCH",
+      "Letter authorization does not match the receiving wallet",
+    );
     return envelope;
   } catch (error) {
     if (error instanceof ProtocolError && error.code === "SHIELDED_RECEIVE_WASM_UNAVAILABLE")

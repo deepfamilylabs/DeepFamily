@@ -77,7 +77,14 @@ test("malformed secret hex never survives in parameter-validation diagnostics", 
     () => deriveShieldedReceivePublicKey(badSeed),
     () => deriveShieldedViewPublicKey(badSeed),
     () => decryptShieldedNote({ ...scope, hpkeIkm: badSeed, ciphertext }),
-    () => decryptShieldedLetter({ ...letterScope, hpkeIkm: badSeed, ciphertext: letter }),
+    // A well-formed expectation lets the failure come from parsing the seed itself.
+    () =>
+      decryptShieldedLetter({
+        ...letterScope,
+        hpkeIkm: badSeed,
+        ciphertext: letter,
+        expectedRecipient: { ownerCommitment: 1n, keyMode: 0n, recipientBinding: 1n },
+      }),
   ]) {
     await assert.rejects(pending, (error) => {
       assert.equal(error.cause, undefined);
@@ -101,6 +108,25 @@ test("a fresh realm without WebAssembly rejects rather than deriving with JavaSc
     await assert.rejects(decryptShieldedReceivePayload({viewIkm:seed,ciphertext,aad:new Uint8Array(),info:new Uint8Array()}), ${JSON.stringify(unavailable)});
     assert.equal(seed[0], 17);
     assert.equal(d[0], 19);
+    console.log('rejected');
+  `);
+  assert.equal(output.trim(), "rejected");
+});
+
+test("a realm without WebCrypto AES-GCM fails closed instead of reading records as foreign", () => {
+  const output = freshProcess(`
+    import assert from 'node:assert/strict';
+    // Browsers keep getRandomValues but drop crypto.subtle outside secure contexts.
+    const getRandomValues = globalThis.crypto.getRandomValues.bind(globalThis.crypto);
+    Object.defineProperty(globalThis, 'crypto', {configurable: true, value: {getRandomValues}});
+    const {deriveShieldedReceivePublicKey, encryptShieldedReceivePayload, initializeShieldedReceiveEncryption, decryptShieldedReceivePayload} = await import(${JSON.stringify(encryptionModule)});
+    const seed = new Uint8Array(32).fill(17), d = new Uint8Array(32).fill(19);
+    await assert.rejects(initializeShieldedReceiveEncryption(), ${JSON.stringify(unavailable)});
+    const ciphertext = new Uint8Array(112);
+    ciphertext.set(Buffer.from('e2f2ae0a6abc4e71a884a961c500515f58e30b6aa582dd8db6a65945e08d2d76','hex'));
+    await assert.rejects(decryptShieldedReceivePayload({viewIkm:seed,ciphertext,aad:new Uint8Array(),info:new Uint8Array()}), ${JSON.stringify(unavailable)});
+    const address = await deriveShieldedReceivePublicKey(seed, d);
+    await assert.rejects(encryptShieldedReceivePayload({recipientPublicKey:address,plaintext:new Uint8Array(1),aad:new Uint8Array(),info:new Uint8Array()}), ${JSON.stringify(unavailable)});
     console.log('rejected');
   `);
   assert.equal(output.trim(), "rejected");

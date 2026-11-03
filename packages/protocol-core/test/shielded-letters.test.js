@@ -45,6 +45,21 @@ async function decrypt(ciphertext, input = {}) {
   });
 }
 
+/** The inbox expectation for a letter really authorized for the wallet owning `viewingKey`. */
+function recipientFor(envelope, material = key, keyMode = 0n, viewingKey = publicKey) {
+  return {
+    ownerCommitment: material.ownerCommitment,
+    keyMode,
+    recipientBinding: computeShieldedReceiveRecipientBinding({
+      authorizationAlias: envelope.authorizationAlias,
+      ownerCommitment: material.ownerCommitment,
+      keyMode,
+      viewingKey,
+      salt: envelope.salt,
+    }),
+  };
+}
+
 test("canonical letter envelope has a fixed, deterministic binary encoding", () => {
   const envelope = createShieldedLetterEnvelope({ authorizationAlias: 9n, body: "A", salt: 1n });
   assert.deepEqual(envelope, { version: 1, body: "A", salt: 1n, authorizationAlias: 9n });
@@ -160,7 +175,10 @@ test("letter ciphertexts cross Archive segment and uint16 payload boundaries", a
     const ciphertext = await encrypt(envelope);
     assert.equal(ciphertext.length, length + 197);
     assert.equal(predictArchiveSegmentCount(ciphertext.length), Math.ceil((length + 197) / 16384));
-    assert.deepEqual(await decrypt(ciphertext), envelope);
+    assert.deepEqual(
+      await decrypt(ciphertext, { expectedRecipient: recipientFor(envelope) }),
+      envelope,
+    );
   }
 });
 
@@ -169,7 +187,10 @@ test("diversified letter recovery reuses both key modes without per-code secrets
     independentKeyRoot: independentKeyVector.independentKeyRoot,
     independentKeyIdentitySecret: independentKeyVector.independentKeyIdentitySecret,
   });
-  for (const material of [key, independent]) {
+  for (const [keyMode, material] of [
+    [0n, key],
+    [1n, independent],
+  ]) {
     const receivingKey = await deriveShieldedReceivePublicKey(material.hpkeIkm);
     const envelope = createShieldedLetterEnvelope({
       authorizationAlias: 9n,
@@ -177,9 +198,12 @@ test("diversified letter recovery reuses both key modes without per-code secrets
       salt: 77n,
     });
     const ciphertext = await encrypt(envelope, { recipientPublicKey: receivingKey });
-    // Restore the same IKM on a fresh context; no code, counter, expiration,
-    // sender material or extra recovery token is accepted by this API.
-    const recovered = await decrypt(ciphertext, { hpkeIkm: material.hpkeIkm });
+    // Restore the same IKM on a fresh context; no code, counter, expiration or sender
+    // material is needed, only the archived binding opened against this wallet.
+    const recovered = await decrypt(ciphertext, {
+      hpkeIkm: material.hpkeIkm,
+      expectedRecipient: recipientFor(envelope, material, keyMode, receivingKey),
+    });
     assert.deepEqual(recovered, envelope);
   }
 });
@@ -206,13 +230,24 @@ test("diversified encryption is randomized and its full archived hash is preserv
   assert(cipherLo >= 0n && cipherLo < 1n << 128n);
   assert(cipherHi >= 0n && cipherHi < 1n << 128n);
   assert.equal((cipherHi << 128n) | cipherLo, BigInt(keccak256(first)));
-  assert.deepEqual(await decrypt(first, { expectedCiphertextHash: keccak256(first) }), envelope);
+  assert.deepEqual(
+    await decrypt(first, {
+      expectedCiphertextHash: keccak256(first),
+      expectedRecipient: recipientFor(envelope),
+    }),
+    envelope,
+  );
 });
 
 test("wrong key, chain, contract, message id and altered bytes fail closed", async () => {
-  const ciphertext = await encrypt(
-    createShieldedLetterEnvelope({ authorizationAlias: 9n, body: "不得泄露的正文", salt: 3n }),
-  );
+  const envelope = createShieldedLetterEnvelope({
+    authorizationAlias: 9n,
+    body: "不得泄露的正文",
+    salt: 3n,
+  });
+  const ciphertext = await encrypt(envelope);
+  // A correct binding makes each failure below come from the changed input alone.
+  const expectedRecipient = recipientFor(envelope);
   const bad = ciphertext.slice();
   bad[bad.length - 1] ^= 1;
   const badEnc = ciphertext.slice();
@@ -225,7 +260,7 @@ test("wrong key, chain, contract, message id and altered bytes fail closed", asy
     { ciphertext: bad },
     { ciphertext: badEnc },
   ]) {
-    await assert.rejects(decrypt(ciphertext, input), (error) => {
+    await assert.rejects(decrypt(ciphertext, { expectedRecipient, ...input }), (error) => {
       assert.equal(error.code, "SHIELDED_LETTER_DECRYPTION_FAILED");
       assert.equal(error.cause, undefined);
       assert(!error.message.includes("不得泄露的正文"));
@@ -233,14 +268,17 @@ test("wrong key, chain, contract, message id and altered bytes fail closed", asy
     });
   }
   await assert.rejects(
-    decrypt(bad, { expectedCiphertextHash: keccak256(ciphertext) }),
+    decrypt(bad, { expectedRecipient, expectedCiphertextHash: keccak256(ciphertext) }),
     isCode("SHIELDED_LETTER_CIPHERTEXT_HASH_MISMATCH"),
   );
   for (const badFormat of [new Uint8Array(10), ciphertext.subarray(1)]) {
-    await assert.rejects(decrypt(badFormat), isCode("INVALID_SHIELDED_LETTER_CIPHERTEXT"));
+    await assert.rejects(
+      decrypt(badFormat, { expectedRecipient }),
+      isCode("INVALID_SHIELDED_LETTER_CIPHERTEXT"),
+    );
   }
   await assert.rejects(
-    decrypt(ciphertext.subarray(0, ciphertext.length - 1)),
+    decrypt(ciphertext.subarray(0, ciphertext.length - 1), { expectedRecipient }),
     isCode("SHIELDED_LETTER_DECRYPTION_FAILED"),
   );
 });
@@ -287,15 +325,20 @@ test("secret and ciphertext input buffers remain owned by their caller", async (
     salt: 8n,
   });
   const ciphertext = await encrypt(envelope);
+  const expectedRecipient = recipientFor(envelope);
   const hpkeIkm = getBytes(key.hpkeIkm);
   const originalIkm = hpkeIkm.slice();
   const originalCiphertext = ciphertext.slice();
-  await decrypt(ciphertext, { hpkeIkm });
+  await decrypt(ciphertext, { hpkeIkm, expectedRecipient });
   assert.deepEqual(hpkeIkm, originalIkm);
   assert.deepEqual(ciphertext, originalCiphertext);
   // The caller may reuse a mutable downloaded buffer after invoking recovery;
   // the decryption's snapshot keeps hash verification and decryption on one payload.
-  const pending = decrypt(ciphertext, { hpkeIkm, expectedCiphertextHash: keccak256(ciphertext) });
+  const pending = decrypt(ciphertext, {
+    hpkeIkm,
+    expectedRecipient,
+    expectedCiphertextHash: keccak256(ciphertext),
+  });
   ciphertext.fill(0);
   assert.deepEqual(await pending, envelope);
 });
@@ -370,8 +413,12 @@ test("inbox authorization rejects a letter encrypted to this wallet but proved f
     salt: envelope.salt,
   });
   const ciphertext = await encrypt(envelope);
-  // Cryptographic decryptability by itself does not establish recipient authorization.
-  assert.deepEqual(await decrypt(ciphertext), envelope);
+  // The letter opens under this wallet's own binding, so the rejection below comes from
+  // the authorization alone: decryptability does not establish recipient authorization.
+  assert.deepEqual(
+    await decrypt(ciphertext, { expectedRecipient: recipientFor(envelope) }),
+    envelope,
+  );
   await assert.rejects(
     decrypt(ciphertext, {
       expectedRecipient: {
@@ -386,6 +433,25 @@ test("inbox authorization rejects a letter encrypted to this wallet but proved f
       assert(!error.message.includes(envelope.body));
       return true;
     },
+  );
+});
+
+test("letter decryption cannot skip the recipient binding", async () => {
+  const envelope = createShieldedLetterEnvelope({
+    authorizationAlias: 9n,
+    body: "必须先核对收款授权",
+    salt: 5n,
+  });
+  const ciphertext = await encrypt(envelope);
+  for (const expectedRecipient of [undefined, null]) {
+    await assert.rejects(
+      decrypt(ciphertext, { expectedRecipient }),
+      isCode("SHIELDED_LETTER_RECIPIENT_REQUIRED"),
+    );
+  }
+  assert.deepEqual(
+    await decrypt(ciphertext, { expectedRecipient: recipientFor(envelope) }),
+    envelope,
   );
 });
 

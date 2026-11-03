@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import {
   computeIdentityFromDerivedSecret,
   computeShieldedAuthorizationAlias,
+  computeShieldedReceiveRecipientBinding,
   buildShieldedIdentityAuthorizationState,
   decodeShieldedReceiveCredential,
   deriveShieldedHeirKeyMaterial,
@@ -248,7 +249,17 @@ describe("receive code proofs", () => {
         authorizationAlias: credentials[index].authorizationAlias,
       });
       const letter = await encryptShieldedLetter({ ...letterScope, recipientPublicKey, envelope });
-      await expect(decryptShieldedLetter({ ...letterScope, hpkeIkm: restored.hpkeIkm, ciphertext: letter })).resolves.toEqual(envelope);
+      const recipientBinding = computeShieldedReceiveRecipientBinding({
+        authorizationAlias: envelope.authorizationAlias,
+        ownerCommitment: restored.ownerCommitment,
+        keyMode,
+        viewingKey: recipientPublicKey,
+        salt: envelope.salt,
+      });
+      await expect(decryptShieldedLetter({
+        ...letterScope, hpkeIkm: restored.hpkeIkm, ciphertext: letter,
+        expectedRecipient: { ownerCommitment: restored.ownerCommitment, keyMode, recipientBinding },
+      })).resolves.toEqual(envelope);
     }
   }, 120_000);
 

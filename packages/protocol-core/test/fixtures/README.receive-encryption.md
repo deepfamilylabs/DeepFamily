@@ -27,6 +27,17 @@ Tests also reject the valid encoding of the identity, which is prohibited by thi
 application protocol. The RFC input set and the additional identity rule are
 separate requirements.
 
+`ristretto255-rfc-vectors.json` copies published values that do not depend on
+this protocol: the seven `expand_message_xmd(SHA-512)` vectors of
+[RFC 9380 Appendix K.3](https://www.rfc-editor.org/rfc/rfc9380.html#appendix-K.3),
+the seven element-derivation vectors of
+[RFC 9496 Appendix A.3](https://www.rfc-editor.org/rfc/rfc9496.html#appendix-A.3)
+and the generator multiples of
+[RFC 9496 Appendix A.1](https://www.rfc-editor.org/rfc/rfc9496.html#appendix-A.1).
+Tests run them against the production noble expansion and the libsodium WASM map
+and multiplication. They anchor the composed hash-to-group and point
+multiplication to the standards, not only to the reference implementation above.
+
 Run the fixed vectors, cross-implementation properties, invalid encodings and
 deterministic mutation corpus with:
 

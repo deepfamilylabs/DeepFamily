@@ -225,8 +225,9 @@ This rule also works when the original independent root and its credential
 material are restored without the identity-derived branch. A valid issuer proof
 still authenticates knowledge of the spending-secret preimage of `owner`.
 Neither current expiry nor current authorization counter enters historical
-reading. Bare `decryptShieldedLetter` without `expectedRecipient` is a low-level
-cryptographic operation and must not be used to admit records into the inbox.
+reading. `decryptShieldedLetter` rejects any call without `expectedRecipient`
+(`SHIELDED_LETTER_RECIPIENT_REQUIRED`), so decryptability alone never admits a
+record into the inbox.
 
 Encryption to a public address does not authenticate the letter's author. The
 presentation proves receive authorization for the record, not the sender's
@@ -242,6 +243,10 @@ libsodium WebAssembly implementation. Scalars remain fixed-length byte strings
 at that boundary rather than JavaScript `BigInt` values. Initialization must
 verify the actual WASM backend before it receives secret material; failure stops
 the operation instead of selecting the former BigInt or an asm.js fallback.
+AES-256-GCM runs in WebCrypto, which browsers expose only in secure contexts.
+Initialization requires it as well, and so does any encryption or decryption that
+reaches the key schedule; its absence fails with the same fixed error code instead
+of reading as a foreign record.
 Synchronous validation of public addresses may use the independent noble
 Ristretto decoder and public hash-to-group implementation.
 
@@ -297,6 +302,14 @@ authorization alias. Diversification does not hide these fields from a party
 holding the code. It also does not hide message size, transaction timing or
 application-visible operation roles.
 
+The suite of an output is visible too. Every ephemeral point is a canonical
+Ristretto encoding, while an X25519 HPKE `enc` decodes as one only about one time
+in eight, so an observer can classify 512-byte pool outputs by suite with high
+confidence. Today this adds nothing, because each pool output slot already shows
+publicly whether it carries a receive authorization. A change that hides or omits
+receive authorizations must first make the suites indistinguishable, for example
+by encrypting every output with one suite.
+
 The same viewing secret intentionally recovers all its diversified addresses.
 Disclosure of that secret exposes the associated past and future ciphertexts;
 the scheme provides no forward secrecy. Credential expiry and revocation control
@@ -306,8 +319,10 @@ Changing the computational backend does not change these properties.
 ## Reproducible checks and sources
 
 The protocol-core test command includes fixed synthetic vectors, an independent
-Node-crypto/noble reference implementation, RFC invalid point encodings and
-deterministic adversarial-input tests. The reference must not call the production
+Node-crypto/noble reference implementation, RFC invalid point encodings, published
+RFC 9380 and RFC 9496 expansion, element-derivation and multiplication vectors, a
+ciphertext that AES-GCM authenticates under two receive keys, and deterministic
+adversarial-input tests. The reference must not call the production
 libsodium operations. Integration tests also exercise both original recovery
 modes and the actual note and letter acceptance rules.
 
@@ -326,7 +341,7 @@ npm run test:receive-security --workspace @deepfamily/protocol-core
 node --test packages/protocol-core/test/shielded-receive-encryption-vectors.test.js
 ```
 
-Wallet and letter recovery initialize this backend before scanning. An unavailable
+Wallet and letter recovery initialize both runtimes before scanning. An unavailable
 runtime is an operation failure, not an unrelated-recipient result or an empty
 wallet. Backend initialization errors retain a fixed public error code through
 the note, letter and recovery layers. Key-input validation and backend initialization

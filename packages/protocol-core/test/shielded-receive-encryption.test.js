@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createCipheriv } from "node:crypto";
 import test from "node:test";
 import { getBytes, hexlify } from "ethers";
 import { ristretto255, ristretto255_hasher } from "@noble/curves/ed25519.js";
@@ -11,6 +12,7 @@ import {
   SHIELDED_RECEIVE_PUBLIC_KEY_BYTES,
 } from "../shielded-receive-encryption.js";
 import {
+  buildShieldedHpkeAad,
   decryptShieldedNote,
   deriveShieldedViewPublicKey,
   encryptShieldedNote,
@@ -18,6 +20,7 @@ import {
 } from "../shielded-hpke.js";
 import { deriveShieldedHeirKeyMaterial } from "../shielded-inheritance.js";
 import { deriveShieldedIndependentKeyMaterial } from "../shielded-independent-key.js";
+import { computeShieldedReceiveRecipientBinding } from "../shielded-receive-presentation.js";
 import {
   createShieldedLetterEnvelope,
   decryptShieldedLetter,
@@ -266,6 +269,130 @@ test("valid AEAD ciphertexts with a false encrypted ephemeral opening are reject
   }
 });
 
+const wideScalar = (domain, input) => {
+  const wide = sha512(join(utf8(domain), input, Uint8Array.of(0)));
+  let value = 0n;
+  for (let index = wide.length - 1; index >= 0; index--)
+    value = (value << 8n) | BigInt(wide[index]);
+  return value % ristretto255.Point.Fn.ORDER;
+};
+const receiveKeys = (shared, ephemeral, aad, info) => {
+  const context = sha256(
+    join(
+      utf8("DeepFamily:ReceiveEncryption:ristretto255:HKDF-SHA256:AES-256-GCM:v1"),
+      ephemeral,
+      sha256(info),
+      sha256(aad),
+    ),
+  );
+  return {
+    key: hkdf(sha256, shared, context, utf8("DeepFamily:ReceiveEncryption:Key:v1"), 32),
+    nonce: hkdf(sha256, shared, context, utf8("DeepFamily:ReceiveEncryption:Nonce:v1"), 12),
+  };
+};
+// GF(2^128) in GCM bit order (NIST SP 800-38D), enough to build a two-key ciphertext.
+const gfMultiply = (x, y) => {
+  let product = 0n;
+  for (let bit = 127n; bit >= 0n; bit--) {
+    if ((x >> bit) & 1n) product ^= y;
+    y = y & 1n ? (y >> 1n) ^ (0xe1n << 120n) : y >> 1n;
+  }
+  return product;
+};
+const gfPower = (x, exponent) => {
+  let result = 1n << 127n;
+  for (; exponent > 0n; exponent >>= 1n, x = gfMultiply(x, x))
+    if (exponent & 1n) result = gfMultiply(result, x);
+  return result;
+};
+const blockInt = (bytes) => BigInt(hexlify(bytes));
+const intBlock = (value) => getBytes("0x" + value.toString(16).padStart(32, "0"));
+const aesBlock = (key, block) => {
+  const cipher = createCipheriv("aes-256-ecb", key, null).setAutoPadding(false);
+  return new Uint8Array(Buffer.concat([cipher.update(block), cipher.final()]));
+};
+const counterBlock = (nonce, counter) => {
+  const block = new Uint8Array(16);
+  block.set(nonce);
+  new DataView(block.buffer).setUint32(12, counter);
+  return block;
+};
+const ghash = (hashKey, aad, blocks) => {
+  const padded = new Uint8Array(Math.ceil(aad.length / 16) * 16);
+  padded.set(aad);
+  const input = [];
+  for (let offset = 0; offset < padded.length; offset += 16)
+    input.push(blockInt(padded.subarray(offset, offset + 16)));
+  input.push(...blocks, (BigInt(aad.length * 8) << 64n) | BigInt(blocks.length * 128));
+  return input.reduce((state, block) => gfMultiply(state ^ block, hashKey), 0n);
+};
+
+test("a ciphertext AES-GCM authenticates under two receive keys opens only for its encrypted address", async () => {
+  // GCM is not key-committing: a sender controlling wallet B can solve one block so a
+  // single sealed body authenticates under A's and B's keys. The encrypted opening
+  // (d, rseed) must reproduce the ephemeral point, which binds acceptance to A alone.
+  const aad = getBytes(buildShieldedHpkeAad(scope));
+  const info = utf8("DeepFamily:ReceiveNote:v1");
+  const address = await deriveShieldedReceivePublicKey(seed, diversifier);
+  const attackerSeed = getBytes(deriveShieldedHeirKeyMaterial(14n).hpkeIkm);
+  const rseed = new Uint8Array(32).fill(51);
+  const e = wideScalar("DeepFamily:ReceiveEphemeralScalar:v1", rseed);
+  const ephemeralPoint = ristretto255_hasher
+    .hashToCurve(diversifier, {
+      DST: "DeepFamily:ReceiveBase:ristretto255_XMD:SHA-512_R255MAP_RO_:v1",
+    })
+    .multiply(e);
+  const ephemeral = ephemeralPoint.toBytes();
+  const [honest, attacker] = [
+    ristretto255.Point.fromBytes(address.subarray(32)).multiply(e),
+    ephemeralPoint.multiply(wideScalar("DeepFamily:ReceiveViewScalar:v1", attackerSeed)),
+  ].map((shared) => receiveKeys(shared.toBytes(), ephemeral, aad, info));
+  const note = new Uint8Array(400).fill(0x5a);
+  note.set([1, 0, 3, 0xa1, 0xa2, 0xa3]);
+  const framed = join(diversifier, rseed, note);
+  const blocks = [];
+  for (let index = 0; index < framed.length / 16; index++) {
+    const stream = aesBlock(honest.key, counterBlock(honest.nonce, 2 + index));
+    const block = framed.subarray(16 * index, 16 * index + 16);
+    blocks.push(blockInt(block.map((byte, at) => byte ^ stream[at])));
+  }
+  // Solve one block inside A's padding so both GCM tags coincide.
+  const free = 20;
+  blocks[free] = 0n;
+  const keys = [honest, attacker];
+  const hashKeys = keys.map(({ key }) => blockInt(aesBlock(key, new Uint8Array(16))));
+  const masks = keys.map(({ key, nonce }) => blockInt(aesBlock(key, counterBlock(nonce, 1))));
+  const power = BigInt(blocks.length + 1 - free);
+  blocks[free] = gfMultiply(
+    ghash(hashKeys[0], aad, blocks) ^ masks[0] ^ ghash(hashKeys[1], aad, blocks) ^ masks[1],
+    gfPower(gfPower(hashKeys[0], power) ^ gfPower(hashKeys[1], power), (1n << 128n) - 2n),
+  );
+  const tag = ghash(hashKeys[0], aad, blocks) ^ masks[0];
+  assert.equal(ghash(hashKeys[1], aad, blocks) ^ masks[1], tag);
+  const sealed = join(...blocks.map(intBlock), intBlock(tag));
+  for (const { key, nonce } of keys) {
+    const aes = await crypto.subtle.importKey("raw", key, "AES-GCM", false, ["decrypt"]);
+    const opened = await crypto.subtle.decrypt(
+      { name: "AES-GCM", iv: nonce, additionalData: aad, tagLength: 128 },
+      aes,
+      sealed,
+    );
+    assert.equal(opened.byteLength, framed.length);
+  }
+  const ciphertext = join(ephemeral, sealed);
+  assert.equal(ciphertext.length, 512);
+  assert.deepEqual(
+    await decryptShieldedNote({ ...scope, hpkeIkm: seed, ciphertext }),
+    Uint8Array.of(0xa1, 0xa2, 0xa3),
+  );
+  // GCM verified under B's key above, so only the opening check can reject B here; the
+  // note envelope checks are deliberately bypassed because they could reject by chance.
+  await assert.rejects(
+    decryptShieldedReceivePayload({ viewIkm: attackerSeed, ciphertext, aad, info }),
+    { code: "SHIELDED_RECEIVE_DECRYPTION_FAILED" },
+  );
+});
+
 test("receive key, address and encryption operations preserve all caller-owned buffers", async () => {
   const originalSeed = seed.slice();
   const originalDiversifier = diversifier.slice();
@@ -286,30 +413,36 @@ test("receive key, address and encryption operations preserve all caller-owned b
 });
 
 test("the same root recovers letters sent to independently generated receive public keys", async () => {
-  const ciphertexts = [];
+  const { ownerCommitment } = deriveShieldedHeirKeyMaterial(13n);
+  const letters = [];
   for (let index = 0; index < 3; index++) {
-    ciphertexts.push(
-      await encryptShieldedLetter({
-        ...letterScope,
-        recipientPublicKey: await deriveShieldedReceivePublicKey(seed),
-        envelope: createShieldedLetterEnvelope({
-          authorizationAlias: 9n,
-          body: `Letter ${index}`,
-          salt: BigInt(index + 1),
-        }),
+    const recipientPublicKey = await deriveShieldedReceivePublicKey(seed);
+    const envelope = createShieldedLetterEnvelope({
+      authorizationAlias: 9n,
+      body: `Letter ${index}`,
+      salt: BigInt(index + 1),
+    });
+    letters.push({
+      envelope,
+      ciphertext: await encryptShieldedLetter({ ...letterScope, recipientPublicKey, envelope }),
+      recipientBinding: computeShieldedReceiveRecipientBinding({
+        authorizationAlias: envelope.authorizationAlias,
+        ownerCommitment,
+        keyMode: 0n,
+        viewingKey: recipientPublicKey,
+        salt: envelope.salt,
       }),
-    );
+    });
   }
-  for (let index = 0; index < ciphertexts.length; index++) {
-    assert.equal(
-      (
-        await decryptShieldedLetter({
-          ...letterScope,
-          hpkeIkm: seed,
-          ciphertext: ciphertexts[index],
-        })
-      ).body,
-      `Letter ${index}`,
+  for (const { envelope, ciphertext, recipientBinding } of letters) {
+    assert.deepEqual(
+      await decryptShieldedLetter({
+        ...letterScope,
+        hpkeIkm: seed,
+        ciphertext,
+        expectedRecipient: { ownerCommitment, keyMode: 0n, recipientBinding },
+      }),
+      envelope,
     );
   }
   await assert.rejects(

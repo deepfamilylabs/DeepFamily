@@ -1,12 +1,15 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import test from "node:test";
+import { expand_message_xmd } from "@noble/curves/abstract/hash-to-curve.js";
+import { sha512 } from "@noble/hashes/sha2.js";
 import {
   assertShieldedReceivePublicKey,
   decryptShieldedReceivePayload,
   deriveShieldedReceivePublicKey,
   encryptShieldedReceivePayload,
 } from "../shielded-receive-encryption.js";
+import { getReceiveWasmBackend } from "../shielded-receive-wasm.js";
 import {
   referenceDecryptReceive,
   referenceEncryptReceive,
@@ -26,6 +29,9 @@ const invalidPoints = JSON.parse(
     new URL("./fixtures/ristretto255-invalid-encodings.json", import.meta.url),
     "utf8",
   ),
+);
+const rfcVectors = JSON.parse(
+  fs.readFileSync(new URL("./fixtures/ristretto255-rfc-vectors.json", import.meta.url), "utf8"),
 );
 const fromHexFields = (value) =>
   Object.fromEntries(Object.entries(value).map(([name, hex]) => [name, Buffer.from(hex, "hex")]));
@@ -137,6 +143,36 @@ test("reference-generated ciphertexts reject other roots and independently chang
         decryptShieldedReceivePayload({ ciphertext, viewIkm, aad, info, ...changed }),
         failure,
       );
+    }
+  }
+});
+
+test("production expansion, hash-to-group and multiplication match RFC 9380 and RFC 9496", async () => {
+  // The reference implementation shares this protocol's author; these published values do not.
+  const { expandMessageXmd, oneWayMap, multiples } = rfcVectors;
+  assert.equal(expandMessageXmd.vectors.length, 7);
+  for (const { msg, lenInBytes, uniformBytes } of expandMessageXmd.vectors) {
+    const uniform = expand_message_xmd(utf8(msg), expandMessageXmd.dst, lenInBytes, sha512);
+    assert.equal(Buffer.from(uniform).toString("hex"), uniformBytes);
+  }
+  const backend = await getReceiveWasmBackend();
+  assert.equal(oneWayMap.vectors.length, 7);
+  for (const { input, element } of oneWayMap.vectors) {
+    const point = backend.hashToGroup(Buffer.from(input, "hex"));
+    assert.equal(Buffer.from(point).toString("hex"), element);
+  }
+  assert.equal(multiples.encodings.length, 16);
+  const generator = Buffer.from(multiples.encodings[1], "hex");
+  for (const [k, encoding] of multiples.encodings.entries()) {
+    const scalar = new Uint8Array(32);
+    scalar[0] = k;
+    if (k === 0) {
+      // The identity result is rejected rather than encoded.
+      assert.throws(() => backend.multiply(scalar, generator), {
+        code: "SHIELDED_RECEIVE_WASM_OPERATION_FAILED",
+      });
+    } else {
+      assert.equal(Buffer.from(backend.multiply(scalar, generator)).toString("hex"), encoding);
     }
   }
 });

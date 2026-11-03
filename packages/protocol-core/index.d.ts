@@ -1252,8 +1252,8 @@ export function decryptShieldedLetter(
     hpkeIkm: BytesLike;
     ciphertext: BytesLike;
     expectedCiphertextHash?: BytesLike;
-    /** Inbox recovery must bind the decrypted opening to the verified archive record and local wallet. */
-    expectedRecipient?: {
+    /** Required: binds the decrypted opening to the verified archive record and local wallet. */
+    expectedRecipient: {
       ownerCommitment: BigNumberish;
       keyMode: BigNumberish;
       recipientBinding: BigNumberish;
