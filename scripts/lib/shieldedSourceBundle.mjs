@@ -10,6 +10,7 @@ import {
 } from "./zkCircuitSelection.mjs";
 import { sanitizeReleaseEnvironment } from "./portableCommand.mjs";
 import { VERIFIER_DIRECTORY } from "../../lib/contractSources.js";
+import { resolveTrustedGitExecutable } from "./trustedGit.mjs";
 
 const DEFAULT_ROOT = path.resolve(fileURLToPath(new URL("../..", import.meta.url)));
 const SOURCE_ROOTS = [
@@ -86,12 +87,17 @@ export function checkedFile(root, relativePath, label, prefix = "") {
 }
 
 /** Hash tracked release sources; generated proof artifacts are hashed by the manifest. */
-export function sourceBundleSha256(root = DEFAULT_ROOT, { env = process.env } = {}) {
+export function sourceBundleSha256(
+  root = DEFAULT_ROOT,
+  { env = process.env, gitExecutable = resolveTrustedGitExecutable() } = {},
+) {
   root = path.resolve(root);
+  if (!path.isAbsolute(gitExecutable))
+    throw new Error("Source bundle Git executable must be absolute");
   const gitOptions = { cwd: root, env: sanitizeReleaseEnvironment(env) };
-  const output = execFileSync("git", ["ls-files", "-z"], gitOptions);
+  const output = execFileSync(gitExecutable, ["ls-files", "-z"], gitOptions);
   const deleted = new Set(
-    execFileSync("git", ["ls-files", "--deleted", "-z"], gitOptions)
+    execFileSync(gitExecutable, ["ls-files", "--deleted", "-z"], gitOptions)
       .toString("utf8")
       .split("\0")
       .filter(Boolean),

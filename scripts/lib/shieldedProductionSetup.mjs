@@ -17,6 +17,8 @@ import {
 import { checkedFile, sourceBundleSha256 } from "./shieldedSourceBundle.mjs";
 import { sha256File } from "./zkArtifactTrust.mjs";
 import { verifierSource } from "../../lib/contractSources.js";
+import { resolveTrustedGitExecutable } from "./trustedGit.mjs";
+import { sanitizeReleaseEnvironment } from "./portableCommand.mjs";
 import {
   SHIELDED_CIRCUITS,
   hasShieldedSolidityVerifier,
@@ -55,11 +57,12 @@ const suffix = (action) => action[0].toUpperCase() + action.slice(1);
 
 /** Pool action counts mirror ProofConstants.sol; the receive code is verified off-chain. */
 const publicSignalCount = (action) => {
-  if (action === "privateTransfer4" || action === "unshield4") return SHIELDED_VALUE_PUBLIC_SIGNAL_COUNTS[4];
+  if (action === "privateTransfer4" || action === "unshield4")
+    return SHIELDED_VALUE_PUBLIC_SIGNAL_COUNTS[4];
   if (action === "claim32") return SHIELDED_POOL_PUBLIC_SIGNAL_COUNTS[SHIELDED_POOL_ACTION.Claim];
   return RECEIVE_PRESENTATION_CIRCUITS[action]
     ? RECEIVE_PRESENTATION_CIRCUITS[action].hiddenInputs +
-      RECEIVE_PRESENTATION_CIRCUITS[action].publicInputs
+        RECEIVE_PRESENTATION_CIRCUITS[action].publicInputs
     : action === "receiveCredential"
       ? 11
       : action === "fundReceiveCredential"
@@ -115,7 +118,12 @@ const readJson = (root, relativePath, label, prefix) => {
 };
 
 /** Reviewed thresholds must be committed before Phase 2 starts. */
-export function readShieldedReleaseCriteria({ root = process.cwd(), criteriaPath }) {
+export function readShieldedReleaseCriteria({
+  root = process.cwd(),
+  criteriaPath,
+  gitExecutable = resolveTrustedGitExecutable(),
+  env = process.env,
+}) {
   const resolvedRoot = path.resolve(root);
   if (typeof criteriaPath !== "string" || criteriaPath.trim() === "") {
     throw new Error(
@@ -138,9 +146,13 @@ export function readShieldedReleaseCriteria({ root = process.cwd(), criteriaPath
       throw new Error(`Shielded release criterion ${field} must be a positive safe integer`);
     }
   }
+  if (!path.isAbsolute(gitExecutable)) {
+    throw new Error("Shielded release criteria Git executable must be absolute");
+  }
   try {
-    execFileSync("git", ["ls-files", "--error-unmatch", "--", relative], {
+    execFileSync(gitExecutable, ["ls-files", "--error-unmatch", "--", relative], {
       cwd: resolvedRoot,
+      env: sanitizeReleaseEnvironment(env),
       stdio: ["ignore", "pipe", "pipe"],
     });
   } catch (error) {
@@ -415,8 +427,8 @@ const shieldedArtifactInstallEntries = ({ compiled, finalized, records }) => {
     ...(records.manifest.linkKeys
       ? [
           RECEIVE_LINK_KEYS_PATH,
-          ...Object.values(RECEIVE_PRESENTATION_CIRCUITS).map(
-            (spec) => verifierSource(spec.contractName),
+          ...Object.values(RECEIVE_PRESENTATION_CIRCUITS).map((spec) =>
+            verifierSource(spec.contractName),
           ),
         ].map((file) => {
           const source = path.join(records.linkedRoot, file);

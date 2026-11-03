@@ -870,6 +870,80 @@ describe("single-operator production ZK setup safety", function () {
     await expectMissing(path.join(root, "frontend", "public", "zk"));
   });
 
+  for (const cancellationPoint of ["source build", "circuit compilation"]) {
+    it(`cleans the setup stage and lock when cancelled during ${cancellationPoint}`, async function () {
+      const fixture = await installFirstSetupFixture(root);
+      const controller = new AbortController();
+      const cancellation = new Error("fixture setup cancellation");
+      const privateDirectories = [];
+      let commands = 0;
+      let entropyRequested = false;
+      const error = await captureError(() =>
+        runSingleOperatorProductionSetup({
+          ...fixture.options,
+          signal: controller.signal,
+          privateDirectoryFactory: async ({ prefix }) => {
+            const directory = await fs.mkdtemp(path.join(stage, prefix));
+            privateDirectories.push(directory);
+            return directory;
+          },
+          compilerSourceBuilder:
+            cancellationPoint === "source build"
+              ? async ({ commandRunner }) => {
+                  await commandRunner({ executable: "fixture-cargo", args: ["build"], cwd: root });
+                  throw new Error("source build must stop after cancellation");
+                }
+              : fixture.options.compilerSourceBuilder,
+          runner: async (command) => {
+            expect(command.signal).to.equal(controller.signal);
+            commands += 1;
+            if (cancellationPoint === "circuit compilation") await fixture.compile(command);
+            controller.abort(cancellation);
+          },
+          randomBytesFn: () => {
+            entropyRequested = true;
+            throw new Error("cancelled setup must not request entropy");
+          },
+        }),
+      );
+      expect(error).to.equal(cancellation);
+      expect(commands).to.equal(1);
+      expect(entropyRequested).to.equal(false);
+      expect(privateDirectories).to.have.length(1);
+      await expectMissing(privateDirectories[0]);
+      await expectMissing(path.join(root, "tmp", "zk-production", ".setup.lock"));
+      await expectMissing(path.join(root, "frontend", "public", "zk"));
+    });
+  }
+
+  it("retains the stage and lock when command-tree termination cannot be confirmed", async function () {
+    const fixture = await installFirstSetupFixture(root);
+    const stopFailure = Object.assign(new Error("fixture command tree could not be stopped"), {
+      processesMayBeRunning: true,
+    });
+    let privateStage;
+    let commands = 0;
+    const error = await captureError(() =>
+      runSingleOperatorProductionSetup({
+        ...fixture.options,
+        privateDirectoryFactory: async ({ prefix }) => {
+          privateStage = await fs.mkdtemp(path.join(stage, prefix));
+          return privateStage;
+        },
+        runner: async () => {
+          commands += 1;
+          throw stopFailure;
+        },
+      }),
+    );
+    expect(error?.processesMayBeRunning).to.equal(true);
+    expect(error?.cause).to.equal(stopFailure);
+    expect(error?.message).to.include(`setup stage retained at ${privateStage}`);
+    expect(commands).to.equal(1);
+    await fs.access(privateStage);
+    await fs.access(path.join(root, "tmp", "zk-production", ".setup.lock"));
+  });
+
   for (const mutationPoint of ["compilation", "Groth16 setup"]) {
     it(`rejects source mutation during ${mutationPoint} before requesting entropy`, async function () {
       const fixture = await installFirstSetupFixture(root);
@@ -1693,6 +1767,48 @@ describe("single-operator production ZK setup safety", function () {
     expect(postCommitCalled).to.equal(false);
     expect(await fs.readFile(existingArtifact, "utf8")).to.equal("old-artifact");
     expect(await fs.readFile(existingManifest, "utf8")).to.equal("development-manifest\n");
+  });
+
+  it("retains backups without racing a command tree that could not be stopped", async function () {
+    const existingArtifact = path.join(root, "artifact.bin");
+    const existingManifest = path.join(root, ZK_ARTIFACT_MANIFEST_PATH);
+    await fs.mkdir(path.dirname(existingManifest), { recursive: true });
+    await fs.writeFile(existingArtifact, "old artifact");
+    await fs.writeFile(existingManifest, "old manifest");
+    const stagedArtifact = path.join(stage, "artifact.bin");
+    const stagedManifest = path.join(stage, "manifest.json");
+    const backupRoot = path.join(stage, "backups");
+    await fs.mkdir(backupRoot);
+    await fs.writeFile(stagedArtifact, "new artifact");
+    await fs.writeFile(stagedManifest, "new manifest");
+    const stopFailure = Object.assign(new Error("fixture tree termination failed"), {
+      processesMayBeRunning: true,
+    });
+    let postCommitCalled = false;
+    const error = await captureError(() =>
+      installProductionArtifacts({
+        root,
+        backupRoot,
+        entries: [
+          { source: stagedArtifact, destination: "artifact.bin" },
+          { source: stagedManifest, destination: ZK_ARTIFACT_MANIFEST_PATH },
+        ],
+        validateBeforeCommit: () => {
+          throw stopFailure;
+        },
+        validateAfterCommit: () => {
+          postCommitCalled = true;
+        },
+      }),
+    );
+    expect(error?.processesMayBeRunning).to.equal(true);
+    expect(error?.cause).to.equal(stopFailure);
+    expect(error?.message).to.include(`Backups retained at ${backupRoot}`);
+    expect(postCommitCalled).to.equal(false);
+    expect(await fs.readFile(existingArtifact, "utf8")).to.equal("new artifact");
+    expect(await fs.readFile(existingManifest, "utf8")).to.equal("old manifest");
+    expect(await fs.readFile(path.join(backupRoot, "0"), "utf8")).to.equal("old artifact");
+    expect(await fs.readFile(path.join(backupRoot, "1"), "utf8")).to.equal("old manifest");
   });
 
   it("refuses an installation plan whose manifest is not the final commit marker", async function () {

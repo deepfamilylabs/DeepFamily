@@ -17,6 +17,7 @@ import {
   resolveLocalCircomTarget,
 } from "./lib/circomToolchain.mjs";
 import { createPrivateTemporaryDirectory } from "./lib/privateTemporaryDirectory.mjs";
+import { resolveTrustedGitExecutable } from "./lib/trustedGit.mjs";
 
 export { CIRCOM_CANONICAL_POLICY, CIRCOM_LINUX_X64_SHA256, CIRCOM_LINUX_X64_URL, CIRCOM_VERSION };
 
@@ -175,20 +176,7 @@ const defaultCommandRunner = ({ executable, args, cwd, capture = false, env = pr
 const trustedSourceBuildToolCandidates = ({ name, platform, homeDirectory }) => {
   const executable = platform === "win32" ? `${name}.exe` : name;
   if (platform === "win32") {
-    const candidates =
-      name === "git"
-        ? [...new Set([path.parse(process.execPath).root, "C:\\"])]
-            .filter((driveRoot) => driveRoot !== "")
-            .map((driveRoot) => path.join(driveRoot, "Program Files", "Git", "cmd", executable))
-        : [];
-    if (name !== "git") {
-      candidates.push(path.join(homeDirectory, ".cargo", "bin", executable));
-    }
-    return candidates;
-  }
-
-  if (name === "git") {
-    return ["/usr/bin/git", "/bin/git", "/opt/homebrew/bin/git", "/usr/local/bin/git"];
+    return [path.join(homeDirectory, ".cargo", "bin", executable)];
   }
   return [
     path.join(homeDirectory, ".cargo", "bin", executable),
@@ -318,6 +306,7 @@ export const resolveTrustedSourceBuildTool = async ({
   if (!["git", "cargo", "rustc"].includes(name)) {
     throw new Error(`Unsupported Circom source-build tool: ${String(name)}`);
   }
+  if (name === "git") return resolveTrustedGitExecutable({ platform });
   const canonicalHome = await fs.realpath(path.resolve(homeDirectory));
   const candidates = trustedSourceBuildToolCandidates({
     name,

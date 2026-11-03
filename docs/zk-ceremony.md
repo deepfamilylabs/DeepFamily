@@ -334,6 +334,11 @@ Internally the command:
 14. rechecks installed artifact hashes and zkey-derived outputs, restoring the previous artifact
     set if final validation fails.
 
+Ctrl+C requests cancellation in both setup modes. Wait for the command to exit: it stops active
+commands and their child processes, restores any replaced artifacts, and removes its temporary
+stage and setup lock. SIGTERM follows the same cleanup on POSIX. Forced termination (including
+SIGKILL or Windows Task Manager) cannot run this cleanup.
+
 The local finalization value is accurately recorded as:
 
 ```text

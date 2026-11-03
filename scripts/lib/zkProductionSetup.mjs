@@ -1,4 +1,4 @@
-import { spawn, execFileSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import { createHash, randomBytes } from "node:crypto";
 import fs from "node:fs";
 import fsp from "node:fs/promises";
@@ -40,9 +40,9 @@ import {
 } from "./zkArtifactTrust.mjs";
 import {
   assertReleaseRuntimeCompatibility,
-  normalizePortableCommand,
   sanitizeReleaseEnvironment,
 } from "./portableCommand.mjs";
+import { runSetupCommand } from "./zkSetupCancellation.mjs";
 import { createPrivateTemporaryDirectory } from "./privateTemporaryDirectory.mjs";
 import { ensureProductionPtau, inspectPtauFile } from "./productionPtau.mjs";
 import {
@@ -120,46 +120,7 @@ const defaultCaptureRunner = ({ executable, args, cwd, env = process.env, encodi
     stdio: ["ignore", "pipe", "pipe"],
   });
 
-export const defaultProductionSetupRunner = ({
-  executable,
-  args,
-  cwd,
-  stdin = null,
-  env = process.env,
-}) => {
-  const command = normalizePortableCommand({
-    executable,
-    args,
-    platform: process.platform,
-    env,
-  });
-  return new Promise((resolve, reject) => {
-    const child = spawn(command.executable, command.args, {
-      cwd,
-      env,
-      shell: false,
-      stdio: [stdin === null ? "ignore" : "pipe", "inherit", "inherit"],
-    });
-    child.once("error", reject);
-    child.once("exit", (code, signal) => {
-      if (code === 0) resolve();
-      else {
-        reject(
-          new Error(
-            `${path.basename(executable)} exited with ` +
-              (signal ? `signal ${signal}` : `code ${String(code)}`),
-          ),
-        );
-      }
-    });
-    if (stdin !== null) {
-      child.stdin.once("error", (error) => {
-        if (error?.code !== "EPIPE") reject(error);
-      });
-      child.stdin.end(stdin);
-    }
-  });
-};
+export const defaultProductionSetupRunner = runSetupCommand;
 
 const assertCleanGitState = ({
   root,
@@ -660,6 +621,7 @@ export const preparePrivateProductionCompiler = async ({
   stageRoot,
   sourceBuilder = buildPinnedCircomFromSource,
   sourceEnvironment = process.env,
+  runner = defaultProductionSetupRunner,
 }) => {
   const destination = path.join(stageRoot, target.platform === "win32" ? "circom.exe" : "circom");
   let sha256;
@@ -675,7 +637,7 @@ export const preparePrivateProductionCompiler = async ({
       );
     }
   } else if (target.strategy === "pinned-source") {
-    const built = await sourceBuilder({ target, env: sourceEnvironment });
+    const built = await sourceBuilder({ target, env: sourceEnvironment, commandRunner: runner });
     if (!Buffer.isBuffer(built?.bytes)) {
       throw new Error("Production ZK setup source builder must return compiler bytes");
     }
@@ -730,7 +692,9 @@ export const installProductionArtifacts = async ({
   validateAfterCommit,
   backupRoot,
   privateDirectoryFactory = createPrivateTemporaryDirectory,
+  signal,
 }) => {
+  signal?.throwIfAborted();
   if (!Array.isArray(entries) || entries.length === 0) {
     throw new Error("Production artifact entries are required");
   }
@@ -757,6 +721,7 @@ export const installProductionArtifacts = async ({
   let retainBackup = false;
   try {
     for (const [index, entry] of entries.entries()) {
+      signal?.throwIfAborted();
       await requireRegularNonSymlink(entry.source, `Staged artifact ${entry.destination}`);
       const destination = await safeDestinationPath(resolvedRoot, entry.destination);
       let existing = null;
@@ -776,13 +741,16 @@ export const installProductionArtifacts = async ({
     }
 
     for (const [index, entry] of entries.slice(0, -1).entries()) {
+      signal?.throwIfAborted();
       await copyIntoPlace({
         source: entry.source,
         destination: snapshots[index].destination,
         mode: entry.mode ?? snapshots[index].existing?.mode ?? 0o644,
       });
     }
+    signal?.throwIfAborted();
     await validateBeforeCommit();
+    signal?.throwIfAborted();
 
     const manifestIndex = entries.length - 1;
     const manifestEntry = entries[manifestIndex];
@@ -791,8 +759,21 @@ export const installProductionArtifacts = async ({
       destination: snapshots[manifestIndex].destination,
       mode: manifestEntry.mode ?? snapshots[manifestIndex].existing?.mode ?? 0o644,
     });
+    signal?.throwIfAborted();
     await validateAfterCommit();
+    signal?.throwIfAborted();
   } catch (error) {
+    if (error.processesMayBeRunning) {
+      retainBackup = true;
+      throw Object.assign(
+        new Error(
+          `${error.message}; automatic rollback was not started because ` +
+            `commands may still write artifacts. Backups retained at ${resolvedBackupRoot}`,
+          { cause: error },
+        ),
+        { processesMayBeRunning: true },
+      );
+    }
     const rollbackErrors = [];
     for (const snapshot of [...snapshots].reverse()) {
       try {
@@ -946,9 +927,14 @@ export const snapshotProductionCompilationManifest = ({ root, stageBuild, initia
     ),
   });
 
-export const snapshotProductionSetupSources = ({ root, includeShielded = true }) => {
+export const snapshotProductionSetupSources = ({
+  root,
+  includeShielded = true,
+  gitExecutable,
+  env = process.env,
+}) => {
   root = path.resolve(root);
-  const sourceBundleDigest = sourceBundleSha256(root);
+  const sourceBundleDigest = sourceBundleSha256(root, { gitExecutable, env });
   const pending = [
     ...Object.values(SETUP_CIRCUITS).map(({ source }) => path.join(root, source)),
     ...(includeShielded
@@ -1498,6 +1484,7 @@ export const runSingleOperatorProductionSetup = async ({
   includeShielded = true,
   shieldedReleaseCriteriaPath,
   env = process.env,
+  signal,
   platform = process.platform,
   arch = process.arch,
   libc,
@@ -1513,7 +1500,8 @@ export const runSingleOperatorProductionSetup = async ({
   gitToolResolver = resolveTrustedSourceBuildTool,
   runtimeSnapshotter = snapshotSnarkjsRuntime,
   privateDirectoryFactory = createPrivateTemporaryDirectory,
-  sourceSnapshotter = (root) => snapshotProductionSetupSources({ root, includeShielded }),
+  sourceSnapshotter = (root, options) =>
+    snapshotProductionSetupSources({ root, includeShielded, ...options }),
   preCommitValidator = defaultPreCommitValidator,
   postCommitValidator = defaultPostCommitValidator,
 } = {}) => {
@@ -1568,6 +1556,14 @@ export const runSingleOperatorProductionSetup = async ({
   ) {
     throw new Error("Production ZK setup collaborators must be functions");
   }
+  signal?.throwIfAborted();
+  const cleanupRunner = runner;
+  runner = async (command) => {
+    signal?.throwIfAborted();
+    const result = await cleanupRunner({ ...command, ...(signal ? { signal } : {}) });
+    signal?.throwIfAborted();
+    return result;
+  };
   assertReleaseRuntimeCompatibility({
     platform,
     arch,
@@ -1598,6 +1594,8 @@ export const runSingleOperatorProductionSetup = async ({
       shieldedReleaseCriteria = readShieldedReleaseCriteria({
         root: resolvedRoot,
         criteriaPath: shieldedReleaseCriteriaPath,
+        gitExecutable,
+        env: baseEnvironment,
       });
     }
     const shieldedManifestPath = path.join(resolvedRoot, SHIELDED_PRODUCTION_MANIFEST_PATH);
@@ -1711,10 +1709,13 @@ export const runSingleOperatorProductionSetup = async ({
     throw new Error("Production ZK rotation requires a new ceremonyId");
   }
   // Bind compilation to the reviewed clean checkout before any compiler can run.
-  const setupSources = sourceSnapshotter(resolvedRoot);
+  const setupSources = sourceSnapshotter(resolvedRoot, { gitExecutable, env: baseEnvironment });
   const setupSourceDigest = JSON.stringify(setupSources);
   const assertSetupSourcesUnchanged = () => {
-    if (JSON.stringify(sourceSnapshotter(resolvedRoot)) !== setupSourceDigest) {
+    if (
+      JSON.stringify(sourceSnapshotter(resolvedRoot, { gitExecutable, env: baseEnvironment })) !==
+      setupSourceDigest
+    ) {
       throw new Error("Production ZK setup sources changed after the reviewed snapshot");
     }
   };
@@ -1749,6 +1750,7 @@ export const runSingleOperatorProductionSetup = async ({
     ? expectedSnarkjsRuntimeSha256
     : initialManifest.toolchain.snarkjsRuntimeSha256;
   const ptau = await ptauInstaller({ root: resolvedRoot, env: baseEnvironment, platform });
+  signal?.throwIfAborted();
   // Keep the lock in this checkout so a reviewed pTau can live on read-only media.
   const localTemporaryDirectory = path.join(resolvedRoot, "tmp");
   await fsp.mkdir(localTemporaryDirectory, { recursive: true, mode: 0o700 });
@@ -1775,7 +1777,9 @@ export const runSingleOperatorProductionSetup = async ({
 
   let stageRoot;
   let compilerEvidence;
+  let retainStage = false;
   try {
+    signal?.throwIfAborted();
     stageRoot = await privateDirectoryFactory({
       prefix: "deepfamily-zk-production-",
     });
@@ -1798,6 +1802,7 @@ export const runSingleOperatorProductionSetup = async ({
       stageRoot,
       sourceBuilder: compilerSourceBuilder,
       sourceEnvironment: baseEnvironment,
+      runner,
     });
     const snarkjsRuntime = runtimeSnapshotter({
       root: resolvedRoot,
@@ -2063,6 +2068,7 @@ export const runSingleOperatorProductionSetup = async ({
       await installProductionArtifacts({
         root: resolvedRoot,
         entries,
+        signal,
         validateBeforeCommit: async () => {
           await preCommitValidator({
             root: resolvedRoot,
@@ -2102,8 +2108,9 @@ export const runSingleOperatorProductionSetup = async ({
         },
       });
     } catch (error) {
+      if (error.processesMayBeRunning) throw error;
       try {
-        await runner({
+        await cleanupRunner({
           executable: "npm",
           args: ["run", "clean"],
           cwd: resolvedRoot,
@@ -2139,16 +2146,28 @@ export const runSingleOperatorProductionSetup = async ({
         records.manifest.trustedSetup.transcript?.sha256 ??
         null,
     });
+  } catch (error) {
+    if (error.processesMayBeRunning) {
+      retainStage = true;
+      throw Object.assign(
+        new Error(
+          `${error.message}; setup stage retained at ${stageRoot}, lock retained at ${lockPath}`,
+          { cause: error },
+        ),
+        { processesMayBeRunning: true },
+      );
+    }
+    throw error;
   } finally {
     try {
-      if (stageRoot) {
+      if (stageRoot && !retainStage) {
         await fsp.rm(stageRoot, { recursive: true, force: true });
       }
     } finally {
       try {
         await lock.close();
       } finally {
-        await fsp.rm(lockPath, { force: true });
+        if (!retainStage) await fsp.rm(lockPath, { force: true });
       }
     }
   }

@@ -4,6 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { runSingleOperatorProductionSetup } from "./lib/zkProductionSetup.mjs";
+import { runWithSetupSignalHandlers } from "./lib/zkSetupCancellation.mjs";
 
 const usage = () => {
   console.log(`Usage:
@@ -113,7 +114,7 @@ export const parseArguments = (argv) => {
   return parsed;
 };
 
-export const main = async (argv = process.argv.slice(2)) => {
+export const main = async (argv = process.argv.slice(2), { signal } = {}) => {
   const parsed = parseArguments(argv);
   if (parsed.help) {
     usage();
@@ -127,6 +128,7 @@ export const main = async (argv = process.argv.slice(2)) => {
           "all Phase 2 entropy after the process exits.",
   );
   const result = await runSingleOperatorProductionSetup({
+    signal,
     ceremonyId: parsed.ceremonyId,
     rotate: parsed.rotate,
     informal: parsed.informal,
@@ -160,8 +162,12 @@ const isMain =
   process.argv[1] !== undefined && fileURLToPath(import.meta.url) === path.resolve(process.argv[1]);
 
 if (isMain) {
-  main().catch((error) => {
+  runWithSetupSignalHandlers((signal) => main(undefined, { signal }), {
+    onSignal: (signalName) => {
+      console.warn(`[zk-setup] ${signalName}: stopping commands and cleaning up; please wait.`);
+    },
+  }).catch((error) => {
     console.error(`[zk-setup] ${error.message}`);
-    process.exitCode = 1;
+    process.exitCode = error.exitCode ?? 1;
   });
 }
