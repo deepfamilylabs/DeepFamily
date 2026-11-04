@@ -32,7 +32,6 @@ function fixture(exit = false, capacity = 1, amount = 100n) {
   const witness = {
     chainId: String(scope.chainId),
     pool: String(BigInt(scope.poolAddress)),
-    inputShardIds: Array(capacity).fill("0"),
     inputRoots: Array(capacity).fill(String(commitment)),
     inputNullifiers: Array.from({ length: capacity }, (_, i) =>
       String(

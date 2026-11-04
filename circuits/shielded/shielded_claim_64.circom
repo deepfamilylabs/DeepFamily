@@ -6,7 +6,6 @@ component main {
     public [
         chainId,
         pool,
-        inputShardIds,
         inputRoots,
         inputNullifiers,
         periodNullifiers,

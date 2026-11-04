@@ -1423,7 +1423,7 @@ const requireShieldedAcceptanceEvidence = (report, repositoryRoot, expectedChain
   requireExact(identityFundSignals[2], "0", "identityBudget initial fund mode");
   requireExact(identityFundSignals[3], "1", "identityBudget identity binding");
   requireExact(
-    identityFundSignals[20],
+    identityFundSignals[18],
     identityBudget.budgetCommitment,
     "identityBudget budget commitment",
   );
@@ -1457,7 +1457,7 @@ const requireShieldedAcceptanceEvidence = (report, repositoryRoot, expectedChain
     proofs.claim.publicSignals.at(-1),
     "identityBudget claim maturity",
   );
-  for (let index = 5; index < 8; index++)
+  for (let index = 4; index < 7; index++)
     requireExact(
       identityClaimSignals[index],
       proofs.claim.publicSignals[index],
@@ -1494,11 +1494,11 @@ const requireShieldedAcceptanceEvidence = (report, repositoryRoot, expectedChain
   ])
     if (requireSafeInteger(scenario[field], `shielded.scenario.${field}`) > maximum)
       throw new Error(`shielded.scenario.${field} exceeds circuit capacity`);
-  // asOf is the last public input of both fund and claim.
+  // Fund appends two receive bindings after asOf; Claim ends with asOf.
   const eligibleFrom = BigInt(scenario.eligibleFrom);
   requireExact(
     eligibleFrom.toString(),
-    (BigInt(proofs.fund.publicSignals.at(-1)) + 7200n).toString(),
+    (BigInt(proofs.fund.publicSignals.at(-3)) + 7200n).toString(),
     "shielded.scenario.eligibleFrom",
   );
   requireExact(

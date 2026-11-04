@@ -143,7 +143,6 @@ export function buildShieldedClaimFixture({
   const publicInputs = {
     chainId: decimal(chainId),
     pool: decimal(pool),
-    inputShardIds: ["0"],
     inputRoots: [decimal(inputBudget)],
     inputNullifiers: [decimal(poseidon3([scoped(1016n), ownerSecret, inputBudget]))],
     periodNullifiers: periodNullifiers.map(decimal),

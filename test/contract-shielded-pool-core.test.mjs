@@ -857,6 +857,50 @@ describe("ShieldedErc20Pool contract boundaries", function () {
     expect(await pool.nullifierSpent(802n)).to.equal(true);
   });
 
+  it("routes roots by shard outside the proof while preserving receipts and global nullifiers", async () => {
+    const { pool } = await setup("ShieldedPoolRolloverHarness");
+    const deposit = actionData();
+    await pool.shield(100n, deposit, await proofFor(pool, 0, deposit, 100n));
+    const root = (await pool.noteShard(0)).root;
+    const transfer = actionData({
+      inputShardIds: [0n],
+      inputRoots: [root],
+      inputNullifiers: [851n],
+      outputCommitments: [103n, 104n],
+    });
+    await authorize(pool, transfer, 0, 4);
+    const proof = await proofFor(pool, 3, transfer);
+    const rerouted = { ...transfer, inputShardIds: [1n] };
+    // A root must be accepted in the selected shard even though shard metadata is
+    // absent from the business statement.
+    await expect(pool.privateTransfer(rerouted, proof)).to.be.revertedWithCustomError(
+      pool,
+      "UnknownNoteRoot",
+    );
+    await pool.seedKnownRoot(1n, root);
+    expect(await proofFor(pool, 3, rerouted)).to.equal(proof);
+    expect(await pool.receiveActionHash(rerouted)).not.to.equal(
+      await pool.receiveActionHash(transfer),
+    );
+    await expect(pool.privateTransfer(rerouted, proof)).to.be.revertedWithCustomError(
+      pool,
+      "InvalidReceiveProof",
+    );
+    await expect(pool.privateTransfer(transfer, proof))
+      .to.emit(pool, "ActionExecuted")
+      .withArgs(3n, 0n, 0n);
+    // Fresh outputs and a fresh receipt cannot spend the same nullifier through
+    // another accepted shard; spent state is shared by the whole pool.
+    const replay = { ...rerouted, outputCommitments: [105n, 106n] };
+    await authorize(pool, replay, 0, 4);
+    await expect(
+      pool.privateTransfer(replay, await proofFor(pool, 3, replay)),
+    ).to.be.revertedWithCustomError(pool, "NullifierAlreadySpent");
+    expect(await pool.nullifierCount()).to.equal(1n);
+    expect((await pool.noteShard(0)).size).to.equal(4n);
+    expect((await pool.noteShard(1)).size).to.equal(0n);
+  });
+
   it("binds one claim root and rejects a second budget input", async () => {
     const { pool, lineage } = await setup();
     const firstDeposit = actionData();

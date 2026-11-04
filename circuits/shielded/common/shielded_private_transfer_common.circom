@@ -7,7 +7,6 @@ include "shielded_receive_binding_common.circom";
 template ShieldedPrivateTransfer(CAPACITY) {
     signal input chainId;
     signal input pool;
-    signal input inputShardIds[CAPACITY];
     signal input inputRoots[CAPACITY];
     signal input inputNullifiers[CAPACITY];
     signal input outputCommitments[2];
@@ -34,7 +33,6 @@ template ShieldedPrivateTransfer(CAPACITY) {
     scope.pool <== pool;
     component inputs = ShieldedValueInputs(CAPACITY);
     inputs.poolDomain <== scope.domain;
-    inputs.inputShardIds <== inputShardIds;
     inputs.inputRoots <== inputRoots;
     inputs.inputNullifiers <== inputNullifiers;
     inputs.inputEnabled <== inputEnabled;

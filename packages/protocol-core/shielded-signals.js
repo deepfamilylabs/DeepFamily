@@ -20,7 +20,7 @@ const MAX_FIELD = SNARK_SCALAR_FIELD - 1n;
 const field = (value, label) => bigintFrom(value, label, MAX_FIELD);
 
 const CONTEXT = ["chainId", "pool"];
-const INPUT_ARRAYS = ["inputShardIds", "inputRoots", "inputNullifiers"];
+const INPUT_ARRAYS = ["inputRoots", "inputNullifiers"];
 const OUTPUTS = ["outputCommitments", "ciphertextHashes"];
 const LINEAGE = ["endorsementRoot", "trustedRoot", "asOf"];
 
@@ -33,10 +33,11 @@ function inputSlotCount(action) {
 }
 
 /** VALUE single-input and four-input circuit variants have the same public field order. */
-export const SHIELDED_VALUE_PUBLIC_SIGNAL_COUNTS = Object.freeze({ 1: 11, 4: 20 });
+export const SHIELDED_VALUE_PUBLIC_SIGNAL_COUNTS = Object.freeze({ 1: 10, 4: 16 });
 
 /**
  * Each action's circuit declares exactly these named public inputs, in this order.
+ * Shard IDs remain transaction routing metadata; the proof authenticates the selected roots.
  * ShieldedPoolCore._publicSignals builds the same sequence. VALUE transfers and
  * withdrawals default to one input slot and also support four; Fund uses two and Claim uses one.
  */
@@ -80,7 +81,6 @@ const INPUT_WIDTHS = Object.freeze({
   fundMode: 1,
   budgetKind: 1,
   publicBudget: 10,
-  inputShardIds: 2,
   inputRoots: 2,
   inputNullifiers: 2,
   periodNullifiers: 3,
@@ -130,7 +130,7 @@ function unused(condition, label) {
  */
 export function buildShieldedPoolPublicInputs(input) {
   const action = Number(bigintFrom(input.action, "action", 4n));
-  const width = isValueAction(action) ? input.inputShardIds?.length : inputSlotCount(action);
+  const width = isValueAction(action) ? input.inputRoots?.length : inputSlotCount(action);
   protocolAssert(
     !isValueAction(action) || width === 1 || width === 4,
     "INVALID_SHIELDED_SIGNAL_SHAPE",
@@ -174,7 +174,6 @@ export function buildShieldedPoolPublicInputs(input) {
     fundMode: [bigintFrom(input.fundMode ?? 0n, "fundMode", 1n)],
     budgetKind: [budgetKind],
     publicBudget,
-    inputShardIds,
     inputRoots,
     inputNullifiers,
     periodNullifiers,
@@ -208,7 +207,7 @@ export function buildShieldedPoolPublicInputs(input) {
       "Continuation fund lineage/time",
     );
   }
-  if (!uses.has("inputShardIds")) {
+  if (!uses.has("inputRoots")) {
     unused(
       [...inputShardIds, ...inputRoots, ...inputNullifiers].every((value) => value === 0n),
       "Note input",

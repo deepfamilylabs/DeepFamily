@@ -56,10 +56,10 @@ library ProofConstants {
 
   // Each pool action proves only the inputs it uses, in ShieldedPoolCore._publicSignals order.
   uint256 internal constant SHIELDED_SHIELD_PUBLIC_SIGNALS_LEN = 7;
-  uint256 internal constant SHIELDED_FUND_PUBLIC_SIGNALS_LEN = 29;
-  uint256 internal constant SHIELDED_CLAIM_PUBLIC_SIGNALS_LEN = 15;
-  uint256 internal constant SHIELDED_PRIVATE_TRANSFER_PUBLIC_SIGNALS_LEN = 11;
-  uint256 internal constant SHIELDED_UNSHIELD_PUBLIC_SIGNALS_LEN = 11;
-  uint256 internal constant SHIELDED_PRIVATE_TRANSFER_4_PUBLIC_SIGNALS_LEN = 20;
-  uint256 internal constant SHIELDED_UNSHIELD_4_PUBLIC_SIGNALS_LEN = 20;
+  uint256 internal constant SHIELDED_FUND_PUBLIC_SIGNALS_LEN = 27;
+  uint256 internal constant SHIELDED_CLAIM_PUBLIC_SIGNALS_LEN = 14;
+  uint256 internal constant SHIELDED_PRIVATE_TRANSFER_PUBLIC_SIGNALS_LEN = 10;
+  uint256 internal constant SHIELDED_UNSHIELD_PUBLIC_SIGNALS_LEN = 10;
+  uint256 internal constant SHIELDED_PRIVATE_TRANSFER_4_PUBLIC_SIGNALS_LEN = 16;
+  uint256 internal constant SHIELDED_UNSHIELD_4_PUBLIC_SIGNALS_LEN = 16;
 }

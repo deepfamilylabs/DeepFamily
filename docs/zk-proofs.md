@@ -306,7 +306,7 @@ The pool protocol, note payload, money HPKE envelope, receive credentials and pr
 
 Authorization reads, presentations and on-chain counter updates support full depth-64 paths. An owner authorization does not depend on that depth. Distinct authorization aliases with identical low 64 bits still exceed the dictionary's path capacity; insertion rejects without changing the current state. This capacity boundary is separate from the removed update-proof depth restriction.
 
-Eight business circuits cover shield, fund, claim (32- and 64-level variants), and privateTransfer/unshield (one- and four-input variants). Fund and PrivateTransfer append two randomized receive commitments to their public statements, giving 29 and 11/20 signals; Claim uses 15. Each required receipt is checked atomically by the pool against the same commitment. Zero commitments are permitted only for circuit-proven own outputs (or public identity funding). The shielded Circom catalog has thirteen sets: eight circuits for five business actions, two credential issuers, two presentations and the owner update. With the two identity/disclosure circuits, the complete catalog has fifteen circuits.
+Eight business circuits cover shield, fund, claim (32- and 64-level variants), and privateTransfer/unshield (one- and four-input variants). Fund and PrivateTransfer append two randomized receive commitments to their public statements, giving 27 and 10/16 signals; Claim uses 14. Each required receipt is checked atomically by the pool against the same commitment. Zero commitments are permitted only for circuit-proven own outputs (or public identity funding). The shielded Circom catalog has thirteen sets: eight circuits for five business actions, two credential issuers, two presentations and the owner update. With the two identity/disclosure circuits, the complete catalog has fifteen circuits.
 
 The presentation's credential fields are public inputs only to the local Groth16 prover. The linked transport hides them; raw presentation proofs and their common input prefix must never be submitted on chain. Fixed Solidity verifiers bind both verification keys and the shared hidden inputs. `linkKeys` in the shielded manifest pins `shielded/receive-link-keys.json`, the verifier base and both generated verifiers. First use requires no recipient registration or transaction; creation and payment read the latest chain authorization state.
 
@@ -333,17 +333,19 @@ The following historical experiment predates the switch back to the fixed librar
 
 The FFT domains were unchanged. These small historical samples showed reduced constraints and key sizes, but did not establish a consistent proving-time or memory improvement. A later isolated comparison, holding all other current circuitry constant, likewise did not detect a stable browser proving-time difference between the library and project-owned Merkle implementations. CLI process measurements do not establish browser or mobile performance. The library choice is based on reviewability and maintenance responsibility; the unconditional project bounds and full protocol regressions remain necessary.
 
-Public and private funding share `shield → donor VALUE → fund → child BUDGET → claim → child VALUE`. Initial/continuation `fundMode` is separate from budget kind and key mode. Both modes use the same `shielded_fund` circuit, proving key and verifier, with 29 public signals. The circuit retains both 64-level qualification paths and both 32-level note paths. The UI labels Public budget, Private (identity credentials) and Private (independent key) correspond to `(budgetKind, keyMode)` values `(1,0)`, `(0,0)` and `(0,1)`, respectively; the recovered summary's `bindingKind` matches `budgetKind`. Public initial funding needs only the child's `personHash`, publishes ten canonical recovery fields and implicitly fixes the identity-derived owner. Private initial funding and refills verify matching Fund credentials and on-chain receive presentations and publishes ten zeros. All entries prove donor ownership, conservation and the same identity/P-based initial-enrollment nullifier. A continuation preserves binding, mode, private owner, P/E, period and start; cross-structure or mode conversion is rejected.
+Public and private funding share `shield → donor VALUE → fund → child BUDGET → claim → child VALUE`. Initial/continuation `fundMode` is separate from budget kind and key mode. Both modes use the same `shielded_fund` circuit, proving key and verifier, with 27 public signals. The circuit retains both 64-level qualification paths and both 32-level note paths. The UI labels Public budget, Private (identity credentials) and Private (independent key) correspond to `(budgetKind, keyMode)` values `(1,0)`, `(0,0)` and `(0,1)`, respectively; the recovered summary's `bindingKind` matches `budgetKind`. Public initial funding needs only the child's `personHash`, publishes ten canonical recovery fields and implicitly fixes the identity-derived owner. Private initial funding and refills verify matching Fund credentials and on-chain receive presentations and publishes ten zeros. All entries prove donor ownership, conservation and the same identity/P-based initial-enrollment nullifier. A continuation preserves binding, mode, private owner, P/E, period and start; cross-structure or mode conversion is rejected.
 
 The two private entries use the same owner-bound BUDGET format and HPKE encryption. They differ in key derivation and authorization: identity credentials reconstruct mode-0 keys, while mode 1 uses separate Spend/View branches derived from the independent key root and requires their owner secret alongside the identity proof. The independent-key entry keeps the same identity and lineage requirements for claims.
 
 Private kind-2 budgets are 284 bytes and authenticate owner, mode and complete viewing key with Poseidon5, plus distinct Fund/Claim origin tags. The two producer domains prevent a Claim continuation from masquerading as an original Fund budget. Public kind-5 budgets retain the 218-byte identity/terms structure and implicit mode 0. Private donor memo payloads are 428/460 bytes without/with allocation key; public memos remain 400/432 bytes. Recovery reconstructs the producer-specific commitment and retains complete receiving keys.
 
-`claim` spends exactly one budget note. Each claim is bounded by that note's remaining balance; separate budgets require separate claims. It proves the identity, lineage from one accepted checkpoint, one to three mature unpaid periods and the authorized owner secret. Mode 0 requires the identity-derived secret; mode 1 requires the independent key secret with no identity fallback. Owner-bound budgets require their rule openings; identity budgets do not. The remainder preserves binding/mode and the VALUE payout preserves the authorized owner; VALUE has no persistent keyMode. All 15 public signals exclude the private input identity, binding and mode. Period nullifiers remain `H(identitySecret, P, epoch, scope)` across entries and exclude owner/mode/root source. This prevents allowance resets but permits a funder knowing the complete identity secret and P to precompute real period markers and associate claims with epochs without knowing the independent key root.
+`claim` spends exactly one budget note. Each claim is bounded by that note's remaining balance; separate budgets require separate claims. It proves the identity, lineage from one accepted checkpoint, one to three mature unpaid periods and the authorized owner secret. Mode 0 requires the identity-derived secret; mode 1 requires the independent key secret with no identity fallback. Owner-bound budgets require their rule openings; identity budgets do not. The remainder preserves binding/mode and the VALUE payout preserves the authorized owner; VALUE has no persistent keyMode. All 14 public signals exclude the private input identity, binding and mode. Period nullifiers remain `H(identitySecret, P, epoch, scope)` across entries and exclude owner/mode/root source. This prevents allowance resets but permits a funder knowing the complete identity secret and P to precompute real period markers and associate claims with epochs without knowing the independent key root.
 
 Initial Fund and Claim include `lineageCheckpointId` in transaction data. The index authenticates its root pair and requires the proof-bound `asOf` to fall between checkpoint creation and retirement (inclusive). Retired checkpoints expire strictly 15 minutes after retirement, regardless of later writes or recurring roots. The ID is lookup metadata, not another circuit input: roots and `asOf` already bind the statement. The two-hour proof freshness and initial eligibility delay are unchanged. This gives an explicit maximum 15-minute qualification-revocation delay; independent historical roots are never combined.
 
-`ShieldedPoolCore` maintains 32-level note shards and secret-derived spend/period nullifiers. The lineage trees remain 64 levels deep. `privateTransfer` and `unshield` default to one real input using `shielded_private_transfer` and `shielded_unshield`. Two to four real inputs use `shielded_private_transfer_4` and `shielded_unshield_4`; the browser downloads only the selected variant. Coin selection first tries one adequate note, then uses up to four notes. Every real VALUE input has a positive uint128 amount and the same owner, chain and pool. Four-slot enabled inputs are contiguous; disabled private openings are zero, their public shard/root repeat slot zero, and their slot-specific dummy nullifiers are distinct. The real spend nullifier remains derived from the owner secret and note commitment. Input sums are bounded to 130 bits; each individual input and each of the two outputs remains uint128, and unshield has one change output plus a zero dummy. Different public roots reveal multiple real inputs, while equal roots do not determine the count. `unshield` exposes its recipient and amount. Public budget facts cannot be made secret again, and proof shapes do not prevent timing, wallet or small-set correlation.
+`inputShardIds` remains in transaction data for the pool's per-shard known-root checks, action events and receive-authorization action hash. Fund, Claim and VALUE proofs receive roots and nullifiers without shard IDs. Initial Fund still requires matching shard IDs on chain and matching roots both on chain and in the circuit. VALUE circuits retain inactive-root repetition and all dummy/private-opening constraints; inactive shard-ID repetition is a client encoding convention.
+
+`ShieldedPoolCore` maintains 32-level note shards and secret-derived spend/period nullifiers. The lineage trees remain 64 levels deep. `privateTransfer` and `unshield` default to one real input using `shielded_private_transfer` and `shielded_unshield`. Two to four real inputs use `shielded_private_transfer_4` and `shielded_unshield_4`; the browser downloads only the selected variant. Coin selection first tries one adequate note, then uses up to four notes. Every real VALUE input has a positive uint128 amount and the same owner, chain and pool. Four-slot enabled inputs are contiguous; disabled private openings are zero, their public roots repeat slot zero, and their slot-specific dummy nullifiers are distinct. The real spend nullifier remains derived from the owner secret and note commitment. Input sums are bounded to 130 bits; each individual input and each of the two outputs remains uint128, and unshield has one change output plus a zero dummy. Different public roots reveal multiple real inputs, while equal roots do not determine the count. `unshield` exposes its recipient and amount. Public budget facts cannot be made secret again, and proof shapes do not prevent timing, wallet or small-set correlation.
 
 `npm run zk:setup` prepares the final keys and single-operator ceremony evidence for all fifteen Circom sets, then synchronizes their artifacts and derives the matching receive-link parameters and fixed verifiers. Local development, CI and release share this artifact set. Presentation circuits use the same shielded manifest as the other shielded circuits; the complete catalog uses one setup workflow.
 
@@ -377,7 +379,7 @@ struct ProofEnvelope {
   count or order of a published deployment requires a new purpose/entrypoint and protocol
   generation; it cannot be installed behind an old route contract ABI. Before initial publication,
   the contracts, circuits, verifiers, artifacts and client can instead be replaced together and
-  redeployed with the new ABI. The current unpublished fund protocol uses purpose 3 with 29 signals
+  redeployed with the new ABI. The current unpublished fund protocol uses purpose 3 with 27 signals
   and does not retain the previous development ABI.
 - A `circuitId` is not stored in `PersonVersion`, included in `personHash`, or used to infer any
   identity suite. Callers choose the route needed for each operation.
@@ -386,12 +388,12 @@ Current generated verifiers are:
 
 - `contracts/verifiers/PersonCommitmentVerifier.sol` for 5 person-relation public signals;
 - `contracts/verifiers/DisclosureBindingVerifier.sol` for 4 disclosure public signals;
-- eight shielded verifier targets for five action routes, with 7 to 29 public signals.
+- eight shielded verifier targets for five action routes, with 7 to 27 public signals.
 
 These ten verifier contracts share one `contracts/adapters/Groth16VerifierAdapter.sol` instance. The
 adapter accepts the same encoding-1, 256-byte ABC payload and routes purposes 0/1 to identity
 and disclosure, and purposes 2–6 to the five pool actions (pool action ID + 2). Transfer and
-withdrawal use 11 public signals for one input and 20 for four slots. The adapter selects the matching immutable verifier directly from that length. Each route checks its supported public-signal length. The action is not a public
+withdrawal use 10 public signals for one input and 16 for four slots. The adapter selects the matching immutable verifier directly from that length. Each route checks its supported public-signal length. The action is not a public
 signal: the pool picks the purpose for its action, and the adapter handles proof transport only.
 
 ## Frontend and Shared Definitions
@@ -415,17 +417,17 @@ are published under `frontend/public/zk/`:
 - one shared `shielded/receive-link-keys.json` containing public linking parameters.
 
 Fund uses `shielded_fund_final.zkey` for both initial funding and refills; its proving key is
-37,794,602 bytes (37.79 MB). The browser reuses this key when the funding mode changes.
+37,656,753 bytes (37.66 MB). The browser reuses this key when the funding mode changes.
 
 VALUE proving keys keep the unsuffixed filenames for the default single-input circuits.
 The four-input variants use `_4` before `_final.zkey`:
 
 | Proving key | Input capacity | Bytes |
 | --- | --- | ---: |
-| `shielded_private_transfer_final.zkey` | 1 | 8,769,268 |
-| `shielded_unshield_final.zkey` | 1 | 7,796,992 |
-| `shielded_private_transfer_4_final.zkey` | 4 | 26,716,484 |
-| `shielded_unshield_4_final.zkey` | 4 | 25,744,208 |
+| `shielded_private_transfer_final.zkey` | 1 | 8,700,657 |
+| `shielded_unshield_final.zkey` | 1 | 7,728,381 |
+| `shielded_private_transfer_4_final.zkey` | 4 | 26,440,125 |
+| `shielded_unshield_4_final.zkey` | 4 | 25,467,849 |
 
 The browser fetches the selected variant only. These are proving-key sizes; the
 Groth16 ABC proof payload remains 256 bytes for either capacity.
@@ -463,13 +465,13 @@ outputs may have different sizes):
 
 | Proving key | Uncompressed MB | Brotli MB |
 | --- | ---: | ---: |
-| `shielded_fund_final.zkey` | 37.79 | 20.89 |
+| `shielded_fund_final.zkey` | 37.66 | 20.80 |
 | `shielded_claim_64_final.zkey` | 35.48 | 18.55 |
 | `shielded_claim_32_final.zkey` | 27.68 | 14.52 |
-| `shielded_private_transfer_final.zkey` | 8.77 | 4.73 |
-| `shielded_unshield_final.zkey` | 7.80 | 4.27 |
+| `shielded_private_transfer_final.zkey` | 8.70 | 4.70 |
+| `shielded_unshield_final.zkey` | 7.73 | 4.23 |
 
-All 30 WASM/zkey files total 260.63 MB uncompressed and 126.85 MB with Brotli. The browser
+All 30 WASM/zkey files total 259.86 MB uncompressed and 126.46 MB with Brotli. The browser
 downloads only the files needed for the selected proof.
 
 The unified `zk:check` rebuilds all fifteen
@@ -591,7 +593,7 @@ as their Solidity names. Single-input VALUE entrypoints keep their unsuffixed na
 four-input variants use `_4`. Fund uses one unsuffixed entrypoint for both modes.
 Shared templates are not circuit entrypoints or separate proving-key sets.
 
-The Claim32 variant (`shielded_claim_32`) shares the fifteen public signals and
+The Claim32 variant (`shielded_claim_32`) shares the fourteen public signals and
 single-note, three-period rules of Claim64 (`shielded_claim_64`). Both compact endorsement and trusted paths must fit
 32 levels. Browser proving selects Claim32 for those paths and downloads only that
 variant; otherwise it uses the existing 64-level Claim circuit. The adapter tries the

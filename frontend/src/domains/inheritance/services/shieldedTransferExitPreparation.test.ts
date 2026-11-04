@@ -386,15 +386,15 @@ describe("local private transfer and unshield preparation", () => {
         { kind: "inputOwner", inputIndex: 0, amount: 40n },
       ],
     });
-    expect(Object.keys(prepared.witness).slice(0, 7)).toEqual([
+    expect(Object.keys(prepared.witness).slice(0, 6)).toEqual([
       "chainId",
       "pool",
-      "inputShardIds",
       "inputRoots",
       "inputNullifiers",
       "outputCommitments",
       "ciphertextHashes",
     ]);
+    expect(prepared.witness).not.toHaveProperty("inputShardIds");
     expect(prepared.witness).not.toHaveProperty("periodNullifiers");
     expect(prepared.witness).not.toHaveProperty("recipient");
     expect(prepared.data.inputNullifiers[0]).not.toBe(prepared.data.inputNullifiers[1]);

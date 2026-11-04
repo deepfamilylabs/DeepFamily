@@ -47,10 +47,10 @@ test("each pool action has the verifier input count in ProofConstants.sol", () =
     ),
     {
       Shield: 7,
-      Fund: 29,
-      Claim: 15,
-      PrivateTransfer: 11,
-      Unshield: 11,
+      Fund: 27,
+      Claim: 14,
+      PrivateTransfer: 10,
+      Unshield: 10,
     },
   );
 });
@@ -68,8 +68,9 @@ test("VALUE actions support the single-input default and reject mixed variant wi
       };
       const { signals, witness } = buildShieldedPoolPublicInputs(input);
       assert.equal(signals.length, SHIELDED_VALUE_PUBLIC_SIGNAL_COUNTS[width]);
-      assert.equal(witness.inputShardIds.length, width);
-      assert.deepEqual(signals.slice(2, 2 + width), input.inputShardIds.map(BigInt));
+      assert.equal(witness.inputRoots.length, width);
+      assert.equal("inputShardIds" in witness, false);
+      assert.deepEqual(signals.slice(2, 2 + width), input.inputRoots.map(BigInt));
       assert.throws(
         () => buildShieldedPoolPublicSignals({ ...input, inputNullifiers: width === 1 ? [1, 2, 3, 4] : [1] }),
         (error) => error.code === "INVALID_SHIELDED_SIGNAL_SHAPE",
@@ -96,7 +97,6 @@ test("claim signals follow the circuit's named public inputs", () => {
   assert.deepEqual(signals, [
     1030n,
     1n,
-    2n,
     11n,
     13n,
     ...periodNullifiers.map(BigInt),
@@ -111,13 +111,13 @@ test("claim signals follow the circuit's named public inputs", () => {
   assert.deepEqual(Object.keys(witness), [
     ...SHIELDED_POOL_PUBLIC_INPUTS[SHIELDED_POOL_ACTION.Claim],
   ]);
-  assert.deepEqual(witness.inputShardIds, ["2"]);
+  assert.equal("inputShardIds" in witness, false);
   assert.deepEqual(witness.inputNullifiers, ["13"]);
   assert.deepEqual(witness.ciphertextHashes, [String(hashA), String(hashB)]);
   assert.equal(witness.asOf, "31");
 });
 
-test("VALUE transfers list all four shard ids before all roots and nullifiers", () => {
+test("VALUE transfers list roots and nullifiers without transaction shard routing", () => {
   const signals = buildShieldedPoolPublicSignals({
     ...valueBase,
     action: SHIELDED_POOL_ACTION.PrivateTransfer,
@@ -125,7 +125,6 @@ test("VALUE transfers list all four shard ids before all roots and nullifiers", 
   assert.deepEqual(signals, [
     1030n,
     1n,
-    ...valueBase.inputShardIds.map(BigInt),
     ...valueBase.inputRoots.map(BigInt),
     ...valueBase.inputNullifiers.map(BigInt),
     27n,
@@ -135,6 +134,39 @@ test("VALUE transfers list all four shard ids before all roots and nullifiers", 
     0n,
     0n,
   ]);
+});
+
+test("shard routing is validated without changing a business proof statement", () => {
+  const cases = [
+    { ...base, action: SHIELDED_POOL_ACTION.Fund, fundMode: 1 },
+    {
+      ...base,
+      action: SHIELDED_POOL_ACTION.Claim,
+      inputShardIds: [2],
+      inputRoots: [11],
+      inputNullifiers: [13],
+    },
+    ...[SHIELDED_POOL_ACTION.PrivateTransfer, SHIELDED_POOL_ACTION.Unshield].flatMap((action) =>
+      [1, 4].map((width) => ({
+        ...valueBase,
+        action,
+        inputShardIds: valueBase.inputShardIds.slice(0, width),
+        inputRoots: valueBase.inputRoots.slice(0, width),
+        inputNullifiers: valueBase.inputNullifiers.slice(0, width),
+      })),
+    ),
+  ];
+  for (const input of cases) {
+    const original = buildShieldedPoolPublicInputs(input);
+    assert.deepEqual(
+      buildShieldedPoolPublicInputs({ ...input, inputShardIds: input.inputShardIds.map((id) => id + 5) }),
+      original,
+    );
+    assert.equal("inputShardIds" in original.witness, false);
+    for (const inputShardIds of [undefined, [], [...input.inputShardIds, 0], input.inputShardIds.map(() => -1)]) {
+      assert.throws(() => buildShieldedPoolPublicInputs({ ...input, inputShardIds }));
+    }
+  }
 });
 
 test("fund includes its mode before the roots and keeps lineage only for the initial enrollment", () => {
@@ -155,8 +187,6 @@ test("fund includes its mode before the roots and keeps lineage only for the ini
       0n,
       0n,
       ...Array(10).fill(0n),
-      2n,
-      2n,
       11n,
       11n,
       13n,
@@ -184,8 +214,6 @@ test("fund includes its mode before the roots and keeps lineage only for the ini
       1n,
       0n,
       ...Array(10).fill(0n),
-      2n,
-      3n,
       11n,
       12n,
       13n,
@@ -236,7 +264,6 @@ test("shield and unshield bind their public amount and recipient", () => {
     [
       1030n,
       1n,
-      ...valueBase.inputShardIds.map(BigInt),
       ...valueBase.inputRoots.map(BigInt),
       ...valueBase.inputNullifiers.map(BigInt),
       27n,

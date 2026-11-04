@@ -48,19 +48,19 @@ describe("shielded proof public inputs", () => {
   });
 
   it("rejects a proof for a different amount, root or recipient before submission", () => {
-    // Single-input unshield: chainId, pool, one shard id, root and nullifier, two
+    // Single-input unshield: chainId, pool, one root and nullifier, two
     // outputs, two ciphertext hashes, amount, recipient.
-    const expected = Array(11).fill("0");
-    expected[9] = "100";
-    expected[10] = "17";
+    const expected = Array(10).fill("0");
+    expected[8] = "100";
+    expected[9] = "17";
     expect(() => assertShieldedPublicSignals("unshield", [...expected], expected)).not.toThrow();
     const forged = [...expected];
-    forged[10] = "18";
+    forged[9] = "18";
     expect(() => assertShieldedPublicSignals("unshield", forged, expected)).toThrow(
-      "public signal 10",
+      "public signal 9",
     );
-    expect(() => assertShieldedPublicSignals("unshield", expected.slice(0, 10), expected)).toThrow(
-      "11 public signals",
+    expect(() => assertShieldedPublicSignals("unshield", expected.slice(0, 9), expected)).toThrow(
+      "10 public signals",
     );
   });
 
@@ -72,13 +72,13 @@ describe("shielded proof public inputs", () => {
       ["fundReceivePresentation", 23],
       ["identityCounterUpdate", 6],
       ["shield", 7],
-      ["fund", 29],
-      ["claim", 15],
-      ["claim32", 15],
-      ["privateTransfer", 11],
-      ["privateTransfer4", 20],
-      ["unshield", 11],
-      ["unshield4", 20],
+      ["fund", 27],
+      ["claim", 14],
+      ["claim32", 14],
+      ["privateTransfer", 10],
+      ["privateTransfer4", 16],
+      ["unshield", 10],
+      ["unshield4", 16],
     ] as const) {
       expect(() =>
         assertShieldedPublicSignals(circuit, Array(count).fill("0"), Array(count).fill("0")),
@@ -104,10 +104,10 @@ describe("shielded proof public inputs", () => {
 
   it("shares one Fund artifact set across both modes and retains each witness", async () => {
     mocks.verify.mockResolvedValue(true);
-    const fetch = vi.fn(async () => new Response(JSON.stringify({ nPublic: 29 })));
+    const fetch = vi.fn(async () => new Response(JSON.stringify({ nPublic: 27 })));
     vi.stubGlobal("fetch", fetch);
     for (const fundMode of [0, 1] as const) {
-      const expectedPublicSignals = Array(29).fill("0");
+      const expectedPublicSignals = Array(27).fill("0");
       expectedPublicSignals[2] = String(fundMode);
       mocks.fullProve.mockResolvedValue({ proof: {}, publicSignals: expectedPublicSignals });
       const witness = { fundMode: String(fundMode), endorsementSiblings: Array(64).fill("0") };
@@ -132,7 +132,7 @@ describe("shielded proof public inputs", () => {
         generateShieldedProof({
           circuit: "fund",
           witness,
-          expectedPublicSignals: Array(29).fill("0"),
+          expectedPublicSignals: Array(27).fill("0"),
         }),
       ).rejects.toThrow("mode must be 0 or 1");
     }
@@ -164,7 +164,7 @@ describe("shielded proof public inputs", () => {
       for (const width of [1, 4] as const) {
         mocks.fetchAsset.mockClear();
         fetch.mockClear();
-        const expectedPublicSignals = Array(width === 1 ? 11 : 20).fill("0");
+        const expectedPublicSignals = Array(width === 1 ? 10 : 16).fill("0");
         mocks.fullProve.mockResolvedValue({ proof: {}, publicSignals: expectedPublicSignals });
         await generateShieldedProof({
           circuit: action,
@@ -202,12 +202,12 @@ describe("shielded proof public inputs", () => {
   });
 
   it("downloads only the selected claim variant and preserves the original witness", async () => {
-    const expectedPublicSignals = Array(15).fill("0");
+    const expectedPublicSignals = Array(14).fill("0");
     mocks.fullProve.mockResolvedValue({ proof: {}, publicSignals: expectedPublicSignals });
     mocks.verify.mockResolvedValue(true);
     vi.stubGlobal(
       "fetch",
-      vi.fn(async () => new Response(JSON.stringify({ nPublic: 15 }))),
+      vi.fn(async () => new Response(JSON.stringify({ nPublic: 14 }))),
     );
     const siblings = Array(64).fill("0");
     const witness = {

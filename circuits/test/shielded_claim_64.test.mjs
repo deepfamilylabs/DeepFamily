@@ -490,7 +490,6 @@ test("shielded claim constraints", async (t) => {
       await invalid(inflated);
       await assert.rejects(() => calculator.calculateWitness({
         ...witness,
-        inputShardIds: ["0", "0"],
         inputRoots: [witness.inputRoots[0], witness.inputRoots[0]],
         inputNullifiers: [witness.inputNullifiers[0], witness.inputNullifiers[0]],
       }, 1));

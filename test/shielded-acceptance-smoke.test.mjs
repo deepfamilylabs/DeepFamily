@@ -82,8 +82,8 @@ describe("integrated shielded acceptance smoke", function () {
     assert.equal(Object.keys(result.proofs).length, 8);
     assert.equal(result.proofs.fund.publicSignals[2], "0");
     for (const action of ["privateTransfer", "unshield"]) {
-      assert.equal(result.proofs[action].publicSignals.length, 11);
-      assert.equal(result.proofs[`${action}4`].publicSignals.length, 20);
+      assert.equal(result.proofs[action].publicSignals.length, 10);
+      assert.equal(result.proofs[`${action}4`].publicSignals.length, 16);
       assert.equal(result.proofs[`${action}4`].execution, "verifier-call");
     }
     assert.equal(result.scenario.fundLabel, "shielded-action-fund");
@@ -100,10 +100,10 @@ describe("integrated shielded acceptance smoke", function () {
     assert.equal(result.scenario.identityBudget.periodDays, "7");
     assert.equal(result.scenario.identityBudget.fundProof.publicSignals[13], "7");
     const publicPeriodNullifiers = result.scenario.identityBudget.claimProof.publicSignals.slice(
-      5,
-      8,
+      4,
+      7,
     );
-    const privatePeriodNullifiers = result.proofs.claim.publicSignals.slice(5, 8);
+    const privatePeriodNullifiers = result.proofs.claim.publicSignals.slice(4, 7);
     assert.notDeepEqual(publicPeriodNullifiers, privatePeriodNullifiers);
     assert.equal(new Set(publicPeriodNullifiers).size, 3);
     assert.equal(new Set(privatePeriodNullifiers).size, 3);

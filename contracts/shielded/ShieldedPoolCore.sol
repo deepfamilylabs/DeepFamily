@@ -446,7 +446,9 @@ abstract contract ShieldedPoolCore is ReentrancyGuardTransient {
   }
 
   /**
-   * @dev Each circuit proves only the inputs its action uses, in this order. Mirrors
+   * @dev Shard IDs select accepted roots above; only the roots enter the proof statement.
+   *      Spend nullifiers remain global across shards. Each circuit proves only the inputs
+   *      its action uses, in this order. Mirrors
    *      SHIELDED_POOL_PUBLIC_INPUTS in packages/protocol-core/shielded-signals.js; the adapter
    *      rejects a length that differs from ProofConstants.
    */
@@ -463,7 +465,7 @@ abstract contract ShieldedPoolCore is ReentrancyGuardTransient {
     bool hasRecipient = action == Action.Unshield;
     signals = new uint256[](
       6 +
-        (inputs == 0 ? 0 : 2 * inputs + data.inputNullifiers.length) +
+        (2 * inputs) +
         (isClaim ? data.periodNullifiers.length : 0) +
         (action == Action.Fund ? 12 : 0) +
         (hasAmount ? 1 : 0) +
@@ -482,7 +484,6 @@ abstract contract ShieldedPoolCore is ReentrancyGuardTransient {
         : [uint256(0), 0, 0, 0, 0, 0, 0, 0, 0, 0];
       for (uint256 i = 0; i < budget.length; ++i) signals[n++] = budget[i];
     }
-    for (uint256 i = 0; i < inputs; ++i) signals[n++] = data.inputShardIds[i];
     for (uint256 i = 0; i < inputs; ++i) signals[n++] = data.inputRoots[i];
     if (inputs != 0) {
       for (uint256 i = 0; i < data.inputNullifiers.length; ++i) {

@@ -55,7 +55,6 @@ function privateTransferFixture(scope = defaultScope) {
   const witness = {
     chainId: String(scope.chainId),
     pool: String(BigInt(scope.poolAddress)),
-    inputShardIds: ["0", "1"],
     inputRoots: strs(inputs),
     inputNullifiers: strs(
       inputs.map((noteCommitment, i) =>
@@ -98,7 +97,6 @@ function privateTransferFixture(scope = defaultScope) {
     outputNonces: strs(outputNonces),
   };
   for (let i = 2; i < 4; i++) {
-    witness.inputShardIds.push(witness.inputShardIds[0]);
     witness.inputRoots.push(witness.inputRoots[0]);
     witness.inputNullifiers.push(
       String(computeShieldedDummyInputNullifierForSlot(inputOwnerSecrets[0], inputs[0], i, scope)),
@@ -122,7 +120,6 @@ function singleInputPrivateTransferFixture(scope = defaultScope) {
   const witness = privateTransferFixture(scope);
   const ownerSecret = BigInt(witness.inputOwnerSecrets[0]);
   const firstCommitment = BigInt(witness.inputRoots[0]);
-  witness.inputShardIds[1] = witness.inputShardIds[0];
   witness.inputRoots[1] = witness.inputRoots[0];
   witness.inputNullifiers[1] = computeShieldedDummyInputNullifier(
     {
@@ -469,11 +466,6 @@ test("private transfer circuit", async (t) => {
         await transfer.invalid(
           mutate(validSingleTransfer, (w) => {
             w.inputAmounts[1] = "1";
-          }),
-        );
-        await transfer.invalid(
-          mutate(validSingleTransfer, (w) => {
-            w.inputShardIds[1] = "1";
           }),
         );
         await transfer.invalid(

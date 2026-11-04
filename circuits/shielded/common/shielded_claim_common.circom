@@ -9,11 +9,10 @@ include "shielded_funding_common.circom";
 
 // Claim consumes one budget note and preserves its policy, enrollment and owner.
 // All three period nullifiers are public, and inactive slots carry
-// domain-separated dummies.
+// domain-separated dummies. Shard routing is checked by the pool against inputRoots.
 template ShieldedClaim(LINEAGE_DEPTH) {
     signal input chainId;
     signal input pool;
-    signal input inputShardIds[1];
     signal input inputRoots[1];
     signal input inputNullifiers[1];
     signal input periodNullifiers[3];

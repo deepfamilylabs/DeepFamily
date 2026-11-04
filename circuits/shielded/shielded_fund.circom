@@ -7,6 +7,7 @@ include "common/shielded_receive_binding_common.circom";
 // Fund consumes only the donor VALUE note. Mode 0 starts a unique enrollment
 // after proving current lineage; mode 1 reads a historical budget template,
 // preserving its enrollment without consuming or counting its old value.
+// The pool checks shard routing against inputRoots outside the proof.
 template ShieldedFund() {
     signal input chainId;
     signal input pool;
@@ -14,7 +15,6 @@ template ShieldedFund() {
     signal input budgetKind;
     signal input keyMode;
     signal input publicBudget[10];
-    signal input inputShardIds[2];
     signal input inputRoots[2];
     signal input inputNullifiers[2];
     signal input outputCommitments[2];
@@ -123,12 +123,6 @@ template ShieldedFund() {
     initial * oldKeyMode === 0;
     fundMode * (budgetKind - oldBudgetKind) === 0;
     fundMode * (keyMode - oldKeyMode) === 0;
-    component shardBits[2];
-    for (var i = 0; i < 2; i++) {
-        shardBits[i] = Num2Bits(128);
-        shardBits[i].in <== inputShardIds[i];
-    }
-    initial * (inputShardIds[1] - inputShardIds[0]) === 0;
     initial * (inputRoots[1] - inputRoots[0]) === 0;
     component asOfBits = Num2Bits(64);
     asOfBits.in <== asOf;
@@ -342,6 +336,6 @@ template ShieldedFund() {
 }
 
 component main {
-    public [chainId, pool, fundMode, budgetKind, publicBudget, inputShardIds, inputRoots, inputNullifiers,
+    public [chainId, pool, fundMode, budgetKind, publicBudget, inputRoots, inputNullifiers,
         outputCommitments, ciphertextHashes, endorsementRoot, trustedRoot, asOf, receiveBindings]
 } = ShieldedFund();

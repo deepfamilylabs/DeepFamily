@@ -243,6 +243,11 @@ contract ShieldedPoolRolloverHarness is ShieldedErc20Pool {
     shard.root = 1;
     shard.knownRoots[1] = true;
   }
+
+  /** @dev Exercise root-routing checks independently of constructing a second full shard. */
+  function seedKnownRoot(uint256 shardId, uint256 noteRoot) external {
+    _shards[shardId].knownRoots[noteRoot] = true;
+  }
 }
 
 /**

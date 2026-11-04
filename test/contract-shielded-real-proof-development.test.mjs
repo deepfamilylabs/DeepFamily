@@ -691,7 +691,7 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
           template ? base.continuation : base.initial,
         );
         const inputs = buildShieldedPoolPublicInputs({ action: 1, chainId, poolAddress, ...data });
-        assert.equal(inputs.signals.length, 29);
+        assert.equal(inputs.signals.length, 27);
         const witness = {
           ...(template ? base.continuation : base.initial),
           ...receive,
@@ -778,7 +778,7 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
           lineageCheckpointId: await lineage.currentCheckpointId(),
         };
         const inputs = buildShieldedPoolPublicInputs({ action: 2, chainId, poolAddress, ...data });
-        assert.equal(inputs.signals.length, 15);
+        assert.equal(inputs.signals.length, 14);
         const base = buildShieldedClaimFixture({
           chainId,
           poolAddress,
@@ -1224,9 +1224,9 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
       },
       unshieldSignals,
     );
-    expect(unshieldSignals).to.have.length(11);
+    expect(unshieldSignals).to.have.length(10);
     expect(await adapter.verifyProof(6, 1, unshieldProof, unshieldSignals)).to.equal(true);
-    expect(await adapter.verifyProof(6, 1, unshieldProof, Array(20).fill(0n))).to.equal(false);
+    expect(await adapter.verifyProof(6, 1, unshieldProof, Array(16).fill(0n))).to.equal(false);
     // Transfer and withdrawal now have the same signal count; their distinct verification
     // keys still reject a proof from the other route.
     expect(await adapter.verifyProof(5, 1, unshieldProof, unshieldSignals)).to.equal(false);

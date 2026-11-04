@@ -6,7 +6,6 @@ include "shielded_value_common.circom";
 template ShieldedUnshield(CAPACITY) {
     signal input chainId;
     signal input pool;
-    signal input inputShardIds[CAPACITY];
     signal input inputRoots[CAPACITY];
     signal input inputNullifiers[CAPACITY];
     signal input outputCommitments[2];
@@ -29,7 +28,6 @@ template ShieldedUnshield(CAPACITY) {
     scope.pool <== pool;
     component inputs = ShieldedValueInputs(CAPACITY);
     inputs.poolDomain <== scope.domain;
-    inputs.inputShardIds <== inputShardIds;
     inputs.inputRoots <== inputRoots;
     inputs.inputNullifiers <== inputNullifiers;
     inputs.inputEnabled <== inputEnabled;

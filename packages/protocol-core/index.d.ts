@@ -1025,7 +1025,6 @@ export type ShieldedPoolPublicInputName =
   | "fundMode"
   | "budgetKind"
   | "publicBudget"
-  | "inputShardIds"
   | "inputRoots"
   | "inputNullifiers"
   | "periodNullifiers"
@@ -1042,7 +1041,7 @@ export const SHIELDED_POOL_PUBLIC_INPUTS: Readonly<
   Record<number, readonly ShieldedPoolPublicInputName[]>
 >;
 export const SHIELDED_POOL_PUBLIC_SIGNAL_COUNTS: Readonly<Record<number, number>>;
-export const SHIELDED_VALUE_PUBLIC_SIGNAL_COUNTS: Readonly<{ 1: 11; 4: 20 }>;
+export const SHIELDED_VALUE_PUBLIC_SIGNAL_COUNTS: Readonly<{ 1: 10; 4: 16 }>;
 export interface ShieldedPoolPublicSignalInput {
   receiveBindings?: readonly [BigNumberish, BigNumberish];
   receiveAuthorizations?: readonly ShieldedReceiveAuthorization[];
@@ -1053,6 +1052,7 @@ export interface ShieldedPoolPublicSignalInput {
   action: BigNumberish;
   chainId: BigNumberish;
   poolAddress: string;
+  /** Transaction routing metadata; validated but omitted from the circuit public inputs. */
   inputShardIds: ReadonlyArray<BigNumberish>;
   inputRoots: ReadonlyArray<BigNumberish>;
   inputNullifiers: ReadonlyArray<BigNumberish>;

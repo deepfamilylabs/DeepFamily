@@ -62,7 +62,21 @@ test("claim variants share roots and reject paths outside their capacity", async
       extend(witness, "trusted", 32);
       const standard = await calculators.shielded_claim_64.calculateWitness(witness, true);
       const compact = await calculators.shielded_claim_32.calculateWitness(for32(witness), true);
-      assert.deepEqual(compact.slice(1, 16), standard.slice(1, 16));
+      const publicSignals = [
+        witness.chainId,
+        witness.pool,
+        ...witness.inputRoots,
+        ...witness.inputNullifiers,
+        ...witness.periodNullifiers,
+        ...witness.outputCommitments,
+        ...witness.ciphertextHashes,
+        witness.endorsementRoot,
+        witness.trustedRoot,
+        witness.asOf,
+      ].map(BigInt);
+      assert.equal(publicSignals.length, 14);
+      assert.deepEqual(compact.slice(1, 15), publicSignals);
+      assert.deepEqual(standard.slice(1, 15), publicSignals);
       const forged = for32(structuredClone(witness));
       forged.endorsementSiblings[31] = "1";
       await assertConstraintViolation(() =>

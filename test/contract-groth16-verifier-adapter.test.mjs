@@ -5,7 +5,7 @@ import { deployUnifiedVerifierAdapter } from "./helpers/unifiedVerifierAdapter.m
 
 const ACTIONS = ["shield", "fund", "claim", "privateTransfer", "unshield"];
 // Mirrors ProofConstants.sol and SHIELDED_POOL_PUBLIC_SIGNAL_COUNTS.
-const SIGNAL_COUNTS = [7, 29, 15, 11, 11];
+const SIGNAL_COUNTS = [7, 27, 14, 10, 10];
 const PROOF = hre.ethers.AbiCoder.defaultAbiCoder().encode(
   ["uint256[2]", "uint256[2][2]", "uint256[2]"],
   [
@@ -74,10 +74,16 @@ describe("Unified Groth16 verifier adapter", function () {
       [1, 5],
       [2, 8],
       [3, 12],
+      [3, 29],
       [4, 12],
+      [4, 15],
       [4, 27],
       [5, 30],
+      [5, 11],
+      [5, 20],
       [5, 12],
+      [6, 11],
+      [6, 20],
       [6, 12],
     ]) {
       await expect(
@@ -106,31 +112,31 @@ describe("Unified Groth16 verifier adapter", function () {
         await verifiers[single].getAddress(),
       );
       expect(await adapter[`${four}Verifier`]()).to.equal(await verifiers[four].getAddress());
-      const singleSignals = Array(11).fill(0n);
-      singleSignals[10] = expected;
+      const singleSignals = Array(10).fill(0n);
+      singleSignals[9] = expected;
       expect(await adapter.verifyProof(purpose, 1, PROOF, singleSignals)).to.equal(true);
-      const fourSignals = Array(20).fill(0n);
-      fourSignals[19] = expected + 2n;
+      const fourSignals = Array(16).fill(0n);
+      fourSignals[15] = expected + 2n;
       expect(await adapter.verifyProof(purpose, 1, PROOF, fourSignals)).to.equal(true);
       // The chosen verifier must reject a signal accepted only by the other capacity.
-      singleSignals[10] = expected + 2n;
-      fourSignals[19] = expected;
+      singleSignals[9] = expected + 2n;
+      fourSignals[15] = expected;
       expect(await adapter.verifyProof(purpose, 1, PROOF, singleSignals)).to.equal(false);
       expect(await adapter.verifyProof(purpose, 1, PROOF, fourSignals)).to.equal(false);
     }
     const singleOnly = await deployUnifiedVerifierAdapter(hre, {
       privateTransfer: verifiers.privateTransfer,
     });
-    await expect(singleOnly.verifyProof(5, 1, PROOF, Array(20).fill(0n)))
+    await expect(singleOnly.verifyProof(5, 1, PROOF, Array(16).fill(0n)))
       .to.be.revertedWithCustomError(singleOnly, "VerifierNotConfigured")
       .withArgs(5);
     const fourOnly = await deployUnifiedVerifierAdapter(hre, {
       privateTransfer4: verifiers.privateTransfer4,
     });
-    const signals = Array(20).fill(0n);
-    signals[19] = 3n;
+    const signals = Array(16).fill(0n);
+    signals[15] = 3n;
     expect(await fourOnly.verifyProof(5, 1, PROOF, signals)).to.equal(true);
-    await expect(fourOnly.verifyProof(5, 1, PROOF, Array(11).fill(0n)))
+    await expect(fourOnly.verifyProof(5, 1, PROOF, Array(10).fill(0n)))
       .to.be.revertedWithCustomError(fourOnly, "VerifierNotConfigured")
       .withArgs(5);
   });
@@ -140,13 +146,13 @@ describe("Unified Groth16 verifier adapter", function () {
     await fund.configure(true, 10n);
     const adapter = await deployUnifiedVerifierAdapter(hre, { fund });
     expect(await adapter.verifierForPurpose(3)).to.equal(await fund.getAddress());
-    const signals = Array(29).fill(0n);
-    signals[28] = 10n;
+    const signals = Array(27).fill(0n);
+    signals[26] = 10n;
     for (const mode of [0n, 1n]) {
       signals[2] = mode;
       expect(await adapter.verifyProof(3, 1, PROOF, signals)).to.equal(true);
     }
-    signals[28] = 11n;
+    signals[26] = 11n;
     expect(await adapter.verifyProof(3, 1, PROOF, signals)).to.equal(false);
   });
 
@@ -157,12 +163,12 @@ describe("Unified Groth16 verifier adapter", function () {
     await claim32.configure(true, 32n);
     const adapter = await deployUnifiedVerifierAdapter(hre, { claim, claim32 });
     expect(await adapter.claim32Verifier()).to.equal(await claim32.getAddress());
-    const signals = Array(15).fill(0n);
+    const signals = Array(14).fill(0n);
     for (const last of [32n, 64n]) {
-      signals[14] = last;
+      signals[13] = last;
       expect(await adapter.verifyProof(4, 1, PROOF, signals)).to.equal(true);
     }
-    signals[14] = 99n;
+    signals[13] = 99n;
     expect(await adapter.verifyProof(4, 1, PROOF, signals)).to.equal(false);
     await expect(deployUnifiedVerifierAdapter(hre, { claim32 })).to.be.revertedWithCustomError(
       adapter,
@@ -173,7 +179,7 @@ describe("Unified Groth16 verifier adapter", function () {
   it("allows isolated disabled routes but rejects their use and codeless verifier addresses", async function () {
     const adapter = await deployUnifiedVerifierAdapter(hre);
     expect(await adapter.verifierForPurpose(4)).to.equal(hre.ethers.ZeroAddress);
-    await expect(adapter.verifyProof(4, 1, PROOF, Array(15).fill(0n)))
+    await expect(adapter.verifyProof(4, 1, PROOF, Array(14).fill(0n)))
       .to.be.revertedWithCustomError(adapter, "VerifierNotConfigured")
       .withArgs(4);
     const [, eoa] = await hre.ethers.getSigners();

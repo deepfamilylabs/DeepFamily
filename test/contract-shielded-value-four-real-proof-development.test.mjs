@@ -293,7 +293,7 @@ describe("development-key real proofs for four-input VALUE routes", function () 
         },
         singleReplayPublic.signals,
       );
-      assert.equal(singleReplayPublic.signals.length, 11);
+      assert.equal(singleReplayPublic.signals.length, 10);
       expect(
         await adapter.verifyProof(5, 1, singleReplayProof, singleReplayPublic.signals),
       ).to.equal(true);

@@ -41,40 +41,40 @@ interface IGroth16Verifier7 {
 }
 
 /** @dev Generated verifier interface for the single-input VALUE circuits. */
-interface IGroth16Verifier11 {
+interface IGroth16Verifier10 {
   function verifyProof(
     uint256[2] calldata a,
     uint256[2][2] calldata b,
     uint256[2] calldata c,
-    uint256[11] calldata publicSignals
+    uint256[10] calldata publicSignals
   ) external view returns (bool);
 }
 
-/** @dev Generated verifier interface for the fifteen-signal claim circuit. */
-interface IGroth16Verifier15 {
+/** @dev Generated verifier interface for the fourteen-signal claim circuit. */
+interface IGroth16Verifier14 {
   function verifyProof(
     uint256[2] calldata a,
     uint256[2][2] calldata b,
     uint256[2] calldata c,
-    uint256[15] calldata publicSignals
+    uint256[14] calldata publicSignals
   ) external view returns (bool);
 }
 
-interface IGroth16Verifier29 {
+interface IGroth16Verifier27 {
   function verifyProof(
     uint256[2] calldata a,
     uint256[2][2] calldata b,
     uint256[2] calldata c,
-    uint256[29] calldata publicSignals
+    uint256[27] calldata publicSignals
   ) external view returns (bool);
 }
 
-interface IGroth16Verifier20 {
+interface IGroth16Verifier16 {
   function verifyProof(
     uint256[2] calldata a,
     uint256[2][2] calldata b,
     uint256[2] calldata c,
-    uint256[20] calldata publicSignals
+    uint256[16] calldata publicSignals
   ) external view returns (bool);
 }
 
@@ -215,9 +215,9 @@ contract Groth16VerifierAdapter is IProofVerifierAdapter {
     }
 
     if (purpose == ProofConstants.PROOF_PURPOSE_SHIELDED_CLAIM && claim32Verifier != address(0)) {
-      uint256[15] memory signals15;
-      for (uint256 i = 0; i < signals15.length; ++i) signals15[i] = publicSignals[i];
-      try IGroth16Verifier15(claim32Verifier).verifyProof(a, b, c, signals15) returns (bool valid) {
+      uint256[14] memory signals14;
+      for (uint256 i = 0; i < signals14.length; ++i) signals14[i] = publicSignals[i];
+      try IGroth16Verifier14(claim32Verifier).verifyProof(a, b, c, signals14) returns (bool valid) {
         if (valid) return true;
       } catch {}
     }
@@ -238,24 +238,24 @@ contract Groth16VerifierAdapter is IProofVerifierAdapter {
       for (uint256 i = 0; i < length; ++i) signals7[i] = publicSignals[i];
       return IGroth16Verifier7(verifier).verifyProof(a, b, c, signals7);
     }
-    if (length == 11) {
-      uint256[11] memory signals11;
-      for (uint256 i = 0; i < length; ++i) signals11[i] = publicSignals[i];
-      return IGroth16Verifier11(verifier).verifyProof(a, b, c, signals11);
+    if (length == 10) {
+      uint256[10] memory signals10;
+      for (uint256 i = 0; i < length; ++i) signals10[i] = publicSignals[i];
+      return IGroth16Verifier10(verifier).verifyProof(a, b, c, signals10);
     }
-    if (length == 29) {
-      uint256[29] memory signals29;
-      for (uint256 i = 0; i < length; ++i) signals29[i] = publicSignals[i];
-      return IGroth16Verifier29(verifier).verifyProof(a, b, c, signals29);
+    if (length == 27) {
+      uint256[27] memory signals27;
+      for (uint256 i = 0; i < length; ++i) signals27[i] = publicSignals[i];
+      return IGroth16Verifier27(verifier).verifyProof(a, b, c, signals27);
     }
-    if (length == 20) {
-      uint256[20] memory signals20;
-      for (uint256 i = 0; i < length; ++i) signals20[i] = publicSignals[i];
-      return IGroth16Verifier20(verifier).verifyProof(a, b, c, signals20);
+    if (length == 16) {
+      uint256[16] memory signals16;
+      for (uint256 i = 0; i < length; ++i) signals16[i] = publicSignals[i];
+      return IGroth16Verifier16(verifier).verifyProof(a, b, c, signals16);
     }
-    uint256[15] memory signals15;
-    for (uint256 i = 0; i < length; ++i) signals15[i] = publicSignals[i];
-    return IGroth16Verifier15(verifier).verifyProof(a, b, c, signals15);
+    uint256[14] memory signals14;
+    for (uint256 i = 0; i < length; ++i) signals14[i] = publicSignals[i];
+    return IGroth16Verifier14(verifier).verifyProof(a, b, c, signals14);
   }
 
   function _publicSignalsLength(uint8 purpose) private pure returns (uint256) {

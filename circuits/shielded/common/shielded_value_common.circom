@@ -8,10 +8,10 @@ include "shielded_merkle_common.circom";
 
 // VALUE spends share their real nullifier formula with every other pool action.
 // Capacity changes only the number of slots, never the authority or spend tag.
+// The pool checks shard routing against these roots outside the proof.
 template ShieldedValueInputs(CAPACITY) {
     assert(CAPACITY == 1 || CAPACITY == 4);
     signal input poolDomain;
-    signal input inputShardIds[CAPACITY];
     signal input inputRoots[CAPACITY];
     signal input inputNullifiers[CAPACITY];
     signal input inputEnabled[CAPACITY];
@@ -47,7 +47,6 @@ template ShieldedValueInputs(CAPACITY) {
     component amountBits[CAPACITY];
     component amountZero[CAPACITY];
     component nonceZero[CAPACITY];
-    component shardBits[CAPACITY];
     component note[CAPACITY];
     component membership[CAPACITY];
     component spend[CAPACITY];
@@ -58,7 +57,6 @@ template ShieldedValueInputs(CAPACITY) {
         if (i > 0) {
             (1 - inputEnabled[i - 1]) * inputEnabled[i] === 0;
             inputEnabled[i] * (inputOwnerSecrets[i] - inputOwnerSecrets[0]) === 0;
-            (1 - inputEnabled[i]) * (inputShardIds[i] - inputShardIds[0]) === 0;
             (1 - inputEnabled[i]) * (inputRoots[i] - inputRoots[0]) === 0;
         }
         (1 - inputEnabled[i]) * inputOwnerSecrets[i] === 0;
@@ -75,8 +73,6 @@ template ShieldedValueInputs(CAPACITY) {
         nonceZero[i] = IsZero();
         nonceZero[i].in <== inputNonces[i];
         inputEnabled[i] * nonceZero[i].out === 0;
-        shardBits[i] = Num2Bits(128);
-        shardBits[i].in <== inputShardIds[i];
         note[i] = Poseidon(5);
         note[i].inputs[0] <== valueTag.tag;
         note[i].inputs[1] <== owner.out;

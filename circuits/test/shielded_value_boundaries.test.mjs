@@ -73,7 +73,6 @@ function unshieldFixture(scope = defaultScope) {
   return {
     chainId: String(scope.chainId),
     pool: String(BigInt(scope.poolAddress)),
-    inputShardIds: Array(4).fill("0"),
     inputRoots: Array(4).fill(inputCommitment.toString()),
     inputNullifiers: asStrings(
       Array.from({ length: 4 }, (_, i) =>

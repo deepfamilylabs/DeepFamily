@@ -332,8 +332,8 @@ const shieldedProofs = (chainId) =>
       const signals = Array(spec.publicSignals).fill("0");
       signals[0] = String(chainId);
       signals[1] = BigInt(SHIELDED_ADDRESSES.shieldedErc20Pool).toString();
-      // asOf closes the fund and claim inputs.
-      if (action === "fund") signals[signals.length - 1] = "1000";
+      // Fund appends receive bindings after asOf; Claim ends with asOf.
+      if (action === "fund") signals[signals.length - 3] = "1000";
       if ((action === "claim" || action === "claim32")) signals[signals.length - 1] = String(8200 + 3 * 2_592_000);
       return [
         action,
@@ -373,7 +373,7 @@ const identityBudgetEvidence = (chainId) => {
   signals[11] = "1500";
   signals[12] = "126";
   signals[13] = "30";
-  signals[20] = "127";
+  signals[18] = "127";
   signals[signals.length - 1] = "0";
   fundProof.publicSignalsSha256 = createHash("sha256")
     .update(JSON.stringify(signals))

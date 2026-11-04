@@ -181,7 +181,6 @@ export function buildShieldedFundingFixtures({
         : Array(10).fill("0"),
     chainId: decimal(chainId),
     pool: decimal(pool),
-    inputShardIds: ["0", "0"],
     outputCommitments: [outputBudget, outputChange].map(decimal),
     ciphertextHashes: [budgetCiphertextHash, changeCiphertextHash].map(decimal),
   };
