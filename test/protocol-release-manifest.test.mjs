@@ -330,8 +330,8 @@ const createProductionFixture = () => {
     memoryKiB: 131_072,
   };
   const deviceMatrix = {
-    schemaVersion: 2,
-    evidenceType: "deepfamily/kdf-device-matrix-v2",
+    schemaVersion: 1,
+    evidenceType: "deepfamily/kdf-device-matrix-v1",
     protocol: manifest.protocol,
     protocolGeneration: manifest.protocolGeneration,
     status: "passed",
@@ -364,8 +364,8 @@ const createProductionFixture = () => {
     },
   };
   const attackerStudy = {
-    schemaVersion: 2,
-    evidenceType: "deepfamily/kdf-attacker-cost-study-v2",
+    schemaVersion: 1,
+    evidenceType: "deepfamily/kdf-attacker-cost-study-v1",
     protocol: manifest.protocol,
     protocolGeneration: manifest.protocolGeneration,
     status: "passed",
@@ -417,8 +417,8 @@ const createProductionFixture = () => {
   manifest.releaseEvidence = {
     kdfDeviceMatrix: {
       status: "passed",
-      schemaVersion: 2,
-      evidenceType: "deepfamily/kdf-device-matrix-v2",
+      schemaVersion: 1,
+      evidenceType: "deepfamily/kdf-device-matrix-v1",
       selectedCandidateId: KDF_SELECTED_CANDIDATE_ID,
       latencyBudgets: structuredClone(KDF_LATENCY_BUDGETS),
       stressRequirements: structuredClone(KDF_STRESS_REQUIREMENTS),
@@ -427,8 +427,8 @@ const createProductionFixture = () => {
     },
     kdfAttackerCostStudy: {
       status: "passed",
-      schemaVersion: 2,
-      evidenceType: "deepfamily/kdf-attacker-cost-study-v2",
+      schemaVersion: 1,
+      evidenceType: "deepfamily/kdf-attacker-cost-study-v1",
       selectedCandidateId: KDF_SELECTED_CANDIDATE_ID,
       path: attackerStudyPath,
       sha256: protocolManifestSha256(fs.readFileSync(path.join(temporaryRoot, attackerStudyPath))),
@@ -1177,19 +1177,19 @@ describe("production protocol release manifest evidence", function () {
   });
 
   it("rejects an unsupported KDF device-matrix schema binding in production", function () {
-    fixture.manifest.releaseEvidence.kdfDeviceMatrix.schemaVersion = 1;
+    fixture.manifest.releaseEvidence.kdfDeviceMatrix.schemaVersion = 2;
     fixture.writeManifest();
 
-    assert.throws(() => fixture.inspect(), /kdfDeviceMatrix schemaVersion must be 2/);
+    assert.throws(() => fixture.inspect(), /kdfDeviceMatrix schemaVersion must be 1/);
   });
 
   for (const [label, mutate, pattern] of [
     [
       "unsupported device-matrix report schema",
       (report) => {
-        report.schemaVersion = 1;
+        report.schemaVersion = 2;
       },
-      /kdfDeviceMatrix schemaVersion must be 2/,
+      /kdfDeviceMatrix schemaVersion must be 1/,
     ],
     [
       "latency budget not frozen by the manifest",
@@ -1290,19 +1290,19 @@ describe("production protocol release manifest evidence", function () {
   }
 
   it("rejects an unsupported KDF attacker-study schema binding in production", function () {
-    fixture.manifest.releaseEvidence.kdfAttackerCostStudy.schemaVersion = 1;
+    fixture.manifest.releaseEvidence.kdfAttackerCostStudy.schemaVersion = 2;
     fixture.writeManifest();
 
-    assert.throws(() => fixture.inspect(), /kdfAttackerCostStudy schemaVersion must be 2/);
+    assert.throws(() => fixture.inspect(), /kdfAttackerCostStudy schemaVersion must be 1/);
   });
 
   for (const [label, mutate, pattern] of [
     [
       "unsupported attacker-study report schema",
       (report) => {
-        report.schemaVersion = 1;
+        report.schemaVersion = 2;
       },
-      /kdfAttackerCostStudy schemaVersion must be 2/,
+      /kdfAttackerCostStudy schemaVersion must be 1/,
     ],
     [
       "attacker study for a different candidate",

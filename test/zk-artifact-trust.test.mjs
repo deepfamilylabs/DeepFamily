@@ -194,7 +194,7 @@ const createProductionFixture = async ({
         : null,
   };
   const transcript = {
-    schemaVersion: trustModel === ZK_TRUST_MODEL_SINGLE_OPERATOR ? 3 : 1,
+    schemaVersion: 1,
     ...(trustModel === ZK_TRUST_MODEL_SINGLE_OPERATOR ? { trustModel, compiler } : {}),
     ceremonyId,
     phase1Sha256,
@@ -204,7 +204,7 @@ const createProductionFixture = async ({
   };
   const transcriptPath = await writeTranscript(root, transcript);
   const manifest = {
-    schemaVersion: 3,
+    schemaVersion: 1,
     circomVersion: "2.2.3",
     snarkjsVersion: "0.7.5",
     toolchain: {
@@ -268,7 +268,7 @@ describe("ZK artifact trust", function () {
 
       expect(result).to.include({
         status: "passed",
-        schemaVersion: 3,
+        schemaVersion: 1,
         trustedSetupStatus: "development",
         trustModel: ZK_TRUST_MODEL_SINGLE_OPERATOR,
         productionReady: false,
@@ -306,12 +306,12 @@ describe("ZK artifact trust", function () {
       fixture = await createProductionFixture(options);
     };
 
-    it("accepts a schema-v3 single-operator transcript with compiler evidence", function () {
+    it("accepts a schema-v1 single-operator transcript with compiler evidence", function () {
       const result = inspectProductionFixture(fixture);
 
       expect(result).to.include({
         status: "passed",
-        schemaVersion: 3,
+        schemaVersion: 1,
         trustedSetupStatus: "production",
         trustModel: ZK_TRUST_MODEL_SINGLE_OPERATOR,
         productionReady: true,
@@ -327,7 +327,7 @@ describe("ZK artifact trust", function () {
         "personCommitmentContributionHash",
         "disclosureBindingContributionHash",
       ]);
-      expect(fixture.transcript.schemaVersion).to.equal(3);
+      expect(fixture.transcript.schemaVersion).to.equal(1);
       expect(fixture.transcript.compiler).to.deep.equal(fixture.compiler);
       expect(result.compiler).to.deep.equal(fixture.compiler);
       expect(result.transcript.record.compiler).to.deep.equal(fixture.compiler);
@@ -359,7 +359,7 @@ describe("ZK artifact trust", function () {
       const manifestLf = `${JSON.stringify(fixture.manifest, null, 2)}\n`;
       const invalidDocuments = [
         `${JSON.stringify(fixture.manifest)}\n`,
-        '{\n  "schemaVersion": 3,\n  "schemaVersion": 3\n}\n',
+        '{\n  "schemaVersion": 1,\n  "schemaVersion": 1\n}\n',
         manifestLf.replaceAll("\n", "\r\n"),
         manifestLf.replace("\n", "\r"),
       ];
@@ -372,7 +372,7 @@ describe("ZK artifact trust", function () {
       }
     });
 
-    it("validates schema-v3 compiler evidence for every supported Circom 2.2.3 target", async function () {
+    it("validates compiler evidence for every supported Circom 2.2.3 target", async function () {
       for (const compilerRuntime of [
         { platform: "linux", arch: "x64", libc: "glibc" },
         { platform: "darwin", arch: "arm64" },
@@ -397,7 +397,7 @@ describe("ZK artifact trust", function () {
       );
     });
 
-    it("rejects invalid schema-v3 compiler identity, digest, and version evidence", async function () {
+    it("rejects invalid compiler identity, digest, and version evidence", async function () {
       const originalCompiler = structuredClone(fixture.compiler);
       const rewriteTranscript = async () => {
         const transcriptPath = await writeTranscript(fixture.root, fixture.transcript);
@@ -433,6 +433,25 @@ describe("ZK artifact trust", function () {
       fixture.transcript.compiler.libcEvidence = null;
       await rewriteTranscript();
       expect(() => inspectProductionFixture(fixture)).to.throw("Unsupported Circom host");
+    });
+
+    it("rejects a transcript schemaVersion other than 1 and a transcript that does not match the trust model", async function () {
+      fixture.transcript.schemaVersion = 2;
+      let transcriptPath = await writeTranscript(fixture.root, fixture.transcript);
+      fixture.manifest.trustedSetup.transcript.sha256 = sha256File(transcriptPath);
+      await writeManifest(fixture.root, fixture.manifest);
+      expect(() => inspectProductionFixture(fixture)).to.throw(
+        "ZK ceremony transcript schemaVersion must be 1",
+      );
+
+      fixture.transcript.schemaVersion = 1;
+      fixture.transcript.trustModel = ZK_TRUST_MODEL_MULTI_PARTY;
+      transcriptPath = await writeTranscript(fixture.root, fixture.transcript);
+      fixture.manifest.trustedSetup.transcript.sha256 = sha256File(transcriptPath);
+      await writeManifest(fixture.root, fixture.manifest);
+      expect(() => inspectProductionFixture(fixture)).to.throw(
+        "ZK ceremony transcript requires matching single-operator trustModel",
+      );
     });
 
     it("rejects a symbolic link in place of the real snarkjs package CLI", async function () {

@@ -241,7 +241,7 @@ const createProductionFixture = async () => {
     sourceBuild: null,
   };
   const transcript = {
-    schemaVersion: 3,
+    schemaVersion: 1,
     trustModel: ZK_TRUST_MODEL_SINGLE_OPERATOR,
     compiler,
     ceremonyId,
@@ -252,7 +252,7 @@ const createProductionFixture = async () => {
   };
   const transcriptPath = await writeTranscript(root, transcript);
   const manifest = {
-    schemaVersion: 3,
+    schemaVersion: 1,
     circomVersion: "2.2.3",
     snarkjsVersion,
     toolchain: {

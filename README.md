@@ -285,8 +285,8 @@ executes snarkjs from that snapshot. The contribution helper and its local depen
 from the exact release-commit Git blobs, then re-hashed both before Phase 2 entropy is generated and
 again immediately before the child process receives it.
 
-The current ZK artifact manifest is schema v3 and commits that snarkjs runtime-graph digest.
-`zk:setup` and `release:preflight` both require schema v3.
+The current ZK artifact manifest is schema v1 and commits that snarkjs runtime-graph digest.
+`zk:setup` and `release:preflight` both require schema v1.
 If a reviewed dependency update changes the runtime graph after production artifacts already
 exist, the setup command keeps refusing overwrite by default. Its explicit rotation mode requires
 the reviewed old-manifest and new-runtime digests, validates the complete old production bundle,

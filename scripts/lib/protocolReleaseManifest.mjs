@@ -56,8 +56,12 @@ import {
   PERSON_RELATION_V1_PUBLIC_SIGNAL_SPEC,
 } from "@deepfamily/protocol-core";
 import {
-  validateKdfAttackerStudyV2Evidence,
-  validateKdfDeviceMatrixV2Evidence,
+  KDF_ATTACKER_STUDY_EVIDENCE_TYPE,
+  KDF_ATTACKER_STUDY_SCHEMA_VERSION,
+  KDF_DEVICE_MATRIX_EVIDENCE_TYPE,
+  KDF_DEVICE_MATRIX_SCHEMA_VERSION,
+  validateKdfAttackerStudyEvidence,
+  validateKdfDeviceMatrixEvidence,
 } from "./kdfReleaseEvidence.mjs";
 import { inspectZkReleaseArtifacts, readCanonicalJsonFile } from "./zkArtifactTrust.mjs";
 import { SHIELDED_DEPLOYMENT_CIRCUITS, RECEIVE_DEPLOYMENT_CONTRACTS, RECEIVE_DEPLOYMENT_IMMUTABLES, receiveDeploymentLibraries } from "./zkDeploymentCatalog.mjs";
@@ -1717,9 +1721,12 @@ export const inspectProtocolReleaseManifest = ({
     ["minimumDurationSeconds", "minimumIterations"],
     "kdfDeviceMatrix stress requirements",
   );
-  assert(deviceMatrixBinding.schemaVersion === 2, "kdfDeviceMatrix schemaVersion must be 2");
   assert(
-    deviceMatrixBinding.evidenceType === "deepfamily/kdf-device-matrix-v2",
+    deviceMatrixBinding.schemaVersion === KDF_DEVICE_MATRIX_SCHEMA_VERSION,
+    `kdfDeviceMatrix schemaVersion must be ${KDF_DEVICE_MATRIX_SCHEMA_VERSION}`,
+  );
+  assert(
+    deviceMatrixBinding.evidenceType === KDF_DEVICE_MATRIX_EVIDENCE_TYPE,
     "kdfDeviceMatrix evidenceType is invalid",
   );
   assert(
@@ -1751,9 +1758,12 @@ export const inspectProtocolReleaseManifest = ({
     ["status", "schemaVersion", "evidenceType", "selectedCandidateId", "path", "sha256"],
     "kdfAttackerCostStudy binding",
   );
-  assert(attackerStudyBinding.schemaVersion === 2, "kdfAttackerCostStudy schemaVersion must be 2");
   assert(
-    attackerStudyBinding.evidenceType === "deepfamily/kdf-attacker-cost-study-v2",
+    attackerStudyBinding.schemaVersion === KDF_ATTACKER_STUDY_SCHEMA_VERSION,
+    `kdfAttackerCostStudy schemaVersion must be ${KDF_ATTACKER_STUDY_SCHEMA_VERSION}`,
+  );
+  assert(
+    attackerStudyBinding.evidenceType === KDF_ATTACKER_STUDY_EVIDENCE_TYPE,
     "kdfAttackerCostStudy evidenceType is invalid",
   );
   assert(
@@ -2099,7 +2109,7 @@ export const inspectProtocolReleaseManifest = ({
       label: "kdfDeviceMatrix",
       trackedPathInspector,
     });
-    const selectedKdfCandidate = validateKdfDeviceMatrixV2Evidence({
+    const selectedKdfCandidate = validateKdfDeviceMatrixEvidence({
       report: deviceMatrixEvidence.report,
       manifest,
       manifestBinding: manifest.releaseEvidence.kdfDeviceMatrix,
@@ -2112,7 +2122,7 @@ export const inspectProtocolReleaseManifest = ({
       label: "kdfAttackerCostStudy",
       trackedPathInspector,
     });
-    validateKdfAttackerStudyV2Evidence({
+    validateKdfAttackerStudyEvidence({
       report: attackerStudyEvidence.report,
       manifest,
       manifestBinding: manifest.releaseEvidence.kdfAttackerCostStudy,

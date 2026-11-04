@@ -644,7 +644,7 @@ export function normalizeShieldedScope(scope: ShieldedScope): {
 };
 export function computeShieldedPoolDomain(scope: ShieldedScope): bigint;
 export function computeShieldedScopedPurpose(purpose: BigNumberish, scope: ShieldedScope): bigint;
-/** Shielded inheritance v2 Poseidon domains. */
+/** Shielded inheritance Poseidon domains. */
 export const SHIELDED_INHERITANCE_DOMAINS: Readonly<{
   policy: bigint;
   enrollment: bigint;

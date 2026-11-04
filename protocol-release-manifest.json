@@ -1715,8 +1715,8 @@
   "releaseEvidence": {
     "kdfDeviceMatrix": {
       "status": "missing",
-      "schemaVersion": 2,
-      "evidenceType": "deepfamily/kdf-device-matrix-v2",
+      "schemaVersion": 1,
+      "evidenceType": "deepfamily/kdf-device-matrix-v1",
       "selectedCandidateId": null,
       "latencyBudgets": {
         "identitySingleDerivationP95Milliseconds": null,
@@ -1736,8 +1736,8 @@
     },
     "kdfAttackerCostStudy": {
       "status": "missing",
-      "schemaVersion": 2,
-      "evidenceType": "deepfamily/kdf-attacker-cost-study-v2",
+      "schemaVersion": 1,
+      "evidenceType": "deepfamily/kdf-attacker-cost-study-v1",
       "selectedCandidateId": null,
       "path": null,
       "sha256": null

@@ -36,7 +36,7 @@ ZK_PTAU_PATH when set. Neither form downloads it.
 The first setup reads the reviewed source/toolchain manifest and compiles the committed sources;
 it does not require previously generated proving files. It refuses to overwrite an existing
 finalized setup without the explicit rotation options.
-The explicit --rotate form accepts only a valid existing schema-v3 single-operator production
+The explicit --rotate form accepts only a valid existing schema-v1 single-operator production
 manifest and requires reviewed hashes for both that manifest and the newly installed snarkjs
 runtime graph. Both forms require a clean Git working tree, stage all outputs before installation,
 and restore the previous artifact set if final validation fails. They intentionally record that

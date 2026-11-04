@@ -20,7 +20,7 @@ npm run --silent release:kdf:template -- --kind attacker-study \
 Do not turn a template into evidence by changing its status. Every non-null measurement must come
 from the named physical device, browser/runtime, worker mode, benchmark revision and measured run.
 
-## Device-matrix schema v2
+## Device-matrix schema v1
 
 Before measuring, review and freeze the latency budgets in `protocol-release-manifest.json`. The
 same values must appear byte-for-byte in the report. The three required environment kinds are
@@ -45,7 +45,7 @@ meets the frozen latency budgets and completes the stress requirement without OO
 reliable candidates, select the greatest `memoryKiB` first and then the greatest `iterations`.
 Identity suite 1 and file-KDF suite 1 must both be frozen to that exact selected candidate.
 
-## Attacker-cost study schema v2
+## Attacker-cost study schema v1
 
 The attacker study binds the device matrix's selected candidate and separately covers the identity
 and file suites. Each implementation entry records:
@@ -73,7 +73,7 @@ claims.
 4. Have a second reviewer compare the canonical summaries with raw device and attacker-tool output.
 5. Rename the reviewed summaries to their final tracked paths, retain two-space JSON with exactly one
    trailing newline, and calculate each file's SHA-256.
-6. Update the manifest bindings with schema version 2, evidence type, selected candidate, budgets,
+6. Update the manifest bindings with schema version 1, evidence type, selected candidate, budgets,
    stress requirements, tracked path, SHA-256, and `status: passed`. Freeze both suite definitions to
    the same selected KDF parameters.
 7. Run the production manifest/release preflight. It will still reject release until all unrelated

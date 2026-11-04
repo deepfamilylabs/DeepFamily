@@ -4,8 +4,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
-  buildKdfAttackerStudyV2Template,
-  buildKdfDeviceMatrixV2Template,
+  buildKdfAttackerStudyTemplate,
+  buildKdfDeviceMatrixTemplate,
   canonicalKdfEvidenceJson,
 } from "./lib/kdfReleaseEvidence.mjs";
 import { inspectProtocolReleaseManifest } from "./lib/protocolReleaseManifest.mjs";
@@ -34,8 +34,8 @@ export const buildKdfReleaseEvidenceTemplate = ({
   if (!KINDS.includes(kind)) throw new Error(`Unsupported KDF evidence template kind: ${kind}`);
   const { manifest } = manifestInspector({ root, requireProduction: false });
   return kind === "device-matrix"
-    ? buildKdfDeviceMatrixV2Template(manifest)
-    : buildKdfAttackerStudyV2Template(manifest);
+    ? buildKdfDeviceMatrixTemplate(manifest)
+    : buildKdfAttackerStudyTemplate(manifest);
 };
 
 export const main = async (argv = process.argv.slice(2)) => {

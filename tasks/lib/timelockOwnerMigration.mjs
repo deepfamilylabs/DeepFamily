@@ -18,7 +18,7 @@ export const deriveOwnerMigrationSalt = (
   return ethers.keccak256(
     ethers.AbiCoder.defaultAbiCoder().encode(
       ["string", "bytes32"],
-      ["deepfamily-timelock-migrate-owner-and-treasury-v3", batchHash],
+      ["deepfamily-timelock-migrate-owner-and-treasury-v1", batchHash],
     ),
   );
 };

@@ -9,11 +9,11 @@ import {
   KDF_BASELINE_CANDIDATE,
   KDF_DEVICE_MATRIX_EVIDENCE_TYPE,
   KDF_MINIMUM_STRESS_DURATION_SECONDS,
-  buildKdfAttackerStudyV2Template,
-  buildKdfDeviceMatrixV2Template,
+  buildKdfAttackerStudyTemplate,
+  buildKdfDeviceMatrixTemplate,
   canonicalKdfEvidenceJson,
-  validateKdfAttackerStudyV2Evidence,
-  validateKdfDeviceMatrixV2Evidence,
+  validateKdfAttackerStudyEvidence,
+  validateKdfDeviceMatrixEvidence,
 } from "../scripts/lib/kdfReleaseEvidence.mjs";
 import {
   buildKdfReleaseEvidenceTemplate,
@@ -60,7 +60,7 @@ const productionBindingFixture = () => {
   };
   const deviceBinding = {
     status: "passed",
-    schemaVersion: 2,
+    schemaVersion: 1,
     evidenceType: KDF_DEVICE_MATRIX_EVIDENCE_TYPE,
     selectedCandidateId,
     latencyBudgets,
@@ -70,7 +70,7 @@ const productionBindingFixture = () => {
   };
   const attackerBinding = {
     status: "passed",
-    schemaVersion: 2,
+    schemaVersion: 1,
     evidenceType: KDF_ATTACKER_STUDY_EVIDENCE_TYPE,
     selectedCandidateId,
     path: "release-evidence/kdf-attacker-study.json",
@@ -83,14 +83,14 @@ const productionBindingFixture = () => {
   return { manifest, selectedCandidateId, deviceBinding, attackerBinding };
 };
 
-describe("KDF schema-v2 incomplete evidence templates", function () {
+describe("KDF schema-v1 incomplete evidence templates", function () {
   it("emits a device matrix skeleton that cannot claim benchmark success", function () {
     const manifest = manifestFixture();
     manifest.identitySuites["1"].kdf.memoryKiB = 131_072;
-    const template = buildKdfDeviceMatrixV2Template(manifest);
+    const template = buildKdfDeviceMatrixTemplate(manifest);
 
     expect(template).to.include({
-      schemaVersion: 2,
+      schemaVersion: 1,
       evidenceType: KDF_DEVICE_MATRIX_EVIDENCE_TYPE,
       status: "incomplete",
       selectedCandidateId: null,
@@ -115,10 +115,10 @@ describe("KDF schema-v2 incomplete evidence templates", function () {
   });
 
   it("emits an attacker-study skeleton without measurements or derived security claims", function () {
-    const template = buildKdfAttackerStudyV2Template(manifestFixture());
+    const template = buildKdfAttackerStudyTemplate(manifestFixture());
 
     expect(template).to.include({
-      schemaVersion: 2,
+      schemaVersion: 1,
       evidenceType: KDF_ATTACKER_STUDY_EVIDENCE_TYPE,
       status: "incomplete",
       selectedCandidateId: null,
@@ -137,11 +137,11 @@ describe("KDF schema-v2 incomplete evidence templates", function () {
 
   it("cannot turn a device-matrix template into completed evidence by changing only status", function () {
     const { manifest, deviceBinding } = productionBindingFixture();
-    const report = buildKdfDeviceMatrixV2Template(manifest);
+    const report = buildKdfDeviceMatrixTemplate(manifest);
     report.status = "passed";
 
     expect(() =>
-      validateKdfDeviceMatrixV2Evidence({
+      validateKdfDeviceMatrixEvidence({
         report,
         manifest,
         manifestBinding: deviceBinding,
@@ -153,11 +153,11 @@ describe("KDF schema-v2 incomplete evidence templates", function () {
 
   it("cannot turn an attacker-study template into completed evidence by changing only status", function () {
     const { manifest, selectedCandidateId, attackerBinding } = productionBindingFixture();
-    const report = buildKdfAttackerStudyV2Template(manifest);
+    const report = buildKdfAttackerStudyTemplate(manifest);
     report.status = "passed";
 
     expect(() =>
-      validateKdfAttackerStudyV2Evidence({
+      validateKdfAttackerStudyEvidence({
         report,
         manifest,
         manifestBinding: attackerBinding,
@@ -172,7 +172,7 @@ describe("KDF schema-v2 incomplete evidence templates", function () {
   });
 
   it("serializes deterministically as canonical two-space JSON with one trailing newline", function () {
-    const template = buildKdfDeviceMatrixV2Template(manifestFixture());
+    const template = buildKdfDeviceMatrixTemplate(manifestFixture());
     const first = canonicalKdfEvidenceJson(template);
     const second = canonicalKdfEvidenceJson(structuredClone(template));
 
@@ -224,7 +224,7 @@ describe("KDF schema-v2 incomplete evidence templates", function () {
       const report = JSON.parse(stdout);
 
       expect(report.status).to.equal("incomplete");
-      expect(report.schemaVersion).to.equal(2);
+      expect(report.schemaVersion).to.equal(1);
       expect(`${JSON.stringify(report, null, 2)}\n`).to.equal(stdout);
     });
   }

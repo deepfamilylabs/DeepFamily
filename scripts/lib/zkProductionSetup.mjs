@@ -1223,7 +1223,7 @@ export const buildTranscriptAndManifest = async ({
     ...ceremonyFieldsFrom(circuits, "beaconContributionHash"),
   };
   const transcript = {
-    schemaVersion: 3,
+    schemaVersion: 1,
     trustModel: ZK_TRUST_MODEL_SINGLE_OPERATOR,
     compiler,
     ceremonyId,

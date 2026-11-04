@@ -355,7 +355,11 @@ export const buildZkContributionApprovalMessage = ({
 
 export const validateProductionTranscript = ({ transcript, manifest }) => {
   assertPlainObject(transcript, "ZK ceremony transcript");
-  const singleOperatorTranscript = transcript.schemaVersion === 3;
+  if (transcript.schemaVersion !== 1) {
+    throw new Error("ZK ceremony transcript schemaVersion must be 1");
+  }
+  const singleOperatorTranscript =
+    manifest.trustedSetup.trustModel === ZK_TRUST_MODEL_SINGLE_OPERATOR;
   let compiler = null;
   if (singleOperatorTranscript) {
     assertExactKeys(
@@ -372,14 +376,8 @@ export const validateProductionTranscript = ({ transcript, manifest }) => {
       ],
       "ZK ceremony transcript",
     );
-    if (
-      transcript.trustModel !== ZK_TRUST_MODEL_SINGLE_OPERATOR ||
-      transcript.trustModel !== manifest.trustedSetup.trustModel
-    ) {
-      throw new Error(
-        `ZK ceremony transcript schemaVersion ${transcript.schemaVersion} requires matching ` +
-          "single-operator trustModel",
-      );
+    if (transcript.trustModel !== ZK_TRUST_MODEL_SINGLE_OPERATOR) {
+      throw new Error("ZK ceremony transcript requires matching single-operator trustModel");
     }
     const compilerRecord = assertPlainObject(
       transcript.compiler,
@@ -489,19 +487,14 @@ export const validateProductionTranscript = ({ transcript, manifest }) => {
       );
     }
     compiler = Object.freeze({ ...compilerRecord, libcEvidence, sourceBuild });
-  } else if (transcript.schemaVersion === 1) {
+  } else if (manifest.trustedSetup.trustModel === ZK_TRUST_MODEL_MULTI_PARTY) {
     assertExactKeys(
       transcript,
       ["schemaVersion", "ceremonyId", "phase1Sha256", "circuits", "contributions", "beacon"],
       "ZK ceremony transcript",
     );
-    if (manifest.trustedSetup.trustModel !== ZK_TRUST_MODEL_MULTI_PARTY) {
-      throw new Error("ZK ceremony transcript schemaVersion 1 requires multi-party trustModel");
-    }
   } else {
-    throw new Error(
-      "ZK ceremony transcript schemaVersion must be 3 (single-operator) or 1 (multi-party)",
-    );
+    throw new Error("ZK ceremony transcript requires a single-operator or multi-party trustModel");
   }
   if (transcript.ceremonyId !== manifest.trustedSetup.ceremonyId) {
     throw new Error("ZK ceremony transcript ceremonyId does not match the manifest");
@@ -672,8 +665,8 @@ export const validateZkArtifactManifest = (
     ["schemaVersion", "circomVersion", "snarkjsVersion", "toolchain", "trustedSetup", "circuits"],
     "ZK artifact manifest",
   );
-  if (manifest.schemaVersion !== 3) {
-    throw new Error("ZK artifact manifest schemaVersion must be 3");
+  if (manifest.schemaVersion !== 1) {
+    throw new Error("ZK artifact manifest schemaVersion must be 1");
   }
   for (const [field, value] of [
     ["circomVersion", manifest.circomVersion],

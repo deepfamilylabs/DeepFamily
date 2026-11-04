@@ -154,7 +154,7 @@ private release stage. Before any Groth16 Setup or Phase 2 contribution, the fir
 the reviewed clean-commit sources and compiles every circuit to establish the R1CS/WASM baseline.
 It then rechecks source and compiled-output hashes throughout the operation. Rotation instead
 requires those hashes to match the existing final manifest. The canonical Linux amd64 glibc
-binary remains a fixed-digest reference; other runtimes hash it but never execute it. The schema-v3
+binary remains a fixed-digest reference; other runtimes hash it but never execute it. The schema-v1
 ceremony transcript records which native compiler and Linux libc evidence actually produced the
 staged circuits.
 
@@ -175,7 +175,7 @@ runner and also exercises macOS arm64 and Windows x64. Repository
 `.gitattributes` keeps hashed circuit and source text on LF line endings across operating systems;
 evidence hashes cover the exact file bytes.
 
-The artifact manifest is schema v3 and includes the reviewed snarkjs runtime-graph digest.
+The artifact manifest is schema v1 and includes the reviewed snarkjs runtime-graph digest.
 
 ## Before running the command
 
@@ -283,7 +283,7 @@ npm run zk:setup -- --rotate \
 ```
 
 The three expected digests are mandatory with `--rotate` and are rejected without it. Rotation only
-accepts an existing schema-v3 `production` manifest using the one-contributor `single-operator`
+accepts an existing schema-v1 `production` manifest using the one-contributor `single-operator`
 trust model. It rejects a development or multi-party baseline, a reused ceremony ID, and a runtime
 digest equal to the current manifest. Before generating entropy it verifies the old canonical
 manifest digest, transcript, source, WASM, zkeys, verification keys, Solidity verifiers, compiler,
@@ -309,7 +309,7 @@ Internally the command:
    final manifest for rotation, before creating any initial Groth16 zkey; the sources, compiled
    circuit outputs and pTau are checked again immediately before each circuit's setup;
 5. hashes the logical installed snarkjs production dependency graph—each package's content,
-   identity, version, and logical dependency path—and compares it with the schema-v3 manifest or
+   identity, version, and logical dependency path—and compares it with the schema-v1 manifest or
    the explicit reviewed rotation digest; it copies only that verified runtime into private
    staging, makes package files read-only on POSIX, and executes snarkjs from the snapshot;
 6. before reading any secret, re-hashes that private runtime snapshot, strips inherited release
@@ -361,12 +361,12 @@ The identity/disclosure production manifest records:
 - `trustModel: single-operator`;
 - the explicit single-operator warning;
 - the fixed pTau source, byte length, SHA-256, BLAKE2b-512, and verification status;
-- schema v3, the canonical Circom reference, the exact snarkjs CLI hash, and the deterministic
+- schema v1, the canonical Circom reference, the exact snarkjs CLI hash, and the deterministic
   logical dependency-graph hash of the installed snarkjs production runtime;
 - the source, R1CS, WASM, zkey, vkey, and Solidity verifier hashes for both circuits;
 - the transcript and local finalization hashes.
 
-The identity/disclosure schema-v3 transcript records:
+The identity/disclosure schema-v1 transcript records:
 
 - the release ceremony ID;
 - the same `single-operator` trust model;
@@ -457,7 +457,7 @@ npm run release:preflight
 ```
 
 `release:preflight` runs on every release-gate runtime in the support matrix and requires a
-schema-v3 manifest. It validates the official native compiler identity or performs a fresh,
+schema-v1 manifest. It validates the official native compiler identity or performs a fresh,
 environment-isolated private build for a source target, validates the canonical reference digest,
 checks the clean commit before and after the build, verifies that the R1CS and WASM produced with
 explicit `--O2 --sanity_check 2` match the reviewed artifact hashes, runs the ceremony's snarkjs

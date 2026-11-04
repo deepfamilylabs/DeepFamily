@@ -1,7 +1,7 @@
-export const KDF_DEVICE_MATRIX_SCHEMA_VERSION = 2;
-export const KDF_DEVICE_MATRIX_EVIDENCE_TYPE = "deepfamily/kdf-device-matrix-v2";
-export const KDF_ATTACKER_STUDY_SCHEMA_VERSION = 2;
-export const KDF_ATTACKER_STUDY_EVIDENCE_TYPE = "deepfamily/kdf-attacker-cost-study-v2";
+export const KDF_DEVICE_MATRIX_SCHEMA_VERSION = 1;
+export const KDF_DEVICE_MATRIX_EVIDENCE_TYPE = "deepfamily/kdf-device-matrix-v1";
+export const KDF_ATTACKER_STUDY_SCHEMA_VERSION = 1;
+export const KDF_ATTACKER_STUDY_EVIDENCE_TYPE = "deepfamily/kdf-attacker-cost-study-v1";
 export const KDF_MINIMUM_STRESS_DURATION_SECONDS = 1_800;
 export const KDF_MINIMUM_ATTACKER_MEASUREMENT_SECONDS = 60;
 export const KDF_REQUIRED_ENVIRONMENT_KINDS = Object.freeze([
@@ -178,7 +178,7 @@ const validateDeviceManifestBinding = (binding) => {
   );
   assert(
     binding.evidenceType === KDF_DEVICE_MATRIX_EVIDENCE_TYPE,
-    "manifest kdfDeviceMatrix evidenceType is not production v2",
+    "manifest kdfDeviceMatrix evidenceType is not production v1",
   );
   assertCandidateId(binding.selectedCandidateId, "manifest kdfDeviceMatrix selectedCandidateId");
   validateLatencyBudgets(binding.latencyBudgets, "manifest kdfDeviceMatrix latencyBudgets");
@@ -409,7 +409,7 @@ const compareCandidateRank = (left, right) => {
   return rightMemory - leftMemory || rightTime - leftTime;
 };
 
-export const validateKdfDeviceMatrixV2Evidence = ({
+export const validateKdfDeviceMatrixEvidence = ({
   report,
   manifest,
   manifestBinding,
@@ -620,7 +620,7 @@ const validateAttackerManifestBinding = (binding, selectedCandidate) => {
   );
   assert(
     binding.evidenceType === KDF_ATTACKER_STUDY_EVIDENCE_TYPE,
-    "manifest kdfAttackerCostStudy evidenceType is not production v2",
+    "manifest kdfAttackerCostStudy evidenceType is not production v1",
   );
   assert(
     binding.selectedCandidateId === selectedCandidate.selectedCandidateId,
@@ -660,7 +660,7 @@ const assertNoForbiddenAttackerClaims = (value, path = "kdfAttackerCostStudy") =
   }
 };
 
-export const validateKdfAttackerStudyV2Evidence = ({
+export const validateKdfAttackerStudyEvidence = ({
   report,
   manifest,
   manifestBinding,
@@ -865,7 +865,7 @@ const incompleteEnvironment = (kind) => ({
   workerMode: null,
 });
 
-export const buildKdfDeviceMatrixV2Template = (manifest) => ({
+export const buildKdfDeviceMatrixTemplate = (manifest) => ({
   schemaVersion: KDF_DEVICE_MATRIX_SCHEMA_VERSION,
   evidenceType: KDF_DEVICE_MATRIX_EVIDENCE_TYPE,
   protocol: manifest.protocol,
@@ -909,7 +909,7 @@ export const buildKdfDeviceMatrixV2Template = (manifest) => ({
   },
 });
 
-export const buildKdfAttackerStudyV2Template = (manifest) => ({
+export const buildKdfAttackerStudyTemplate = (manifest) => ({
   schemaVersion: KDF_ATTACKER_STUDY_SCHEMA_VERSION,
   evidenceType: KDF_ATTACKER_STUDY_EVIDENCE_TYPE,
   protocol: manifest.protocol,

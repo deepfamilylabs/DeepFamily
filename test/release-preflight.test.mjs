@@ -162,7 +162,7 @@ const createProductionFixture = async () => {
     arch: "x64",
   });
   const transcript = {
-    schemaVersion: 3,
+    schemaVersion: 1,
     trustModel: ZK_TRUST_MODEL_SINGLE_OPERATOR,
     ceremonyId,
     phase1Sha256,
@@ -182,7 +182,7 @@ const createProductionFixture = async () => {
   };
   const transcriptPath = await writeTranscript(root, transcript);
   const manifest = {
-    schemaVersion: 3,
+    schemaVersion: 1,
     circomVersion: "2.2.3",
     snarkjsVersion,
     toolchain: {
@@ -849,7 +849,7 @@ describe("production release preflight", function () {
       }),
     );
 
-    expect(error?.message).to.equal("ZK artifact manifest schemaVersion must be 3");
+    expect(error?.message).to.equal("ZK artifact manifest schemaVersion must be 1");
     expect(sourceBuildCalled).to.equal(false);
     expect(fake.calls.map(commandLabel)).to.deep.equal([
       "git rev-parse HEAD",

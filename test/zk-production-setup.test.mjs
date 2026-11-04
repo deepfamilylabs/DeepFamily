@@ -112,7 +112,7 @@ const installFirstSetupFixture = async (root) => {
     JSON.stringify({ name: "snarkjs", version: "0.7.5", main: "build/cli.cjs" }),
   );
   const manifest = {
-    schemaVersion: 3,
+    schemaVersion: 1,
     circomVersion: CIRCOM_VERSION,
     snarkjsVersion: "0.7.5",
     toolchain: {
@@ -253,7 +253,7 @@ const createCoreRecordFixture = async ({ root, stage }) => {
     root,
     stageBuild,
     initialManifest: {
-      schemaVersion: 3,
+      schemaVersion: 1,
       circomVersion: CIRCOM_VERSION,
       snarkjsVersion: "0.7.5",
       toolchain: canonicalToolchain,
@@ -383,7 +383,7 @@ describe("single-operator production ZK setup safety", function () {
     let ptauInstallerCalled = false;
     const attempt = async ({ trustedSetup, expectedRuntimeSha256, ceremonyId }) => {
       const manifest = {
-        schemaVersion: 3,
+        schemaVersion: 1,
         toolchain: { snarkjsRuntimeSha256: "33".repeat(32) },
         trustedSetup,
       };
@@ -677,7 +677,7 @@ describe("single-operator production ZK setup safety", function () {
     });
 
     expect(records.transcript).to.include({
-      schemaVersion: 3,
+      schemaVersion: 1,
       compiler,
     });
     expect(records.manifest.toolchain).to.deep.equal({
@@ -1056,7 +1056,7 @@ describe("single-operator production ZK setup safety", function () {
       },
     };
     const manifest = {
-      schemaVersion: 3,
+      schemaVersion: 1,
       toolchain: {
         snarkjsRuntimeSha256: "78".repeat(32),
       },
@@ -1197,7 +1197,7 @@ describe("single-operator production ZK setup safety", function () {
       disclosure_binding: { r1cs: "disclosure-r1cs\n", wasm: "disclosure-wasm\n" },
     };
     const manifest = {
-      schemaVersion: 3,
+      schemaVersion: 1,
       toolchain: { snarkjsRuntimeSha256: "78".repeat(32) },
       circuits: Object.fromEntries(
         Object.entries(compiledBytes).map(([circuitName, bytes]) => [

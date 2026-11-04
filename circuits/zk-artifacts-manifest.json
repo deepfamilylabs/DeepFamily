@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 3,
+  "schemaVersion": 1,
   "circomVersion": "2.2.3",
   "snarkjsVersion": "0.7.5",
   "toolchain": {
