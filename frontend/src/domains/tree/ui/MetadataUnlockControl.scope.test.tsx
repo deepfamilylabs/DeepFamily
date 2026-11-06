@@ -279,6 +279,21 @@ describe("MetadataUnlockControl selection and scope", () => {
     expect(unlockButton().textContent).toBe("Unlock 1 selected version(s)");
   });
 
+  it("rejects multiline paste without changing the original unlock passphrase", async () => {
+    render(<MetadataUnlockControl open target={target} />);
+    const input = await enterPassphrase("original secret");
+    expect(fireEvent.paste(input, { clipboardData: { getData: () => "first\r\nsecond" } })).toBe(
+      false,
+    );
+    expect(input.value).toBe("original secret");
+    const error = screen.getByRole("alert");
+    expect(error.textContent).toContain("cannot preserve line breaks");
+    expect(input.getAttribute("aria-invalid")).toBe("true");
+    expect(input.getAttribute("aria-describedby")).toContain(error.id);
+    expect(fireEvent.paste(input, { clipboardData: { getData: () => "single line" } })).toBe(true);
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
   it.each([false, true])(
     "clears and remasks the input on pagehide persisted=%s",
     async (persisted) => {

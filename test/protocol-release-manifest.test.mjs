@@ -16,11 +16,12 @@ import {
   protocolManifestSha256,
   PROTOCOL_CONTRACT_INTERFACE_ARTIFACTS,
   PROTOCOL_RELEASE_MANIFEST_PATH,
-  PROTOCOL_PRECIS_DATA_PATH,
-  PROTOCOL_UNICODE_NORMALIZATION_DATA_PATH,
   shieldedDeploymentBindingsFromAddresses,
 } from "../scripts/lib/protocolReleaseManifest.mjs";
-import { SHIELDED_DEPLOYMENT_CIRCUITS, RECEIVE_DEPLOYMENT_CONTRACTS } from "../scripts/lib/zkDeploymentCatalog.mjs";
+import {
+  SHIELDED_DEPLOYMENT_CIRCUITS,
+  RECEIVE_DEPLOYMENT_CONTRACTS,
+} from "../scripts/lib/zkDeploymentCatalog.mjs";
 
 const ROOT = path.resolve(import.meta.dirname, "..");
 const hash = (digit) => digit.repeat(64);
@@ -71,18 +72,6 @@ const createDevelopmentManifestFixture = () => {
   fs.copyFileSync(
     path.join(ROOT, manifest.goldenVectors.path),
     path.join(root, manifest.goldenVectors.path),
-  );
-  fs.mkdirSync(path.join(root, path.dirname(PROTOCOL_UNICODE_NORMALIZATION_DATA_PATH)), {
-    recursive: true,
-  });
-  fs.copyFileSync(
-    path.join(ROOT, PROTOCOL_UNICODE_NORMALIZATION_DATA_PATH),
-    path.join(root, PROTOCOL_UNICODE_NORMALIZATION_DATA_PATH),
-  );
-  fs.mkdirSync(path.join(root, path.dirname(PROTOCOL_PRECIS_DATA_PATH)), { recursive: true });
-  fs.copyFileSync(
-    path.join(ROOT, PROTOCOL_PRECIS_DATA_PATH),
-    path.join(root, PROTOCOL_PRECIS_DATA_PATH),
   );
   return {
     root,
@@ -276,7 +265,9 @@ const createProductionFixture = () => {
   };
   const shieldedAddresses = {
     deepFamily: ADDRESSES.proxy,
-    ...Object.fromEntries(RECEIVE_DEPLOYMENT_CONTRACTS.map(({property}, index) => [property, address(400 + index)])),
+    ...Object.fromEntries(
+      RECEIVE_DEPLOYMENT_CONTRACTS.map(({ property }, index) => [property, address(400 + index)]),
+    ),
     groth16VerifierAdapter: ADDRESSES.adapter,
     personCommitmentVerifier: ADDRESSES.personVerifier,
     disclosureBindingVerifier: ADDRESSES.disclosureVerifier,
@@ -314,10 +305,12 @@ const createProductionFixture = () => {
       ]),
     ),
     ...Object.fromEntries(
-      ["shieldedErc20Pool", "shieldedNativePool", "shieldedPoolFactory", ...RECEIVE_DEPLOYMENT_CONTRACTS.map(({property}) => property)].map((key) => [
-        key,
-        withHashes(shieldedBindings[key]),
-      ]),
+      [
+        "shieldedErc20Pool",
+        "shieldedNativePool",
+        "shieldedPoolFactory",
+        ...RECEIVE_DEPLOYMENT_CONTRACTS.map(({ property }) => property),
+      ].map((key) => [key, withHashes(shieldedBindings[key])]),
     ),
   });
 
@@ -443,18 +436,6 @@ const createProductionFixture = () => {
   const goldenVectorPath = path.join(temporaryRoot, manifest.goldenVectors.path);
   fs.mkdirSync(path.dirname(goldenVectorPath), { recursive: true });
   fs.copyFileSync(path.join(ROOT, manifest.goldenVectors.path), goldenVectorPath);
-  const unicodeNormalizationDataPath = path.join(
-    temporaryRoot,
-    PROTOCOL_UNICODE_NORMALIZATION_DATA_PATH,
-  );
-  fs.mkdirSync(path.dirname(unicodeNormalizationDataPath), { recursive: true });
-  fs.copyFileSync(
-    path.join(ROOT, PROTOCOL_UNICODE_NORMALIZATION_DATA_PATH),
-    unicodeNormalizationDataPath,
-  );
-  const precisDataPath = path.join(temporaryRoot, PROTOCOL_PRECIS_DATA_PATH);
-  fs.mkdirSync(path.dirname(precisDataPath), { recursive: true });
-  fs.copyFileSync(path.join(ROOT, PROTOCOL_PRECIS_DATA_PATH), precisDataPath);
   writeCanonicalJson(path.join(temporaryRoot, PROTOCOL_RELEASE_MANIFEST_PATH), manifest);
 
   const zkEvidence = {
@@ -490,7 +471,12 @@ const createProductionFixture = () => {
       ]),
     ),
     ...Object.fromEntries(
-      ["shieldedErc20Pool", "shieldedNativePool", "shieldedPoolFactory", ...RECEIVE_DEPLOYMENT_CONTRACTS.map(({property}) => property)].map((key) => [
+      [
+        "shieldedErc20Pool",
+        "shieldedNativePool",
+        "shieldedPoolFactory",
+        ...RECEIVE_DEPLOYMENT_CONTRACTS.map(({ property }) => property),
+      ].map((key) => [
         key,
         { artifactSha256: HASHES.adapterArtifact, runtimeSha256: HASHES.adapterRuntime },
       ]),
@@ -584,7 +570,7 @@ const acceptanceReportForManifest = (manifest) => ({
         "shieldedErc20Pool",
         "shieldedNativePool",
         "shieldedPoolFactory",
-        ...RECEIVE_DEPLOYMENT_CONTRACTS.map(({property}) => property),
+        ...RECEIVE_DEPLOYMENT_CONTRACTS.map(({ property }) => property),
       ].map((key) => [key, structuredClone(manifest.deployments[key])]),
     ),
     deepFamily: {
@@ -631,6 +617,33 @@ const acceptanceReportForManifest = (manifest) => ({
 });
 
 describe("protocol release manifest", function () {
+  it("uses one trim-only rule for person, file and independent-key inputs", function () {
+    const { manifest } = inspectProtocolReleaseManifest({ root: ROOT });
+    for (const definition of [
+      manifest.identity.fullName,
+      manifest.identitySuites["1"],
+      manifest.fileKdfSuites["1"],
+      manifest.independentKeyCredentials.fullName,
+      manifest.independentKeyCredentials.passphrase,
+    ]) {
+      assert.equal(definition.normalization, "trim-only");
+      assert.equal(definition.codePointRestriction, "Unicode-scalar-values");
+      assert.equal(definition.whiteSpaceProperty, "Unicode White_Space");
+      assert.equal(definition.whiteSpaceUnicodeVersion, "17.0.0");
+      assert.equal(definition.collapse, "none");
+      assert.equal(definition.trim, true);
+      assert.equal(Object.hasOwn(definition, "normalizationDataSha256"), false);
+      assert.equal(Object.hasOwn(definition, "precisDataSha256"), false);
+    }
+    assert.equal(manifest.independentKeyCredentials.fullName.maximumUtf8Bytes, 256);
+    assert.equal(manifest.independentKeyCredentials.passphrase.nonblank, true);
+    assert.equal(
+      Object.hasOwn(manifest.independentKeyCredentials, "normalizationDataSha256"),
+      false,
+    );
+    assert.equal(Object.hasOwn(manifest.independentKeyCredentials, "precisDataSha256"), false);
+  });
+
   it("freezes v1 constants, public signals and contract ABI selectors/events", function () {
     const evidence = inspectProtocolReleaseManifest({ root: ROOT });
     const interfaceEvidence = inspectProtocolContractInterfaces({
@@ -682,7 +695,7 @@ describe("protocol release manifest", function () {
     assert.equal(evidence.manifest.proofRoutes[1].publicSignals.length, 4);
     assert.equal(
       evidence.manifest.goldenVectors.sha256,
-      "661a7a429035a0aefb01fa299140d9b031ab7e6a6121e24d8a704200a36df205",
+      "690db5cdfd4690699bc814fa171d7c2480538279b4e12f19f1449048a887d447",
     );
   });
 
@@ -754,22 +767,6 @@ describe("protocol release manifest", function () {
       }
     });
   }
-
-  it("binds both suite definitions to the exact checked-in Unicode normalization data", function () {
-    const fixture = createDevelopmentManifestFixture();
-    try {
-      fs.appendFileSync(
-        path.join(fixture.root, PROTOCOL_UNICODE_NORMALIZATION_DATA_PATH),
-        "// drift\n",
-      );
-      assert.throws(
-        () => fixture.inspect(),
-        /Unicode normalization data hash does not match the suite definitions/,
-      );
-    } finally {
-      fixture.cleanup();
-    }
-  });
 
   it("rejects a moved universal self-suite offset", function () {
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), "deepfamily-protocol-manifest-"));
@@ -957,25 +954,61 @@ describe("production protocol release manifest evidence", function () {
       /canonical identity definition does not match/,
     ],
     [
-      "name canonicalization Unicode data hash",
+      "full-name whitespace collapse",
       (manifest) => {
-        manifest.identity.fullName.normalizationDataSha256 = hash("0");
+        manifest.identity.fullName.collapse = "runs to U+0020";
       },
       /canonical identity definition does not match/,
     ],
     [
-      "identity Unicode normalization-data hash",
+      "identity code point restriction",
       (manifest) => {
-        manifest.identitySuites["1"].normalizationDataSha256 = hash("0");
+        manifest.identitySuites["1"].codePointRestriction = "PRECIS FreeformClass (RFC 8264)";
       },
       /identity suite 1 definition does not match/,
     ],
     [
-      "file Unicode normalization implementation",
+      "file passphrase trim flag",
       (manifest) => {
-        manifest.fileKdfSuites["1"].normalizationImplementation = "host-icu";
+        manifest.fileKdfSuites["1"].trim = false;
       },
       /file KDF suite 1 definition does not match/,
+    ],
+    [
+      "identity whitespace Unicode version",
+      (manifest) => {
+        manifest.identitySuites["1"].whiteSpaceUnicodeVersion = "16.0.0";
+      },
+      /identity suite 1 definition does not match/,
+    ],
+    [
+      "independent-key name normalization",
+      (manifest) => {
+        manifest.independentKeyCredentials.fullName.normalization = "NFKC";
+      },
+      /independent-key credentials definition does not match/,
+    ],
+    [
+      "independent-key passphrase trim flag",
+      (manifest) => {
+        manifest.independentKeyCredentials.passphrase.trim = false;
+      },
+      /independent-key credentials definition does not match/,
+    ],
+    [
+      "independent-key internal whitespace collapse",
+      (manifest) => {
+        manifest.independentKeyCredentials.fullName.collapse = "runs to U+0020";
+      },
+      /independent-key credentials definition does not match/,
+    ],
+    [
+      "independent-key code point restriction",
+      (manifest) => {
+        manifest.independentKeyCredentials.passphrase.codePointRestriction =
+          "PRECIS FreeformClass (RFC 8264)";
+      },
+      /independent-key credentials definition does not match/,
     ],
     [
       "identity KDF parameter",
@@ -1135,8 +1168,6 @@ describe("production protocol release manifest evidence", function () {
   for (const [label, relativePath] of [
     ["manifest", PROTOCOL_RELEASE_MANIFEST_PATH],
     ["golden vectors", "protocol-vectors/onchain-biography-v1.json"],
-    ["Unicode normalization data", PROTOCOL_UNICODE_NORMALIZATION_DATA_PATH],
-    ["PRECIS repertoire data", PROTOCOL_PRECIS_DATA_PATH],
     ["device matrix", "release-evidence/kdf-device-matrix.json"],
     ["attacker study", "release-evidence/kdf-attacker-study.json"],
   ]) {

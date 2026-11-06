@@ -190,7 +190,7 @@ describe("Hardhat Tasks Integration", function () {
 
       const inputPath = path.join(outputDir, "disclosure_binding_input.json");
       expect(fs.existsSync(inputPath)).to.equal(true);
-      expect(result.canonicalFullName).to.equal("Task User");
+      expect(result.canonicalFullName).to.equal("Task   User");
     } finally {
       fs.rmSync(outputDir, { recursive: true, force: true });
     }

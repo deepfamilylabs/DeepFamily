@@ -4,6 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useTranslation } from "react-i18next";
 import { isMetadataUnlockUsable, makeNodeId } from "../../../../../shared/model";
 import type { ProtocolPassphraseRisk } from "../../../../../shared/crypto/passphraseStrength";
+import { safeCanonicalizeFullName } from "../../../../../shared/identity/fullName";
 import { useResponsiveModalMode } from "../../../../../shared/ui";
 import { useWallet } from "../../../../wallet";
 import { useContractClient } from "../../../hooks/useContractClient";
@@ -110,7 +111,7 @@ export function useMintNftModalController({
     endorsementReader,
   );
   const allConsentsChecked = consents.public && consents.age && consents.legal;
-  const hasPersonInfo = Boolean(personInfo?.fullName?.trim());
+  const hasPersonInfo = Boolean(safeCanonicalizeFullName(personInfo?.fullName || ""));
   const validatedTargetBiography = useMemo(() => {
     if (!hasValidTarget) return undefined;
     const exact = nodesData[makeNodeId(targetPersonHash, targetVersionIndex)];

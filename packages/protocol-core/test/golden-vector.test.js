@@ -14,6 +14,7 @@ import {
   buildFilePasswordBytes,
   buildIdentityPasswordBytes,
   bytesToHex,
+  canonicalizeFullName,
   computeFormat1Aad,
   computeDisclosureBinding,
   computePersonVersionContentCommitment,
@@ -24,11 +25,13 @@ import {
   deriveFileKekBytes,
   deriveIdentityMaterial,
   encryptPersonVersionEnvelope,
+  normalizePassphrase,
   packSubmitterAndSelfSuiteId,
   parseCanonicalPersonVersion,
   parseFormat1Envelope,
   roundTripPersonVersionEnvelope,
   serializeCanonicalPersonVersion,
+  utf8Bytes,
   wipeBytes,
 } from "../index.js";
 
@@ -115,6 +118,40 @@ test("empty passphrase golden vector runs full domain-separated identity Argon2i
       derivedSecretField: 0n,
     }).personHash,
   );
+});
+
+test("golden text vectors preserve original Unicode and converge only across edge whitespace", async () => {
+  assert.equal(vector.textPreparation.length, 5);
+  for (const expected of vector.textPreparation) {
+    assert.equal(canonicalizeFullName(expected.rawFullName), expected.fullName);
+    assert.equal(normalizePassphrase(expected.rawPassphrase), expected.passphrase);
+    assert.equal(bytesToHex(utf8Bytes(expected.fullName)), expected.fullNameUtf8Hex);
+    assert.equal(
+      bytesToHex(buildIdentityPasswordBytes(expected.rawPassphrase)),
+      expected.identityPasswordInputHex,
+    );
+    assert.equal(
+      bytesToHex(buildFilePasswordBytes(expected.rawPassphrase)),
+      expected.filePasswordInputHex,
+    );
+    const material = await deriveIdentityMaterial({
+      identity: { ...identity, fullName: expected.rawFullName },
+      rawPassphrase: expected.rawPassphrase,
+      identitySuiteId: 1,
+    });
+    try {
+      assert.equal(bytesToHex(material.identitySalt), expected.identitySaltHex);
+      assert.equal(bytesToHex(material.derivedSecretBytes), expected.argon2idOutputHex);
+      assert.equal(material.derivedSecretField.toString(), expected.derivedSecretField);
+      assert.equal(material.personHash, expected.personHash);
+    } finally {
+      wipeBytes(material.identitySalt);
+      wipeBytes(material.derivedSecretBytes);
+    }
+  }
+  const [exact, trimmed, ...different] = vector.textPreparation;
+  assert.equal(exact.personHash, trimmed.personHash);
+  assert.equal(new Set([exact, ...different].map((entry) => entry.personHash)).size, 4);
 });
 
 test("empty passphrase golden vector runs full domain-separated file Argon2id", async () => {

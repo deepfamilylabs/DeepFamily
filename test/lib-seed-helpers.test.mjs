@@ -13,6 +13,8 @@ const {
   mintPersonVersionNFT,
   computePersonHash,
   checkPersonExists,
+  normalizeNameForHash,
+  normalizePassphraseForHash,
 } = seedHelpers;
 
 const TEST_PASSPHRASE = "seed helper unified passphrase";
@@ -39,6 +41,47 @@ describe("SeedHelpers Library Tests", function () {
   }
 
   describe("computePersonHash", function () {
+    it("uses the same trim-only rules for seed names and passphrases", function () {
+      const original = "Ａlice　 Cafe\u0301  张·王\tSmith";
+      const withBoundaryWhitespace = `\u0085\t　${original}\u00a0\n`;
+
+      expect(normalizeNameForHash(withBoundaryWhitespace)).to.equal(original);
+      expect(normalizePassphraseForHash(withBoundaryWhitespace)).to.equal(original);
+      expect(normalizePassphraseForHash("\u0085　\t\n")).to.equal("");
+      expect(normalizeNameForHash("\ufeffAlice\ufeff")).to.equal("\ufeffAlice\ufeff");
+      expect(normalizePassphraseForHash("\ufeffsecret\ufeff")).to.equal("\ufeffsecret\ufeff");
+    });
+
+    it("converges only on boundary whitespace when deriving a seed identity", async function () {
+      const personData = {
+        fullName: "Ａlice　 Cafe\u0301",
+        passphrase: "secret　 Cafe\u0301\t张·王",
+        isBirthBC: false,
+        birthYear: 1990,
+        birthMonth: 1,
+        birthDay: 1,
+        gender: 1,
+      };
+      const baseHash = await computePersonHash({ personData });
+      const trimmedHash = await computePersonHash({
+        personData: {
+          ...personData,
+          fullName: `\u0085　${personData.fullName}\u00a0\n`,
+          passphrase: `\u0085　${personData.passphrase}\u00a0\n`,
+        },
+      });
+      const otherNameHash = await computePersonHash({
+        personData: { ...personData, fullName: "Alice Café" },
+      });
+      const otherPassphraseHash = await computePersonHash({
+        personData: { ...personData, passphrase: "secret　 Café\t张·王" },
+      });
+
+      expect(trimmedHash).to.equal(baseHash);
+      expect(otherNameHash).not.to.equal(baseHash);
+      expect(otherPassphraseHash).not.to.equal(baseHash);
+    });
+
     it("should correctly compute person hash", async function () {
       const personData = {
         fullName: "TestPerson",

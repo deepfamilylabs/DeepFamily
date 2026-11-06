@@ -268,7 +268,7 @@ export class ShieldedAssetSession {
     let keyIdentitySecret: Uint8Array | undefined;
     let material: IdentityMaterial | undefined;
     try {
-      // This path receives the original form fields and uses the fixed independent-key rules.
+      // Both derivations receive the original form fields and share trim-only text preparation.
       // Run the two memory-hard KDFs sequentially.
       keyIdentitySecret = await deriveShieldedIndependentKeyIdentitySecret({
         identity: params.identity,

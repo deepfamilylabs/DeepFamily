@@ -46,6 +46,8 @@ DeepFamily creates the decentralized family tree infrastructure, using zero-know
 - Multiple versions per person allow different contributors to record the same individual
 - One user-entered passphrase drives domain-separated identity and file KDFs; matching identity
   fields, suite, and passphrase reproduce the same person hash
+- Full names and identity/file/independent-key passphrases remove only leading and trailing Unicode White_Space;
+  all interior characters, case, fullwidth forms, and combining sequences remain exact
 
 ### Endorsement, Incentives & Public Records
 

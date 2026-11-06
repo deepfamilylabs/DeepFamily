@@ -137,11 +137,9 @@ describe("production crypto worker handlers", () => {
     expect(decrypted).not.toHaveProperty("contentDigest");
   });
 
-  it("uses OpaqueString without trimming on both real identity and file KDF paths", async () => {
-    const rawPassphrase = "  caf\u00e9  ";
-    // These fixtures contain no non-ASCII Zs, so the OpaqueString additional
-    // mapping rule is a no-op and host NFC reproduces the protocol form exactly.
-    const normalizedPassphrase = rawPassphrase.normalize("NFC");
+  it("trims surrounding whitespace and preserves raw Unicode on both real identity and file KDF paths", async () => {
+    const rawPassphrase = "\u0085  caf\u0065\u0301\u00a0motto\u3000";
+    const normalizedPassphrase = "caf\u0065\u0301\u00a0motto";
     const material = await cryptoWorkerHandlers.deriveIdentityMaterialV1({
       identity,
       rawPassphrase,
@@ -179,7 +177,7 @@ describe("production crypto worker handlers", () => {
     await expect(
       cryptoWorkerHandlers.decryptPersonVersionEnvelopeV1({
         envelopeHex: encrypted.envelopeHex,
-        rawPassphrase: normalizedPassphrase.trim(),
+        rawPassphrase: normalizedPassphrase.normalize("NFC"),
         context: protectedContext,
       }),
     ).rejects.toMatchObject({ code: "AES_GCM_AUTHENTICATION_FAILED" });
@@ -262,9 +260,9 @@ describe("production crypto worker handlers", () => {
   });
 
   it("redacts the protocol-normalized secret, not only the raw input", async () => {
-    const rawPassphrase = "a\u030a-worker-secret";
+    const rawPassphrase = "\u0085 a\u030a-worker-secret\u3000";
     const normalizedPassphrase = normalizePassphrase(rawPassphrase);
-    expect(normalizedPassphrase).toBe("\u00e5-worker-secret");
+    expect(normalizedPassphrase).toBe("a\u030a-worker-secret");
     const computeHash = vi
       .spyOn(cryptoWorkerHandlers, "computeIdentityHash")
       .mockRejectedValueOnce(new Error(`derive failed for ${normalizedPassphrase}`));

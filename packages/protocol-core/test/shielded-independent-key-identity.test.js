@@ -5,8 +5,9 @@ import { getBytes, hexlify } from "ethers";
 import {
   INDEPENDENT_KEY_ARGON2ID_PROFILE,
   SHIELDED_INDEPENDENT_KEY_UNICODE_VERSION,
-  UNICODE_NORMALIZATION_VERSION,
-  PRECIS_UNICODE_VERSION,
+  UNICODE_WHITE_SPACE_VERSION,
+  normalizeIdentityFields,
+  normalizePassphrase,
   buildShieldedIndependentKeyPasswordBytes,
   deriveShieldedIndependentKeyMaterial,
   deriveShieldedIndependentKeyIdentitySalt,
@@ -23,8 +24,7 @@ const hkdf = (value, domain, info = Buffer.alloc(0)) =>
 
 test("independent key freezes full credential, Argon2id, HKDF and X25519 recovery vector", async (t) => {
   assert.equal(SHIELDED_INDEPENDENT_KEY_UNICODE_VERSION, "17.0.0");
-  assert.equal(UNICODE_NORMALIZATION_VERSION, SHIELDED_INDEPENDENT_KEY_UNICODE_VERSION);
-  assert.equal(PRECIS_UNICODE_VERSION, SHIELDED_INDEPENDENT_KEY_UNICODE_VERSION);
+  assert.equal(UNICODE_WHITE_SPACE_VERSION, SHIELDED_INDEPENDENT_KEY_UNICODE_VERSION);
   assert.deepEqual(INDEPENDENT_KEY_ARGON2ID_PROFILE, {
     status: "candidate-awaiting-device-benchmark",
     provisional: true,
@@ -47,8 +47,8 @@ test("independent key freezes full credential, Argon2id, HKDF and X25519 recover
   assert.deepEqual(
     Buffer.from(identityBytes),
     Buffer.concat([
-      Buffer.from([0, 8]),
-      Buffer.from("Alice é"),
+      Buffer.from([0, 12]),
+      Buffer.from("Ａlice\u00a0e\u0301"),
       Buffer.from([255, 1, 255, 255, 12, 31]),
     ]),
   );
@@ -56,7 +56,7 @@ test("independent key freezes full credential, Argon2id, HKDF and X25519 recover
   const password = buildShieldedIndependentKeyPasswordBytes(vector.rawPassphrase);
   assert.deepEqual(
     Buffer.from(password),
-    Buffer.from("DeepFamily:IndependentKeyIdentityPassword:v1\0  Pa ssé  "),
+    Buffer.from("DeepFamily:IndependentKeyIdentityPassword:v1\0Pa\u00a0sse\u0301"),
   );
   assert.equal(hexlify(password), vector.passwordBytes);
   const salt = deriveShieldedIndependentKeyIdentitySalt(vector.identity);
@@ -149,46 +149,73 @@ test("independent key freezes full credential, Argon2id, HKDF and X25519 recover
   );
 });
 
-test("independent-key credential normalization preserves frozen Unicode 17 semantics and raw whitespace", () => {
+test("independent-key credentials use the same trim-only text rules as person identities", () => {
+  for (const value of [
+    "\u2000꟱mith\u0085 Ａ\u3000",
+    "  e\u0301  ①ﬃ  ",
+    "\u0085 张·王\u3000",
+    "ab‍cd",
+    "👩‍🔬",
+    "a\tb",
+    "a\u2028b",
+    "a\u200bb",
+    "a\ufeffb",
+    "a\u0000b",
+  ]) {
+    assert.deepEqual(
+      normalizeShieldedIndependentKeyIdentity({ ...vector.identity, fullName: value }),
+      normalizeIdentityFields({ ...vector.identity, fullName: value }),
+    );
+    assert.equal(normalizeShieldedIndependentKeyPassphrase(value), normalizePassphrase(value));
+  }
   assert.equal(
     normalizeShieldedIndependentKeyIdentity({
       ...vector.identity,
       fullName: "\u2000꟱mith\u0085 Ａ\u3000",
     }).fullName,
-    "Smith A",
+    "꟱mith\u0085 Ａ",
   );
-  assert.equal(normalizeShieldedIndependentKeyPassphrase("\uff21\u00a0a\u030a "), "\uff21 å ");
-  assert.notEqual(
+  assert.equal(
+    normalizeShieldedIndependentKeyPassphrase("\uff21\u00a0a\u030a "),
+    "\uff21\u00a0a\u030a",
+  );
+  assert.equal(
     normalizeShieldedIndependentKeyPassphrase(" phrase "),
     normalizeShieldedIndependentKeyPassphrase("phrase"),
   );
-  assert.notEqual(
-    normalizeShieldedIndependentKeyPassphrase("Secret"),
-    normalizeShieldedIndependentKeyPassphrase("secret"),
-  );
-  assert.equal(normalizeShieldedIndependentKeyPassphrase("क्‍क"), "क्‍क");
-  assert.equal(normalizeShieldedIndependentKeyPassphrase("l·l"), "l·l");
-  assert.throws(() => normalizeShieldedIndependentKeyPassphrase("a·b"), {
-    code: "CONTEXTUAL_RULE_NOT_SATISFIED",
-  });
-  assert.throws(() => normalizeShieldedIndependentKeyPassphrase("ab‍cd"), {
-    code: "CONTEXTUAL_RULE_NOT_SATISFIED",
-  });
-  for (const value of ["", " ", "\u00a0\u3000"]) {
+  for (const [first, second] of [
+    ["Secret", "secret"],
+    ["Ａ", "A"],
+    ["e\u0301", "é"],
+    ["A  B", "A B"],
+    ["A\u00a0B", "A B"],
+  ]) {
+    assert.notEqual(
+      normalizeShieldedIndependentKeyPassphrase(first),
+      normalizeShieldedIndependentKeyPassphrase(second),
+    );
+  }
+  for (const value of ["", " ", "\u00a0\u3000", "\t\n\u0085"]) {
     assert.throws(() => normalizeShieldedIndependentKeyPassphrase(value), {
       code: "INDEPENDENT_KEY_PASSPHRASE_REQUIRED",
     });
   }
-  for (const value of ["a\tb", "a\u2028b", "a\u200bb", "a\ud800b"]) {
-    assert.throws(() => normalizeShieldedIndependentKeyPassphrase(value));
-  }
+  assert.throws(() => normalizeShieldedIndependentKeyPassphrase("a\ud800b"), {
+    code: "ISOLATED_SURROGATE",
+  });
   const originalNormalize = String.prototype.normalize;
   try {
     String.prototype.normalize = () => {
       throw new Error("Host Unicode normalization forbidden");
     };
-    assert.equal(normalizeShieldedIndependentKeyIdentity(vector.identity).fullName, "Alice é");
-    assert.equal(normalizeShieldedIndependentKeyPassphrase(vector.rawPassphrase), "  Pa ssé  ");
+    assert.equal(
+      normalizeShieldedIndependentKeyIdentity(vector.identity).fullName,
+      vector.normalizedName,
+    );
+    assert.equal(
+      normalizeShieldedIndependentKeyPassphrase(vector.rawPassphrase),
+      vector.normalizedPassphrase,
+    );
   } finally {
     String.prototype.normalize = originalNormalize;
   }
@@ -242,10 +269,18 @@ test("independent-key identity uses exact integer widths and rejects malformed c
 
 test("independent-key credentials are stable across defaults and change only with normalized credentials", async () => {
   const canonical = {
-    identity: { ...vector.identity, fullName: "Alice é" },
-    rawPassphrase: "  Pa ssé  ",
+    identity: { ...vector.identity, fullName: vector.normalizedName },
+    rawPassphrase: vector.normalizedPassphrase,
   };
   const expected = getBytes(vector.independentKeyIdentitySecret);
+  assert.deepEqual(await deriveShieldedIndependentKeyIdentitySecret(vector), expected);
+  assert.deepEqual(
+    await deriveShieldedIndependentKeyIdentitySecret({
+      identity: { ...vector.identity, fullName: `\u0085\u3000${vector.normalizedName}\n` },
+      rawPassphrase: `\t${vector.normalizedPassphrase}\u3000`,
+    }),
+    expected,
+  );
   assert.deepEqual(
     await deriveShieldedIndependentKeyIdentitySecret({
       ...canonical,
@@ -261,7 +296,9 @@ test("independent-key credentials are stable across defaults and change only wit
   for (const changed of [
     { ...canonical, identity: { ...canonical.identity, fullName: "Bob" } },
     { ...canonical, identity: { ...canonical.identity, birthDay: 30 } },
-    { ...canonical, rawPassphrase: "  Pa ssé  x" },
+    { ...canonical, rawPassphrase: `${vector.normalizedPassphrase}x` },
+    { ...canonical, rawPassphrase: vector.normalizedPassphrase.normalize("NFC") },
+    { ...canonical, identity: { ...canonical.identity, fullName: "Alice é" } },
   ]) {
     const secret = await deriveShieldedIndependentKeyIdentitySecret(changed);
     assert.notDeepEqual(secret, expected);

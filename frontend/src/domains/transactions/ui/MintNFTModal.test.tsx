@@ -45,6 +45,7 @@ const mocks = vi.hoisted(() => ({
   cryptoWorkerCall: vi.fn(),
   nodesData: {} as Record<string, any>,
   personPassphrase: "",
+  personFullName: "Ada Lovelace",
   passphrasesMatch: true,
   clearSecretInputs: vi.fn(),
 }));
@@ -110,10 +111,6 @@ vi.mock("../../../shared/zk/zk", () => ({
   }),
 }));
 
-vi.mock("../../../shared/identity/fullName", () => ({
-  safeCanonicalizeFullName: (value: string) => value.trim(),
-}));
-
 vi.mock("../../../shared/lib/errors", () => ({
   getFriendlyError: (error: any) => ({
     type: error?.type || "UNKNOWN_ERROR",
@@ -131,7 +128,7 @@ vi.mock("../../person", () => ({
     useImperativeHandle(ref, () => ({
       getSecretInputs: () => ({ passphrase: mocks.personPassphrase }),
       getPublicFormData: () => ({
-        fullName: "Ada Lovelace",
+        fullName: mocks.personFullName,
         gender: 2,
         birthYear: 1815,
         birthMonth: 12,
@@ -145,7 +142,7 @@ vi.mock("../../person", () => ({
 
     useEffect(() => {
       props.onPublicFormChange?.({
-        fullName: "Ada Lovelace",
+        fullName: mocks.personFullName,
         gender: 2,
         birthYear: 1815,
         birthMonth: 12,
@@ -234,6 +231,7 @@ describe("MintNFTModal", () => {
     mocks.cryptoWorkerCall.mockReset();
     mocks.nodesData = {};
     mocks.personPassphrase = "";
+    mocks.personFullName = "Ada Lovelace";
     mocks.passphrasesMatch = true;
     mocks.clearSecretInputs.mockReset();
 
@@ -302,6 +300,21 @@ describe("MintNFTModal", () => {
   afterEach(() => {
     cleanup();
     vi.restoreAllMocks();
+  });
+
+  it.each([
+    ["BOM name", "\ufeff", true],
+    ["Unicode whitespace only", "\u0085\u3000", false],
+  ])("uses protocol name validity for the mint button (%s)", async (_label, fullName, valid) => {
+    mocks.personFullName = fullName;
+    renderMintModal();
+    await waitForMintableTarget();
+    await checkAllConsents();
+    await waitFor(() =>
+      expect((screen.getByRole("button", { name: "Mint NFT" }) as HTMLButtonElement).disabled).toBe(
+        !valid,
+      ),
+    );
   });
 
   it("mints without a biography title and patches tree state on success", async () => {
@@ -496,10 +509,8 @@ describe("MintNFTModal", () => {
     expect(screen.queryByRole("button", { name: /Go Endorse/i })).toBeNull();
   });
 
-  it("refuses a passphrase the protocol disallows before running the mint flow", async () => {
-    // The FreeformClass rejects controls and invisible code points. Catching it
-    // here gives a specific error instead of a generic worker failure later.
-    mocks.personPassphrase = `family${String.fromCharCode(9)}motto`;
+  it("refuses malformed Unicode before running the mint flow", async () => {
+    mocks.personPassphrase = "family\ud800motto";
 
     renderMintModal();
 
@@ -511,7 +522,7 @@ describe("MintNFTModal", () => {
     });
 
     await screen.findByRole("alert");
-    expect(screen.getAllByText(/does not accept/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/malformed Unicode/).length).toBeGreaterThan(0);
     expect(mocks.mintRunOrThrow).not.toHaveBeenCalled();
     expect(mocks.onSuccess).not.toHaveBeenCalled();
   });

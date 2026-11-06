@@ -12,7 +12,7 @@ describe("shared identity-name normalization", () => {
     // U+0085 is Unicode White_Space but is not consistently covered by host
     // JavaScript \\s tables. U+FEFF is intentionally not in the frozen set,
     // even though String.prototype.trim historically removes it.
-    expect(normalizeNameForHash("  Ada\u0085Lovelace  ")).toBe("Ada Lovelace");
+    expect(normalizeNameForHash("  Ada\u0085Lovelace  ")).toBe("Ada\u0085Lovelace");
     expect(normalizeNameForHash("  Ada\uFEFFLovelace  ")).toBe("Ada\uFEFFLovelace");
     expect(normalizeNameForHash("  Ada\u0085Lovelace  ")).toBe(
       canonicalizeFullName("  Ada\u0085Lovelace  "),
@@ -20,7 +20,9 @@ describe("shared identity-name normalization", () => {
     expect(normalizeNameForHash("  Ada\uFEFFLovelace  ")).toBe(
       canonicalizeFullName("  Ada\uFEFFLovelace  "),
     );
-    expect(normalizeNameForHash("\ua7f1")).toBe("S");
+    expect(normalizeNameForHash("\u0085\u3000Ada\u0085\u3000")).toBe("Ada");
+    expect(normalizeNameForHash("\ufeffAda\ufeff")).toBe("\ufeffAda\ufeff");
+    expect(normalizeNameForHash("\ua7f1")).toBe("\ua7f1");
   });
 
   it("fails closed for an invalid or empty canonical name without throwing in UI code", () => {
@@ -29,24 +31,21 @@ describe("shared identity-name normalization", () => {
   });
 });
 
-describe("passphrase input the protocol refuses", () => {
-  // The PRECIS FreeformClass rejects controls and invisible code points. The
-  // meter must say so instead of reporting "ordinary" risk and an "empty"
-  // recommendation, which left the failure to surface at wallet-call time.
-  const rejected = [
+describe("passphrase scalar values preserved by the protocol", () => {
+  const accepted = [
     ["TAB", `good${String.fromCharCode(9)}passphrase`],
     ["BOM", "good\ufeffpassphrase"],
     ["soft hyphen", "good\u00adpassphrase"],
   ] as const;
 
-  for (const [label, value] of rejected) {
-    it(`classifies a passphrase containing ${label} as disallowed`, () => {
-      expect(classifyProtocolPassphraseRisk(value)).toBe("disallowed");
+  for (const [label, value] of accepted) {
+    it(`accepts and preserves a passphrase containing ${label}`, () => {
+      expect(classifyProtocolPassphraseRisk(value)).toBe("ordinary");
+      expect(normalizePassphraseForHash(value)).toBe(value);
       const strength = validatePassphraseStrength(value, true);
-      expect(strength.isStrong).toBe(false);
-      expect(strength.recommendation).toMatch(/does not accept/);
-      // It is not empty, so it must not be described as empty.
-      expect(strength.recommendation).not.toMatch(/Empty passphrase/);
+      expect(strength.recommendation ?? "").not.toMatch(
+        /does not accept|malformed|Empty passphrase/,
+      );
     });
   }
 
@@ -82,11 +81,11 @@ describe("passphrase strength analysis folds compatibility forms", () => {
 });
 
 describe("shared protocol passphrase risk classification", () => {
-  it("uses the protocol OpaqueString/no-trim and frozen Unicode White_Space rules", () => {
+  it("uses the frozen Unicode White_Space trim rules and preserves the whitespace UX category", () => {
     expect(classifyProtocolPassphraseRisk("")).toBe("empty");
     expect(classifyProtocolPassphraseRisk("\u00a0\u3000")).toBe("unicode-whitespace");
-    // U+FEFF is Default_Ignorable, so the FreeformClass refuses it outright.
-    expect(classifyProtocolPassphraseRisk("\ufeff")).toBe("disallowed");
+    // U+FEFF is outside Unicode White_Space and remains part of the secret.
+    expect(classifyProtocolPassphraseRisk("\ufeff")).toBe("ordinary");
     expect(classifyProtocolPassphraseRisk("  family secret  ")).toBe("ordinary");
   });
 
@@ -97,10 +96,12 @@ describe("shared protocol passphrase risk classification", () => {
 });
 
 describe("shared passphrase normalization", () => {
-  it("delegates Unicode 17 OpaqueString normalization to protocol-core", () => {
-    expect(normalizePassphraseForHash("a\u030a")).toBe("\u00e5");
-    // OpaqueString does no width or compatibility mapping; NFKD would fold this to "S".
+  it("trims only surrounding Unicode White_Space without NFC or compatibility folding", () => {
+    expect(normalizePassphraseForHash("\u0085\u3000a\u030a\u00a0 ")).toBe("a\u030a");
+    expect(normalizePassphraseForHash("  a\u00a0\u3000b  ")).toBe("a\u00a0\u3000b");
+    expect(normalizePassphraseForHash("\ufeffphrase\ufeff")).toBe("\ufeffphrase\ufeff");
     expect(normalizePassphraseForHash("\ua7f1")).toBe("\ua7f1");
+    expect(normalizePassphraseForHash("Ａ①ﬃ")).toBe("Ａ①ﬃ");
   });
 
   it("keeps render-time consumers total for malformed programmatic input", () => {

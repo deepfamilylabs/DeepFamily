@@ -17,6 +17,78 @@
     "identityCommitment": "2448806948328023004905318568563354917968596071482962793087051191126557408993",
     "personHash": "0xb3e55e03665d31b94fb9c7408541a90b673cb9204118a98f175ab0aa1979ddab"
   },
+  "textPreparation": [
+    {
+      "id": "exact",
+      "rawFullName": "Ａlice   é",
+      "rawPassphrase": "Pa ssé",
+      "fullName": "Ａlice   é",
+      "passphrase": "Pa ssé",
+      "fullNameUtf8Hex": "0xefbca16c696365c2a0202065cc81",
+      "identityPasswordInputHex": "0x4465657046616d696c793a4964656e746974794b44463a7631005061c2a0737365cc81",
+      "filePasswordInputHex": "0x4465657046616d696c793a46696c654b44463a7631005061c2a0737365cc81",
+      "identitySaltHex": "0x3cf716b2099807109ee005128d2d4ad3",
+      "argon2idOutputHex": "0xfaee2f074ff5333522797bfc12ba5642c6850619c6dc5412f994e80b5d0688a2",
+      "derivedSecretField": "4057831967255942762416228385775233972280678748926655481347619584832591792285",
+      "personHash": "0x8416d1003b3f7d9d8f7a0579bb8c34dbd436f1ba05b7dccd8fd192d43f01f50e"
+    },
+    {
+      "id": "trimmed",
+      "rawFullName": "　Ａlice   é\n",
+      "rawPassphrase": "\t Pa ssé　",
+      "fullName": "Ａlice   é",
+      "passphrase": "Pa ssé",
+      "fullNameUtf8Hex": "0xefbca16c696365c2a0202065cc81",
+      "identityPasswordInputHex": "0x4465657046616d696c793a4964656e746974794b44463a7631005061c2a0737365cc81",
+      "filePasswordInputHex": "0x4465657046616d696c793a46696c654b44463a7631005061c2a0737365cc81",
+      "identitySaltHex": "0x3cf716b2099807109ee005128d2d4ad3",
+      "argon2idOutputHex": "0xfaee2f074ff5333522797bfc12ba5642c6850619c6dc5412f994e80b5d0688a2",
+      "derivedSecretField": "4057831967255942762416228385775233972280678748926655481347619584832591792285",
+      "personHash": "0x8416d1003b3f7d9d8f7a0579bb8c34dbd436f1ba05b7dccd8fd192d43f01f50e"
+    },
+    {
+      "id": "name-folded",
+      "rawFullName": "Alice é",
+      "rawPassphrase": "Pa ssé",
+      "fullName": "Alice é",
+      "passphrase": "Pa ssé",
+      "fullNameUtf8Hex": "0x416c69636520c3a9",
+      "identityPasswordInputHex": "0x4465657046616d696c793a4964656e746974794b44463a7631005061c2a0737365cc81",
+      "filePasswordInputHex": "0x4465657046616d696c793a46696c654b44463a7631005061c2a0737365cc81",
+      "identitySaltHex": "0x253befedfc01eee14ff02d9f25f4b924",
+      "argon2idOutputHex": "0x529c6cb944d1463e5add10e268343d8b618ee9212c03e32420854e07de9465db",
+      "derivedSecretField": "15477789237536909707191869692649467649244301231396519137934792008191693841882",
+      "personHash": "0x49d18e3c90e1e1d9194fb5ce0fabd9a41bb19f21becc7cbaf68df90048b50a63"
+    },
+    {
+      "id": "passphrase-composed",
+      "rawFullName": "Ａlice   é",
+      "rawPassphrase": "Pa ssé",
+      "fullName": "Ａlice   é",
+      "passphrase": "Pa ssé",
+      "fullNameUtf8Hex": "0xefbca16c696365c2a0202065cc81",
+      "identityPasswordInputHex": "0x4465657046616d696c793a4964656e746974794b44463a7631005061c2a07373c3a9",
+      "filePasswordInputHex": "0x4465657046616d696c793a46696c654b44463a7631005061c2a07373c3a9",
+      "identitySaltHex": "0x3cf716b2099807109ee005128d2d4ad3",
+      "argon2idOutputHex": "0xfb188a5b8394b87105512a084c9525e99a31a8f40cc0c9d2bdce0f68728b9012",
+      "derivedSecretField": "4132669872966262666138111394508147187524346202668450779343120155138172096525",
+      "personHash": "0xfe01b0d4961afa9fed8c3d80ca6f2da9d3befb247517041691c5db20546dc712"
+    },
+    {
+      "id": "passphrase-space-mapped",
+      "rawFullName": "Ａlice   é",
+      "rawPassphrase": "Pa ssé",
+      "fullName": "Ａlice   é",
+      "passphrase": "Pa ssé",
+      "fullNameUtf8Hex": "0xefbca16c696365c2a0202065cc81",
+      "identityPasswordInputHex": "0x4465657046616d696c793a4964656e746974794b44463a763100506120737365cc81",
+      "filePasswordInputHex": "0x4465657046616d696c793a46696c654b44463a763100506120737365cc81",
+      "identitySaltHex": "0x3cf716b2099807109ee005128d2d4ad3",
+      "argon2idOutputHex": "0xcb4d22c65356d25a6ef18345cf0f16de7fa996721db3aa6ef197b8421ee0aa19",
+      "derivedSecretField": "4402824005255779100293975050449936082783727986032397710991210403669399874069",
+      "personHash": "0x1de9db9a58ff77d38d1df683bda0d1fecf25c0be246edb686c548602d6274d3a"
+    }
+  ],
   "metadata": {
     "canonicalJsonUtf8": "{\"schema\":\"deepfamily/person-version@1.0\",\"person\":{\"fullName\":\"Alice Smith\",\"gender\":2,\"birthYear\":1980,\"birthMonth\":1,\"birthDay\":2,\"isBirthBC\":false,\"personHash\":\"0xb3e55e03665d31b94fb9c7408541a90b673cb9204118a98f175ab0aa1979ddab\"},\"parents\":{\"father\":null,\"mother\":null},\"tag\":\"v1\",\"biography\":\"Hello 世界\\n\"}",
     "canonicalJsonHex": "0x7b22736368656d61223a226465657066616d696c792f706572736f6e2d76657273696f6e40312e30222c22706572736f6e223a7b2266756c6c4e616d65223a22416c69636520536d697468222c2267656e646572223a322c22626972746859656172223a313938302c2262697274684d6f6e7468223a312c226269727468446179223a322c22697342697274684243223a66616c73652c22706572736f6e48617368223a22307862336535356530333636356433316239346662396337343038353431613930623637336362393230343131386139386631373561623061613139373964646162227d2c22706172656e7473223a7b22666174686572223a6e756c6c2c226d6f74686572223a6e756c6c7d2c22746167223a227631222c2262696f677261706879223a2248656c6c6f20e4b896e7958c5c6e227d",

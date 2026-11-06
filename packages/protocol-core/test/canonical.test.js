@@ -55,8 +55,8 @@ test("canonical serializer fixes field order, escapes, lowercase hex and bigint 
   assert.deepEqual(serializeCanonicalPersonVersion(parsed), encoded);
 });
 
-test("fullName canonicalization is NFKC with a frozen Unicode White_Space table", () => {
-  assert.equal(canonicalizeFullName(" \u3000Ａlice\u00a0\tSmith \n"), "Alice Smith");
+test("fullName canonicalization trims only the frozen Unicode White_Space at the edges", () => {
+  assert.equal(canonicalizeFullName(" \u3000Ａlice\u00a0\tSmith \n"), "Ａlice\u00a0\tSmith");
   assert.throws(() => canonicalizeFullName("\u2003\u3000"), /cannot be empty/);
 });
 
@@ -108,5 +108,19 @@ test("serializer rejects unsafe Number, isolated surrogate, oversized tag and no
 
   const name = fixture();
   name.person.fullName = " 王小明 ";
-  assert.throws(() => serializeCanonicalPersonVersion(name), /already be NFKC-normalized/);
+  assert.throws(
+    () => serializeCanonicalPersonVersion(name),
+    /leading and trailing Unicode White_Space/,
+  );
+});
+
+test("canonical metadata round-trips exact interior name characters for person and parents", () => {
+  const metadata = fixture();
+  metadata.person.fullName = "Ａlice\u00a0 e\u0301\t①\u200b";
+  metadata.parents.father.fullName = "Father  \u3000Name\u0000";
+  const encoded = serializeCanonicalPersonVersion(metadata);
+  const parsed = parseCanonicalPersonVersion(encoded);
+  assert.equal(parsed.person.fullName, metadata.person.fullName);
+  assert.equal(parsed.parents.father.fullName, metadata.parents.father.fullName);
+  assert.deepEqual(serializeCanonicalPersonVersion(parsed), encoded);
 });

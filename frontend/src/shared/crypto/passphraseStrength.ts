@@ -16,7 +16,8 @@ export type ProtocolPassphraseRisk = "empty" | "unicode-whitespace" | "disallowe
 
 /**
  * Normalize full name for identity flows.
- * Uses the release-frozen protocol NFKC + Unicode White_Space rules.
+ * Trims only the release-frozen Unicode White_Space set at either end.
+ * All remaining characters and internal whitespace are preserved.
  * Returns an empty string when canonicalization yields an invalid empty name.
  */
 export const normalizeNameForHash = (value: string): string => {
@@ -31,7 +32,7 @@ export const normalizeNameForHash = (value: string): string => {
 
 /**
  * Normalize passphrase for hashing
- * Uses RFC 8265 OpaqueString; no trimming or other mutation
+ * Trims only protocol Unicode White_Space at either end; preserves the rest.
  */
 export const normalizePassphraseForHash = (value: string): string => {
   try {
@@ -46,9 +47,9 @@ export const normalizePassphraseForHash = (value: string): string => {
 /**
  * Classify the exact v1 passphrase bytes for high-risk UX decisions.
  *
- * The protocol applies RFC 8265 OpaqueString and deliberately does not trim.
- * Keep UI event
- * handling total for malformed programmatic input; the authoritative worker
+ * Keep the existing whitespace-only UX category even though the protocol now
+ * trims that input to the empty public passphrase. Keep UI event handling total
+ * for malformed programmatic input; the authoritative worker
  * path still rejects invalid Unicode before doing proof or transaction work.
  */
 export const classifyProtocolPassphraseRisk = (value: string): ProtocolPassphraseRisk => {
@@ -56,13 +57,14 @@ export const classifyProtocolPassphraseRisk = (value: string): ProtocolPassphras
   try {
     normalized = normalizePassphrase(value);
   } catch {
-    // The protocol refused this input, most often a control or invisible code
-    // point the PRECIS FreeformClass disallows. Reporting "ordinary" here used
-    // to hide the problem until the wallet call failed.
+    // Only malformed Unicode is refused; controls and invisible scalar values
+    // are preserved by the identity protocol.
     return "disallowed";
   }
-  if (normalized.length === 0) return "empty";
-  return isUnicodeWhiteSpaceOnly(normalized) ? "unicode-whitespace" : "ordinary";
+  if (normalized.length === 0) {
+    return value.length > 0 && isUnicodeWhiteSpaceOnly(value) ? "unicode-whitespace" : "empty";
+  }
+  return "ordinary";
 };
 
 export type FundingPassphraseErrorCode = "passphraseRequired" | "passphraseDisallowed";
@@ -220,7 +222,7 @@ export function validatePassphraseStrength(
       rawEntropy: 0,
       level: "weak",
       recommendation: includeRecommendation
-        ? "Passphrase contains a character the protocol does not accept, such as a control or invisible code point. Remove it and use a visible, reproducible passphrase"
+        ? "Passphrase contains malformed Unicode. Re-enter the affected text"
         : undefined,
     };
   }

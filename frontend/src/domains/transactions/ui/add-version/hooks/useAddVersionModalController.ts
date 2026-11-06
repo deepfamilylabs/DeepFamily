@@ -71,8 +71,8 @@ function formatParentSummary(
   info: PersonInfoPublic | null,
   versionIndex: number | "",
 ): string | undefined {
-  const name = info?.fullName?.trim();
-  if (!name || !safeCanonicalizeFullName(name)) return undefined;
+  const name = safeCanonicalizeFullName(info?.fullName || "");
+  if (!name) return undefined;
   const parts = [name];
   if (info?.birthYear) {
     parts.push(info.isBirthBC ? `${info.birthYear} BC` : String(info.birthYear));

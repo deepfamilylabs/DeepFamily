@@ -16,8 +16,10 @@ import {
   deriveFileKekBytes,
   deriveIdentityMaterial,
   encryptPersonVersionEnvelope,
+  normalizePassphrase,
   packSubmitterAndSelfSuiteId,
   parseFormat1Envelope,
+  utf8Bytes,
   wipeBytes,
 } from "../index.js";
 
@@ -116,6 +118,42 @@ const fileKek = await deriveFileKekBytes({
 const fileArgon2idOutputHex = bytesToHex(fileKek);
 wipeBytes(fileKek);
 
+const exactName = "Ａlice\u00a0  e\u0301";
+const exactPassphrase = "Pa\u00a0sse\u0301";
+const textPreparation = [];
+for (const [id, rawFullName, rawTextPassphrase] of [
+  ["exact", exactName, exactPassphrase],
+  ["trimmed", `\u0085\u3000${exactName}\n`, `\t ${exactPassphrase}\u3000`],
+  ["name-folded", "Alice é", exactPassphrase],
+  ["passphrase-composed", exactName, "Pa\u00a0ssé"],
+  ["passphrase-space-mapped", exactName, "Pa sse\u0301"],
+]) {
+  const textMaterial = await deriveIdentityMaterial({
+    identity: { ...identity, fullName: rawFullName },
+    rawPassphrase: rawTextPassphrase,
+    identitySuiteId,
+  });
+  try {
+    textPreparation.push({
+      id,
+      rawFullName,
+      rawPassphrase: rawTextPassphrase,
+      fullName: textMaterial.identity.fullName,
+      passphrase: normalizePassphrase(rawTextPassphrase),
+      fullNameUtf8Hex: bytesToHex(utf8Bytes(textMaterial.identity.fullName)),
+      identityPasswordInputHex: bytesToHex(buildIdentityPasswordBytes(rawTextPassphrase)),
+      filePasswordInputHex: bytesToHex(buildFilePasswordBytes(rawTextPassphrase)),
+      identitySaltHex: bytesToHex(textMaterial.identitySalt),
+      argon2idOutputHex: bytesToHex(textMaterial.derivedSecretBytes),
+      derivedSecretField: decimal(textMaterial.derivedSecretField),
+      personHash: textMaterial.personHash,
+    });
+  } finally {
+    wipeBytes(textMaterial.identitySalt);
+    wipeBytes(textMaterial.derivedSecretBytes);
+  }
+}
+
 const vector = {
   schemaVersion: 1,
   status: "candidate-not-production-frozen",
@@ -135,6 +173,7 @@ const vector = {
     identityCommitment: decimal(material.identityCommitment),
     personHash: material.personHash,
   },
+  textPreparation,
   metadata: {
     canonicalJsonUtf8: new TextDecoder().decode(prepared.canonicalJsonBytes),
     canonicalJsonHex: bytesToHex(prepared.canonicalJsonBytes),

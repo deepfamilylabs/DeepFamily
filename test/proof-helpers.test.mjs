@@ -44,9 +44,9 @@ const mother = {
 const contentDigest = `0x${"0123456789abcdef".repeat(4)}`;
 
 describe("fresh-v1 proof helpers", function () {
-  it("canonicalizes names while keeping the atomic identity suite explicit", function () {
+  it("trims name boundaries while keeping the atomic identity suite explicit", function () {
     const base = { ...child, fullName: "Alice Smith" };
-    const spaced = { ...child, fullName: "  Alice　Smith  " };
+    const spaced = { ...child, fullName: "\u0085　Alice Smith\u00a0\t" };
     const a = computePersonHashFromInput(base, { selfSuiteId: 2 });
     const b = computePersonHashFromInput(spaced, { selfSuiteId: 2 });
     const otherSuite = computePersonHashFromInput(base, { selfSuiteId: 1 });
@@ -57,6 +57,27 @@ describe("fresh-v1 proof helpers", function () {
     expect(otherSuite.identityCommitment).not.to.equal(a.identityCommitment);
     expect(a.suiteCommitment).to.equal(poseidon4([1000n, 2n, 0n, 0n]));
     expect(computeAtomicSuiteCommitment(2)).to.equal(a.suiteCommitment);
+  });
+
+  it("keeps internal whitespace, compatibility characters, and combining sequences distinct", function () {
+    const pairs = [
+      ["Alice Smith", "Alice　Smith"],
+      ["Alice Smith", "Alice  Smith"],
+      ["Alice Smith", "Alice\tSmith"],
+      ["Alice", "Ａlice"],
+      ["Office", "Oﬃce"],
+      ["Café", "Cafe\u0301"],
+    ];
+    for (const [first, second] of pairs) {
+      const a = computePersonHashFromInput({ ...child, fullName: first });
+      const b = computePersonHashFromInput({ ...child, fullName: second });
+
+      expect(a.canonicalFullName).to.equal(first);
+      expect(b.canonicalFullName).to.equal(second);
+      expect(a.personHash, `${JSON.stringify(first)} vs ${JSON.stringify(second)}`).not.to.equal(
+        b.personHash,
+      );
+    }
   });
 
   it("uses the release-frozen Unicode White_Space set for proof names", function () {

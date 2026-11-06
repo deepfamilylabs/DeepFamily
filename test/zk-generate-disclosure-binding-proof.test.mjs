@@ -14,8 +14,10 @@ const { buildDisclosureBindingInput } = disclosureBindingProof;
 
 describe("zk-generate-disclosure-binding-proof helpers", function () {
   describe("normalizeNameForHash", function () {
-    it("canonicalizes whitespace variants", function () {
-      expect(normalizeNameForHash("  Alice　Smith  ")).to.equal("Alice Smith");
+    it("trims boundary whitespace and preserves the name's internal characters", function () {
+      expect(normalizeNameForHash("\u0085  Ａlice　 Cafe\u0301  \u00a0")).to.equal(
+        "Ａlice　 Cafe\u0301",
+      );
     });
 
     it("does not treat BOM as Unicode White_Space", function () {
@@ -103,7 +105,7 @@ describe("zk-generate-disclosure-binding-proof helpers", function () {
       );
 
       expect(taskBuilt.built.input).to.deep.equal(expected.input);
-      expect(taskBuilt.built.canonicalFullName).to.equal("Alice Smith");
+      expect(taskBuilt.built.canonicalFullName).to.equal("Alice　Smith");
       expect(taskBuilt.built.disclosureBinding).to.equal(expected.disclosureBinding);
     });
   });

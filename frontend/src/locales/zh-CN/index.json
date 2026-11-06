@@ -272,7 +272,9 @@
       "birthDayLabel": "日",
       "passphrase": "身份口令",
       "passphrasePlaceholder": "可输入任意字符的家训或暗号，推荐 15+ 字符并混合不同符号",
-      "passphraseDisallowed": "此口令包含协议不接受的字符，例如控制字符或不可见字符。请移除该字符后再计算身份哈希。",
+      "passphraseDisallowed": "此口令不符合当前凭据的要求，请重新输入相关文本。",
+      "identityInputRule": "全名和身份口令使用单行输入框，只移除首尾空白，内部空格及其余已输入字符均按原文保留。",
+      "multilinePasteRejected": "此单行输入框无法保留换行。已取消粘贴并保留原有内容。",
       "confirmPassphrasePlaceholder": "再次输入身份口令（允许留空）",
       "deterministicIdentityNotice": "身份套件 1 始终从规范化身份字段确定性派生盐值，不保存也不接受恢复盐。",
       "passphraseHelp": {
@@ -302,7 +304,7 @@
         "weak": "建议：至少使用 15+ 混合字符或 20+ 字母以获得更好的安全性"
       },
       "entropyDisplay": "真实熵值：{{raw}} bits · 评估强度评分：{{adjusted}}",
-      "passphraseCharCount": "规范化后的字符数（不裁剪）：{{count}}",
+      "passphraseCharCount": "实际使用的字符数：{{count}}",
       "nameInputPlaceholder": "例如：张三",
       "bcOptions": {
         "ad": "公元",
@@ -1184,7 +1186,7 @@
     "consentAge": "我确认被铸造人物已年满 18 周岁。",
     "consentLegal": "我确认提交内容合法、真实且有权公开，不包含超出约定范围的个人隐私数据。",
     "passphraseMismatch": "两次输入的身份口令不一致。",
-    "passphraseDisallowed": "此口令包含协议不接受的码点，例如控制字符或不可见字符。必须先移除该字符才能使用，因为不可见字符无法重新键入，而口令不可找回。",
+    "passphraseDisallowed": "此口令包含无效的 Unicode 编码，请重新输入相关文本。",
     "consentMissing": "请勾选所有必选项后再铸造。",
     "supplementalInfo": "补充信息",
     "birthPlace": "出生地",

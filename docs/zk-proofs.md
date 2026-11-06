@@ -25,38 +25,44 @@ The shielded inheritance pool uses a separate set of action circuits. Version-1 
 
 ### Canonical identity
 
-Full names are canonicalized before identity derivation using the checked-in Unicode 17.0.0
-normalization tables, independent of the host browser or Node ICU version:
+Full names and passphrases for person identities, metadata files, and independent asset-key
+credentials use the same **trim-only** preparation:
 
-- Unicode NFKC;
-- Unicode whitespace collapsed to one ASCII space;
-- leading and trailing whitespace removed;
-- the result must be nonempty and at most 256 UTF-8 bytes.
+- require a string containing valid Unicode scalar values; isolated UTF-16 surrogates are rejected;
+- remove only leading and trailing characters in the explicitly frozen Unicode 17.0.0
+  `White_Space` set;
+- preserve every remaining code point exactly, including internal whitespace, controls, case,
+  fullwidth forms, combining sequences, and otherwise invisible characters;
+- require the prepared full name to be nonempty and at most 256 UTF-8 bytes; an empty prepared
+  identity/file passphrase is valid and still executes the complete Argon2id derivation.
+  Independent asset-key credentials require a nonempty prepared passphrase.
 
-Passphrases follow a different rule: RFC 8265 OpaqueString over Unicode 17.0.0, no trim.
+There is no NFC/NFKC normalization, compatibility folding, non-ASCII space mapping, whitespace
+collapse, or PRECIS/contextual restriction on any of these inputs. For example, `Ａ` and `A`,
+`é` and `e` followed by U+0301, and internal single/double spaces remain distinct. An all-whitespace
+passphrase becomes the empty public-tree passphrase.
 
-Preparation (Section 4.2.1) rejects any code point outside the PRECIS FreeformClass (RFC 8264
-Section 4.3), derived from pinned UCD bytes by `scripts/generate-precis-data.mjs`. Controls such as
-U+0009 and U+0000, Default_Ignorable code points such as U+00AD and U+FEFF, noncharacters,
-unassigned code points and Old Hangul Jamo are all refused, because a code point that is invisible
-or untypeable cannot be reproduced and the passphrase is not recoverable. CONTEXTJ and CONTEXTO
-code points are admitted only when their RFC 5892 Appendix A rule confirms the surrounding context.
+The exact edge-whitespace set is:
 
-Enforcement (Section 4.2.2) then maps every General_Category Zs other than U+0020 to U+0020 and
-applies NFC; there is no width or case mapping, so fullwidth forms and compatibility decompositions
-survive. The Zs rule is narrower than the White_Space property used for names, so U+0085, U+2028
-and U+2029 are not folded to a space — they are rejected outright during preparation.
-The normalized result must satisfy the FreeformClass and contextual rules again (RFC 8264
-Section 7): NFC can introduce a contextual code point or change its surrounding script. For
-example, U+0387 becomes U+00B7 and is accepted only between two lowercase `l` characters.
+```text
+U+0009..U+000D U+0020 U+0085 U+00A0 U+1680 U+2000..U+200A
+U+2028 U+2029 U+202F U+205F U+3000
+```
 
-The profile's nonempty-password rule is the one deliberate divergence: an empty passphrase is valid
-and still executes Argon2id. Both suite definitions bind the exact SHA-256 of the generated
-normalization tables and FreeformClass repertoire in the protocol release manifest.
-`npm run test:protocol` checks both generated Unicode normalization and PRECIS
-tables against hash-pinned official UCD sources, runs normalization conformance, and
-executes the protocol tests. `npm test` includes these checks; the table checks
-require access to the official source downloads.
+U+FEFF (BOM), U+200B (zero-width space), and U+180E are outside this set and remain part of the
+input even at the edges. The implementation uses this explicit set rather than host `trim()`,
+regular-expression whitespace tables, or browser/Node ICU normalization.
+
+The release manifest records this same trim-only preparation for identity suites, file KDF suites,
+and `independentKeyCredentials`. Independent asset keys keep their separate KDF domains and field
+encoding, but use the shared name/passphrase preparation functions. See
+[independent keys and recovery](frontend.md#independent-keys-backup-and-recovery).
+
+`npm run test:protocol` verifies the generated Unicode normalization and PRECIS utility tables
+against hash-pinned official UCD sources and executes the protocol tests. Normalization utilities
+support passphrase strength analysis; these tables are not used to rewrite or restrict identity,
+file, or independent-key inputs. `npm test` includes these checks; the utility table checks require
+access to the official downloads.
 Identity suite 1 derives its 16-byte deterministic salt from the suite ID, canonical name, and
 packed birth/gender field. The file KDF uses the same user-entered passphrase with a different
 password-input domain and a random 16-byte `fileSalt`.
@@ -64,8 +70,11 @@ password-input domain and a random 16-byte `fileSalt`.
 The candidate suite-1 byte rules are:
 
 ```text
-identityPassword = UTF8("DeepFamily:IdentityKDF:v1") || 0x00 || UTF8(OpaqueString(rawPassphrase))
-filePassword     = UTF8("DeepFamily:FileKDF:v1")     || 0x00 || UTF8(OpaqueString(rawPassphrase))
+canonicalFullName = trimUnicodeWhiteSpace(rawFullName)
+preparedPassphrase = trimUnicodeWhiteSpace(rawPassphrase)
+
+identityPassword = UTF8("DeepFamily:IdentityKDF:v1") || 0x00 || UTF8(preparedPassphrase)
+filePassword     = UTF8("DeepFamily:FileKDF:v1")     || 0x00 || UTF8(preparedPassphrase)
 
 identitySalt = first16(keccak256(solidityPacked(
   "deepfamily:identity-kdf-salt:v1", // string

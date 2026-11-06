@@ -1,26 +1,28 @@
 // Public, synthetic recovery vector. These values are not user credentials.
+// Argon2id output cross-checked with Node native crypto; text preparation is trim-only.
 export const independentKeyVector = Object.freeze({
   identity: {
-    fullName: "  Ａlice\u00a0e\u0301  ",
+    fullName: "  Ａlice é  ",
     gender: 255,
-    birthYear: 65_535,
+    birthYear: 65535,
     birthMonth: 12,
     birthDay: 31,
     isBirthBC: true,
   },
-  rawPassphrase: "  Pa\u00a0ss\u0065\u0301  ",
-  normalizedName: "Alice é",
-  normalizedPassphrase: "  Pa ssé  ",
-  identityBytes: "0x0008416c69636520c3a9ff01ffff0c1f",
+  rawPassphrase: "  Pa ssé  ",
+  normalizedName: "Ａlice é",
+  normalizedPassphrase: "Pa ssé",
+  identityBytes: "0x000cefbca16c696365c2a065cc81ff01ffff0c1f",
   passwordBytes:
-    "0x4465657046616d696c793a496e646570656e64656e744b65794964656e7469747950617373776f72643a76310020205061207373c3a92020",
-  salt: "0x7dbd17b0c2c3502f504014c9b790b531",
-  independentKeyIdentitySecret: "0x6da1d85bf4ec586e83c38c8f90a5acc2088b66287932de1efba14171a2c9a732",
+    "0x4465657046616d696c793a496e646570656e64656e744b65794964656e7469747950617373776f72643a7631005061c2a0737365cc81",
+  salt: "0x47885bb9f40a0fdca2fa59f115117e6d",
+  independentKeyIdentitySecret:
+    "0x68adae8bc70be5d2e700ee86cd7f234f7ab651f5525bed5b91d2b88d16ddb3f7",
   independentKeyRoot: "0x000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
-  boundRoot: "0xac8e920630832a56d499599759944f0fa32175b3755ebce01e3256264da9cd00",
-  ownerSecret: 10400222934374357632422407323519977969270195870498123820584356687811761232329n,
-  ownerCommitment: 11538469256616061637085443976916945838848915430916707446353062605779991594628n,
-  hpkeIkm: "0x13de50f45eb52a98f3443ab41eb8042d2c56ce69610a2fdf16d85e27bbc64ebf",
-  viewPublicKey: "0xf13c574b5ab44a4c3dea58c6fa6576ef2a61c19bd294437f8c99027b3311a60c",
-  keyFingerprint: "0x37af1368eb551aef95979a52296217d53e66c81eb42fb5619624c76f43d72956",
+  boundRoot: "0x48e288de56721ffc8a320478e59ee70b69995d379a0069982c43a62223c42120",
+  ownerSecret: 13032573960527683083322876190357354579941001250157198378196810523411060752049n,
+  ownerCommitment: 9087875439824714602639874093449419199012081998104793072616791118288838787545n,
+  hpkeIkm: "0x5534c65cb581a5dc62c1d2228d70eb654c9c17664de3b8e2e141167bc66a4690",
+  viewPublicKey: "0xbd551ffcbccacb58b55d31f832ba44e1f1603944b8fa4abc9a7d5e7ea3ea1a5b",
+  keyFingerprint: "0xbe35d3bd6cd116a312c405ba0af523d6607a8828494e54de55fc4c029967258a",
 });

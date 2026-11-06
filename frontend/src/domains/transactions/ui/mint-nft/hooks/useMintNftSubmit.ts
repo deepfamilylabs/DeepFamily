@@ -130,7 +130,7 @@ export function useMintNftSubmit({
             "PASSPHRASE_DISALLOWED",
             t(
               "mintNFT.passphraseDisallowed",
-              "This passphrase contains a code point the protocol does not accept, such as a control or invisible character.",
+              "This passphrase contains malformed Unicode. Re-enter the affected text.",
             ),
           ),
         );

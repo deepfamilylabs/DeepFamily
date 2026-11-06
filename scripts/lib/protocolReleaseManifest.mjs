@@ -48,7 +48,6 @@ import {
   VERSION_HASH_DOMAIN_TEXT,
 } from "../../packages/protocol-core/constants.js";
 import { UNICODE_WHITE_SPACE_VERSION } from "../../packages/protocol-core/canonical.js";
-import { UNICODE_NORMALIZATION_VERSION } from "../../packages/protocol-core/unicode-normalization.js";
 import {
   DISCLOSURE_BINDING_PROOF_DEFINITION,
   DISCLOSURE_BINDING_V1_PUBLIC_SIGNAL_SPEC,
@@ -64,7 +63,12 @@ import {
   validateKdfDeviceMatrixEvidence,
 } from "./kdfReleaseEvidence.mjs";
 import { inspectZkReleaseArtifacts, readCanonicalJsonFile } from "./zkArtifactTrust.mjs";
-import { SHIELDED_DEPLOYMENT_CIRCUITS, RECEIVE_DEPLOYMENT_CONTRACTS, RECEIVE_DEPLOYMENT_IMMUTABLES, receiveDeploymentLibraries } from "./zkDeploymentCatalog.mjs";
+import {
+  SHIELDED_DEPLOYMENT_CIRCUITS,
+  RECEIVE_DEPLOYMENT_CONTRACTS,
+  RECEIVE_DEPLOYMENT_IMMUTABLES,
+  receiveDeploymentLibraries,
+} from "./zkDeploymentCatalog.mjs";
 import { contractArtifact, contractSource } from "../../lib/contractSources.js";
 
 export const GROTH16_ADAPTER_VERIFIER_BINDINGS = Object.freeze({
@@ -93,9 +97,6 @@ export const groth16VerifierAdapterBindingsFromAddresses = (addresses) => ({
 });
 
 export const PROTOCOL_RELEASE_MANIFEST_PATH = "protocol-release-manifest.json";
-export const PROTOCOL_PRECIS_DATA_PATH = "packages/protocol-core/precis-data.js";
-export const PROTOCOL_UNICODE_NORMALIZATION_DATA_PATH =
-  "packages/protocol-core/unicode-normalization-data.js";
 export const PROTOCOL_DEPLOYMENT_EVIDENCE_SCHEMA_VERSION = 1;
 
 const PROTOCOL_IDENTIFIER = "deepfamily/onchain-biography-unified-passphrase-v1";
@@ -131,24 +132,47 @@ export const PROTOCOL_DEPLOYMENT_ARTIFACTS = Object.freeze({
   ),
   shieldedErc20Pool: Object.freeze({
     ...artifactSpec("ShieldedErc20Pool"),
-    immutableFields: Object.freeze(["TOKEN", "LINEAGE_INDEX", "VERIFIER", "AUTHORIZATION_STATE", "RECEIVE_VERIFIER"]),
+    immutableFields: Object.freeze([
+      "TOKEN",
+      "LINEAGE_INDEX",
+      "VERIFIER",
+      "AUTHORIZATION_STATE",
+      "RECEIVE_VERIFIER",
+    ]),
     libraryFields: Object.freeze(["PoseidonT3"]),
   }),
   shieldedNativePool: Object.freeze({
     ...artifactSpec("ShieldedNativePool"),
-    immutableFields: Object.freeze(["LINEAGE_INDEX", "VERIFIER", "AUTHORIZATION_STATE", "RECEIVE_VERIFIER"]),
+    immutableFields: Object.freeze([
+      "LINEAGE_INDEX",
+      "VERIFIER",
+      "AUTHORIZATION_STATE",
+      "RECEIVE_VERIFIER",
+    ]),
     libraryFields: Object.freeze(["PoseidonT3"]),
   }),
   shieldedPoolFactory: Object.freeze({
     ...artifactSpec("ShieldedPoolFactory"),
-    immutableFields: Object.freeze(["DEEP_TOKEN", "LINEAGE_INDEX", "VERIFIER", "NATIVE_POOL", "AUTHORIZATION_STATE", "RECEIVE_VERIFIER"]),
+    immutableFields: Object.freeze([
+      "DEEP_TOKEN",
+      "LINEAGE_INDEX",
+      "VERIFIER",
+      "NATIVE_POOL",
+      "AUTHORIZATION_STATE",
+      "RECEIVE_VERIFIER",
+    ]),
     libraryFields: Object.freeze(["PoseidonT3"]),
   }),
-  ...Object.fromEntries(RECEIVE_DEPLOYMENT_CONTRACTS.map(({ contractName, property }) => [property, Object.freeze({
-    ...artifactSpec(contractName),
-    immutableFields: Object.freeze(Object.keys(RECEIVE_DEPLOYMENT_IMMUTABLES[property])),
-    libraryFields: Object.freeze(Object.keys(receiveDeploymentLibraries(property, {}))),
-  })])),
+  ...Object.fromEntries(
+    RECEIVE_DEPLOYMENT_CONTRACTS.map(({ contractName, property }) => [
+      property,
+      Object.freeze({
+        ...artifactSpec(contractName),
+        immutableFields: Object.freeze(Object.keys(RECEIVE_DEPLOYMENT_IMMUTABLES[property])),
+        libraryFields: Object.freeze(Object.keys(receiveDeploymentLibraries(property, {}))),
+      }),
+    ]),
+  ),
 });
 
 export const PROTOCOL_CONTRACT_INTERFACE_ARTIFACTS = Object.freeze({
@@ -247,6 +271,15 @@ const expectedArgon2idProfile = () => ({
   iterations: CANDIDATE_ARGON2ID_PROFILE.iterations,
   parallelism: CANDIDATE_ARGON2ID_PROFILE.parallelism,
   outputBytes: CANDIDATE_ARGON2ID_PROFILE.outputBytes,
+});
+
+const expectedTrimOnlyTextPreparation = () => ({
+  normalization: "trim-only",
+  codePointRestriction: "Unicode-scalar-values",
+  whiteSpaceProperty: "Unicode White_Space",
+  whiteSpaceUnicodeVersion: UNICODE_WHITE_SPACE_VERSION,
+  collapse: "none",
+  trim: true,
 });
 
 const functionSelector = (signature) => id(signature).slice(0, 10);
@@ -388,13 +421,7 @@ const validateFrozenV1Constants = ({
   assertExactJson(
     identityDefinition,
     {
-      normalization: "RFC8265-OpaqueString",
-      unicodeVersion: "17.0.0",
-      normalizationImplementation: "deepfamily-ucd-normalization-v1",
-      normalizationDataSha256: "f4f31f42e0e3b87e821bea40f4b4396a0da16095cc6fad69b9c898d3b592b2a4",
-      codePointRestriction: "PRECIS FreeformClass (RFC 8264)",
-      precisDataSha256: "396dec075f54f1242e5268274db1fae0ca31ed38f5b2270ccc76ae9123bb91c3",
-      trim: false,
+      ...expectedTrimOnlyTextPreparation(),
       passwordDomain: IDENTITY_PASSWORD_DOMAIN,
       passwordDomainSeparatorHex: "00",
       salt: {
@@ -413,13 +440,7 @@ const validateFrozenV1Constants = ({
   assertExactJson(
     fileDefinition,
     {
-      normalization: "RFC8265-OpaqueString",
-      unicodeVersion: "17.0.0",
-      normalizationImplementation: "deepfamily-ucd-normalization-v1",
-      normalizationDataSha256: "f4f31f42e0e3b87e821bea40f4b4396a0da16095cc6fad69b9c898d3b592b2a4",
-      codePointRestriction: "PRECIS FreeformClass (RFC 8264)",
-      precisDataSha256: "396dec075f54f1242e5268274db1fae0ca31ed38f5b2270ccc76ae9123bb91c3",
-      trim: false,
+      ...expectedTrimOnlyTextPreparation(),
       passwordDomain: FILE_PASSWORD_DOMAIN,
       passwordDomainSeparatorHex: "00",
       saltBytes: CANDIDATE_ARGON2ID_PROFILE.saltBytes,
@@ -432,15 +453,7 @@ const validateFrozenV1Constants = ({
     manifest.identity,
     {
       fullName: {
-        normalization: "NFKC",
-        unicodeVersion: UNICODE_NORMALIZATION_VERSION,
-        normalizationImplementation: "deepfamily-ucd-normalization-v1",
-        normalizationDataSha256: identitySuite.normalizationDataSha256,
-        whiteSpaceProperty: "Unicode White_Space",
-        whiteSpaceUnicodeVersion: UNICODE_WHITE_SPACE_VERSION,
-        collapse: "runs to U+0020",
-        // Names are trimmed; passphrases deliberately are not.
-        trim: true,
+        ...expectedTrimOnlyTextPreparation(),
         maximumUtf8Bytes: MAX_FULL_NAME_UTF8_BYTES,
       },
       nameField: {
@@ -449,6 +462,21 @@ const validateFrozenV1Constants = ({
       },
     },
     "canonical identity definition",
+  );
+
+  assertExactJson(
+    manifest.independentKeyCredentials,
+    {
+      fullName: {
+        ...expectedTrimOnlyTextPreparation(),
+        maximumUtf8Bytes: MAX_FULL_NAME_UTF8_BYTES,
+      },
+      passphrase: {
+        ...expectedTrimOnlyTextPreparation(),
+        nonblank: true,
+      },
+    },
+    "independent-key credentials definition",
   );
 
   assertExactJson(
@@ -988,10 +1016,17 @@ export const inspectProtocolDeploymentArtifacts = ({ root = process.cwd(), deplo
         ]),
       ),
     ),
-    ...Object.fromEntries(RECEIVE_DEPLOYMENT_CONTRACTS.map(({property}) => [property, inspectProtocolDeploymentArtifact({
-      root, artifactName: property, immutableValues: deployments?.[property]?.immutables ?? {},
-      libraries: receiveDeploymentLibraries(property, deployments ?? {}),
-    })])),
+    ...Object.fromEntries(
+      RECEIVE_DEPLOYMENT_CONTRACTS.map(({ property }) => [
+        property,
+        inspectProtocolDeploymentArtifact({
+          root,
+          artifactName: property,
+          immutableValues: deployments?.[property]?.immutables ?? {},
+          libraries: receiveDeploymentLibraries(property, deployments ?? {}),
+        }),
+      ]),
+    ),
     shieldedErc20Pool: inspectProtocolDeploymentArtifact({
       root,
       artifactName: "shieldedErc20Pool",
@@ -1082,7 +1117,7 @@ const SHIELDED_DEPLOYMENT_KEYS = Object.freeze([
   "shieldedErc20Pool",
   "shieldedNativePool",
   "shieldedPoolFactory",
-  ...RECEIVE_DEPLOYMENT_CONTRACTS.map(({property}) => property),
+  ...RECEIVE_DEPLOYMENT_CONTRACTS.map(({ property }) => property),
 ]);
 
 const assertShieldedDeploymentShape = (deployments) => {
@@ -1117,9 +1152,17 @@ const assertShieldedDeploymentShape = (deployments) => {
       `${key} deployment`,
     );
   }
-  for (const {property} of RECEIVE_DEPLOYMENT_CONTRACTS) {
-    assertExactKeys(deployments[property], ["address", "immutables", ...SHIELDED_RECORD_HASH_KEYS], `${property} deployment`);
-    assertExactKeys(deployments[property].immutables, Object.keys(RECEIVE_DEPLOYMENT_IMMUTABLES[property]), `${property} immutable bindings`);
+  for (const { property } of RECEIVE_DEPLOYMENT_CONTRACTS) {
+    assertExactKeys(
+      deployments[property],
+      ["address", "immutables", ...SHIELDED_RECORD_HASH_KEYS],
+      `${property} deployment`,
+    );
+    assertExactKeys(
+      deployments[property].immutables,
+      Object.keys(RECEIVE_DEPLOYMENT_IMMUTABLES[property]),
+      `${property} immutable bindings`,
+    );
   }
 };
 
@@ -1130,10 +1173,20 @@ export const shieldedDeploymentBindingsFromAddresses = (addresses) => ({
   poseidonT4: addresses?.poseidonT4,
   poseidonT6: addresses?.poseidonT6,
   deepFamilyLineageIndex: addresses?.deepFamilyLineageIndex,
-  ...Object.fromEntries(RECEIVE_DEPLOYMENT_CONTRACTS.map(({property}) => [property, {
-    address: addresses?.[property],
-    immutables: Object.fromEntries(Object.entries(RECEIVE_DEPLOYMENT_IMMUTABLES[property]).map(([getter, key]) => [getter, addresses?.[key]])),
-  }])),
+  ...Object.fromEntries(
+    RECEIVE_DEPLOYMENT_CONTRACTS.map(({ property }) => [
+      property,
+      {
+        address: addresses?.[property],
+        immutables: Object.fromEntries(
+          Object.entries(RECEIVE_DEPLOYMENT_IMMUTABLES[property]).map(([getter, key]) => [
+            getter,
+            addresses?.[key],
+          ]),
+        ),
+      },
+    ]),
+  ),
   shieldedVerifiers: Object.fromEntries(
     Object.entries(SHIELDED_DEPLOYMENT_CIRCUITS).map(([action, spec]) => [
       action,
@@ -1197,20 +1250,38 @@ export const protocolShieldedDeploymentEvidenceFromRecords = (deployments) => {
   const pool = normalizeRecord(deployments.shieldedErc20Pool, "ShieldedErc20Pool");
   const nativePool = normalizeRecord(deployments.shieldedNativePool, "ShieldedNativePool");
   const factory = normalizeRecord(deployments.shieldedPoolFactory, "ShieldedPoolFactory");
-  const receive = Object.fromEntries(RECEIVE_DEPLOYMENT_CONTRACTS.map(({contractName, property}) => [property, normalizeRecord(deployments[property], contractName)]));
-  const receiveAddresses = Object.fromEntries(Object.entries(receive).map(([property, record]) => [property, record.address]));
-  Object.assign(receiveAddresses, { deepFamily: deployments.deepFamilyProxy, shieldedPoolFactory: factory.address });
-  for (const {property} of RECEIVE_DEPLOYMENT_CONTRACTS) {
+  const receive = Object.fromEntries(
+    RECEIVE_DEPLOYMENT_CONTRACTS.map(({ contractName, property }) => [
+      property,
+      normalizeRecord(deployments[property], contractName),
+    ]),
+  );
+  const receiveAddresses = Object.fromEntries(
+    Object.entries(receive).map(([property, record]) => [property, record.address]),
+  );
+  Object.assign(receiveAddresses, {
+    deepFamily: deployments.deepFamilyProxy,
+    shieldedPoolFactory: factory.address,
+  });
+  for (const { property } of RECEIVE_DEPLOYMENT_CONTRACTS) {
     const values = {};
     for (const [getter, key] of Object.entries(RECEIVE_DEPLOYMENT_IMMUTABLES[property])) {
       values[getter] = assertAddress(receive[property].immutables[getter], `${property} ${getter}`);
-      assert(values[getter] === assertAddress(receiveAddresses[key], `${property} expected ${getter}`), `${property} ${getter} must bind the declared deployment`);
+      assert(
+        values[getter] === assertAddress(receiveAddresses[key], `${property} expected ${getter}`),
+        `${property} ${getter} must bind the declared deployment`,
+      );
     }
     receive[property].immutables = Object.freeze(values);
     Object.freeze(receive[property]);
   }
   for (const record of [pool, nativePool, factory]) {
-    for (const field of ["lineageIndexImmutable", "verifierAdapterImmutable", "authorizationStateImmutable", "receiveVerifierImmutable"])
+    for (const field of [
+      "lineageIndexImmutable",
+      "verifierAdapterImmutable",
+      "authorizationStateImmutable",
+      "receiveVerifierImmutable",
+    ])
       record[field] = assertAddress(record[field], `pool/factory ${field}`);
     assert(
       record.lineageIndexImmutable === addressFields.deepFamilyLineageIndex &&
@@ -1219,9 +1290,11 @@ export const protocolShieldedDeploymentEvidenceFromRecords = (deployments) => {
         ? "ShieldedErc20Pool must bind the declared token, lineage and common verifier adapter"
         : "Shielded pools/factory must bind the declared lineage and common verifier adapter",
     );
-    assert(record.authorizationStateImmutable === receive.identityAuthorizationState.address &&
-      record.receiveVerifierImmutable === receive.receivePresentationVerifierRouter.address,
-      "Shielded pools/factory must bind the shared identity authorization state and receive verifier");
+    assert(
+      record.authorizationStateImmutable === receive.identityAuthorizationState.address &&
+        record.receiveVerifierImmutable === receive.receivePresentationVerifierRouter.address,
+      "Shielded pools/factory must bind the shared identity authorization state and receive verifier",
+    );
   }
   pool.tokenImmutable = assertAddress(pool.tokenImmutable, "pool tokenImmutable");
   assert(
@@ -1367,7 +1440,9 @@ export const protocolDeploymentEvidenceFromAcceptanceReport = (report) => {
     contracts: Object.freeze({
       ...protocolShieldedDeploymentEvidenceFromRecords({
         deepFamilyProxy: proxyAddress,
-        ...Object.fromEntries(RECEIVE_DEPLOYMENT_CONTRACTS.map(({property}) => [property, terminal?.[property]])),
+        ...Object.fromEntries(
+          RECEIVE_DEPLOYMENT_CONTRACTS.map(({ property }) => [property, terminal?.[property]]),
+        ),
         token: addresses?.token,
         poseidonT3: terminal?.poseidonT3,
         poseidonT4: terminal?.poseidonT4,
@@ -1466,6 +1541,7 @@ export const inspectProtocolReleaseManifest = ({
       "identity",
       "identitySuites",
       "fileKdfSuites",
+      "independentKeyCredentials",
       "commitments",
       "contractInterfaces",
       "proofRoutes",
@@ -1603,64 +1679,6 @@ export const inspectProtocolReleaseManifest = ({
     personRoute,
     disclosureRoute,
   });
-
-  assert(
-    identitySuite.normalizationDataSha256 === fileSuite.normalizationDataSha256,
-    "identity and file suites must bind the same Unicode normalization data",
-  );
-  const unicodeNormalizationDataPath = path.join(
-    resolvedRoot,
-    PROTOCOL_UNICODE_NORMALIZATION_DATA_PATH,
-  );
-  let unicodeNormalizationData;
-  try {
-    const state = fs.lstatSync(unicodeNormalizationDataPath);
-    assert(
-      state.isFile() &&
-        !state.isSymbolicLink() &&
-        fs.realpathSync(unicodeNormalizationDataPath) === unicodeNormalizationDataPath,
-      "Unicode normalization data must be a regular non-symlink file",
-    );
-    unicodeNormalizationData = fs.readFileSync(unicodeNormalizationDataPath);
-  } catch (error) {
-    if (String(error?.message ?? "").startsWith("Protocol release manifest:")) throw error;
-    throw new Error("Protocol release manifest: Unicode normalization data is unavailable", {
-      cause: error,
-    });
-  }
-  assert(
-    protocolManifestSha256(unicodeNormalizationData) === identitySuite.normalizationDataSha256,
-    "Unicode normalization data hash does not match the suite definitions",
-  );
-  assert(
-    identitySuite.precisDataSha256 === fileSuite.precisDataSha256,
-    "identity and file suites must bind the same PRECIS repertoire data",
-  );
-  const precisDataPath = path.join(resolvedRoot, PROTOCOL_PRECIS_DATA_PATH);
-  let precisData;
-  try {
-    const state = fs.lstatSync(precisDataPath);
-    assert(
-      state.isFile() &&
-        !state.isSymbolicLink() &&
-        fs.realpathSync(precisDataPath) === precisDataPath,
-      "PRECIS repertoire data must be a regular non-symlink file",
-    );
-    precisData = fs.readFileSync(precisDataPath);
-  } catch (error) {
-    if (String(error?.message ?? "").startsWith("Protocol release manifest:")) throw error;
-    throw new Error("Protocol release manifest: PRECIS repertoire data is unavailable", {
-      cause: error,
-    });
-  }
-  assert(
-    protocolManifestSha256(precisData) === identitySuite.precisDataSha256,
-    "PRECIS repertoire data hash does not match the suite definitions",
-  );
-  assert(
-    manifest.identity.fullName.normalizationDataSha256 === identitySuite.normalizationDataSha256,
-    "name canonicalization must bind the same Unicode normalization data as the suites",
-  );
 
   const goldenVectors = manifest.goldenVectors;
   assertExactKeys(goldenVectors, ["status", "path", "sha256"], "golden vectors");
@@ -1878,8 +1896,6 @@ export const inspectProtocolReleaseManifest = ({
     for (const [relativePath, label] of [
       [PROTOCOL_RELEASE_MANIFEST_PATH, "protocol release manifest"],
       [goldenVectors.path, "golden vector"],
-      [PROTOCOL_UNICODE_NORMALIZATION_DATA_PATH, "Unicode normalization data"],
-      [PROTOCOL_PRECIS_DATA_PATH, "PRECIS repertoire data"],
     ]) {
       assert(
         trackedPathInspector({ root: resolvedRoot, relativePath }) === true,
@@ -2067,7 +2083,11 @@ export const inspectProtocolReleaseManifest = ({
         deployments.shieldedVerifiers[action],
         deploymentArtifacts.shieldedVerifiers?.[action],
       ]),
-      ...RECEIVE_DEPLOYMENT_CONTRACTS.map(({contractName, property}) => [contractName, deployments[property], deploymentArtifacts[property]]),
+      ...RECEIVE_DEPLOYMENT_CONTRACTS.map(({ contractName, property }) => [
+        contractName,
+        deployments[property],
+        deploymentArtifacts[property],
+      ]),
       ["ShieldedErc20Pool", deployments.shieldedErc20Pool, deploymentArtifacts.shieldedErc20Pool],
       [
         "ShieldedNativePool",

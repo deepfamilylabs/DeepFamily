@@ -36,7 +36,7 @@ different salts; "one passphrase" does not mean reusing the same KDF output as b
 
 Treat all of the following as sensitive working material:
 
-- raw and OpaqueString-normalized passphrases for the current person and non-null parents;
+- raw and edge-trimmed passphrases for the current person and non-null parents;
 - domain-separated identity/file password bytes;
 - deterministic identity salts and random file salts;
 - Argon2id outputs, `derivedSecretField`, KEK, DEK, and proof witnesses;
@@ -56,12 +56,21 @@ Rules:
 - An uncertain RPC result may retain and resubmit the exact frozen proof/public-signals/envelope
   package. It must not rerun the KDF, prover, or encryption with already-cleared secrets.
 
-The identity and file KDF paths both normalize the raw passphrase with the protocol's checked-in
-Unicode 17.0.0 RFC 8265 OpaqueString implementation and do not trim it; browser/Node host ICU
-tables are not used.
-They prepend different nonempty domains before Argon2id, so even an empty raw passphrase executes
-the full KDF. Identity suite 1 derives a deterministic salt from the suite ID and canonical
-identity fields; format 1 uses a fresh random `fileSalt` for every envelope.
+Full names and the identity/file/independent-key KDF passphrases use one trim-only preparation
+rule: remove leading and trailing Unicode 17.0.0 `White_Space` using the protocol's explicit
+character set, then preserve
+the remaining scalar values exactly. There is no NFC/NFKC, space replacement/collapse, case or
+width mapping, or PRECIS restriction. Internal controls and invisible characters remain part of
+the input; malformed UTF-16 surrogates are refused before UTF-8 encoding. U+0085 is trimmed at the
+edges, while U+FEFF and U+200B remain significant. Whitespace-only identity/file passphrases
+therefore derive the same values as the empty string. Independent asset-key credentials use the
+same preparation but require a nonempty prepared passphrase. Their separate KDF domains and
+encodings remain distinct. See [independent keys and recovery](frontend.md#independent-keys-backup-and-recovery).
+The browser's single-line name/passphrase fields reject pastes containing CR or LF with an explicit
+message and retain the previous value, rather than allowing the browser to silently delete line breaks.
+The identity and file paths prepend different nonempty domains before Argon2id, so even an empty
+raw passphrase executes the full KDF. Identity suite 1 derives a deterministic salt from the suite
+ID and canonical identity fields; format 1 uses a fresh random `fileSalt` for every envelope.
 
 ## Metadata Read and Unlock Boundary
 

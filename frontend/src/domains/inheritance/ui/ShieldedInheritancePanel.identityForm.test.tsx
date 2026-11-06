@@ -148,11 +148,7 @@ function panel(enabled = true) {
   return (
     <ToastProvider>
       <ShieldedIdentitySessionProvider scope="31337:factory" enabled={enabled}>
-        <ShieldedInheritancePanel
-          modules={modules}
-          signer={signer}
-          account={address}
-        />
+        <ShieldedInheritancePanel modules={modules} signer={signer} account={address} />
         <SessionObserver />
       </ShieldedIdentitySessionProvider>
     </ToastProvider>
@@ -278,7 +274,9 @@ describe("Shielded identity form privacy with a real session and form", () => {
     expect(Array.from(content.children)).toEqual(children);
     expect(unlockButton.getAttribute("aria-busy")).toBe("true");
     expect((unlockButton as HTMLButtonElement).disabled).toBe(true);
-    expect(within(unlockButton).getByRole("status").textContent).toBe("shielded.walletKeys.unlocking");
+    expect(within(unlockButton).getByRole("status").textContent).toBe(
+      "shielded.walletKeys.unlocking",
+    );
     expect(screen.queryByRole("button", { name: "common.cancel" })).toBeNull();
     expect(screen.queryByRole("button", { name: "shielded.lock" })).toBeNull();
     expect(screen.getAllByText("shielded.walletKeys.unlocking")).toHaveLength(1);
@@ -296,7 +294,9 @@ describe("Shielded identity form privacy with a real session and form", () => {
     fireEvent.click(screen.getByRole("button", { name: "shielded.unlock" }));
 
     expect((await screen.findByRole("alert")).textContent).toBe("Unlock failed");
-    expect((screen.getByRole("button", { name: "shielded.unlock" }) as HTMLButtonElement).disabled).toBe(false);
+    expect(
+      (screen.getByRole("button", { name: "shielded.unlock" }) as HTMLButtonElement).disabled,
+    ).toBe(false);
     expect(screen.queryByText("shielded.walletKeys.unlocking")).toBeNull();
     expect(screen.queryByRole("button", { name: "common.cancel" })).toBeNull();
     expect(screen.queryByRole("button", { name: "shielded.lock" })).toBeNull();
@@ -329,11 +329,15 @@ describe("Shielded identity form privacy with a real session and form", () => {
     fireEvent.click(screen.getByRole("button", { name: "shielded.unlock" }));
     mounted.rerender(panel(false));
     expect(sessionState()).toEqual({ identity: null, identityDraft: null });
-    expect((screen.getByLabelText("search.hashCalculator.passphrase") as HTMLInputElement).value).toBe("");
+    expect(
+      (screen.getByLabelText("search.hashCalculator.passphrase") as HTMLInputElement).value,
+    ).toBe("");
 
     await act(async () => complete(unlocked));
     expect(sessionState()).toEqual({ identity: null, identityDraft: null });
-    expect((screen.getByRole("button", { name: "shielded.unlock" }) as HTMLButtonElement).disabled).toBe(false);
+    expect(
+      (screen.getByRole("button", { name: "shielded.unlock" }) as HTMLButtonElement).disabled,
+    ).toBe(false);
     expect(screen.queryByRole("navigation", { name: "shielded.actionsTitle" })).toBeNull();
   });
 
@@ -432,7 +436,7 @@ describe("Shielded identity form privacy with a real session and form", () => {
     expect(sessionState().identity?.personHash).toBe(identity.personHash);
   });
 
-  it("submits original credentials under fixed independent-key rules even when the identity hash preview is unavailable", async () => {
+  it("uses shared trim-only preparation even when the identity hash preview is unavailable", async () => {
     mocks.crypto.mockResolvedValue({ identityHash: "" });
     render(panel());
     const rawName = "  Ａlice\u3000Example  ";
@@ -449,7 +453,7 @@ describe("Shielded identity form privacy with a real session and form", () => {
         "computeIdentityHash",
         {
           input: expect.objectContaining({
-            fullName: rawName,
+            fullName: "Ａlice\u3000Example",
             birthYear: 65535,
             passphrase: rawPassphrase,
           }),
@@ -464,6 +468,41 @@ describe("Shielded identity form privacy with a real session and form", () => {
         rawPassphrase,
       }),
     );
+  });
+
+  it("preserves fullwidth names, combining sequences, middle dots and joiners throughout asset unlock", async () => {
+    const rawName = "\u0085　Ａlice\u00a0  张·王e\u0301\u200d　";
+    const preparedName = "Ａlice\u00a0  张·王e\u0301\u200d";
+    const rawPassphrase = "\u0085　家训·e\u0301\u200d\u00a0密语　";
+    const previewHash = "0x" + "ab".repeat(32);
+    mocks.crypto.mockResolvedValue({ identityHash: previewHash });
+    render(panel());
+    fireEvent.change(nameInput(), { target: { value: rawName } });
+    const passphraseInput = screen.getByLabelText(
+      "search.hashCalculator.passphrase",
+    ) as HTMLInputElement;
+    fireEvent.change(passphraseInput, { target: { value: rawPassphrase } });
+    expect(mocks.form?.getPublicFormData().fullName).toBe(preparedName);
+    expect(mocks.form?.getRawIdentityFields().fullName).toBe(rawName);
+    expect(passphraseInput.value).toBe(rawPassphrase);
+    await waitFor(() =>
+      expect(mocks.crypto).toHaveBeenCalledWith(
+        "computeIdentityHash",
+        {
+          input: expect.objectContaining({ fullName: preparedName, passphrase: rawPassphrase }),
+        },
+        expect.anything(),
+      ),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "shielded.unlock" }));
+    await waitFor(() =>
+      expect(mocks.call).toHaveBeenCalledWith("unlockIdentity", {
+        identity: expect.objectContaining({ fullName: rawName }),
+        rawPassphrase,
+      }),
+    );
+    expect(sessionState().identity?.handle).toBe(identity.handle);
+    expect(passphraseInput.value).toBe("");
   });
 
   it.each(["birthYear", "birthMonth", "birthDay"] as const)(

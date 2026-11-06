@@ -24,7 +24,7 @@ vi.mock("react-i18next", () => ({
       const values =
         fallbackOrOptions && typeof fallbackOrOptions === "object" ? fallbackOrOptions : options;
       if (key === "search.hashCalculator.passphraseCharCount") {
-        return `Characters after normalization (not trimmed): ${String(values?.count ?? "")}`;
+        return `Characters used: ${String(values?.count ?? "")}`;
       }
       return template.replace(/{{\s*(\w+)\s*}}/g, (_match, name) => String(values?.[name] ?? ""));
     },
@@ -71,16 +71,16 @@ describe("PersonHashCalculator accessibility", () => {
     expect(screen.queryByText("Computing identity hash...")).toBeNull();
     expect(screen.queryByText("search.hashCalculator.calculatedHash:")).toBeNull();
     expect(screen.queryByRole("button", { name: "Identity passphrase help" })).toBeNull();
-    expect(screen.queryByText(/Characters after normalization/)).toBeNull();
+    expect(screen.queryByText(/Characters used/)).toBeNull();
     expect(screen.queryByText("Weak")).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "Show identity passphrase" }));
     expect(passphrase.type).toBe("text");
     fireEvent.click(screen.getByRole("button", { name: "Hide identity passphrase" }));
     expect(passphrase.type).toBe("password");
-    fireEvent.change(passphrase, { target: { value: `x${String.fromCharCode(9)}` } });
+    fireEvent.change(passphrase, { target: { value: "x\ud800" } });
     const error = screen.getByRole("alert");
-    expect(error.textContent).toContain("character the protocol does not accept");
+    expect(error.textContent).toContain("invalid for these credentials");
     expect(passphrase.getAttribute("aria-invalid")).toBe("true");
     expect(passphrase.getAttribute("aria-describedby")).toBe(error.id);
 
@@ -282,10 +282,11 @@ describe("PersonHashCalculator accessibility", () => {
     await waitFor(() => expect(document.activeElement).toBe(helpButton));
   });
 
-  it("warns that protocol Unicode whitespace is not trimmed", () => {
+  it("counts whitespace-only identity input as the empty public passphrase", () => {
+    const ref = createRef<PersonHashCalculatorHandle>();
     render(
       <ToastProvider>
-        <PersonHashCalculator showTitle={false} />
+        <PersonHashCalculator ref={ref} showTitle={false} />
       </ToastProvider>,
     );
 
@@ -296,7 +297,9 @@ describe("PersonHashCalculator accessibility", () => {
       { target: { value: "\u00a0\u3000" } },
     );
 
-    expect(screen.getByText("Characters after normalization (not trimmed): 2")).toBeTruthy();
+    expect(ref.current?.hasPassphrase()).toBe(false);
+    expect(screen.queryByText(/Characters used:/)).toBeNull();
+    expect(screen.getByText(/Only leading and trailing whitespace is removed/)).toBeTruthy();
   });
 
   it("shows a refused passphrase error and removes a previously computed hash", async () => {
@@ -316,11 +319,11 @@ describe("PersonHashCalculator accessibility", () => {
     await waitFor(() => expect(onComputedHashChange).toHaveBeenLastCalledWith(hash));
     const passphraseInput = screen.getByLabelText("Identity passphrase");
     fireEvent.change(passphraseInput, {
-      target: { value: `family${String.fromCharCode(9)}motto` },
+      target: { value: "family\ud800motto" },
     });
 
     const error = screen.getByRole("alert");
-    expect(error.textContent).toContain("character the protocol does not accept");
+    expect(error.textContent).toContain("invalid for these credentials");
     expect(passphraseInput.getAttribute("aria-invalid")).toBe("true");
     expect(passphraseInput.getAttribute("aria-describedby")).toBe(error.id);
     expect(screen.queryByText(hash)).toBeNull();
@@ -331,7 +334,7 @@ describe("PersonHashCalculator accessibility", () => {
   it("does not treat two different refused passphrases as matching", () => {
     // Refused input normalizes to "", so comparing only normalized forms would
     // call any two refused passphrases a match and hide a real typo.
-    const tab = String.fromCharCode(9);
+    const malformed = "\ud800";
     const ref = createRef<PersonHashCalculatorHandle>();
     render(
       <ToastProvider>
@@ -343,11 +346,88 @@ describe("PersonHashCalculator accessibility", () => {
     );
     const second = screen.getByPlaceholderText("Repeat the identity passphrase (empty is allowed)");
 
-    fireEvent.change(first, { target: { value: `family${tab}motto` } });
-    fireEvent.change(second, { target: { value: `other${tab}words` } });
+    fireEvent.change(first, { target: { value: `family${malformed}motto` } });
+    fireEvent.change(second, { target: { value: `other${malformed}words` } });
     expect(ref.current?.passphrasesMatch()).toBe(false);
 
-    fireEvent.change(second, { target: { value: `family${tab}motto` } });
+    fireEvent.change(second, { target: { value: `family${malformed}motto` } });
     expect(ref.current?.passphrasesMatch()).toBe(true);
   });
+
+  it.each([
+    [false, "\u0085 phrase\u3000", "phrase", true],
+    [false, "e\u0301-secret", "é-secret", false],
+    [false, "a\u00a0b", "a b", false],
+    [false, "family\tmotto", "family\tmotto", true],
+    [true, "\u0085 phrase\u3000", "phrase", true],
+    [true, "e\u0301-secret", "é-secret", false],
+    [true, "a\u00a0b", "a b", false],
+    [true, "a·b", "c·d", false],
+    [true, "张·王\u200d", "张·王\u200d", true],
+    [true, "Ａ-secret", "A-secret", false],
+    [true, "family\tmotto", "family\tmotto", true],
+  ])(
+    "uses the same trim-only confirmations in every credential form (independent=%s, first=%s)",
+    (independentKeyCredentials, firstValue, secondValue, expectedMatch) => {
+      const ref = createRef<PersonHashCalculatorHandle>();
+      render(
+        <ToastProvider>
+          <PersonHashCalculator
+            ref={ref}
+            showTitle={false}
+            computeHash={false}
+            requirePassphraseConfirmation
+            independentKeyCredentials={independentKeyCredentials}
+          />
+        </ToastProvider>,
+      );
+      fireEvent.change(screen.getByLabelText("Identity passphrase"), {
+        target: { value: firstValue },
+      });
+      fireEvent.change(
+        screen.getByPlaceholderText("Repeat the identity passphrase (empty is allowed)"),
+        {
+          target: { value: secondValue },
+        },
+      );
+      expect(ref.current?.passphrasesMatch()).toBe(expectedMatch);
+    },
+  );
+
+  it.each(["name", "passphrase", "confirmation"])(
+    "rejects multiline paste into the %s field without changing its original value",
+    (field) => {
+      render(
+        <ToastProvider>
+          <PersonHashCalculator
+            showTitle={false}
+            computeHash={false}
+            requirePassphraseConfirmation
+          />
+        </ToastProvider>,
+      );
+      const input = (
+        field === "name"
+          ? screen.getByPlaceholderText("search.hashCalculator.nameInputPlaceholder")
+          : field === "passphrase"
+            ? screen.getByLabelText("Identity passphrase")
+            : screen.getByPlaceholderText("Repeat the identity passphrase (empty is allowed)")
+      ) as HTMLInputElement;
+      fireEvent.change(input, { target: { value: "existing text" } });
+      const accepted = fireEvent.paste(input, {
+        clipboardData: { getData: () => "first\r\nsecond" },
+      });
+      expect(accepted).toBe(false);
+      expect(input.value).toBe("existing text");
+      const error = screen.getByRole("alert");
+      expect(error.textContent).toContain("cannot preserve line breaks");
+      expect(input.getAttribute("aria-invalid")).toBe("true");
+      expect(input.getAttribute("aria-describedby")).toBe(error.id);
+
+      expect(fireEvent.paste(input, { clipboardData: { getData: () => "single line" } })).toBe(
+        true,
+      );
+      expect(screen.queryByRole("alert")).toBeNull();
+    },
+  );
 });

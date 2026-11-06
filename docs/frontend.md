@@ -246,9 +246,10 @@ credentials session with the original person details and identity passphrase.
 There is no independent-key-only entry. The form previews the person hash as details
 are entered; this preview uses the identity suite's rules and is cancelled before
 unlocking. An unavailable preview does not block independent key recovery. The form passes
-raw fields to the Worker; the fixed independent-key normalization and validation run independently of the active
-identity suite. The Worker derives its independent-key identity secret and
-reconstructs identity proof material separately. If only the proof path is
+raw fields to the Worker. All names and passphrases share the same trim-only text preparation;
+independent asset-key credentials additionally require a nonempty prepared passphrase. The Worker
+derives its independent-key identity secret and reconstructs identity proof material separately.
+If only the proof path is
 unavailable, the credentials session still opens the workspace for independent-key
 recovery and matching VALUE use, without requiring a person record on the
 current chain. Asset selection follows credentials unlock. Metadata failures
@@ -335,10 +336,9 @@ One asset Worker holds an independent credentials-session handle, its
 root-derived independent key slot. The identity-derived slot needs no root backup.
 The independent key slot combines its 32-byte `independentKeyRoot` with the independent-key identity
 secret before deriving separate spend/view branches. This secret comes from an
-independent frozen Argon2id invocation over the original person details and
-passphrase; it is not derived from identity proof KDF output, suite or commitment.
-Exact normalization, encoding and KDF parameters are in the
-[independent-key specification](shielded-independent-key-spec.md).
+independent Argon2id invocation over the person details and passphrase after the shared trim-only
+preparation; it is not derived from identity proof KDF output, suite or commitment. The independent
+key domain separation and field encoding remain separate from the person identity derivation.
 
 **Shielded Key** and **24 English recovery words** encode the same original
 32-byte root. Neither includes identity details or passphrase. The codec uses
@@ -804,7 +804,12 @@ Selection starts public Archive/header preflight automatically; one supplied pas
 sequentially against that selection. Per-version results remain visible while the user selects the
 next person. Each successful item is cached immediately; a failed item is not written.
 Unlocking existing metadata requires no passphrase-risk confirmation. Empty and whitespace-only
-inputs may be submitted directly, with whitespace preserved for protocol decoding.
+inputs may be submitted directly. The raw value reaches protocol decoding, where the common
+identity/file rule removes only leading and trailing Unicode 17 White_Space; internal characters
+are preserved exactly, and whitespace-only inputs become the empty passphrase. Names use the same
+trim-only rule. Neither input undergoes NFC/NFKC, case/width mapping, or internal whitespace
+collapse. Independent asset-key credentials use the same text preparation, with a nonempty
+passphrase requirement for asset access.
 
 Both manual candidates and background attempts use the current root hash/version's projected family
 graph, honoring strict/union child rules, version deduplication, and trusted-source filters. The book

@@ -122,13 +122,11 @@
   },
   "identity": {
     "fullName": {
-      "normalization": "NFKC",
-      "unicodeVersion": "17.0.0",
-      "normalizationImplementation": "deepfamily-ucd-normalization-v1",
-      "normalizationDataSha256": "f4f31f42e0e3b87e821bea40f4b4396a0da16095cc6fad69b9c898d3b592b2a4",
+      "normalization": "trim-only",
+      "codePointRestriction": "Unicode-scalar-values",
       "whiteSpaceProperty": "Unicode White_Space",
       "whiteSpaceUnicodeVersion": "17.0.0",
-      "collapse": "runs to U+0020",
+      "collapse": "none",
       "trim": true,
       "maximumUtf8Bytes": 256
     },
@@ -140,13 +138,12 @@
   "identitySuites": {
     "1": {
       "status": "candidate-awaiting-device-benchmark",
-      "normalization": "RFC8265-OpaqueString",
-      "unicodeVersion": "17.0.0",
-      "normalizationImplementation": "deepfamily-ucd-normalization-v1",
-      "normalizationDataSha256": "f4f31f42e0e3b87e821bea40f4b4396a0da16095cc6fad69b9c898d3b592b2a4",
-      "codePointRestriction": "PRECIS FreeformClass (RFC 8264)",
-      "precisDataSha256": "396dec075f54f1242e5268274db1fae0ca31ed38f5b2270ccc76ae9123bb91c3",
-      "trim": false,
+      "normalization": "trim-only",
+      "codePointRestriction": "Unicode-scalar-values",
+      "whiteSpaceProperty": "Unicode White_Space",
+      "whiteSpaceUnicodeVersion": "17.0.0",
+      "collapse": "none",
+      "trim": true,
       "passwordDomain": "DeepFamily:IdentityKDF:v1",
       "passwordDomainSeparatorHex": "00",
       "salt": {
@@ -168,13 +165,12 @@
   "fileKdfSuites": {
     "1": {
       "status": "candidate-awaiting-device-benchmark",
-      "normalization": "RFC8265-OpaqueString",
-      "unicodeVersion": "17.0.0",
-      "normalizationImplementation": "deepfamily-ucd-normalization-v1",
-      "normalizationDataSha256": "f4f31f42e0e3b87e821bea40f4b4396a0da16095cc6fad69b9c898d3b592b2a4",
-      "codePointRestriction": "PRECIS FreeformClass (RFC 8264)",
-      "precisDataSha256": "396dec075f54f1242e5268274db1fae0ca31ed38f5b2270ccc76ae9123bb91c3",
-      "trim": false,
+      "normalization": "trim-only",
+      "codePointRestriction": "Unicode-scalar-values",
+      "whiteSpaceProperty": "Unicode White_Space",
+      "whiteSpaceUnicodeVersion": "17.0.0",
+      "collapse": "none",
+      "trim": true,
       "passwordDomain": "DeepFamily:FileKDF:v1",
       "passwordDomainSeparatorHex": "00",
       "saltBytes": 16,
@@ -186,6 +182,26 @@
         "parallelism": 1,
         "outputBytes": 32
       }
+    }
+  },
+  "independentKeyCredentials": {
+    "fullName": {
+      "normalization": "trim-only",
+      "codePointRestriction": "Unicode-scalar-values",
+      "whiteSpaceProperty": "Unicode White_Space",
+      "whiteSpaceUnicodeVersion": "17.0.0",
+      "collapse": "none",
+      "trim": true,
+      "maximumUtf8Bytes": 256
+    },
+    "passphrase": {
+      "normalization": "trim-only",
+      "codePointRestriction": "Unicode-scalar-values",
+      "whiteSpaceProperty": "Unicode White_Space",
+      "whiteSpaceUnicodeVersion": "17.0.0",
+      "collapse": "none",
+      "trim": true,
+      "nonblank": true
     }
   },
   "commitments": {
@@ -927,20 +943,14 @@
         "activeBinding": "DEEP_FAMILY.archive() == address(this)",
         "metadata": {
           "authorization": "msg.sender == DEEP_FAMILY",
-          "key": [
-            "personHash",
-            "versionIndex"
-          ],
+          "key": ["personHash", "versionIndex"],
           "writeOnce": true
         },
         "story": {
           "authorization": "msg.sender == DEEP_FAMILY.ownerOf(tokenId)",
           "schema": "nonzero opaque bytes; reserved biography schema rejected by ordinary append",
           "expectedPayloadHash": "mandatory keccak256(payload)",
-          "concurrency": [
-            "expectedIndex == totalRecords",
-            "expectedHead == recordsHead"
-          ],
+          "concurrency": ["expectedIndex == totalRecords", "expectedHead == recordsHead"],
           "initialHead": "0x0000000000000000000000000000000000000000000000000000000000000000",
           "recordHash": "keccak256(abi.encode(STORY_RECORD_DOMAIN, uint256(chainId), address(archive), uint256(tokenId), uint64(index), bytes32(schemaId), bytes32(payloadHash), uint64(payloadLength), address(author), uint64(timestamp)))",
           "newHead": "keccak256(abi.encode(STORY_HEAD_DOMAIN, bytes32(previousHead), bytes32(recordHash)))",
@@ -976,10 +986,7 @@
             },
             "originalHash": "keccak256(complete canonical story JSON bytes)",
             "biographyType": 0,
-            "editableTypes": [
-              1,
-              19
-            ]
+            "editableTypes": [1, 19]
           }
         },
         "blob": {
@@ -1710,7 +1717,7 @@
   "goldenVectors": {
     "status": "candidate-not-production-frozen",
     "path": "protocol-vectors/onchain-biography-v1.json",
-    "sha256": "661a7a429035a0aefb01fa299140d9b031ab7e6a6121e24d8a704200a36df205"
+    "sha256": "690db5cdfd4690699bc814fa171d7c2480538279b4e12f19f1449048a887d447"
   },
   "releaseEvidence": {
     "kdfDeviceMatrix": {

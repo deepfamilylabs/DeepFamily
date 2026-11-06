@@ -182,10 +182,6 @@ vi.mock("../../../shared/clients/contractFactory", () => ({
   createDeepFamilyReaderContract: (...args: any[]) => mocks.createDeepFamilyReaderContract(...args),
 }));
 
-vi.mock("../../../shared/identity/fullName", () => ({
-  safeCanonicalizeFullName: (value: string) => value.trim(),
-}));
-
 vi.mock("../../../shared/lib/errors", () => ({
   getFriendlyError: (error: any) => ({
     type: error?.type || "UNKNOWN_ERROR",

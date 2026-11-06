@@ -1,23 +1,13 @@
 import { argon2id } from "hash-wasm";
 import { getBytes, sha256 } from "ethers";
-import {
-  assertUnicodeScalarString,
-  bigintFrom,
-  concatBytes,
-  utf8Bytes,
-  wipeBytes,
-} from "./bytes.js";
+import { concatBytes, utf8Bytes, wipeBytes } from "./bytes.js";
+import { UNICODE_WHITE_SPACE_VERSION } from "./canonical.js";
 import { protocolAssert } from "./errors.js";
-import { assertFreeformClass } from "./precis.js";
-import {
-  mapNonAsciiSpacesToAscii,
-  normalizeUnicodeNfc,
-  normalizeUnicodeNfkc,
-} from "./unicode-normalization.js";
+import { normalizeIdentityFields, normalizePassphrase } from "./identity.js";
 
-// These are independent-key protocol constants, independent of identity suites, current
-// Unicode defaults and device performance. Release still requires device review.
-export const SHIELDED_INDEPENDENT_KEY_UNICODE_VERSION = "17.0.0";
+// The independent-key KDF has its own domain and parameters. Text preparation
+// shares the same trim-only rules as every person identity and file KDF.
+export const SHIELDED_INDEPENDENT_KEY_UNICODE_VERSION = UNICODE_WHITE_SPACE_VERSION;
 export const INDEPENDENT_KEY_ARGON2ID_PROFILE = Object.freeze({
   status: "candidate-awaiting-device-benchmark",
   provisional: true,
@@ -31,59 +21,9 @@ export const INDEPENDENT_KEY_ARGON2ID_PROFILE = Object.freeze({
 });
 const PASSWORD_DOMAIN = "DeepFamily:IndependentKeyIdentityPassword:v1";
 const SALT_DOMAIN = "DeepFamily:IndependentKeyIdentitySalt:v1";
-const WHITE_SPACE_RUN =
-  /[\u0009-\u000d\u0020\u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]+/gu;
-const WHITE_SPACE_ONLY =
-  /^[\u0009-\u000d\u0020\u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]*$/u;
-
-function smallUnsigned(value, maximum, label) {
-  return Number(bigintFrom(value, label, BigInt(maximum)));
-}
-
-/** Frozen independent-key validation; never first normalize through an identity suite. */
+/** Share person identity validation and preserve every interior name character. */
 export function normalizeShieldedIndependentKeyIdentity(input) {
-  protocolAssert(
-    input && typeof input === "object",
-    "INVALID_IDENTITY",
-    "Independent-key identity fields are required",
-  );
-  protocolAssert(
-    typeof input.fullName === "string",
-    "INVALID_FULL_NAME",
-    "fullName must be a string",
-  );
-  assertUnicodeScalarString(input.fullName, "fullName");
-  const fullName = normalizeUnicodeNfkc(input.fullName, "fullName")
-    .replace(WHITE_SPACE_RUN, " ")
-    .replace(/^ +| +$/gu, "");
-  const nameBytes = utf8Bytes(fullName);
-  try {
-    protocolAssert(
-      nameBytes.length > 0,
-      "EMPTY_FULL_NAME",
-      "Canonical independent-key fullName cannot be empty",
-    );
-    protocolAssert(
-      nameBytes.length <= 256,
-      "FULL_NAME_TOO_LARGE",
-      "Canonical independent-key fullName exceeds 256 UTF-8 bytes",
-    );
-  } finally {
-    wipeBytes(nameBytes);
-  }
-  protocolAssert(
-    typeof input.isBirthBC === "boolean",
-    "INVALID_BOOLEAN",
-    "isBirthBC must be boolean",
-  );
-  return {
-    fullName,
-    gender: smallUnsigned(input.gender, 255, "gender"),
-    birthYear: smallUnsigned(input.birthYear, 65_535, "birthYear"),
-    birthMonth: smallUnsigned(input.birthMonth, 12, "birthMonth"),
-    birthDay: smallUnsigned(input.birthDay, 31, "birthDay"),
-    isBirthBC: input.isBirthBC,
-  };
+  return normalizeIdentityFields(input);
 }
 
 /** uint16 name length, UTF-8 name, uint8 gender/BC, uint16 year, uint8 month/day. */
@@ -107,21 +47,11 @@ export function encodeShieldedIndependentKeyIdentity(input) {
   }
 }
 
-/** Unicode 17 PRECIS FreeformClass, non-ASCII Zs mapping, NFC, no trim/case map. */
+/** Use the common trim-only rule, then require a nonempty asset credential. */
 export function normalizeShieldedIndependentKeyPassphrase(rawPassphrase) {
+  const normalized = normalizePassphrase(rawPassphrase);
   protocolAssert(
-    typeof rawPassphrase === "string",
-    "INVALID_PASSPHRASE",
-    "Passphrase must be a string",
-  );
-  assertFreeformClass(rawPassphrase, "passphrase");
-  const normalized = normalizeUnicodeNfc(
-    mapNonAsciiSpacesToAscii(rawPassphrase, "passphrase"),
-    "passphrase",
-  );
-  assertFreeformClass(normalized, "passphrase");
-  protocolAssert(
-    !WHITE_SPACE_ONLY.test(normalized),
+    normalized.length > 0,
     "INDEPENDENT_KEY_PASSPHRASE_REQUIRED",
     "Independent-key credentials require a nonblank passphrase",
   );

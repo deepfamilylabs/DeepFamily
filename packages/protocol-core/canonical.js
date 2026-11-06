@@ -14,17 +14,15 @@ import {
   utf8Bytes,
 } from "./bytes.js";
 import { ProtocolError, protocolAssert } from "./errors.js";
-import { normalizeUnicodeNfkc } from "./unicode-normalization.js";
 
 // Unicode White_Space property, frozen by the v1 release manifest. The set is
 // unchanged in Unicode 17.0 and is written explicitly so host RegExp tables do
 // not silently redefine identity canonicalization.
 export const UNICODE_WHITE_SPACE_VERSION = "17.0.0";
-const UNICODE_WHITE_SPACE_RUN =
-  /[\u0009-\u000d\u0020\u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]+/gu;
+const UNICODE_WHITE_SPACE_CHARACTER =
+  /[\u0009-\u000d\u0020\u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]/u;
 const UNICODE_WHITE_SPACE_ONLY =
   /^[\u0009-\u000d\u0020\u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]+$/u;
-const LEADING_OR_TRAILING_ASCII_SPACE = /^ +| +$/gu;
 
 const TOP_LEVEL_KEYS = ["schema", "person", "parents", "tag", "biography"];
 const PERSON_KEYS = [
@@ -62,20 +60,29 @@ function assertExactKeys(value, expected, label) {
   }
 }
 
+/** Trim only the frozen White_Space set; preserve every interior code point. */
+export function trimUnicodeWhiteSpace(value, label = "string") {
+  protocolAssert(typeof value === "string", "INVALID_STRING", `${label} must be a string`);
+  assertUnicodeScalarString(value, label);
+  // Every White_Space character is in the BMP. Scan the edges in linear time;
+  // an unanchored trailing-whitespace regex can backtrack over long interior runs.
+  let start = 0;
+  let end = value.length;
+  while (start < end && UNICODE_WHITE_SPACE_CHARACTER.test(value[start])) start += 1;
+  while (end > start && UNICODE_WHITE_SPACE_CHARACTER.test(value[end - 1])) end -= 1;
+  return value.slice(start, end);
+}
+
 export function canonicalizeFullName(value) {
   protocolAssert(typeof value === "string", "INVALID_FULL_NAME", "fullName must be a string");
-  assertUnicodeScalarString(value, "fullName");
-  const normalized = normalizeUnicodeNfkc(value, "fullName");
-  const collapsed = normalized
-    .replace(UNICODE_WHITE_SPACE_RUN, " ")
-    .replace(LEADING_OR_TRAILING_ASCII_SPACE, "");
-  protocolAssert(collapsed.length > 0, "EMPTY_FULL_NAME", "Canonical fullName cannot be empty");
+  const trimmed = trimUnicodeWhiteSpace(value, "fullName");
+  protocolAssert(trimmed.length > 0, "EMPTY_FULL_NAME", "Canonical fullName cannot be empty");
   protocolAssert(
-    utf8Bytes(collapsed).length <= MAX_FULL_NAME_UTF8_BYTES,
+    utf8Bytes(trimmed).length <= MAX_FULL_NAME_UTF8_BYTES,
     "FULL_NAME_TOO_LARGE",
     `Canonical fullName exceeds ${MAX_FULL_NAME_UTF8_BYTES} UTF-8 bytes`,
   );
-  return collapsed;
+  return trimmed;
 }
 
 /** Tests the release-frozen Unicode 17 White_Space set without host tables. */
@@ -90,7 +97,7 @@ function assertCanonicalFullName(value) {
   protocolAssert(
     canonical === value,
     "NON_CANONICAL_FULL_NAME",
-    "fullName must already be NFKC-normalized with Unicode White_Space collapsed",
+    "fullName must already have leading and trailing Unicode White_Space removed",
   );
   return value;
 }

@@ -241,6 +241,8 @@ export function mapNonAsciiSpacesToAscii(value: string, label?: string): string;
 export function canonicalCombiningClass(codePoint: number): number;
 export const PRECIS_UNICODE_VERSION: "17.0.0";
 export function assertFreeformClass(value: string, label?: string): void;
+/** Remove only leading/trailing Unicode 17 White_Space, preserving other code points. */
+export function trimUnicodeWhiteSpace(value: string, label?: string): string;
 export function canonicalizeFullName(value: string): string;
 export function isUnicodeWhiteSpaceOnly(value: string): boolean;
 export function escapeCanonicalJsonString(value: string): string;
@@ -1132,11 +1134,12 @@ export const INDEPENDENT_KEY_ARGON2ID_PROFILE: Readonly<{
   outputBytes: 32;
   saltBytes: 16;
 }>;
-/** Frozen Unicode 17 independent-key rules, independent of the active identity suite. */
+/** Shares the common trim-only name and identity-field validation. */
 export function normalizeShieldedIndependentKeyIdentity(
   identity: IdentityFields,
 ): CanonicalIdentityFields;
 export function encodeShieldedIndependentKeyIdentity(identity: IdentityFields): Uint8Array;
+/** Shares trim-only preparation; asset credentials additionally require a nonempty result. */
 export function normalizeShieldedIndependentKeyPassphrase(rawPassphrase: string): string;
 /** The caller must wipe the returned password bytes after use. */
 export function buildShieldedIndependentKeyPasswordBytes(rawPassphrase: string): Uint8Array;

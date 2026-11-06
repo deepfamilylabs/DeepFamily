@@ -33,34 +33,37 @@ describe("useAddVersionIdentityMaterials", () => {
     mocks.cryptoWorkerCall.mockReset();
   });
 
-  it("refuses a passphrase the protocol disallows before deriving anything", async () => {
+  it("refuses malformed Unicode before deriving anything", async () => {
     // Failing here gives a specific reason instead of a generic worker error,
     // and no secret leaves the page for a derivation that could only fail.
     const { result } = renderHook(() => useAddVersionIdentityMaterials());
-    const passphrase = `family${String.fromCharCode(9)}motto`;
+    const passphrase = "family\ud800motto";
 
     await expect(result.current.resolveIdentityMaterial(calculator(passphrase))).rejects.toThrow(
-      /does not accept/,
+      /malformed Unicode/,
     );
     expect(mocks.cryptoWorkerCall).not.toHaveBeenCalled();
   });
 
-  it("derives identity material for an accepted passphrase", async () => {
-    mocks.cryptoWorkerCall.mockResolvedValue({
-      derivedSecretField: "7",
-      identitySuiteId: 1,
-      personHash: `0x${"11".repeat(32)}`,
-      identityCommitment: "9",
-    });
-    const { result } = renderHook(() => useAddVersionIdentityMaterials());
+  it.each(["family motto", " family\tmotto\u3000", "张·王\u200d-secret"])(
+    "passes accepted raw characters unchanged to the derivation worker (%s)",
+    async (passphrase) => {
+      mocks.cryptoWorkerCall.mockResolvedValue({
+        derivedSecretField: "7",
+        identitySuiteId: 1,
+        personHash: `0x${"11".repeat(32)}`,
+        identityCommitment: "9",
+      });
+      const { result } = renderHook(() => useAddVersionIdentityMaterials());
 
-    const material = await result.current.resolveIdentityMaterial(calculator("family motto"));
+      const material = await result.current.resolveIdentityMaterial(calculator(passphrase));
 
-    expect(mocks.cryptoWorkerCall).toHaveBeenCalledWith(
-      "deriveIdentityMaterialV1",
-      expect.objectContaining({ rawPassphrase: "family motto" }),
-      expect.anything(),
-    );
-    expect(material?.identityCommitment).toBe(9n);
-  });
+      expect(mocks.cryptoWorkerCall).toHaveBeenCalledWith(
+        "deriveIdentityMaterialV1",
+        expect.objectContaining({ rawPassphrase: passphrase }),
+        expect.anything(),
+      );
+      expect(material?.identityCommitment).toBe(9n);
+    },
+  );
 });

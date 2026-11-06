@@ -40,10 +40,6 @@ import {
 } from "../../../shared/crypto/passphraseStrength";
 import { safeCanonicalizeFullName } from "../../../shared/identity/fullName";
 import { cryptoWorkerCall } from "../../../shared/workers/cryptoWorkerClient";
-import {
-  normalizeShieldedIndependentKeyIdentity,
-  normalizeShieldedIndependentKeyPassphrase,
-} from "@deepfamily/protocol-core";
 
 const MAX_FULL_NAME_BYTES = 256;
 
@@ -226,7 +222,7 @@ interface PersonHashCalculatorProps {
   requirePassphraseConfirmation?: boolean;
   /** Disable live hash computation when the enclosing action derives the identity itself. */
   computeHash?: boolean;
-  /** Validate independent-key credentials with their frozen rules, independently of identity suites. */
+  /** Allow the complete protocol date range for asset credentials; text preparation is shared. */
   independentKeyCredentials?: boolean;
   /** Hide explanatory passphrase help and strength details in focused action forms. */
   showPassphraseGuidance?: boolean;
@@ -272,6 +268,9 @@ export const PersonHashCalculator = forwardRef<
     const [showConfirmPassphrase, setShowConfirmPassphrase] = useState(false);
     const [showPassphraseHelp, setShowPassphraseHelp] = useState(false);
     const [passphraseRevision, setPassphraseRevision] = useState(0);
+    const [namePasteError, setNamePasteError] = useState(false);
+    const [passphrasePasteError, setPassphrasePasteError] = useState(false);
+    const [confirmationPasteError, setConfirmationPasteError] = useState(false);
     const toast = useToast();
     const passphraseInputRef = useRef<HTMLInputElement | null>(null);
     const confirmPassphraseInputRef = useRef<HTMLInputElement | null>(null);
@@ -281,28 +280,21 @@ export const PersonHashCalculator = forwardRef<
     const passphraseHelpDescriptionId = useId();
     const passphraseInputId = useId();
     const passphraseErrorId = useId();
-    const canonicalName = (value: string) => {
-      if (!independentKeyCredentials) return safeCanonicalizeFullName(value);
-      try {
-        return normalizeShieldedIndependentKeyIdentity({
-          fullName: value,
-          gender: 0,
-          isBirthBC: false,
-          birthYear: 0,
-          birthMonth: 0,
-          birthDay: 0,
-        }).fullName;
-      } catch {
-        return "";
-      }
-    };
-    const normalizeFormPassphrase = (value: string) => {
-      if (!independentKeyCredentials) return normalizePassphraseForHash(value);
-      try {
-        return normalizeShieldedIndependentKeyPassphrase(value);
-      } catch {
-        return "";
-      }
+    const namePasteErrorId = useId();
+    const confirmationPasteErrorId = useId();
+    const multilinePasteMessage = t(
+      "search.hashCalculator.multilinePasteRejected",
+      "This single-line field cannot preserve line breaks. The paste was cancelled and the previous value was kept.",
+    );
+    const handleSingleLinePaste = (
+      event: React.ClipboardEvent<HTMLInputElement>,
+      setError: (error: boolean) => void,
+    ) => {
+      // Cancel before the browser silently removes CR/LF. Keep only an error
+      // flag in React state; clipboard text and passphrases stay out of state.
+      const containsLineBreak = /[\r\n]/u.test(event.clipboardData.getData("text/plain"));
+      if (containsLineBreak) event.preventDefault();
+      setError(containsLineBreak);
     };
 
     // Use external state if provided, otherwise use internal state
@@ -323,12 +315,15 @@ export const PersonHashCalculator = forwardRef<
             fullName: z
               .string()
               .min(1, t("search.validation.required"))
-              .refine((val) => canonicalName(val).length > 0, {
+              .refine((val) => safeCanonicalizeFullName(val).length > 0, {
                 message: t("search.validation.required"),
               })
-              .refine((val) => getByteLength(canonicalName(val)) <= MAX_FULL_NAME_BYTES, {
-                message: t("search.validation.nameTooLong"),
-              }),
+              .refine(
+                (val) => getByteLength(safeCanonicalizeFullName(val)) <= MAX_FULL_NAME_BYTES,
+                {
+                  message: t("search.validation.nameTooLong"),
+                },
+              ),
             isBirthBC: z.boolean(),
             birthYear: z
               .union([
@@ -420,20 +415,14 @@ export const PersonHashCalculator = forwardRef<
       strength: passwordStrength,
     } = useMemo(() => {
       const rawPassphrase = passphraseInputRef.current?.value ?? "";
-      const normalized = normalizeFormPassphrase(rawPassphrase);
+      const normalized = normalizePassphraseForHash(rawPassphrase);
       return {
-        risk: independentKeyCredentials
-          ? ((rawPassphrase === ""
-              ? "empty"
-              : normalized
-                ? "ordinary"
-                : "disallowed") as ProtocolPassphraseRisk)
-          : classifyProtocolPassphraseRisk(rawPassphrase),
+        risk: classifyProtocolPassphraseRisk(rawPassphrase),
         graphemeLength: getGraphemeLength(normalized),
         hasPassphrase: normalized.length > 0,
         strength: validatePassphraseStrength(normalized, false),
       };
-    }, [passphraseRevision, independentKeyCredentials]);
+    }, [passphraseRevision]);
     const isPassphraseDisallowed = passphraseRisk === "disallowed";
 
     const buildTransformedData = (
@@ -441,7 +430,7 @@ export const PersonHashCalculator = forwardRef<
     ): Omit<HashForm, "passphrase"> => {
       const snapshot = values ?? getValues();
       return {
-        fullName: canonicalName(snapshot.fullName || ""),
+        fullName: safeCanonicalizeFullName(snapshot.fullName || ""),
         isBirthBC: snapshot.isBirthBC || false,
         birthYear:
           snapshot.birthYear === "" || snapshot.birthYear === undefined
@@ -468,6 +457,8 @@ export const PersonHashCalculator = forwardRef<
       if (confirmPassphraseInputRef.current) confirmPassphraseInputRef.current.value = "";
       setShowPassphrase(false);
       setShowConfirmPassphrase(false);
+      setPassphrasePasteError(false);
+      setConfirmationPasteError(false);
       setComputedHash("");
       setIsComputingHash(false);
       setPassphraseRevision((revision) => revision + 1);
@@ -545,7 +536,7 @@ export const PersonHashCalculator = forwardRef<
           return {
             ...buildTransformedData(),
             hasPassphrase:
-              normalizeFormPassphrase(passphraseInputRef.current?.value ?? "").length > 0,
+              normalizePassphraseForHash(passphraseInputRef.current?.value ?? "").length > 0,
           };
         },
         getSecretInputs: () => ({
@@ -555,7 +546,7 @@ export const PersonHashCalculator = forwardRef<
             : {}),
         }),
         hasPassphrase: () =>
-          normalizeFormPassphrase(passphraseInputRef.current?.value ?? "").length > 0,
+          normalizePassphraseForHash(passphraseInputRef.current?.value ?? "").length > 0,
         passphrasesMatch: () => {
           if (!requirePassphraseConfirmation) return true;
           const first = passphraseInputRef.current?.value ?? "";
@@ -611,9 +602,6 @@ export const PersonHashCalculator = forwardRef<
         birthDay,
         gender: Number(gender || 0),
       });
-      // The preview uses the identity suite's own rules. It must not rewrite
-      // the original fields later submitted to the independent key path.
-      if (independentKeyCredentials) transformedData.fullName = fullName || "";
       if (!transformedData.fullName.length || isPassphraseDisallowed) {
         setIsComputingHash(false);
         return;
@@ -688,9 +676,18 @@ export const PersonHashCalculator = forwardRef<
               <input
                 className={MODAL_FIELD_SM}
                 placeholder={t("search.hashCalculator.nameInputPlaceholder")}
-                {...register("fullName")}
+                {...register("fullName", { onChange: () => setNamePasteError(false) })}
+                onPaste={(event) => handleSingleLinePaste(event, setNamePasteError)}
+                aria-invalid={namePasteError || undefined}
+                aria-describedby={namePasteError ? namePasteErrorId : undefined}
               />
-              <FieldError message={errors.fullName?.message} />
+              {namePasteError ? (
+                <p id={namePasteErrorId} role="alert" className="mt-1 text-xs text-danger">
+                  {multilinePasteMessage}
+                </p>
+              ) : (
+                <FieldError message={errors.fullName?.message} />
+              )}
             </div>
 
             <div className="w-28 sm:w-28 shrink-0">
@@ -737,7 +734,9 @@ export const PersonHashCalculator = forwardRef<
                 <input
                   type="number"
                   min="0"
-                  max={independentKeyCredentials ? 65535 : isBirthBC ? 9999 : new Date().getFullYear()}
+                  max={
+                    independentKeyCredentials ? 65535 : isBirthBC ? 9999 : new Date().getFullYear()
+                  }
                   placeholder={
                     independentKeyCredentials
                       ? "0–65535"
@@ -930,9 +929,13 @@ export const PersonHashCalculator = forwardRef<
                 spellCheck={false}
                 lang={i18n.language}
                 ref={passphraseInputRef}
-                aria-invalid={isPassphraseDisallowed || undefined}
-                aria-describedby={isPassphraseDisallowed ? passphraseErrorId : undefined}
+                aria-invalid={isPassphraseDisallowed || passphrasePasteError || undefined}
+                aria-describedby={
+                  isPassphraseDisallowed || passphrasePasteError ? passphraseErrorId : undefined
+                }
+                onPaste={(event) => handleSingleLinePaste(event, setPassphrasePasteError)}
                 onChange={() => {
+                  setPassphrasePasteError(false);
                   setComputedHash("");
                   setIsComputingHash(false);
                   setPassphraseRevision((r) => r + 1);
@@ -960,46 +963,74 @@ export const PersonHashCalculator = forwardRef<
                 {showPassphrase ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
             </div>
-            {isPassphraseDisallowed && (
+            {(isPassphraseDisallowed || passphrasePasteError) && (
               <p id={passphraseErrorId} role="alert" className="mt-1 text-xs text-danger">
+                {passphrasePasteError
+                  ? multilinePasteMessage
+                  : t(
+                      "search.hashCalculator.passphraseDisallowed",
+                      "This passphrase is invalid for these credentials. Re-enter the affected text.",
+                    )}
+              </p>
+            )}
+
+            {showPassphraseGuidance && (
+              <p className="mt-1 text-[11px] text-ink-muted">
                 {t(
-                  "search.hashCalculator.passphraseDisallowed",
-                  "This passphrase contains a character the protocol does not accept, such as a control or invisible character. Remove it to calculate the identity hash.",
+                  "search.hashCalculator.identityInputRule",
+                  "Names and identity passphrases use single-line fields. Only leading and trailing whitespace is removed; internal spaces and other entered characters are preserved exactly.",
                 )}
               </p>
             )}
 
             {requirePassphraseConfirmation ? (
-              <div className="relative mt-2">
-                <input
-                  type={showConfirmPassphrase ? "text" : "password"}
-                  className={`${MODAL_FIELD_SM} pr-10`}
-                  placeholder={t(
-                    "search.hashCalculator.confirmPassphrasePlaceholder",
-                    "Repeat the identity passphrase (empty is allowed)",
-                  )}
-                  inputMode="text"
-                  autoCapitalize="none"
-                  autoComplete="new-password"
-                  autoCorrect="off"
-                  spellCheck={false}
-                  lang={i18n.language}
-                  ref={confirmPassphraseInputRef}
-                  onChange={() => onPassphraseConfirmationChange?.()}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowConfirmPassphrase((value) => !value)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-subtle hover:text-gray-600 dark:hover:text-gray-300 transition-colors focus:outline-hidden"
-                  aria-label={
-                    showConfirmPassphrase
-                      ? t("search.hashCalculator.passphraseVisibility.hide", "Hide passphrase")
-                      : t("search.hashCalculator.passphraseVisibility.show", "Show passphrase")
-                  }
-                >
-                  {showConfirmPassphrase ? <EyeOff size={16} /> : <Eye size={16} />}
-                </button>
-              </div>
+              <>
+                <div className="relative mt-2">
+                  <input
+                    type={showConfirmPassphrase ? "text" : "password"}
+                    className={`${MODAL_FIELD_SM} pr-10`}
+                    placeholder={t(
+                      "search.hashCalculator.confirmPassphrasePlaceholder",
+                      "Repeat the identity passphrase (empty is allowed)",
+                    )}
+                    inputMode="text"
+                    autoCapitalize="none"
+                    autoComplete="new-password"
+                    autoCorrect="off"
+                    spellCheck={false}
+                    lang={i18n.language}
+                    ref={confirmPassphraseInputRef}
+                    aria-invalid={confirmationPasteError || undefined}
+                    aria-describedby={confirmationPasteError ? confirmationPasteErrorId : undefined}
+                    onPaste={(event) => handleSingleLinePaste(event, setConfirmationPasteError)}
+                    onChange={() => {
+                      setConfirmationPasteError(false);
+                      onPassphraseConfirmationChange?.();
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassphrase((value) => !value)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-subtle hover:text-gray-600 dark:hover:text-gray-300 transition-colors focus:outline-hidden"
+                    aria-label={
+                      showConfirmPassphrase
+                        ? t("search.hashCalculator.passphraseVisibility.hide", "Hide passphrase")
+                        : t("search.hashCalculator.passphraseVisibility.show", "Show passphrase")
+                    }
+                  >
+                    {showConfirmPassphrase ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+                {confirmationPasteError && (
+                  <p
+                    id={confirmationPasteErrorId}
+                    role="alert"
+                    className="mt-1 text-xs text-danger"
+                  >
+                    {multilinePasteMessage}
+                  </p>
+                )}
+              </>
             ) : null}
 
             {showPassphraseGuidance && hasPassphrase && (

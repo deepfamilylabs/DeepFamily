@@ -103,7 +103,7 @@ describe("ShieldedRecipientCredentialsForm", () => {
     });
     expect(credentials).toEqual({
       identity: {
-        fullName: "Alice",
+        fullName: "Ａlice",
         gender: 0,
         isBirthBC: false,
         birthYear: 0,

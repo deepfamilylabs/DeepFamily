@@ -224,6 +224,7 @@ export function MetadataUnlockControl({
   const listHeadingId = useId();
   const localHeadingId = useId();
   const passphraseId = useId();
+  const passphrasePasteErrorId = useId();
   const statusId = useId();
   const isDesktop = useResponsiveModalMode();
   const coordinatorRef = useRef(new MetadataUnlockCoordinator());
@@ -250,6 +251,7 @@ export function MetadataUnlockControl({
   const [error, setError] = useState("");
   const [preflightRetry, setPreflightRetry] = useState(0);
   const [showPassphrase, setShowPassphrase] = useState(false);
+  const [passphrasePasteError, setPassphrasePasteError] = useState(false);
   const unlockScopeKey = useMemo(
     () => buildTreeStorageNamespace({ chainId, contractAddress }),
     [chainId, contractAddress],
@@ -349,6 +351,7 @@ export function MetadataUnlockControl({
     coordinatorRef.current.cancel();
     if (passphraseRef.current) passphraseRef.current.value = "";
     setShowPassphrase(false);
+    setPassphrasePasteError(false);
     setPreparation("idle");
     setPreparedNodes([]);
     setProgress(null);
@@ -1158,7 +1161,18 @@ export function MetadataUnlockControl({
                   autoCorrect="off"
                   spellCheck={false}
                   disabled={passphraseDisabled}
-                  aria-describedby={statusId}
+                  aria-invalid={passphrasePasteError || undefined}
+                  aria-describedby={
+                    passphrasePasteError ? `${statusId} ${passphrasePasteErrorId}` : statusId
+                  }
+                  onPaste={(event) => {
+                    const containsLineBreak = /[\r\n]/u.test(
+                      event.clipboardData.getData("text/plain"),
+                    );
+                    if (containsLineBreak) event.preventDefault();
+                    setPassphrasePasteError(containsLineBreak);
+                  }}
+                  onChange={() => setPassphrasePasteError(false)}
                   placeholder={
                     selectedIds.length
                       ? t("metadataUnlock.passphrasePlaceholder", "Enter identity passphrase")
@@ -1217,6 +1231,14 @@ export function MetadataUnlockControl({
                 </button>
               )}
             </div>
+            {passphrasePasteError && (
+              <p id={passphrasePasteErrorId} role="alert" className="mt-1 text-xs text-danger">
+                {t(
+                  "search.hashCalculator.multilinePasteRejected",
+                  "This single-line field cannot preserve line breaks. The paste was cancelled and the previous value was kept.",
+                )}
+              </p>
+            )}
             <div id={statusId} aria-live="polite" className="mt-2 text-xs empty:hidden">
               {statusLine()}
             </div>

@@ -272,7 +272,9 @@
       "birthDayLabel": "Day",
       "passphrase": "Identity passphrase",
       "passphrasePlaceholder": "Enter any characters—family mottos or secret phrases. 15+ characters with mixed symbols recommended",
-      "passphraseDisallowed": "This passphrase contains a character the protocol does not accept, such as a control or invisible character. Remove it to calculate the identity hash.",
+      "passphraseDisallowed": "This passphrase is invalid for these credentials. Re-enter the affected text.",
+      "identityInputRule": "Names and identity passphrases use single-line fields. Only leading and trailing whitespace is removed; internal spaces and other entered characters are preserved exactly.",
+      "multilinePasteRejected": "This single-line field cannot preserve line breaks. The paste was cancelled and the previous value was kept.",
       "confirmPassphrasePlaceholder": "Repeat the identity passphrase (empty is allowed)",
       "deterministicIdentityNotice": "Identity suite 1 always derives its salt deterministically from the canonical identity fields. No recovery salt is stored or accepted.",
       "passphraseHelp": {
@@ -302,7 +304,7 @@
         "weak": "Tip: Use at least 15+ mixed characters or 20+ letters for better security"
       },
       "entropyDisplay": "Raw entropy: {{raw}} bits · Adjusted strength score: {{adjusted}}",
-      "passphraseCharCount": "Characters after normalization (not trimmed): {{count}}",
+      "passphraseCharCount": "Characters used: {{count}}",
       "nameInputPlaceholder": "e.g., John Smith",
       "bcOptions": {
         "ad": "AD",
@@ -1184,7 +1186,7 @@
     "consentAge": "I confirm the person is 18 years or older.",
     "consentLegal": "I confirm the data is lawful, truthful, and authorized for public disclosure without extra private content.",
     "passphraseMismatch": "The identity passphrases do not match.",
-    "passphraseDisallowed": "This passphrase contains a code point the protocol does not accept, such as a control or invisible character. It cannot be used until that character is removed, because an invisible character cannot be retyped and the passphrase is not recoverable.",
+    "passphraseDisallowed": "This passphrase contains malformed Unicode. Re-enter the affected text.",
     "consentMissing": "Please confirm all required checkboxes before minting.",
     "supplementalInfo": "Supplemental Information",
     "birthPlace": "Birth Place",

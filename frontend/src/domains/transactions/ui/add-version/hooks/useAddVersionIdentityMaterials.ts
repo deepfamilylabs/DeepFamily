@@ -52,11 +52,13 @@ export function useAddVersionIdentityMaterials() {
       const identity = getPublicIdentity(calc);
       if (!calc || !identity) return null;
       if (!calc.passphrasesMatch()) {
-        throw new Error("Identity passphrase confirmation does not match after normalization");
+        throw new Error(
+          "Identity passphrase confirmation does not match after trimming surrounding whitespace",
+        );
       }
       const rawPassphrase = calc.getSecretInputs().passphrase;
       if (classifyProtocolPassphraseRisk(rawPassphrase) === "disallowed") {
-        throw new Error("Identity passphrase contains a code point the protocol does not accept");
+        throw new Error("Identity passphrase contains malformed Unicode");
       }
       const derived = await cryptoWorkerCall(
         "deriveIdentityMaterialV1",
