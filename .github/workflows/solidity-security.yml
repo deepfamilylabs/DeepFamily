@@ -1,0 +1,67 @@
+name: Solidity security
+
+on:
+  push:
+    branches: [main, master, dev]
+  pull_request:
+    branches: [main, master, dev]
+
+permissions:
+  contents: read
+
+jobs:
+  slither:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22.23.2
+          package-manager-cache: false
+
+      - name: Setup Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.14.4"
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Install pinned Solidity analyzer
+        run: python -m pip install -r security/slither-requirements.txt
+
+      - name: Check Solidity security
+        run: |
+          npm run build -- --force
+          node scripts/check-solidity-security.mjs
+
+      - name: Keep Solidity analysis report
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: solidity-security-report
+          path: artifacts/security/slither.json
+          if-no-files-found: warn
+          retention-days: 7
+
+  shielded-stateful:
+    name: Shielded pool operation sequences
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22.23.2
+          package-manager-cache: false
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Check shielded operation sequences
+        run: npx hardhat --config hardhat.config.mjs test mocha test/contract-shielded-stateful.test.mjs

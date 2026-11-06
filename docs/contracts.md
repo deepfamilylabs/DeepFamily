@@ -1349,6 +1349,18 @@ not establish an unlimited write capacity or low transaction fees.
 
 `publicBudget` follows the ten identity-payload fields, ending with periodDays; private funding supplies ten zeros. `ActionData.fundMode` and `budgetKind` apply only to fund and must be zero for other actions. The three input arrays have matching lengths: one slot for claim, two slots for shield/fund, and one or four for transfer/unshield. The VALUE array width selects its matching verifier. Initial fund repeats its first shard/root in both data slots; disabled transfer/unshield slots repeat slot zero and use distinct secret-bound placeholder nullifiers. Additional fund requires zero lineage roots and time. Contract and protocol-core signal layouts must match the generated circuits exactly.
 
+The shared business-action layout lives in `packages/protocol-core/shielded-signal-layout.js`
+as one ordered sequence of field segments with their applicable actions.
+The internal `scripts/generate-shielded-signal-layout.mjs` generator produces the Solidity
+signal-length constants and the pool's public-signal construction from that layout;
+the pool constructs common fields once and adds action-specific fields conditionally.
+Protocol-core derives each action's fields from the same definition. The existing `zk:check` command runs its `--check`
+mode for the complete bundle and shielded selections to reject stale generated code and
+mismatched public-input declarations in all eight business circuits.
+Layout changes still require circuit artifact regeneration and the existing real-proof checks.
+See [Contract security checks](contract-security-checks.md) for static analysis and reproducible
+asset-pool state tests.
+
 Secret-derived nullifiers and hidden input commitments prevent a direct public note reference on claim, transfer and exit. They do not guarantee absolute unlinkability: fee-wallet reuse, known budget terms, public activity, timing and small candidate sets can still correlate actions. Public facts remain disclosed. Recovery replays unfiltered pool events and validates envelopes or decrypts them locally, without identity-specific private-note queries.
 
 `ShieldedPoolFactory.poolCount` includes native and DEEP at construction and increments only when a new token pool is created; reusing a pool does not change it. Each pool's `nullifierCount` includes all emitted real, placeholder and period nullifiers. Recovery compares these public counts and note-tree state with unfiltered logs at one anchor block before treating a scan as complete.

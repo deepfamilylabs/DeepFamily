@@ -360,7 +360,11 @@ describe("parameterized ZK command wrappers", function () {
         fs.writeFileSync(path.join(root, "circuits", "shielded-production-manifest.json"), "{}");
         const seen = [];
         runZkCheck({ root, verifyCeremonies: false, runner: (command) => seen.push(command) });
-        expect(seen.map(({ check }) => check).slice(0, 2)).to.deep.equal(["build", "artifacts"]);
+        expect(seen.map(({ check }) => check).slice(0, 3)).to.deep.equal([
+          "public-signal-layout",
+          "build",
+          "artifacts",
+        ]);
         expect(seen.some(({ check }) => check.includes("ceremony"))).to.equal(false);
         expect(seen.filter(({ check }) => check === "proof")).to.have.length(2);
         expect(seen.at(-1).circuit).to.equal("receive");
@@ -376,7 +380,14 @@ describe("parameterized ZK command wrappers", function () {
     });
     it("rebuilds and verifies artifacts and ceremony records before running proof checks", function () {
       const commands = buildZkCheckCommands({ root: fixtureRoot });
-      expect(commands.slice(0, 3)).to.deep.equal(
+      expect(commands[0]).to.deep.equal({
+        circuit: "shielded-layout",
+        check: "public-signal-layout",
+        executable: process.execPath,
+        args: [path.join(fixtureRoot, "scripts", "generate-shielded-signal-layout.mjs"), "--check"],
+        cwd: fixtureRoot,
+      });
+      expect(commands.slice(1, 4)).to.deep.equal(
         [
           ["build", "zk-build.mjs"],
           ["artifacts", "check-zk-artifacts.mjs"],
@@ -389,7 +400,7 @@ describe("parameterized ZK command wrappers", function () {
           cwd: fixtureRoot,
         })),
       );
-      expect(commands[3].check).to.equal("proof");
+      expect(commands[4].check).to.equal("proof");
       for (const circuit of ["core", "person", "disclosure", "shielded", "shielded:claim"]) {
         expect(
           buildZkCheckCommands({ root: fixtureRoot, circuit }).some(
@@ -496,9 +507,10 @@ describe("parameterized ZK command wrappers", function () {
 
     it("runs the existing Claim32 proof fixture in a focused development check", function () {
       const commands = buildZkCheckCommands({ root: fixtureRoot, circuit: "shielded:claim32" });
-      expect(commands).to.have.length(1);
-      expect(commands[0].check).to.equal("development-proof-smoke");
-      expect(commands[0].args).to.deep.equal([
+      expect(commands).to.have.length(2);
+      expect(commands[0].check).to.equal("public-signal-layout");
+      expect(commands[1].check).to.equal("development-proof-smoke");
+      expect(commands[1].args).to.deep.equal([
         path.join(fixtureRoot, "scripts", "zk-shielded-development-proof-smoke.mjs"),
         "claim32",
       ]);
@@ -514,9 +526,10 @@ describe("parameterized ZK command wrappers", function () {
         expect(commands.some(({ check }) => check === "production-ceremony")).to.equal(false);
         expect(commands.some(({ circuit }) => circuit === "shielded")).to.equal(false);
         const scoped = buildZkCheckCommands({ root, circuit: "shielded" });
-        expect(scoped).to.have.length(1);
-        expect(scoped[0].check).to.equal("production-ceremony");
-        expect(scoped[0].args[0]).to.equal(
+        expect(scoped).to.have.length(2);
+        expect(scoped[0].check).to.equal("public-signal-layout");
+        expect(scoped[1].check).to.equal("production-ceremony");
+        expect(scoped[1].args[0]).to.equal(
           path.join(root, "scripts", "zk-shielded-production-check.mjs"),
         );
       } finally {
@@ -568,7 +581,12 @@ describe("parameterized ZK command wrappers", function () {
       expect(seen).to.deep.equal(["person:proof"]);
     });
 
-    for (const [index, failedCheck] of ["build", "artifacts", "ceremony"].entries()) {
+    for (const [index, failedCheck] of [
+      "public-signal-layout",
+      "build",
+      "artifacts",
+      "ceremony",
+    ].entries()) {
       it(`stops before proofs when the ${failedCheck} check fails`, function () {
         const failure = new Error(`${failedCheck} failed`);
         const seen = [];
@@ -581,7 +599,9 @@ describe("parameterized ZK command wrappers", function () {
             },
           }),
         ).to.throw(failure);
-        expect(seen).to.deep.equal(["build", "artifacts", "ceremony"].slice(0, index + 1));
+        expect(seen).to.deep.equal(
+          ["public-signal-layout", "build", "artifacts", "ceremony"].slice(0, index + 1),
+        );
       });
     }
 

@@ -1,0 +1,681 @@
+{
+  "version": 1,
+  "slitherVersion": "0.11.6",
+  "sourceSha256": {
+    "contracts/adapters/Groth16VerifierAdapter.sol": "389ff8580201245a29f42ce6811609b1f270c895cf97c26679b4d7706f1e450f",
+    "contracts/family/AdultAgeGate.sol": "5bf06089e8be949f735553218a277d330076d3c4ac6aa55c65b87bea3141e6a6",
+    "contracts/family/DeepFamily.sol": "f90f39c75a3459ef17d6f28ba9794e87d5864dd2ed699e901cc7f4bfb450b23c",
+    "contracts/family/DeepFamilyLineageIndex.sol": "506b3111cd8cd68ffa0ae779e351903873d2c2beb92799070744c36748506dcf",
+    "contracts/family/DeepFamilyReader.sol": "16412d80ff06edae81da1895f950a5ea56de02e99fa129fddad1ca483b7e04e1",
+    "contracts/family/DeepFamilyToken.sol": "6e5ac701240222518504edebceed3b3f147c0b875bfeb09e5d0cd4a04da5f19f",
+    "contracts/receive/IdentityAuthorizationState.sol": "2e3a1472e5452a62b5e976b0f333dd1f1e9c164d3ad70b744c89a221d31d1790",
+    "contracts/shielded/ShieldedNativePool.sol": "97ca57ef47f986be5af91265154b22a00f2d03c2e9ddd33e1ed90c12bd15da8e",
+    "contracts/shielded/ShieldedPoolCore.sol": "80a6a3618530fab9666258a36f687cd0c5b3f70f9109da1b7016fca40d78d8ee",
+    "contracts/verifiers/DisclosureBindingVerifier.sol": "22db1b5f52894d5dab505fc2f4d95220e1fd12b671381e8ca5c6db61371ef520",
+    "contracts/verifiers/PersonCommitmentVerifier.sol": "562d08d79a0c95b009f312618fec8af69defd8992835703bf29ecbba04a599ed",
+    "contracts/verifiers/ShieldedClaim32Verifier.sol": "440cecb93f4959f0b654de232ca1d7a37fe28c27b9b6d934e5953e1b459e04f9",
+    "contracts/verifiers/ShieldedClaim64Verifier.sol": "8d97c1ade1b2cc335f98a62aa6f946cdf51249287318ad0d23466143209f81dc",
+    "contracts/verifiers/ShieldedFundVerifier.sol": "8bc2887188ae517b3ec372841efb1db3a81302305bf0da4be16e832f4f634981",
+    "contracts/verifiers/ShieldedIdentityCounterUpdateVerifier.sol": "a7cb95814bc787d9f718b67af9d84bbf5fe549f9a123db84e16dbac8f7dcfccc",
+    "contracts/verifiers/ShieldedPrivateTransfer4Verifier.sol": "cf1b9f10021f4bc9066573807c1466631d10afd1084b9ad16eb3d79f7ccf9f61",
+    "contracts/verifiers/ShieldedPrivateTransferVerifier.sol": "38b447d60f53d41250d16d9c43e5c7a3e58079351ed8ac8e1a5e13eea07616b1",
+    "contracts/verifiers/ShieldedShieldVerifier.sol": "cd2b1034afb375aa3608e42eb42b4e4d64a382f33387f1da480f81af38b14923",
+    "contracts/verifiers/ShieldedUnshield4Verifier.sol": "b1ce2fa7aa8d898a0a731199b8f0cc0caf6446890a607d4906a5c6a704540a66",
+    "contracts/verifiers/ShieldedUnshieldVerifier.sol": "b5bd9ce041cb7c1ff0a8b2267576893699abe67c7b06333639f3d8278898af3a",
+    "node_modules/poseidon-solidity/PoseidonT3.sol": "08a7493be37838166954af6c77d583d797cc17d37673196498fc70cbf557831c",
+    "node_modules/poseidon-solidity/PoseidonT4.sol": "289e22a19a20bcec7519e29d172b8c1624b65ac6140d1982fe029254e1600a8f",
+    "node_modules/poseidon-solidity/PoseidonT5.sol": "69d69724244679b80a243e517aca5d3e5d067c51d352bf072db22dd5afbeb85e"
+  },
+  "findings": [
+    {
+      "id": "2fa4c643625d05feebcdaf82c8c422cc946dd9f0f6196edb544b3c8909bca03f",
+      "check": "arbitrary-send-eth",
+      "impact": "High",
+      "subject": "ShieldedNativePool._pay(address,uint256) (contracts/shielded/ShieldedNativePool.sol#39-42) sends eth to arbitrary user",
+      "reason": "This is the native pool's intended withdrawal payment. unshield binds this exact recipient and amount in its verified public inputs, rejects zero/self recipients, spends nullifiers and reduces totalShielded before calling _pay, and protects the whole entry point with nonReentrant. An arbitrary caller cannot choose another proof's destination.",
+      "sources": ["contracts/shielded/ShieldedNativePool.sol"]
+    },
+    {
+      "id": "30235420d8d2ab3fe25eca28fbbc4803a7ed02bbe0e7e681447c7bae4eb6c050",
+      "check": "divide-before-multiply",
+      "impact": "Medium",
+      "subject": "AdultAgeGate._timestampToDate(uint256) (contracts/family/AdultAgeGate.sol#37-55) performs a multiplication on the result of a division:",
+      "reason": "The Gregorian date conversion intentionally uses integer quotients to extract calendar cycles, years, months and days. The discarded remainder is handled by the subsequent subtraction in this exact algorithm. Reordering multiplication and division would change calendar boundaries rather than improve monetary precision; this calculation does not handle asset balances.",
+      "sources": ["contracts/family/AdultAgeGate.sol"]
+    },
+    {
+      "id": "355efe5857567a07a32149f1b6c757170436f6e6edbeed55bd04fd6e837e8503",
+      "check": "divide-before-multiply",
+      "impact": "Medium",
+      "subject": "AdultAgeGate._timestampToDate(uint256) (contracts/family/AdultAgeGate.sol#37-55) performs a multiplication on the result of a division:",
+      "reason": "The Gregorian date conversion intentionally uses integer quotients to extract calendar cycles, years, months and days. The discarded remainder is handled by the subsequent subtraction in this exact algorithm. Reordering multiplication and division would change calendar boundaries rather than improve monetary precision; this calculation does not handle asset balances.",
+      "sources": ["contracts/family/AdultAgeGate.sol"]
+    },
+    {
+      "id": "45262527df4de5201fe5b575d3f9ac4c5913dd63f56ace69af38533e9a1df3f3",
+      "check": "divide-before-multiply",
+      "impact": "Medium",
+      "subject": "AdultAgeGate._timestampToDate(uint256) (contracts/family/AdultAgeGate.sol#37-55) performs a multiplication on the result of a division:",
+      "reason": "The Gregorian date conversion intentionally uses integer quotients to extract calendar cycles, years, months and days. The discarded remainder is handled by the subsequent subtraction in this exact algorithm. Reordering multiplication and division would change calendar boundaries rather than improve monetary precision; this calculation does not handle asset balances.",
+      "sources": ["contracts/family/AdultAgeGate.sol"]
+    },
+    {
+      "id": "76db24db20c475df2e18cc4ddf9e7910acc601251b4403e64f276498ddd1d828",
+      "check": "divide-before-multiply",
+      "impact": "Medium",
+      "subject": "AdultAgeGate._timestampToDate(uint256) (contracts/family/AdultAgeGate.sol#37-55) performs a multiplication on the result of a division:",
+      "reason": "The Gregorian date conversion intentionally uses integer quotients to extract calendar cycles, years, months and days. The discarded remainder is handled by the subsequent subtraction in this exact algorithm. Reordering multiplication and division would change calendar boundaries rather than improve monetary precision; this calculation does not handle asset balances.",
+      "sources": ["contracts/family/AdultAgeGate.sol"]
+    },
+    {
+      "id": "089442745c1e4033c3c78b2f4ba56833a9be486f4b0c3d3a2a8fd373bba5c5be",
+      "check": "incorrect-return",
+      "impact": "High",
+      "subject": "ShieldedFundVerifier.verifyProof(uint256[2],uint256[2][2],uint256[2],uint256[27]) (contracts/verifiers/ShieldedFundVerifier.sol#137-349) calls ShieldedFundVerifier.verifyProof.asm_0.checkField() (contracts/verifiers/ShieldedFundVerifier.sol#139-144) which halt the execution return(uint256,uint256)(0,0x20) (contracts/verifiers/ShieldedFundVerifier.sol#142)",
+      "reason": "This generated snarkjs verifier deliberately returns one ABI-encoded false word on an invalid field or a failed precompile. Its outer verifyProof has no modifier or required cleanup. The consuming adapter and business contract reject false; exiting the verifier at this point is the intended fail-closed behavior.",
+      "sources": ["contracts/verifiers/ShieldedFundVerifier.sol"]
+    },
+    {
+      "id": "0ab2662103731e9d48ec0bb024e261c186a5190922f2f4d6c3a88ed08769c686",
+      "check": "incorrect-return",
+      "impact": "High",
+      "subject": "ShieldedPrivateTransfer4Verifier.verifyProof(uint256[2],uint256[2][2],uint256[2],uint256[16]) (contracts/verifiers/ShieldedPrivateTransfer4Verifier.sol#104-272) calls ShieldedPrivateTransfer4Verifier.verifyProof.asm_0.checkPairing() (contracts/verifiers/ShieldedPrivateTransfer4Verifier.sol#139-226) which halt the execution return(uint256,uint256)(0,0x20) (contracts/verifiers/ShieldedPrivateTransfer4Verifier.sol#125)",
+      "reason": "This generated snarkjs verifier deliberately returns one ABI-encoded false word on an invalid field or a failed precompile. Its outer verifyProof has no modifier or required cleanup. The consuming adapter and business contract reject false; exiting the verifier at this point is the intended fail-closed behavior.",
+      "sources": ["contracts/verifiers/ShieldedPrivateTransfer4Verifier.sol"]
+    },
+    {
+      "id": "0fc1b0b77e100e0cf92f20fdda565973698ab4eb2db5ce13d9a9bcbeee878806",
+      "check": "incorrect-return",
+      "impact": "High",
+      "subject": "ShieldedPoolCore.unshield(address,uint256,ShieldedPoolCore.ActionData,bytes) (contracts/shielded/ShieldedPoolCore.sol#189-203) calls ShieldedPoolCore._appendOutputs(ShieldedPoolCore.Action,ShieldedPoolCore.ActionData) (contracts/shielded/ShieldedPoolCore.sol#570-585) which halt the execution return(uint256,uint256)(0,0x20) (node_modules/poseidon-solidity/PoseidonT3.sol#388)",
+      "reason": "The reported RETURN belongs to a public linked Poseidon library function, which executes in its own DELEGATECALL frame. Returning the hash exits that library call and resumes this caller; it does not skip the caller's subsequent state updates or guards.",
+      "sources": [
+        "contracts/shielded/ShieldedPoolCore.sol",
+        "node_modules/poseidon-solidity/PoseidonT3.sol"
+      ]
+    },
+    {
+      "id": "103b6fc071df449b0f5c31a25624a0e8c183e4d538e14c9ebaeac001c285127a",
+      "check": "incorrect-return",
+      "impact": "High",
+      "subject": "ShieldedClaim64Verifier.verifyProof.asm_0.checkPairing() (contracts/verifiers/ShieldedClaim64Verifier.sol#133-216) calls ShieldedClaim64Verifier.verifyProof.asm_0.g1_mulAccC() (contracts/verifiers/ShieldedClaim64Verifier.sol#108-131) which halt the execution return(uint256,uint256)(0,0x20) (contracts/verifiers/ShieldedClaim64Verifier.sol#119)",
+      "reason": "This generated snarkjs verifier deliberately returns one ABI-encoded false word on an invalid field or a failed precompile. Its outer verifyProof has no modifier or required cleanup. The consuming adapter and business contract reject false; exiting the verifier at this point is the intended fail-closed behavior.",
+      "sources": ["contracts/verifiers/ShieldedClaim64Verifier.sol"]
+    },
+    {
+      "id": "1562ab0a1e0a5fe5e456d517d9cb79a07bcb1b406aa220d61fd868c1530c29f5",
+      "check": "incorrect-return",
+      "impact": "High",
+      "subject": "ShieldedClaim32Verifier.verifyProof(uint256[2],uint256[2][2],uint256[2],uint256[14]) (contracts/verifiers/ShieldedClaim32Verifier.sol#98-258) calls ShieldedClaim32Verifier.verifyProof.asm_0.checkField() (contracts/verifiers/ShieldedClaim32Verifier.sol#100-105) which halt the execution return(uint256,uint256)(0,0x20) (contracts/verifiers/ShieldedClaim32Verifier.sol#103)",
+      "reason": "This generated snarkjs verifier deliberately returns one ABI-encoded false word on an invalid field or a failed precompile. Its outer verifyProof has no modifier or required cleanup. The consuming adapter and business contract reject false; exiting the verifier at this point is the intended fail-closed behavior.",
+      "sources": ["contracts/verifiers/ShieldedClaim32Verifier.sol"]
+    },
+    {
+      "id": "17e445de77b52ece1014c73f9cdd4c6567f900a995a8d1d3a5bcb4e491140aef",
+      "check": "incorrect-return",
+      "impact": "High",
+      "subject": "ShieldedUnshield4Verifier.verifyProof(uint256[2],uint256[2][2],uint256[2],uint256[16]) (contracts/verifiers/ShieldedUnshield4Verifier.sol#104-272) calls ShieldedUnshield4Verifier.verifyProof.asm_0.checkField() (contracts/verifiers/ShieldedUnshield4Verifier.sol#106-111) which halt the execution return(uint256,uint256)(0,0x20) (contracts/verifiers/ShieldedUnshield4Verifier.sol#109)",
+      "reason": "This generated snarkjs verifier deliberately returns one ABI-encoded false word on an invalid field or a failed precompile. Its outer verifyProof has no modifier or required cleanup. The consuming adapter and business contract reject false; exiting the verifier at this point is the intended fail-closed behavior.",
+      "sources": ["contracts/verifiers/ShieldedUnshield4Verifier.sol"]
+    },
+    {
+      "id": "17e9eb1f09fa588d42023b00f408d85b1c168eae9680459a90362c718a9aff40",
+      "check": "incorrect-return",
+      "impact": "High",
+      "subject": "ShieldedClaim64Verifier.verifyProof(uint256[2],uint256[2][2],uint256[2],uint256[14]) (contracts/verifiers/ShieldedClaim64Verifier.sol#98-258) calls ShieldedClaim64Verifier.verifyProof.asm_0.checkPairing() (contracts/verifiers/ShieldedClaim64Verifier.sol#133-216) which halt the execution return(uint256,uint256)(0,0x20) (contracts/verifiers/ShieldedClaim64Verifier.sol#119)",
+      "reason": "This generated snarkjs verifier deliberately returns one ABI-encoded false word on an invalid field or a failed precompile. Its outer verifyProof has no modifier or required cleanup. The consuming adapter and business contract reject false; exiting the verifier at this point is the intended fail-closed behavior.",
+      "sources": ["contracts/verifiers/ShieldedClaim64Verifier.sol"]
+    },
+    {
+      "id": "24680320304a4772cab4bd0b9d5c381916caaf6fc2d81b0c81f82a4b42b85c23",
+      "check": "incorrect-return",
+      "impact": "High",
+      "subject": "ShieldedClaim32Verifier.verifyProof.asm_0.checkPairing() (contracts/verifiers/ShieldedClaim32Verifier.sol#133-216) calls ShieldedClaim32Verifier.verifyProof.asm_0.g1_mulAccC() (contracts/verifiers/ShieldedClaim32Verifier.sol#108-131) which halt the execution return(uint256,uint256)(0,0x20) (contracts/verifiers/ShieldedClaim32Verifier.sol#119)",
+      "reason": "This generated snarkjs verifier deliberately returns one ABI-encoded false word on an invalid field or a failed precompile. Its outer verifyProof has no modifier or required cleanup. The consuming adapter and business contract reject false; exiting the verifier at this point is the intended fail-closed behavior.",
+      "sources": ["contracts/verifiers/ShieldedClaim32Verifier.sol"]
+    },
+    {
+      "id": "257f8ae487ba89ae573b9c9c153c7fb53853ffae386bec16c9b76e2d7c851aad",
+      "check": "incorrect-return",
+      "impact": "High",
+      "subject": "IdentityAuthorizationState.incrementCounter(uint256,uint256,uint64,uint64,bytes) (contracts/receive/IdentityAuthorizationState.sol#135-186) calls IdentityAuthorizationState._writeCounter(uint256,uint64) (contracts/receive/IdentityAuthorizationState.sol#205-247) which halt the execution return(uint256,uint256)(0,0x20) (node_modules/poseidon-solidity/PoseidonT3.sol#388)",
+      "reason": "The reported RETURN belongs to a public linked Poseidon library function, which executes in its own DELEGATECALL frame. Returning the hash exits that library call and resumes this caller; it does not skip the caller's subsequent state updates or guards.",
+      "sources": [
+        "contracts/receive/IdentityAuthorizationState.sol",
+        "node_modules/poseidon-solidity/PoseidonT3.sol"
+      ]
+    },
+    {
+      "id": "2e76b78ebcab83a15f097cdb5aec1be456671bfdea3106fe30857f5ce4a89b1a",
+      "check": "incorrect-return",
+      "impact": "High",
+      "subject": "ShieldedFundVerifier.verifyProof.asm_0.checkPairing() (contracts/verifiers/ShieldedFundVerifier.sol#172-281) calls ShieldedFundVerifier.verifyProof.asm_0.g1_mulAccC() (contracts/verifiers/ShieldedFundVerifier.sol#147-170) which halt the execution return(uint256,uint256)(0,0x20) (contracts/verifiers/ShieldedFundVerifier.sol#158)",
+      "reason": "This generated snarkjs verifier deliberately returns one ABI-encoded false word on an invalid field or a failed precompile. Its outer verifyProof has no modifier or required cleanup. The consuming adapter and business contract reject false; exiting the verifier at this point is the intended fail-closed behavior.",
+      "sources": ["contracts/verifiers/ShieldedFundVerifier.sol"]
+    },
+    {
+      "id": "327f38010d226d91a443e05f8e43cdc96cc46537f7be9a5e1a4f6155e18ab337",
+      "check": "incorrect-return",
+      "impact": "High",
+      "subject": "PersonCommitmentVerifier.verifyProof(uint256[2],uint256[2][2],uint256[2],uint256[5]) (contracts/verifiers/PersonCommitmentVerifier.sol#71-195) calls PersonCommitmentVerifier.verifyProof.asm_0.checkField() (contracts/verifiers/PersonCommitmentVerifier.sol#73-78) which halt the execution return(uint256,uint256)(0,0x20) (contracts/verifiers/PersonCommitmentVerifier.sol#76)",
+      "reason": "This generated snarkjs verifier deliberately returns one ABI-encoded false word on an invalid field or a failed precompile. Its outer verifyProof has no modifier or required cleanup. The consuming adapter and business contract reject false; exiting the verifier at this point is the intended fail-closed behavior.",
+      "sources": ["contracts/verifiers/PersonCommitmentVerifier.sol"]
+    },
+    {
+      "id": "33414ad9520eb7404c8771e579489be08dfd237ca85f7c7fc7ae299459bb3581",
+      "check": "incorrect-return",
+      "impact": "High",
+      "subject": "ShieldedClaim64Verifier.verifyProof(uint256[2],uint256[2][2],uint256[2],uint256[14]) (contracts/verifiers/ShieldedClaim64Verifier.sol#98-258) calls ShieldedClaim64Verifier.verifyProof.asm_0.checkField() (contracts/verifiers/ShieldedClaim64Verifier.sol#100-105) which halt the execution return(uint256,uint256)(0,0x20) (contracts/verifiers/ShieldedClaim64Verifier.sol#103)",
+      "reason": "This generated snarkjs verifier deliberately returns one ABI-encoded false word on an invalid field or a failed precompile. Its outer verifyProof has no modifier or required cleanup. The consuming adapter and business contract reject false; exiting the verifier at this point is the intended fail-closed behavior.",
+      "sources": ["contracts/verifiers/ShieldedClaim64Verifier.sol"]
+    },
+    {
+      "id": "3fd41b8ca50d3d47e2e28871eca1393e32a8c6351af317856aa72f33eed3e158",
+      "check": "incorrect-return",
+      "impact": "High",
+      "subject": "IdentityAuthorizationState._writeCounter(uint256,uint64) (contracts/receive/IdentityAuthorizationState.sol#205-247) calls IdentityAuthorizationState._newBranch(uint64,uint64) (contracts/receive/IdentityAuthorizationState.sol#196-202) which halt the execution return(uint256,uint256)(0,0x20) (node_modules/poseidon-solidity/PoseidonT3.sol#388)",
+      "reason": "The reported RETURN belongs to a public linked Poseidon library function, which executes in its own DELEGATECALL frame. Returning the hash exits that library call and resumes this caller; it does not skip the caller's subsequent state updates or guards.",
+      "sources": [
+        "contracts/receive/IdentityAuthorizationState.sol",
+        "node_modules/poseidon-solidity/PoseidonT3.sol"
+      ]
+    },
+    {
+      "id": "4049ed5e0852712b7ace534c23a6d5c53d6c8436fa20df6989cc17ca5a2a681b",
+      "check": "incorrect-return",
+      "impact": "High",
+      "subject": "PersonCommitmentVerifier.verifyProof.asm_0.checkPairing() (contracts/verifiers/PersonCommitmentVerifier.sol#106-171) calls PersonCommitmentVerifier.verifyProof.asm_0.g1_mulAccC() (contracts/verifiers/PersonCommitmentVerifier.sol#81-104) which halt the execution return(uint256,uint256)(0,0x20) (contracts/verifiers/PersonCommitmentVerifier.sol#92)",
+      "reason": "This generated snarkjs verifier deliberately returns one ABI-encoded false word on an invalid field or a failed precompile. Its outer verifyProof has no modifier or required cleanup. The consuming adapter and business contract reject false; exiting the verifier at this point is the intended fail-closed behavior.",
+      "sources": ["contracts/verifiers/PersonCommitmentVerifier.sol"]
+    },
+    {
+      "id": "46b5db298db3bfc2fc86aa6600f349e6a1351f7fb21a9bfd49d3fc546663cf25",
+      "check": "incorrect-return",
+      "impact": "High",
+      "subject": "DeepFamilyLineageIndex.onEndorsementSet(bytes32,address,uint256) (contracts/family/DeepFamilyLineageIndex.sol#175-200) calls DeepFamilyLineageIndex._write(uint8,uint256,uint256) (contracts/family/DeepFamilyLineageIndex.sol#477-486) which halt the execution return(uint256,uint256)(0,0x20) (node_modules/poseidon-solidity/PoseidonT3.sol#388)",
+      "reason": "The reported RETURN belongs to a public linked Poseidon library function, which executes in its own DELEGATECALL frame. Returning the hash exits that library call and resumes this caller; it does not skip the caller's subsequent state updates or guards.",
+      "sources": [
+        "contracts/family/DeepFamilyLineageIndex.sol",
+        "node_modules/poseidon-solidity/PoseidonT3.sol"
+      ]
+    },
+    {
+      "id": "4faff13ea4300209dbc9b950eda4c74c749ab46af0080a8067ed90196de292bc",
+      "check": "incorrect-return",
+      "impact": "High",
+      "subject": "ShieldedIdentityCounterUpdateVerifier.verifyProof.asm_0.checkPairing() (contracts/verifiers/ShieldedIdentityCounterUpdateVerifier.sol#109-176) calls ShieldedIdentityCounterUpdateVerifier.verifyProof.asm_0.g1_mulAccC() (contracts/verifiers/ShieldedIdentityCounterUpdateVerifier.sol#84-107) which halt the execution return(uint256,uint256)(0,0x20) (contracts/verifiers/ShieldedIdentityCounterUpdateVerifier.sol#95)",
+      "reason": "This generated snarkjs verifier deliberately returns one ABI-encoded false word on an invalid field or a failed precompile. Its outer verifyProof has no modifier or required cleanup. The consuming adapter and business contract reject false; exiting the verifier at this point is the intended fail-closed behavior.",
+      "sources": ["contracts/verifiers/ShieldedIdentityCounterUpdateVerifier.sol"]
+    },
+    {
+      "id": "56c25a935bcb244b090b13b5ffbefe557bda1248813c4ea0f6514f49b58838b8",
+      "check": "incorrect-return",
+      "impact": "High",
+      "subject": "IdentityAuthorizationState._writeCounter(uint256,uint64) (contracts/receive/IdentityAuthorizationState.sol#205-247) calls IdentityAuthorizationState._newLeaf(uint256,uint64) (contracts/receive/IdentityAuthorizationState.sol#188-194) which halt the execution return(uint256,uint256)(0,0x20) (node_modules/poseidon-solidity/PoseidonT4.sol#564)",
+      "reason": "The reported RETURN belongs to a public linked Poseidon library function, which executes in its own DELEGATECALL frame. Returning the hash exits that library call and resumes this caller; it does not skip the caller's subsequent state updates or guards.",
+      "sources": [
+        "contracts/receive/IdentityAuthorizationState.sol",
+        "node_modules/poseidon-solidity/PoseidonT4.sol"
+      ]
+    },
+    {
+      "id": "5b1f8fb8b46bcdc7b645a79565893be464cf45f0bc2c88aa0aa419e1e0133bf1",
+      "check": "incorrect-return",
+      "impact": "High",
+      "subject": "DisclosureBindingVerifier.verifyProof(uint256[2],uint256[2][2],uint256[2],uint256[4]) (contracts/verifiers/DisclosureBindingVerifier.sol#68-188) calls DisclosureBindingVerifier.verifyProof.asm_0.checkField() (contracts/verifiers/DisclosureBindingVerifier.sol#70-75) which halt the execution return(uint256,uint256)(0,0x20) (contracts/verifiers/DisclosureBindingVerifier.sol#73)",
+      "reason": "This generated snarkjs verifier deliberately returns one ABI-encoded false word on an invalid field or a failed precompile. Its outer verifyProof has no modifier or required cleanup. The consuming adapter and business contract reject false; exiting the verifier at this point is the intended fail-closed behavior.",
+      "sources": ["contracts/verifiers/DisclosureBindingVerifier.sol"]
+    },
+    {
+      "id": "5d19cc6c2f10d8b0a74adc5e867cd1443c4ecc41d3bd684d40729053122d689e",
+      "check": "incorrect-return",
+      "impact": "High",
+      "subject": "PersonCommitmentVerifier.verifyProof(uint256[2],uint256[2][2],uint256[2],uint256[5]) (contracts/verifiers/PersonCommitmentVerifier.sol#71-195) calls PersonCommitmentVerifier.verifyProof.asm_0.checkPairing() (contracts/verifiers/PersonCommitmentVerifier.sol#106-171) which halt the execution return(uint256,uint256)(0,0x20) (contracts/verifiers/PersonCommitmentVerifier.sol#92)",
+      "reason": "This generated snarkjs verifier deliberately returns one ABI-encoded false word on an invalid field or a failed precompile. Its outer verifyProof has no modifier or required cleanup. The consuming adapter and business contract reject false; exiting the verifier at this point is the intended fail-closed behavior.",
+      "sources": ["contracts/verifiers/PersonCommitmentVerifier.sol"]
+    },
+    {
+      "id": "6a3b42d3da310275dc803fa5bc3d6556825708b5b96cea9bbc010f33bc130732",
+      "check": "incorrect-return",
+      "impact": "High",
+      "subject": "DeepFamilyLineageIndex.onEndorsementSet(bytes32,address,uint256) (contracts/family/DeepFamilyLineageIndex.sol#175-200) calls DeepFamilyLineageIndex._append(uint8,uint256) (contracts/family/DeepFamilyLineageIndex.sol#462-475) which halt the execution return(uint256,uint256)(0,0x20) (node_modules/poseidon-solidity/PoseidonT3.sol#388)",
+      "reason": "The reported RETURN belongs to a public linked Poseidon library function, which executes in its own DELEGATECALL frame. Returning the hash exits that library call and resumes this caller; it does not skip the caller's subsequent state updates or guards.",
+      "sources": [
+        "contracts/family/DeepFamilyLineageIndex.sol",
+        "node_modules/poseidon-solidity/PoseidonT3.sol"
+      ]
+    },
+    {
+      "id": "6a9ad3938a1c2998f6ccd88ecafdae02a8c90b01245410b3cd68e75d74472ced",
+      "check": "incorrect-return",
+      "impact": "High",
+      "subject": "DisclosureBindingVerifier.verifyProof(uint256[2],uint256[2][2],uint256[2],uint256[4]) (contracts/verifiers/DisclosureBindingVerifier.sol#68-188) calls DisclosureBindingVerifier.verifyProof.asm_0.checkPairing() (contracts/verifiers/DisclosureBindingVerifier.sol#103-166) which halt the execution return(uint256,uint256)(0,0x20) (contracts/verifiers/DisclosureBindingVerifier.sol#89)",
+      "reason": "This generated snarkjs verifier deliberately returns one ABI-encoded false word on an invalid field or a failed precompile. Its outer verifyProof has no modifier or required cleanup. The consuming adapter and business contract reject false; exiting the verifier at this point is the intended fail-closed behavior.",
+      "sources": ["contracts/verifiers/DisclosureBindingVerifier.sol"]
+    },
+    {
+      "id": "72a3ad96ea665cbccf823a47b8829e55a603c2e0365aee1dc2224fa6d5a757c6",
+      "check": "incorrect-return",
+      "impact": "High",
+      "subject": "DeepFamilyLineageIndex.onTrustedEndorserSet(bytes32,uint256,address,bool) (contracts/family/DeepFamilyLineageIndex.sol#153-173) calls DeepFamilyLineageIndex._write(uint8,uint256,uint256) (contracts/family/DeepFamilyLineageIndex.sol#477-486) which halt the execution return(uint256,uint256)(0,0x20) (node_modules/poseidon-solidity/PoseidonT3.sol#388)",
+      "reason": "The reported RETURN belongs to a public linked Poseidon library function, which executes in its own DELEGATECALL frame. Returning the hash exits that library call and resumes this caller; it does not skip the caller's subsequent state updates or guards.",
+      "sources": [
+        "contracts/family/DeepFamilyLineageIndex.sol",
+        "node_modules/poseidon-solidity/PoseidonT3.sol"
+      ]
+    },
+    {
+      "id": "85e391017ae2a59ecb67730e7cb20ec59a1d9c32278db3906c703037d85ad1ee",
+      "check": "incorrect-return",
+      "impact": "High",
+      "subject": "ShieldedPrivateTransfer4Verifier.verifyProof.asm_0.checkPairing() (contracts/verifiers/ShieldedPrivateTransfer4Verifier.sol#139-226) calls ShieldedPrivateTransfer4Verifier.verifyProof.asm_0.g1_mulAccC() (contracts/verifiers/ShieldedPrivateTransfer4Verifier.sol#114-137) which halt the execution return(uint256,uint256)(0,0x20) (contracts/verifiers/ShieldedPrivateTransfer4Verifier.sol#125)",
+      "reason": "This generated snarkjs verifier deliberately returns one ABI-encoded false word on an invalid field or a failed precompile. Its outer verifyProof has no modifier or required cleanup. The consuming adapter and business contract reject false; exiting the verifier at this point is the intended fail-closed behavior.",
+      "sources": ["contracts/verifiers/ShieldedPrivateTransfer4Verifier.sol"]
+    },
+    {
+      "id": "8b341b60640fe6460ee27eda1a4d8dee7a83b61e6d88a2988f34560ac2477a96",
+      "check": "incorrect-return",
+      "impact": "High",
+      "subject": "DisclosureBindingVerifier.verifyProof.asm_0.checkPairing() (contracts/verifiers/DisclosureBindingVerifier.sol#103-166) calls DisclosureBindingVerifier.verifyProof.asm_0.g1_mulAccC() (contracts/verifiers/DisclosureBindingVerifier.sol#78-101) which halt the execution return(uint256,uint256)(0,0x20) (contracts/verifiers/DisclosureBindingVerifier.sol#89)",
+      "reason": "This generated snarkjs verifier deliberately returns one ABI-encoded false word on an invalid field or a failed precompile. Its outer verifyProof has no modifier or required cleanup. The consuming adapter and business contract reject false; exiting the verifier at this point is the intended fail-closed behavior.",
+      "sources": ["contracts/verifiers/DisclosureBindingVerifier.sol"]
+    },
+    {
+      "id": "8d92d3495092c46c88549ba3ffee810e710f68da54532dd6b45f17930194a3d8",
+      "check": "incorrect-return",
+      "impact": "High",
+      "subject": "ShieldedPrivateTransferVerifier.verifyProof(uint256[2],uint256[2][2],uint256[2],uint256[10]) (contracts/verifiers/ShieldedPrivateTransferVerifier.sol#86-230) calls ShieldedPrivateTransferVerifier.verifyProof.asm_0.checkPairing() (contracts/verifiers/ShieldedPrivateTransferVerifier.sol#121-196) which halt the execution return(uint256,uint256)(0,0x20) (contracts/verifiers/ShieldedPrivateTransferVerifier.sol#107)",
+      "reason": "This generated snarkjs verifier deliberately returns one ABI-encoded false word on an invalid field or a failed precompile. Its outer verifyProof has no modifier or required cleanup. The consuming adapter and business contract reject false; exiting the verifier at this point is the intended fail-closed behavior.",
+      "sources": ["contracts/verifiers/ShieldedPrivateTransferVerifier.sol"]
+    },
+    {
+      "id": "96349c8250fa93159aadfda650568f32145c826f91ce678396e6562a043dad28",
+      "check": "incorrect-return",
+      "impact": "High",
+      "subject": "ShieldedPrivateTransferVerifier.verifyProof(uint256[2],uint256[2][2],uint256[2],uint256[10]) (contracts/verifiers/ShieldedPrivateTransferVerifier.sol#86-230) calls ShieldedPrivateTransferVerifier.verifyProof.asm_0.checkField() (contracts/verifiers/ShieldedPrivateTransferVerifier.sol#88-93) which halt the execution return(uint256,uint256)(0,0x20) (contracts/verifiers/ShieldedPrivateTransferVerifier.sol#91)",
+      "reason": "This generated snarkjs verifier deliberately returns one ABI-encoded false word on an invalid field or a failed precompile. Its outer verifyProof has no modifier or required cleanup. The consuming adapter and business contract reject false; exiting the verifier at this point is the intended fail-closed behavior.",
+      "sources": ["contracts/verifiers/ShieldedPrivateTransferVerifier.sol"]
+    },
+    {
+      "id": "a00e664dd93cbef97faaf0495b7b294395f7a4a62aad03a6cf71d29fef483944",
+      "check": "incorrect-return",
+      "impact": "High",
+      "subject": "DeepFamily.mintPersonVersionNFT(DeepFamily.ProofEnvelope,DeepFamily.DisclosureBindingPublicSignals,uint256,string,DeepFamily.PersonCoreInfo,bytes,bytes32) (contracts/family/DeepFamily.sol#972-1015) calls DeepFamily._validateMintBindings(DeepFamily.DisclosureBindingPublicSignals,DeepFamily.PersonCoreInfo) (contracts/family/DeepFamily.sol#433-449) which halt the execution return(uint256,uint256)(0,0x20) (node_modules/poseidon-solidity/PoseidonT5.sol#698)",
+      "reason": "The reported RETURN belongs to a public linked Poseidon library function, which executes in its own DELEGATECALL frame. Returning the hash exits that library call and resumes this caller; it does not skip the caller's subsequent state updates or guards.",
+      "sources": [
+        "contracts/family/DeepFamily.sol",
+        "node_modules/poseidon-solidity/PoseidonT5.sol"
+      ]
+    },
+    {
+      "id": "a7abcbfd7b01c641851c9801ffd886f68312d5260ee101069c25a6e64cafb50f",
+      "check": "incorrect-return",
+      "impact": "High",
+      "subject": "ShieldedPrivateTransfer4Verifier.verifyProof(uint256[2],uint256[2][2],uint256[2],uint256[16]) (contracts/verifiers/ShieldedPrivateTransfer4Verifier.sol#104-272) calls ShieldedPrivateTransfer4Verifier.verifyProof.asm_0.checkField() (contracts/verifiers/ShieldedPrivateTransfer4Verifier.sol#106-111) which halt the execution return(uint256,uint256)(0,0x20) (contracts/verifiers/ShieldedPrivateTransfer4Verifier.sol#109)",
+      "reason": "This generated snarkjs verifier deliberately returns one ABI-encoded false word on an invalid field or a failed precompile. Its outer verifyProof has no modifier or required cleanup. The consuming adapter and business contract reject false; exiting the verifier at this point is the intended fail-closed behavior.",
+      "sources": ["contracts/verifiers/ShieldedPrivateTransfer4Verifier.sol"]
+    },
+    {
+      "id": "a833c26522780bd66798d9584ccac9e1ec7a796775dc218160c1d81febe7ed4a",
+      "check": "incorrect-return",
+      "impact": "High",
+      "subject": "ShieldedPrivateTransferVerifier.verifyProof.asm_0.checkPairing() (contracts/verifiers/ShieldedPrivateTransferVerifier.sol#121-196) calls ShieldedPrivateTransferVerifier.verifyProof.asm_0.g1_mulAccC() (contracts/verifiers/ShieldedPrivateTransferVerifier.sol#96-119) which halt the execution return(uint256,uint256)(0,0x20) (contracts/verifiers/ShieldedPrivateTransferVerifier.sol#107)",
+      "reason": "This generated snarkjs verifier deliberately returns one ABI-encoded false word on an invalid field or a failed precompile. Its outer verifyProof has no modifier or required cleanup. The consuming adapter and business contract reject false; exiting the verifier at this point is the intended fail-closed behavior.",
+      "sources": ["contracts/verifiers/ShieldedPrivateTransferVerifier.sol"]
+    },
+    {
+      "id": "a9c159a31baef787fb181ef657c769ffe7345e001dedf0db1de99d2d22ea9d5e",
+      "check": "incorrect-return",
+      "impact": "High",
+      "subject": "ShieldedUnshield4Verifier.verifyProof.asm_0.checkPairing() (contracts/verifiers/ShieldedUnshield4Verifier.sol#139-226) calls ShieldedUnshield4Verifier.verifyProof.asm_0.g1_mulAccC() (contracts/verifiers/ShieldedUnshield4Verifier.sol#114-137) which halt the execution return(uint256,uint256)(0,0x20) (contracts/verifiers/ShieldedUnshield4Verifier.sol#125)",
+      "reason": "This generated snarkjs verifier deliberately returns one ABI-encoded false word on an invalid field or a failed precompile. Its outer verifyProof has no modifier or required cleanup. The consuming adapter and business contract reject false; exiting the verifier at this point is the intended fail-closed behavior.",
+      "sources": ["contracts/verifiers/ShieldedUnshield4Verifier.sol"]
+    },
+    {
+      "id": "ad0a6229436eb8e82be9646e3a1e2d2165d380b424811783014841dad4e400c6",
+      "check": "incorrect-return",
+      "impact": "High",
+      "subject": "DeepFamily._validateMintBindings(DeepFamily.DisclosureBindingPublicSignals,DeepFamily.PersonCoreInfo) (contracts/family/DeepFamily.sol#433-449) calls DeepFamily._computeDisclosureBinding(string,DeepFamily.PersonBasicInfo,uint256) (contracts/family/DeepFamily.sol#361-374) which halt the execution return(uint256,uint256)(0,0x20) (node_modules/poseidon-solidity/PoseidonT5.sol#698)",
+      "reason": "The reported RETURN belongs to a public linked Poseidon library function, which executes in its own DELEGATECALL frame. Returning the hash exits that library call and resumes this caller; it does not skip the caller's subsequent state updates or guards.",
+      "sources": [
+        "contracts/family/DeepFamily.sol",
+        "node_modules/poseidon-solidity/PoseidonT5.sol"
+      ]
+    },
+    {
+      "id": "ad1deb8efc8a90d34fcff8cc764a961cbe043e183b6450cbdcd950007ecc3195",
+      "check": "incorrect-return",
+      "impact": "High",
+      "subject": "DeepFamilyLineageIndex.onEndorsementCleared(bytes32,address) (contracts/family/DeepFamilyLineageIndex.sol#202-210) calls DeepFamilyLineageIndex._write(uint8,uint256,uint256) (contracts/family/DeepFamilyLineageIndex.sol#477-486) which halt the execution return(uint256,uint256)(0,0x20) (node_modules/poseidon-solidity/PoseidonT3.sol#388)",
+      "reason": "The reported RETURN belongs to a public linked Poseidon library function, which executes in its own DELEGATECALL frame. Returning the hash exits that library call and resumes this caller; it does not skip the caller's subsequent state updates or guards.",
+      "sources": [
+        "contracts/family/DeepFamilyLineageIndex.sol",
+        "node_modules/poseidon-solidity/PoseidonT3.sol"
+      ]
+    },
+    {
+      "id": "aec33e9c5c3e18e9c004f115d82f21a2dd4cdcc1b0f8211c9421f17853a21c9c",
+      "check": "incorrect-return",
+      "impact": "High",
+      "subject": "ShieldedPoolCore._append(uint256,bytes) (contracts/shielded/ShieldedPoolCore.sol#587-606) calls ShieldedPoolCore._writePath(ShieldedPoolCore.Shard,uint256,uint256,uint256,uint256) (contracts/shielded/ShieldedPoolCore.sol#608-627) which halt the execution return(uint256,uint256)(0,0x20) (node_modules/poseidon-solidity/PoseidonT3.sol#388)",
+      "reason": "The reported RETURN belongs to a public linked Poseidon library function, which executes in its own DELEGATECALL frame. Returning the hash exits that library call and resumes this caller; it does not skip the caller's subsequent state updates or guards.",
+      "sources": [
+        "contracts/shielded/ShieldedPoolCore.sol",
+        "node_modules/poseidon-solidity/PoseidonT3.sol"
+      ]
+    },
+    {
+      "id": "b868046ae4952a12c7541b5b4cb1033306c2cf5ca3683cd99aa724da9d9dbc75",
+      "check": "incorrect-return",
+      "impact": "High",
+      "subject": "ShieldedIdentityCounterUpdateVerifier.verifyProof(uint256[2],uint256[2][2],uint256[2],uint256[6]) (contracts/verifiers/ShieldedIdentityCounterUpdateVerifier.sol#74-202) calls ShieldedIdentityCounterUpdateVerifier.verifyProof.asm_0.checkField() (contracts/verifiers/ShieldedIdentityCounterUpdateVerifier.sol#76-81) which halt the execution return(uint256,uint256)(0,0x20) (contracts/verifiers/ShieldedIdentityCounterUpdateVerifier.sol#79)",
+      "reason": "This generated snarkjs verifier deliberately returns one ABI-encoded false word on an invalid field or a failed precompile. Its outer verifyProof has no modifier or required cleanup. The consuming adapter and business contract reject false; exiting the verifier at this point is the intended fail-closed behavior.",
+      "sources": ["contracts/verifiers/ShieldedIdentityCounterUpdateVerifier.sol"]
+    },
+    {
+      "id": "bfcd48dae5460c89d18a1555c0ed8627d245ccd41dad345cca781d3079650da8",
+      "check": "incorrect-return",
+      "impact": "High",
+      "subject": "ShieldedIdentityCounterUpdateVerifier.verifyProof(uint256[2],uint256[2][2],uint256[2],uint256[6]) (contracts/verifiers/ShieldedIdentityCounterUpdateVerifier.sol#74-202) calls ShieldedIdentityCounterUpdateVerifier.verifyProof.asm_0.checkPairing() (contracts/verifiers/ShieldedIdentityCounterUpdateVerifier.sol#109-176) which halt the execution return(uint256,uint256)(0,0x20) (contracts/verifiers/ShieldedIdentityCounterUpdateVerifier.sol#95)",
+      "reason": "This generated snarkjs verifier deliberately returns one ABI-encoded false word on an invalid field or a failed precompile. Its outer verifyProof has no modifier or required cleanup. The consuming adapter and business contract reject false; exiting the verifier at this point is the intended fail-closed behavior.",
+      "sources": ["contracts/verifiers/ShieldedIdentityCounterUpdateVerifier.sol"]
+    },
+    {
+      "id": "c49e05218830b58f56b95911d22223dc3337666ca03db793e0a5d6e2086d8075",
+      "check": "incorrect-return",
+      "impact": "High",
+      "subject": "ShieldedFundVerifier.verifyProof(uint256[2],uint256[2][2],uint256[2],uint256[27]) (contracts/verifiers/ShieldedFundVerifier.sol#137-349) calls ShieldedFundVerifier.verifyProof.asm_0.checkPairing() (contracts/verifiers/ShieldedFundVerifier.sol#172-281) which halt the execution return(uint256,uint256)(0,0x20) (contracts/verifiers/ShieldedFundVerifier.sol#158)",
+      "reason": "This generated snarkjs verifier deliberately returns one ABI-encoded false word on an invalid field or a failed precompile. Its outer verifyProof has no modifier or required cleanup. The consuming adapter and business contract reject false; exiting the verifier at this point is the intended fail-closed behavior.",
+      "sources": ["contracts/verifiers/ShieldedFundVerifier.sol"]
+    },
+    {
+      "id": "c7c504710ce6fc4b808804c5b7d13448fc7d7dda3b965eec77578175333e9613",
+      "check": "incorrect-return",
+      "impact": "High",
+      "subject": "ShieldedUnshieldVerifier.verifyProof(uint256[2],uint256[2][2],uint256[2],uint256[10]) (contracts/verifiers/ShieldedUnshieldVerifier.sol#86-230) calls ShieldedUnshieldVerifier.verifyProof.asm_0.checkPairing() (contracts/verifiers/ShieldedUnshieldVerifier.sol#121-196) which halt the execution return(uint256,uint256)(0,0x20) (contracts/verifiers/ShieldedUnshieldVerifier.sol#107)",
+      "reason": "This generated snarkjs verifier deliberately returns one ABI-encoded false word on an invalid field or a failed precompile. Its outer verifyProof has no modifier or required cleanup. The consuming adapter and business contract reject false; exiting the verifier at this point is the intended fail-closed behavior.",
+      "sources": ["contracts/verifiers/ShieldedUnshieldVerifier.sol"]
+    },
+    {
+      "id": "d70670bfa1ce85f8ba518316d8c502c75e5427be1e83dda8d5681df943fbd523",
+      "check": "incorrect-return",
+      "impact": "High",
+      "subject": "ShieldedClaim32Verifier.verifyProof(uint256[2],uint256[2][2],uint256[2],uint256[14]) (contracts/verifiers/ShieldedClaim32Verifier.sol#98-258) calls ShieldedClaim32Verifier.verifyProof.asm_0.checkPairing() (contracts/verifiers/ShieldedClaim32Verifier.sol#133-216) which halt the execution return(uint256,uint256)(0,0x20) (contracts/verifiers/ShieldedClaim32Verifier.sol#119)",
+      "reason": "This generated snarkjs verifier deliberately returns one ABI-encoded false word on an invalid field or a failed precompile. Its outer verifyProof has no modifier or required cleanup. The consuming adapter and business contract reject false; exiting the verifier at this point is the intended fail-closed behavior.",
+      "sources": ["contracts/verifiers/ShieldedClaim32Verifier.sol"]
+    },
+    {
+      "id": "d8708d7775d24d8957831debd50e1fd82c644493573f020f92fd7f587a2d240a",
+      "check": "incorrect-return",
+      "impact": "High",
+      "subject": "ShieldedUnshield4Verifier.verifyProof(uint256[2],uint256[2][2],uint256[2],uint256[16]) (contracts/verifiers/ShieldedUnshield4Verifier.sol#104-272) calls ShieldedUnshield4Verifier.verifyProof.asm_0.checkPairing() (contracts/verifiers/ShieldedUnshield4Verifier.sol#139-226) which halt the execution return(uint256,uint256)(0,0x20) (contracts/verifiers/ShieldedUnshield4Verifier.sol#125)",
+      "reason": "This generated snarkjs verifier deliberately returns one ABI-encoded false word on an invalid field or a failed precompile. Its outer verifyProof has no modifier or required cleanup. The consuming adapter and business contract reject false; exiting the verifier at this point is the intended fail-closed behavior.",
+      "sources": ["contracts/verifiers/ShieldedUnshield4Verifier.sol"]
+    },
+    {
+      "id": "dbaac564ec08b01c62334135239631b15508f3eafa747c9f84ebf670bc477c7b",
+      "check": "incorrect-return",
+      "impact": "High",
+      "subject": "DeepFamilyLineageIndex.onTrustedEndorserSet(bytes32,uint256,address,bool) (contracts/family/DeepFamilyLineageIndex.sol#153-173) calls DeepFamilyLineageIndex._append(uint8,uint256) (contracts/family/DeepFamilyLineageIndex.sol#462-475) which halt the execution return(uint256,uint256)(0,0x20) (node_modules/poseidon-solidity/PoseidonT3.sol#388)",
+      "reason": "The reported RETURN belongs to a public linked Poseidon library function, which executes in its own DELEGATECALL frame. Returning the hash exits that library call and resumes this caller; it does not skip the caller's subsequent state updates or guards.",
+      "sources": [
+        "contracts/family/DeepFamilyLineageIndex.sol",
+        "node_modules/poseidon-solidity/PoseidonT3.sol"
+      ]
+    },
+    {
+      "id": "e1c64c3d6108e320bf198d7823f384e0b3346ec429137f8c7b5df2f89f2907cf",
+      "check": "incorrect-return",
+      "impact": "High",
+      "subject": "ShieldedShieldVerifier.verifyProof(uint256[2],uint256[2][2],uint256[2],uint256[7]) (contracts/verifiers/ShieldedShieldVerifier.sol#77-209) calls ShieldedShieldVerifier.verifyProof.asm_0.checkField() (contracts/verifiers/ShieldedShieldVerifier.sol#79-84) which halt the execution return(uint256,uint256)(0,0x20) (contracts/verifiers/ShieldedShieldVerifier.sol#82)",
+      "reason": "This generated snarkjs verifier deliberately returns one ABI-encoded false word on an invalid field or a failed precompile. Its outer verifyProof has no modifier or required cleanup. The consuming adapter and business contract reject false; exiting the verifier at this point is the intended fail-closed behavior.",
+      "sources": ["contracts/verifiers/ShieldedShieldVerifier.sol"]
+    },
+    {
+      "id": "e708a9c84ee952dd0ba6be3b4fe188b97601deaebf858574c6b21e62bd762653",
+      "check": "incorrect-return",
+      "impact": "High",
+      "subject": "ShieldedShieldVerifier.verifyProof.asm_0.checkPairing() (contracts/verifiers/ShieldedShieldVerifier.sol#112-181) calls ShieldedShieldVerifier.verifyProof.asm_0.g1_mulAccC() (contracts/verifiers/ShieldedShieldVerifier.sol#87-110) which halt the execution return(uint256,uint256)(0,0x20) (contracts/verifiers/ShieldedShieldVerifier.sol#98)",
+      "reason": "This generated snarkjs verifier deliberately returns one ABI-encoded false word on an invalid field or a failed precompile. Its outer verifyProof has no modifier or required cleanup. The consuming adapter and business contract reject false; exiting the verifier at this point is the intended fail-closed behavior.",
+      "sources": ["contracts/verifiers/ShieldedShieldVerifier.sol"]
+    },
+    {
+      "id": "e7a00936cb32917bce5ed7bdace93472ae90ce8aeeba025b5cfa503610b36b48",
+      "check": "incorrect-return",
+      "impact": "High",
+      "subject": "ShieldedUnshieldVerifier.verifyProof.asm_0.checkPairing() (contracts/verifiers/ShieldedUnshieldVerifier.sol#121-196) calls ShieldedUnshieldVerifier.verifyProof.asm_0.g1_mulAccC() (contracts/verifiers/ShieldedUnshieldVerifier.sol#96-119) which halt the execution return(uint256,uint256)(0,0x20) (contracts/verifiers/ShieldedUnshieldVerifier.sol#107)",
+      "reason": "This generated snarkjs verifier deliberately returns one ABI-encoded false word on an invalid field or a failed precompile. Its outer verifyProof has no modifier or required cleanup. The consuming adapter and business contract reject false; exiting the verifier at this point is the intended fail-closed behavior.",
+      "sources": ["contracts/verifiers/ShieldedUnshieldVerifier.sol"]
+    },
+    {
+      "id": "ecc0f652e41c8b1771a173a931e99513b8110f463feca6640de67220c93a1ad4",
+      "check": "incorrect-return",
+      "impact": "High",
+      "subject": "ShieldedShieldVerifier.verifyProof(uint256[2],uint256[2][2],uint256[2],uint256[7]) (contracts/verifiers/ShieldedShieldVerifier.sol#77-209) calls ShieldedShieldVerifier.verifyProof.asm_0.checkPairing() (contracts/verifiers/ShieldedShieldVerifier.sol#112-181) which halt the execution return(uint256,uint256)(0,0x20) (contracts/verifiers/ShieldedShieldVerifier.sol#98)",
+      "reason": "This generated snarkjs verifier deliberately returns one ABI-encoded false word on an invalid field or a failed precompile. Its outer verifyProof has no modifier or required cleanup. The consuming adapter and business contract reject false; exiting the verifier at this point is the intended fail-closed behavior.",
+      "sources": ["contracts/verifiers/ShieldedShieldVerifier.sol"]
+    },
+    {
+      "id": "ee2bf50d9867ac064981e00f7b712fb82441559360dc249bf13325abca15eb7f",
+      "check": "incorrect-return",
+      "impact": "High",
+      "subject": "DeepFamilyLineageIndex._append(uint8,uint256) (contracts/family/DeepFamilyLineageIndex.sol#462-475) calls DeepFamilyLineageIndex._writePath(DeepFamilyLineageIndex.Tree,uint256,uint256,uint256,uint256) (contracts/family/DeepFamilyLineageIndex.sol#488-507) which halt the execution return(uint256,uint256)(0,0x20) (node_modules/poseidon-solidity/PoseidonT3.sol#388)",
+      "reason": "The reported RETURN belongs to a public linked Poseidon library function, which executes in its own DELEGATECALL frame. Returning the hash exits that library call and resumes this caller; it does not skip the caller's subsequent state updates or guards.",
+      "sources": [
+        "contracts/family/DeepFamilyLineageIndex.sol",
+        "node_modules/poseidon-solidity/PoseidonT3.sol"
+      ]
+    },
+    {
+      "id": "f4361682e5950e9629610bc7444666866812a4001eca4c5f8663893136e82b49",
+      "check": "incorrect-return",
+      "impact": "High",
+      "subject": "ShieldedPoolCore._appendOutputs(ShieldedPoolCore.Action,ShieldedPoolCore.ActionData) (contracts/shielded/ShieldedPoolCore.sol#570-585) calls ShieldedPoolCore._append(uint256,bytes) (contracts/shielded/ShieldedPoolCore.sol#587-606) which halt the execution return(uint256,uint256)(0,0x20) (node_modules/poseidon-solidity/PoseidonT3.sol#388)",
+      "reason": "The reported RETURN belongs to a public linked Poseidon library function, which executes in its own DELEGATECALL frame. Returning the hash exits that library call and resumes this caller; it does not skip the caller's subsequent state updates or guards.",
+      "sources": [
+        "contracts/shielded/ShieldedPoolCore.sol",
+        "node_modules/poseidon-solidity/PoseidonT3.sol"
+      ]
+    },
+    {
+      "id": "f61648dff24280b644d58a073e8cacb8d7482541ecf3cdb01bd10e3e65a3c4b9",
+      "check": "incorrect-return",
+      "impact": "High",
+      "subject": "ShieldedUnshieldVerifier.verifyProof(uint256[2],uint256[2][2],uint256[2],uint256[10]) (contracts/verifiers/ShieldedUnshieldVerifier.sol#86-230) calls ShieldedUnshieldVerifier.verifyProof.asm_0.checkField() (contracts/verifiers/ShieldedUnshieldVerifier.sol#88-93) which halt the execution return(uint256,uint256)(0,0x20) (contracts/verifiers/ShieldedUnshieldVerifier.sol#91)",
+      "reason": "This generated snarkjs verifier deliberately returns one ABI-encoded false word on an invalid field or a failed precompile. Its outer verifyProof has no modifier or required cleanup. The consuming adapter and business contract reject false; exiting the verifier at this point is the intended fail-closed behavior.",
+      "sources": ["contracts/verifiers/ShieldedUnshieldVerifier.sol"]
+    },
+    {
+      "id": "1e6d094c039a130e65d578cbf9835335c047314eabd34f09bfc0e40bc52e8618",
+      "check": "incorrect-equality",
+      "impact": "Medium",
+      "subject": "IdentityAuthorizationState.incrementCounter(uint256,uint256,uint64,uint64,bytes) (contracts/receive/IdentityAuthorizationState.sol#135-186) uses a dangerous strict equality:",
+      "reason": "The comparison checks whether a deterministic Merkle update left the root unchanged and rejects that impossible/no-op transition. It does not compare an externally movable currency balance or timestamp; unrelated transfers cannot alter either locally computed root.",
+      "sources": ["contracts/receive/IdentityAuthorizationState.sol"]
+    },
+    {
+      "id": "f470a6cba2946d31de5b312e4a238afda4aac86382bb89e6c737738a2f3f3bad",
+      "check": "incorrect-equality",
+      "impact": "Medium",
+      "subject": "IdentityAuthorizationState.getCounterProof(uint256) (contracts/receive/IdentityAuthorizationState.sol#103-126) uses a dangerous strict equality:",
+      "reason": "Counter zero is the dictionary's intentional absence sentinel. Stored authorization counters start at one and increment exactly; checking equality with zero produces the canonical non-membership flag. This value is not an attacker-inflatable currency balance.",
+      "sources": ["contracts/receive/IdentityAuthorizationState.sol"]
+    },
+    {
+      "id": "0528af8c7eb3029d69b7ca7496065daadbf5aeafa41c4381e5cce981edb5b8ad",
+      "check": "uninitialized-local",
+      "impact": "Medium",
+      "subject": "Groth16VerifierAdapter._verifyShieldedAction(address,uint256[2],uint256[2][2],uint256[2],uint256[]).signals7 (contracts/adapters/Groth16VerifierAdapter.sol#237) is a local variable never initialized",
+      "reason": "This is a fixed-size memory uint256 array. Solidity allocates and zero-initializes it, and the following bounded loop writes every element before the external verifier reads it. Length checks run before this branch. It is not an uninitialized dynamic memory or storage reference.",
+      "sources": ["contracts/adapters/Groth16VerifierAdapter.sol"]
+    },
+    {
+      "id": "1341ef26003edf0d05b0b60b9be232b60ac2d573b88b0924635227e6e4c0ce21",
+      "check": "uninitialized-local",
+      "impact": "Medium",
+      "subject": "Groth16VerifierAdapter.verifyProof(uint8,uint8,bytes,uint256[]).personSignals (contracts/adapters/Groth16VerifierAdapter.sol#202) is a local variable never initialized",
+      "reason": "This is a fixed-size memory uint256 array. Solidity allocates and zero-initializes it, and the following bounded loop writes every element before the external verifier reads it. Length checks run before this branch. It is not an uninitialized dynamic memory or storage reference.",
+      "sources": ["contracts/adapters/Groth16VerifierAdapter.sol"]
+    },
+    {
+      "id": "2b74adcfbdc827dc3566d4750ee04ac25d288f4ba324fd1fd53177aaace698b1",
+      "check": "uninitialized-local",
+      "impact": "Medium",
+      "subject": "Groth16VerifierAdapter._verifyShieldedAction(address,uint256[2],uint256[2][2],uint256[2],uint256[]).signals14 (contracts/adapters/Groth16VerifierAdapter.sol#256) is a local variable never initialized",
+      "reason": "This is a fixed-size memory uint256 array. Solidity allocates and zero-initializes it, and the following bounded loop writes every element before the external verifier reads it. Length checks run before this branch. It is not an uninitialized dynamic memory or storage reference.",
+      "sources": ["contracts/adapters/Groth16VerifierAdapter.sol"]
+    },
+    {
+      "id": "2c1352de1916010a29bf5da3c54ec313ee25679de45e737ffd745d14c177c77f",
+      "check": "uninitialized-local",
+      "impact": "Medium",
+      "subject": "ShieldedPoolCore._publicSignals(ShieldedPoolCore.Action,ShieldedPoolCore.ActionData,uint256,address).n (contracts/shielded/ShieldedPoolCore.sol#464) is a local variable never initialized",
+      "reason": "The unsigned signal cursor intentionally starts at Solidity's default zero. It increments while writing the already allocated public-input array in schema order; zero is the required first index, and this local value never refers to an uninitialized storage pointer.",
+      "sources": ["contracts/shielded/ShieldedPoolCore.sol"]
+    },
+    {
+      "id": "328787bb65c525db3a0ad0b4fe69c07c8e157580ba5dfbe9148a77d10ccd6dc7",
+      "check": "uninitialized-local",
+      "impact": "Medium",
+      "subject": "ShieldedPoolCore._publicBudgetFields(bytes).value (contracts/shielded/ShieldedPoolCore.sol#519) is a local variable never initialized",
+      "reason": "The unsigned accumulator intentionally starts at Solidity's default zero, then shifts and incorporates each byte while decoding a fixed-width public-budget field. A zero initial accumulator is required for canonical big-endian decoding.",
+      "sources": ["contracts/shielded/ShieldedPoolCore.sol"]
+    },
+    {
+      "id": "3c8df2b29df8f44b4fef3edf8df258a9024f527749575bf99e6f1be77d308709",
+      "check": "uninitialized-local",
+      "impact": "Medium",
+      "subject": "ShieldedPoolCore._verifyReceiveAuthorizations(ShieldedPoolCore.Action,ShieldedPoolCore.ActionData).actionHash (contracts/shielded/ShieldedPoolCore.sol#396) is a local variable never initialized",
+      "reason": "bytes32 actionHash intentionally starts at Solidity's zero default as a lazy-computation sentinel. It is computed from action data before use by an active receipt, while empty authorization slots skip it entirely.",
+      "sources": ["contracts/shielded/ShieldedPoolCore.sol"]
+    },
+    {
+      "id": "3dddcd0f1d1835b6083893c8ad27cd25e6a342d1ec44a63fe3b1ff50a1f0af8f",
+      "check": "uninitialized-local",
+      "impact": "Medium",
+      "subject": "DeepFamilyReader.constructor(address).archive (contracts/family/DeepFamilyReader.sol#42) is a local variable never initialized",
+      "reason": "The local address is assigned from the successful external getter before every subsequent read. The catch branch always reverts, so no control-flow path reaches its use without assignment; the returned address is then validated against the required binding.",
+      "sources": ["contracts/family/DeepFamilyReader.sol"]
+    },
+    {
+      "id": "4095cab2d8d0a16c6db77ec6a1ea7bf0a932c16178765e181dc8c2933e17b98d",
+      "check": "uninitialized-local",
+      "impact": "Medium",
+      "subject": "ShieldedPoolCore.getNoteMerkleProof(uint256,uint256).siblingIndex (contracts/shielded/ShieldedPoolCore.sol#252) is a local variable never initialized",
+      "reason": "The unsigned compact-path output cursor intentionally starts at Solidity's default zero. Each existing sibling is written sequentially into an allocated array before the cursor increments; it does not denote an uninitialized reference.",
+      "sources": ["contracts/shielded/ShieldedPoolCore.sol"]
+    },
+    {
+      "id": "46126c94a5c16d2fa655b9a7a8bb7a9d5f19ced5abb3892312e877a071b2712d",
+      "check": "uninitialized-local",
+      "impact": "Medium",
+      "subject": "IdentityAuthorizationState._writeCounter(uint256,uint64).depth (contracts/receive/IdentityAuthorizationState.sol#207) is a local variable never initialized",
+      "reason": "The unsigned traversal depth intentionally starts at Solidity's default zero at the dictionary root. The loop increments it only when descending a branch and uses bounded assigned ancestor entries; zero is a valid empty/root-only path depth.",
+      "sources": ["contracts/receive/IdentityAuthorizationState.sol"]
+    },
+    {
+      "id": "53d9cb1064c60aee1ca7dd8c0edfd9bae9aea6921a94c6bd9d53f1985215ee4f",
+      "check": "uninitialized-local",
+      "impact": "Medium",
+      "subject": "DeepFamilyToken.initialize(address).configuredToken (contracts/family/DeepFamilyToken.sol#88) is a local variable never initialized",
+      "reason": "The local address is assigned from the successful external getter before every subsequent read. The catch branch always reverts, so no control-flow path reaches its use without assignment; the returned address is then validated against the required binding.",
+      "sources": ["contracts/family/DeepFamilyToken.sol"]
+    },
+    {
+      "id": "5c13ce7bc0ed1cfaf3e59047d34c6bad455321ab2c17f84b7638ab2db64e90fd",
+      "check": "uninitialized-local",
+      "impact": "Medium",
+      "subject": "DeepFamilyLineageIndex.getMerkleProof(uint8,uint256).siblingIndex (contracts/family/DeepFamilyLineageIndex.sol#425) is a local variable never initialized",
+      "reason": "The unsigned compact-path output cursor intentionally starts at Solidity's default zero. Each existing sibling is written sequentially into an allocated array before the cursor increments; it does not denote an uninitialized reference.",
+      "sources": ["contracts/family/DeepFamilyLineageIndex.sol"]
+    },
+    {
+      "id": "5d019a985faade9f0d6de61da24bd4e45d66aaa2b8c5ca38cd662656c410bdbb",
+      "check": "uninitialized-local",
+      "impact": "Medium",
+      "subject": "IdentityAuthorizationState._writeCounter(uint256,uint64).ancestors (contracts/receive/IdentityAuthorizationState.sol#206) is a local variable never initialized",
+      "reason": "The fixed-size uint64 memory array is zero-initialized by Solidity. Every ancestor entry below depth is assigned while descending the tree before the reverse traversal reads that same entry; unused entries are never read.",
+      "sources": ["contracts/receive/IdentityAuthorizationState.sol"]
+    },
+    {
+      "id": "5ea96892bc2d15e8fb932125a88bfec7ddeb5d724d176a9b0232bb18440a574f",
+      "check": "uninitialized-local",
+      "impact": "Medium",
+      "subject": "Groth16VerifierAdapter._verifyShieldedAction(address,uint256[2],uint256[2][2],uint256[2],uint256[]).signals10 (contracts/adapters/Groth16VerifierAdapter.sol#242) is a local variable never initialized",
+      "reason": "This is a fixed-size memory uint256 array. Solidity allocates and zero-initializes it, and the following bounded loop writes every element before the external verifier reads it. Length checks run before this branch. It is not an uninitialized dynamic memory or storage reference.",
+      "sources": ["contracts/adapters/Groth16VerifierAdapter.sol"]
+    },
+    {
+      "id": "795d46f0613a971532b7b297f5a578922d3a51d7fa686f781d06d9cf69d96c7b",
+      "check": "uninitialized-local",
+      "impact": "Medium",
+      "subject": "Groth16VerifierAdapter.verifyProof(uint8,uint8,bytes,uint256[]).disclosureSignals (contracts/adapters/Groth16VerifierAdapter.sol#210) is a local variable never initialized",
+      "reason": "This is a fixed-size memory uint256 array. Solidity allocates and zero-initializes it, and the following bounded loop writes every element before the external verifier reads it. Length checks run before this branch. It is not an uninitialized dynamic memory or storage reference.",
+      "sources": ["contracts/adapters/Groth16VerifierAdapter.sol"]
+    },
+    {
+      "id": "a15d1cb6fd6c78c5ecf3c92211c60a881ec8fa36b8599eb23b48868737545491",
+      "check": "uninitialized-local",
+      "impact": "Medium",
+      "subject": "Groth16VerifierAdapter._verifyShieldedAction(address,uint256[2],uint256[2][2],uint256[2],uint256[]).signals16 (contracts/adapters/Groth16VerifierAdapter.sol#252) is a local variable never initialized",
+      "reason": "This is a fixed-size memory uint256 array. Solidity allocates and zero-initializes it, and the following bounded loop writes every element before the external verifier reads it. Length checks run before this branch. It is not an uninitialized dynamic memory or storage reference.",
+      "sources": ["contracts/adapters/Groth16VerifierAdapter.sol"]
+    },
+    {
+      "id": "b59eb0aa8df3748e6d647f628c2c5efd109bb65674a56f8320db0d8629c01c7e",
+      "check": "uninitialized-local",
+      "impact": "Medium",
+      "subject": "Groth16VerifierAdapter.verifyProof(uint8,uint8,bytes,uint256[]).signals14 (contracts/adapters/Groth16VerifierAdapter.sol#218) is a local variable never initialized",
+      "reason": "This is a fixed-size memory uint256 array. Solidity allocates and zero-initializes it, and the following bounded loop writes every element before the external verifier reads it. Length checks run before this branch. It is not an uninitialized dynamic memory or storage reference.",
+      "sources": ["contracts/adapters/Groth16VerifierAdapter.sol"]
+    },
+    {
+      "id": "ecc6d3079d43d1a10692c1e720ac089cdf3cc2c3bd9d398debda85354695e460",
+      "check": "uninitialized-local",
+      "impact": "Medium",
+      "subject": "Groth16VerifierAdapter._verifyShieldedAction(address,uint256[2],uint256[2][2],uint256[2],uint256[]).signals27 (contracts/adapters/Groth16VerifierAdapter.sol#247) is a local variable never initialized",
+      "reason": "This is a fixed-size memory uint256 array. Solidity allocates and zero-initializes it, and the following bounded loop writes every element before the external verifier reads it. Length checks run before this branch. It is not an uninitialized dynamic memory or storage reference.",
+      "sources": ["contracts/adapters/Groth16VerifierAdapter.sol"]
+    },
+    {
+      "id": "f08a3e852de05457f5d7fe37199811d4c90a91ea5ff547c732f9acb7ad9d9f66",
+      "check": "uninitialized-local",
+      "impact": "Medium",
+      "subject": "DeepFamilyLineageIndex.onTrustedEndorserSet(bytes32,uint256,address,bool).leaf (contracts/family/DeepFamilyLineageIndex.sol#159) is a local variable never initialized",
+      "reason": "A false trusted flag intentionally writes Solidity's default-zero leaf to remove trust. A true flag assigns the Poseidon leaf before insertion/update. Zero is the documented revocation value, not an accidentally missing assignment.",
+      "sources": ["contracts/family/DeepFamilyLineageIndex.sol"]
+    },
+    {
+      "id": "0158b1d8bd3c383896f12d79281d440678dded16959d4b91c29b822040beb37b",
+      "check": "unused-return",
+      "impact": "Medium",
+      "subject": "DeepFamily._addPersonInternal(bytes32,bytes32,bytes32,uint256,uint256,DeepFamily.PersonProofPublicSignals,bytes) (contracts/family/DeepFamily.sol#681-772) ignores return value by IDeepFamilyArchive(archive).storeMetadata(personHash,versionIndex,metadataEnvelope) (contracts/family/DeepFamily.sol#727)",
+      "reason": "storeMetadata performs the required atomic archive write and reverts if it fails. Its returned BlobRef is a location for readers, not a success boolean or authorization result; the caller intentionally does not duplicate it in family storage.",
+      "sources": ["contracts/family/DeepFamily.sol"]
+    },
+    {
+      "id": "4490eb7442423a364677db5fd8fb0b8ad74af29fa2d65362bf187fef0e40a4b5",
+      "check": "unused-return",
+      "impact": "Medium",
+      "subject": "DeepFamilyReader._readCoreInfo(uint256) (contracts/family/DeepFamilyReader.sol#455-459) ignores return value by (coreInfo.basicInfo,coreInfo.supplementInfo) = DEEP_FAMILY.nftCoreInfo(tokenId) (contracts/family/DeepFamilyReader.sol#458)",
+      "reason": "Both nftCoreInfo tuple members are assigned directly into the returned memory struct's basicInfo and supplementInfo fields. The result is consumed through member assignments; no required return value is discarded.",
+      "sources": ["contracts/family/DeepFamilyReader.sol"]
+    },
+    {
+      "id": "5d585f1cd9c38a57658bf5c9f25f4597b191f0ddfa6c7aa9c7ada113635a52d4",
+      "check": "unused-return",
+      "impact": "Medium",
+      "subject": "DeepFamilyReader._requireOwned(uint256) (contracts/family/DeepFamilyReader.sol#437-439) ignores return value by DEEP_FAMILY.ownerOf(tokenId) (contracts/family/DeepFamilyReader.sol#438)",
+      "reason": "This read helper calls the fixed ERC-721 ownerOf solely to require existence of a minted token. ownerOf reverts for a nonexistent token; public reader access does not require a particular owner address, so its returned owner is intentionally unused.",
+      "sources": ["contracts/family/DeepFamilyReader.sol"]
+    },
+    {
+      "id": "c157719e0c8dba20133798c5cd7d6bfc6100a3812b259f2a9c5d696bd66a4641",
+      "check": "write-after-write",
+      "impact": "Medium",
+      "subject": "AdultAgeGate._timestampToDate(uint256).dateOffset (contracts/family/AdultAgeGate.sol#43) is written in both",
+      "reason": "dateOffset first holds the within-year calendar offset used to calculate monthValue and dayValue. After these reads it is intentionally reused for monthValue / 11 and then consumed to adjust monthValue/yearValue. No needed value or observable state write is lost.",
+      "sources": ["contracts/family/AdultAgeGate.sol"]
+    }
+  ]
+}

@@ -474,7 +474,8 @@ outputs may have different sizes):
 All 30 WASM/zkey files total 259.86 MB uncompressed and 126.46 MB with Brotli. The browser
 downloads only the files needed for the selected proof.
 
-The unified `zk:check` rebuilds all fifteen
+The unified `zk:check` first checks the shared shielded business public-signal schema and
+its generated Solidity regions, then rebuilds all fifteen
 circuits and checks artifact digests, shared linking parameters, derived verifiers, current
 proofs and available Circom ceremony evidence. It uses the same pinned artifact set in every
 environment; `release:preflight` also requires the other release evidence.

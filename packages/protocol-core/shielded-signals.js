@@ -7,107 +7,25 @@ import {
   decodePublicShieldedBudgetEnvelope,
   getShieldedPublicBudgetFields,
 } from "./shielded-note-codec.js";
-
-export const SHIELDED_POOL_ACTION = Object.freeze({
-  Shield: 0,
-  Fund: 1,
-  Claim: 2,
-  PrivateTransfer: 3,
-  Unshield: 4,
-});
+import {
+  SHIELDED_POOL_ACTION,
+  SHIELDED_POOL_PUBLIC_INPUTS,
+  SHIELDED_POOL_INPUT_WIDTHS as INPUT_WIDTHS,
+  shieldedInputSlotCount as inputSlotCount,
+} from "./shielded-signal-layout.js";
+export {
+  SHIELDED_POOL_ACTION,
+  SHIELDED_POOL_PUBLIC_INPUTS,
+  SHIELDED_POOL_PUBLIC_SIGNAL_COUNTS,
+  SHIELDED_VALUE_PUBLIC_SIGNAL_COUNTS,
+} from "./shielded-signal-layout.js";
 
 const MAX_FIELD = SNARK_SCALAR_FIELD - 1n;
 const field = (value, label) => bigintFrom(value, label, MAX_FIELD);
 
-const CONTEXT = ["chainId", "pool"];
-const INPUT_ARRAYS = ["inputRoots", "inputNullifiers"];
-const OUTPUTS = ["outputCommitments", "ciphertextHashes"];
-const LINEAGE = ["endorsementRoot", "trustedRoot", "asOf"];
-
 function isValueAction(action) {
   return action === SHIELDED_POOL_ACTION.PrivateTransfer || action === SHIELDED_POOL_ACTION.Unshield;
 }
-
-function inputSlotCount(action) {
-  return action === SHIELDED_POOL_ACTION.Claim || isValueAction(action) ? 1 : 2;
-}
-
-/** VALUE single-input and four-input circuit variants have the same public field order. */
-export const SHIELDED_VALUE_PUBLIC_SIGNAL_COUNTS = Object.freeze({ 1: 10, 4: 16 });
-
-/**
- * Each action's circuit declares exactly these named public inputs, in this order.
- * Shard IDs remain transaction routing metadata; the proof authenticates the selected roots.
- * ShieldedPoolCore._publicSignals builds the same sequence. VALUE transfers and
- * withdrawals default to one input slot and also support four; Fund uses two and Claim uses one.
- */
-export const SHIELDED_POOL_PUBLIC_INPUTS = Object.freeze({
-  [SHIELDED_POOL_ACTION.Shield]: Object.freeze([...CONTEXT, ...OUTPUTS, "amount"]),
-  [SHIELDED_POOL_ACTION.Fund]: Object.freeze([
-    ...CONTEXT,
-    "fundMode",
-    "budgetKind",
-    "publicBudget",
-    ...INPUT_ARRAYS,
-    ...OUTPUTS,
-    ...LINEAGE,
-    "receiveBindings",
-  ]),
-  [SHIELDED_POOL_ACTION.Claim]: Object.freeze([
-    ...CONTEXT,
-    ...INPUT_ARRAYS,
-    "periodNullifiers",
-    ...OUTPUTS,
-    ...LINEAGE,
-  ]),
-  [SHIELDED_POOL_ACTION.PrivateTransfer]: Object.freeze([
-    ...CONTEXT,
-    ...INPUT_ARRAYS,
-    ...OUTPUTS,
-    "receiveBindings",
-  ]),
-  [SHIELDED_POOL_ACTION.Unshield]: Object.freeze([
-    ...CONTEXT,
-    ...INPUT_ARRAYS,
-    ...OUTPUTS,
-    "amount",
-    "recipient",
-  ]),
-});
-
-const INPUT_WIDTHS = Object.freeze({
-  chainId: 1,
-  pool: 1,
-  fundMode: 1,
-  budgetKind: 1,
-  publicBudget: 10,
-  inputRoots: 2,
-  inputNullifiers: 2,
-  periodNullifiers: 3,
-  outputCommitments: 2,
-  ciphertextHashes: 2,
-  amount: 1,
-  recipient: 1,
-  endorsementRoot: 1,
-  trustedRoot: 1,
-  asOf: 1,
-  receiveBindings: 2,
-});
-
-/** Mirrors the per-purpose lengths in ProofConstants.sol. */
-export const SHIELDED_POOL_PUBLIC_SIGNAL_COUNTS = Object.freeze(
-  Object.fromEntries(
-    Object.entries(SHIELDED_POOL_PUBLIC_INPUTS).map(([action, names]) => [
-      action,
-      names.reduce(
-        (total, name) =>
-          total +
-          (INPUT_ARRAYS.includes(name) ? inputSlotCount(Number(action)) : INPUT_WIDTHS[name]),
-        0,
-      ),
-    ]),
-  ),
-);
 
 function values(list, length, label) {
   protocolAssert(

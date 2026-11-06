@@ -89,6 +89,20 @@ export const buildZkCheckCommands = ({
   const core = selected.filter((name) => !name.startsWith("shielded:"));
   const shielded = selected.filter((name) => name.startsWith("shielded:"));
   return Object.freeze([
+    ...(shielded.length > 0
+      ? [
+          Object.freeze({
+            circuit: "shielded-layout",
+            check: "public-signal-layout",
+            executable: process.execPath,
+            args: Object.freeze([
+              path.join(resolvedRoot, "scripts", "generate-shielded-signal-layout.mjs"),
+              "--check",
+            ]),
+            cwd: resolvedRoot,
+          }),
+        ]
+      : []),
     ...(circuit === "all"
       ? [
           ["build", "zk-build.mjs"],
@@ -196,7 +210,8 @@ const printUsage = () => {
   console.log(`Usage:
   node scripts/zk-check.mjs [--circuit <all|core|person|disclosure|shielded|shielded:action>]
 
-The default check rebuilds all circuits, validates artifact hashes and derived verifiers,
+The default check validates the shared shielded public-signal layout, rebuilds all circuits,
+validates artifact hashes and derived verifiers,
 verifies recorded setup ceremonies, then checks real proofs, constraints and receive presentations.
 Every step reuses the current keys; no check generates replacement keys.
 Use --circuit to run the existing focused proof and constraint checks without rebuilding or

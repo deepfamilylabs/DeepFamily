@@ -5,17 +5,31 @@ const EXPECTED_ACTION_PINS = new Map([
   ["actions/checkout", "3d3c42e5aac5ba805825da76410c181273ba90b1"],
   ["actions/setup-node", "820762786026740c76f36085b0efc47a31fe5020"],
   ["actions/cache", "55cc8345863c7cc4c66a329aec7e433d2d1c52a9"],
+  ["actions/setup-python", "6d4fd22b20465ccc0f7354476588e8df7c9ca0e0"],
+  ["actions/upload-artifact", "cf430e030ddbb5b0abf93d22962f4752f3646cd9"],
 ]);
 
 describe("CI action supply-chain policy", function () {
   it("pins every first-party action to the reviewed immutable commit", async function () {
-    const workflow = await readFile(".github/workflows/ci.yml", "utf8");
+    const workflow = (
+      await Promise.all(
+        ["ci.yml", "solidity-security.yml"].map((file) =>
+          readFile(`.github/workflows/${file}`, "utf8"),
+        ),
+      )
+    ).join("\n");
     const uses = [...workflow.matchAll(/^\s*uses:\s*([^@\s]+)@([^\s#]+)(?:\s+#\s+(.+))?$/gm)].map(
       ([, action, revision, annotation]) => ({ action, revision, annotation }),
     );
 
-    expect(uses).to.have.length(7);
+    expect(uses).to.have.length(13);
     expect(uses.map(({ action }) => action)).to.have.members([
+      "actions/checkout",
+      "actions/setup-node",
+      "actions/checkout",
+      "actions/setup-node",
+      "actions/setup-python",
+      "actions/upload-artifact",
       "actions/checkout",
       "actions/setup-node",
       "actions/checkout",
@@ -31,10 +45,16 @@ describe("CI action supply-chain policy", function () {
   });
 
   it("keeps setup-node's implicit package-manager cache disabled in every job", async function () {
-    const workflow = await readFile(".github/workflows/ci.yml", "utf8");
+    const workflow = (
+      await Promise.all(
+        ["ci.yml", "solidity-security.yml"].map((file) =>
+          readFile(`.github/workflows/${file}`, "utf8"),
+        ),
+      )
+    ).join("\n");
     const setupNodeSteps = workflow.split(/^\s*- name: Setup Node\.js\s*$/m).slice(1);
 
-    expect(setupNodeSteps).to.have.length(3);
+    expect(setupNodeSteps).to.have.length(5);
     for (const stepAndRemainder of setupNodeSteps) {
       const step = stepAndRemainder.split(/^\s*- name:/m, 1)[0];
       expect(step).to.include("package-manager-cache: false");
