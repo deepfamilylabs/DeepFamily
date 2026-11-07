@@ -3,7 +3,10 @@ import assert from "node:assert/strict";
 import { AbiCoder, keccak256 } from "ethers";
 import {
   buildShieldedIdentityAuthorizationState,
+  createShieldedReceiveDiversifier,
   deriveShieldedReceivePublicKey,
+  deriveShieldedReceiveOwnerNonce,
+  computeShieldedValueOwnerCommitment,
   computeShieldedReceiveActionHash,
   computeShieldedReceiveCredentialBinding,
   emptyShieldedReceiveAuthorizations,
@@ -21,7 +24,7 @@ const credential = {
   ownerCommitment: 23n,
   viewingKey: await deriveShieldedReceivePublicKey(
     new Uint8Array(32).fill(17),
-    new Uint8Array(32).fill(1),
+    createShieldedReceiveDiversifier(0n, 1900000000n, new Uint8Array(16).fill(1)),
   ),
   // Transport fixture only: real issuer and presentation verification run in the prover tests.
   proof: {
@@ -73,9 +76,37 @@ test("presentation authenticates an operation without publishing its reusable cr
     { checkpointId: 0 },
     { asOf: credential.expiresAt },
     { payloadHash: "0x12" },
-    { asOf: (1n << 64n) - 100n, credential: { ...credential, expiresAt: (1n << 64n) - 1n } },
   ])
     assert.throws(() => prepareShieldedReceivePresentation({ ...request, ...patch }));
+});
+
+test("presentation deadline accepts the uint64 limit and rejects overflow", async () => {
+  const maximum = (1n << 64n) - 1n;
+  const viewingKey = await deriveShieldedReceivePublicKey(
+    new Uint8Array(32).fill(17),
+    createShieldedReceiveDiversifier(0n, maximum, new Uint8Array(16).fill(1)),
+  );
+  const boundaryRequest = {
+    ...request,
+    credential: {
+      ...credential,
+      expiresAt: maximum,
+      viewingKey,
+      ownerCommitment: computeShieldedValueOwnerCommitment(
+        13n,
+        deriveShieldedReceiveOwnerNonce(viewingKey),
+      ),
+    },
+    asOf: maximum - SHIELDED_RECEIVE_PROOF_LIFETIME,
+  };
+  assert.equal(prepareShieldedReceivePresentation(boundaryRequest).deadline, maximum);
+  assert.throws(
+    () => prepareShieldedReceivePresentation({ ...boundaryRequest, asOf: boundaryRequest.asOf + 1n }),
+    {
+      code: "INVALID_SHIELDED_RECEIVE_PRESENTATION",
+      message: "Receive state time is out of range",
+    },
+  );
 });
 
 test("a code unexpired at asOf keeps its deadline even when that deadline passes the expiry", () => {
@@ -89,17 +120,26 @@ test("a code unexpired at asOf keeps its deadline even when that deadline passes
   );
 });
 
-test("current state rejects revoked code and renewed code retains original recipient keys", () => {
+test("current state rejects revoked code and renewal changes the address with the same root", async () => {
   const state = buildShieldedIdentityAuthorizationState([[13n, 1n]]);
   assert.throws(() => prepareShieldedReceivePresentation({ ...request, state }), /revoked/u);
+  const viewingKey = await deriveShieldedReceivePublicKey(
+    new Uint8Array(32).fill(17),
+    createShieldedReceiveDiversifier(1n, credential.expiresAt),
+  );
   const renewed = prepareShieldedReceivePresentation({
     ...request,
     state,
     checkpointId: 2,
-    credential: { ...credential, authorizationCounter: 1n },
+    credential: {
+      ...credential,
+      authorizationCounter: 1n,
+      viewingKey,
+      ownerCommitment: computeShieldedValueOwnerCommitment(13n, deriveShieldedReceiveOwnerNonce(viewingKey)),
+    },
   });
   assert.equal(renewed.presentation.absent, "0");
-  assert.equal(renewed.recipientBinding, computeShieldedReceiveCredentialBinding(request));
+  assert.notEqual(renewed.recipientBinding, computeShieldedReceiveCredentialBinding(request));
   const fund = {
     ...credential,
     purpose: "fund",

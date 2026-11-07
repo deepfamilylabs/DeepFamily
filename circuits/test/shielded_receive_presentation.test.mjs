@@ -10,6 +10,7 @@ import { WitnessCalculatorBuilder } from "circom_runtime";
 import { poseidon2 } from "poseidon-lite";
 import {
   buildShieldedIdentityAuthorizationState,
+  createShieldedReceiveDiversifier,
   deriveShieldedReceivePublicKey,
   prepareReceivePresentationWitness,
   prepareShieldedReceivePresentation,
@@ -28,10 +29,14 @@ const circuitNames = {
   fund: "shielded_fund_receive_presentation",
 };
 
-const receiveViewingKey = await deriveShieldedReceivePublicKey(
-  new Uint8Array(32).fill(1),
-  new Uint8Array(32).fill(1),
-);
+const receiveViewingKeys = new Map(await Promise.all(
+  [0n, 3n, (1n << 64n) - 1n].map(async (counter) => [counter,
+    await deriveShieldedReceivePublicKey(
+      new Uint8Array(32).fill(1),
+      createShieldedReceiveDiversifier(counter, 1900000000n, new Uint8Array(16).fill(1)),
+    ),
+  ]),
+));
 
 // The fixture needs only the public credential statement. Authentication of its
 // issuer proof is a separate linked-verifier obligation, never a recursive
@@ -44,7 +49,7 @@ function fixture(kind, { counter = 3n, keyMode = 0n, entries } = {}) {
     authorizationCounter: counter,
     expiresAt: 1900000000n,
     ownerCommitment: 23n,
-    viewingKey: kind === "fund" ? new Uint8Array(32).fill(1) : receiveViewingKey,
+    viewingKey: kind === "fund" ? new Uint8Array(32).fill(1) : receiveViewingKeys.get(counter),
     keyMode,
     ...(kind === "fund" ? { identityCommitment: 41n } : {}),
   };

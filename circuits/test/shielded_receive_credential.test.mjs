@@ -12,6 +12,7 @@ import {
   computeShieldedAuthorizationAlias,
   computeShieldedOwnerCommitment,
   computeShieldedValueOwnerCommitment,
+  createShieldedReceiveDiversifier,
   deriveShieldedHeirKeyMaterial,
   deriveShieldedReceiveOwnerNonce,
   deriveShieldedReceivePublicKey,
@@ -41,7 +42,10 @@ async function fixture(purpose, keyMode, diversifier) {
   const spendingSecret = keyMode === 0 ? keys.ownerSecret : 37n;
   const viewingKey =
     purpose === "receive"
-      ? await deriveShieldedReceivePublicKey(keys.hpkeIkm, new Uint8Array(32).fill(diversifier))
+      ? await deriveShieldedReceivePublicKey(
+          keys.hpkeIkm,
+          createShieldedReceiveDiversifier(0n, 1900000000n, new Uint8Array(16).fill(diversifier)),
+        )
       : await deriveShieldedViewPublicKey(keys.hpkeIkm);
   const ownerCommitment =
     purpose === "receive"

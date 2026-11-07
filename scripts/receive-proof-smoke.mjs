@@ -11,6 +11,7 @@ import { getBytes, keccak256 } from "ethers";
 import {
   SHIELDED_RECEIVE_CREDENTIAL_VERSION,
   computeShieldedValueOwnerCommitment,
+  createShieldedReceiveDiversifier,
   decodeShieldedIndependentKey,
   deriveShieldedHeirKeyMaterial,
   deriveShieldedIndependentKeyIdentitySecret,
@@ -36,7 +37,7 @@ const sourceNames = {
 const json = (file, value) => fs.writeFileSync(file, `${JSON.stringify(value, null, 2)}\n`);
 
 // Public synthetic recovery credentials for proving tests, never user material.
-export const RECEIVE_PROOF_DIVERSIFIER = `0x${"33".repeat(32)}`;
+export const RECEIVE_PROOF_DIVERSIFIER = `0x${"00".repeat(16)}${"33".repeat(16)}`;
 const independentFixtureKey = "0x000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f";
 export const RECEIVE_PROOF_INDEPENDENT_RECOVERY = Object.freeze({
   identity: Object.freeze({
@@ -89,7 +90,14 @@ export async function prepareReceiveProofFixtures(
     const keys = await receiveProofFixtureKeyMaterial(keyMode);
     keyMode = Number(BigInt(keyMode));
     const viewingKeys = {
-      receive: await deriveShieldedReceivePublicKey(keys.hpkeIkm, RECEIVE_PROOF_DIVERSIFIER),
+      receive: await deriveShieldedReceivePublicKey(
+        keys.hpkeIkm,
+        createShieldedReceiveDiversifier(
+          authorizationCounter,
+          1900000000n,
+          getBytes(RECEIVE_PROOF_DIVERSIFIER).subarray(16),
+        ),
+      ),
       fund: await deriveShieldedViewPublicKey(keys.hpkeIkm),
     };
     const alias = poseidon3([202610210001n, identity, BigInt(lineage.derivedSecretField)]);

@@ -63,9 +63,19 @@ bias. The zero retry counter is one byte, and starts at zero for every call.
 
 `viewIkm` is the original viewing input deterministically derived by the selected
 wallet key mode. It is not the serialized X25519 private key. Let
-`v = Scalar(ViewDomain, viewIkm)`. Generate a fresh uniformly random 32-byte `d`
-with the platform CSPRNG unless an explicit diversifier is supplied for address
-reconstruction. Compute:
+`v = Scalar(ViewDomain, viewIkm)`. The general encryption primitive accepts an
+explicit 32-byte diversifier `d`, or generates one with the platform CSPRNG.
+Ordinary credential creation supplies the following structured diversifier:
+
+```text
+d = I2OSP_BE(authorizationCounter, 8) || I2OSP_BE(expiresAt, 8) || random[16]
+```
+
+Both integers are uint64, expiry is nonzero, and the fresh 16-byte tail comes
+from the platform CSPRNG. The counter and expiry remain public; the tail supplies
+128 bits of fresh randomness. This layout applies to new ordinary credentials,
+while the primitive and historical decryption continue to accept arbitrary valid
+32-byte diversifiers. Compute:
 
 ```text
 G_d = hash_to_ristretto255(d, DST)
@@ -98,6 +108,38 @@ Reject a zero `ownerNonce`. The original root `ownerSecret` stays unchanged; eac
 fresh address changes its authenticated nonce and owner commitment. This is the
 ordinary credential's owner relation, not a new per-code spending secret. Fund
 credentials and BUDGET notes retain `Poseidon2(1013, ownerSecret)`.
+
+## Credential transport
+
+The current `dfrecv` Bech32m payload is exactly 385 bytes (629 characters including
+the prefix, separator and checksum). All integers below are big-endian:
+
+| Offset | Bytes | Content |
+| ------ | ----: | ------- |
+| 0 | 1 | `(version << 1) \| keyMode`; currently `0x02` or `0x03` |
+| 1 | 32 | `authorizationAlias` |
+| 33 | 32 | Diversified `ownerCommitment` |
+| 65 | 64 | `d \|\| Encode(P_d)` |
+| 129 | 256 | Eight canonical BN254 Groth16 proof coordinates |
+
+Counter and expiry are reconstructed from `d[0:8]` and `d[8:16]`, rather than
+serialized again. The statement builder requires these values to match the
+credential's counter and expiry before verification or presentation. Decode
+reconstructs the same eight issuer public signals; the circuits, proving keys and
+verifiers are unchanged. Changing either value changes the authenticated complete
+address as well as its metadata, and the original issuer proof cannot be reused.
+Changing counter or expiry when renewing a code therefore requires regenerating
+its address, diversified owner and issuer proof under the same root secrets.
+
+Fund credentials use the same packed one-byte header and occupy 401 bytes
+(655 Bech32m characters). Their layout is `header[1] || alias[32] || counter[8]
+|| expiry[8] || identity[32] || owner[32] || X25519PublicKey[32] || proof[256]`.
+Counter, expiry and the fixed recipient material remain independent fields.
+
+Only the current 385-byte ordinary and 401-byte Fund layouts are accepted. The
+former 402-byte layouts have no compatibility decoder. These changes optimize
+size: counter, expiry and the stable authorization alias remain visible to code
+holders.
 
 ## Shared secret and key schedule
 

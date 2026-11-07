@@ -33,6 +33,7 @@ import {
   computeShieldedBudgetUseNullifier,
   computeShieldedValueNoteCommitment,
   computeShieldedValueOwnerCommitment,
+  createShieldedReceiveDiversifier,
   decodeShieldedReceiveCredential,
   decodePublicShieldedBudgetEnvelope,
   encodePublicShieldedBudgetEnvelope,
@@ -305,8 +306,17 @@ export async function runShieldedAcceptanceSmoke({
     const files = candidate.circuits[action];
     const alias = computeShieldedAuthorizationAlias(material);
     const checkpoint = await loadAuthorizationWitness(alias);
+    const expiresAt = checkpoint.asOf + 86400n;
     const viewingKey =
-      purpose === "receive" ? await deriveShieldedReceivePublicKey(keys.hpkeIkm) : keys.viewingKey;
+      purpose === "receive"
+        ? await deriveShieldedReceivePublicKey(
+            keys.hpkeIkm,
+            createShieldedReceiveDiversifier(
+              checkpoint.authorizationWitness.authorizationCounter,
+              expiresAt,
+            ),
+          )
+        : keys.viewingKey;
     const ownerCommitment =
       purpose === "receive"
         ? computeShieldedValueOwnerCommitment(
@@ -319,7 +329,7 @@ export async function runShieldedAcceptanceSmoke({
       ...(purpose === "fund" ? { identityCommitment: material.identityCommitment } : {}),
       authorizationAlias: alias,
       authorizationCounter: checkpoint.authorizationWitness.authorizationCounter,
-      expiresAt: checkpoint.asOf + 86400n,
+      expiresAt,
       ownerCommitment,
       viewingKey,
     };

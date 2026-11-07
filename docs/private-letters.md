@@ -22,7 +22,8 @@ the live counter and updates its stored dictionary through
 API; the old global-tree transition APIs and authorization ABI have been removed.
 The replacement development keys and fixed verifier match the six-signal circuit.
 Incrementing the counter invalidates earlier credentials on this chain
-within the checkpoint retirement window of 15 minutes. Credential expiry stays private:
+within the checkpoint retirement window of 15 minutes. Credential expiry stays private in
+on-chain presentations:
 the presentation proves the credential is unexpired at its `asOf`, and the only public
 time is `deadline = asOf + 15 minutes`, which the consumer checks against the execution
 block. A payment or letter started before expiry may therefore land up to 15 minutes
@@ -43,10 +44,26 @@ The selected wallet's original viewing input deterministically recreates one
 viewing scalar; different bases produce different receiving public points for the
 same scalar. `dffund` continues to carry its fixed 32-byte X25519 key for budget
 funding and recovery. These are separate current purposes, not historical formats.
-Both credential packets are 402 bytes before Bech32m encoding. Their two-byte
-header contains only the credential version and key mode. Version 1 fixes the
-identity suite, independent-key suite and independent-key derivation rules;
-those three constant identifiers are absent from the encoding and proof inputs.
+Ordinary credentials are 385 bytes before Bech32m encoding, producing 629-character
+`dfrecv` codes instead of the former 657 characters. Their one-byte header is
+`(version << 1) | keyMode`, and their diversifier is
+`I2OSP_BE(authorizationCounter, 8) || I2OSP_BE(expiresAt, 8) || random[16]`.
+The two uint64 values are recovered from the address rather than duplicated as
+separate credential fields. The fresh 16-byte tail provides 128 bits of diversifier
+randomness; this is not a security-level claim for the complete protocol. Fund
+credentials use the same packed one-byte header and occupy 401 bytes (655
+characters). They retain standalone counter and expiry fields and the 32-byte
+X25519 key. Only the current 385-byte ordinary and 401-byte Fund layouts are
+accepted; the former 402-byte layouts have no compatibility path.
+Version 1 fixes the identity suite, independent-key suite and independent-key
+derivation rules; those three constant identifiers are absent from the encoding
+and proof inputs. The packing changes neither the 8/9 issuer signals nor the
+circuits, proving keys or verifiers.
+
+This packing saves bytes without hiding the counter or expiry from code holders;
+both remain publicly readable, and the fixed authorization alias still links
+codes. The general receive-encryption API continues to accept arbitrary valid
+32-byte diversifiers; only credential creation requires this structured layout.
 
 The two receive-circuit key limbs authenticate a domain-separated SHA-256 digest
 of the complete 64-byte ordinary receive address. Thus changing its diversifier
@@ -68,8 +85,8 @@ address diversifier and encryption randomness are authenticated inside the
 encrypted plaintext, and recovery verifies the reconstructed ephemeral point
 before returning any payload. Recovery needs the original wallet credentials and,
 for independent mode, the original independent root; it does not require saved
-codes, per-code private keys, diversifiers or an address index. Expiry and counter
-revocation do not participate in historical decryption.
+codes, per-code private keys, diversifiers or an address index. Historical
+decryption does not check the current expiry or authorization state.
 
 Every VALUE note authenticates its owner as
 `Poseidon3(1013, ownerSecret, noteNonce)`. An external receive-code transfer uses

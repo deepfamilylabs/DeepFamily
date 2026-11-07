@@ -10,6 +10,7 @@ import {
 import { deriveShieldedIndependentKeyMaterial } from "../shielded-independent-key.js";
 import { deriveShieldedReceiveOwnerNonce } from "../shielded-hpke.js";
 import { deriveShieldedReceivePublicKey } from "../shielded-receive-encryption.js";
+import { createShieldedReceiveDiversifier } from "../shielded-receive-credential.js";
 import {
   computeShieldedReceiveCredentialBinding,
   computeShieldedReceiveRecipientBinding,
@@ -359,7 +360,10 @@ test("recipient binding recovery matches the credential and supports both origin
     [0n, key],
     [1n, independent],
   ]) {
-    const viewingKey = await deriveShieldedReceivePublicKey(material.hpkeIkm);
+    const viewingKey = await deriveShieldedReceivePublicKey(
+      material.hpkeIkm,
+      createShieldedReceiveDiversifier(123n, 1n),
+    );
     const envelope = createShieldedLetterEnvelope({
       authorizationAlias: 9n,
       body: "已过期和撤销的历史家书",

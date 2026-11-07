@@ -5,6 +5,7 @@ import {
   computeIdentityFromDerivedSecret,
   computeShieldedAuthorizationAlias,
   computeShieldedValueOwnerCommitment,
+  createShieldedReceiveDiversifier,
   computeShieldedReceiveRecipientBinding,
   buildShieldedIdentityAuthorizationState,
   decodeShieldedReceiveCredential,
@@ -18,6 +19,7 @@ import {
   encryptShieldedLetter,
   encryptShieldedNote,
   encodeShieldedReceiveCredential,
+  readShieldedReceiveAddressMetadata,
   wrapIdentityCommitmentAsPersonHash,
 } from "@deepfamily/protocol-core";
 import { hexlify } from "ethers";
@@ -190,6 +192,7 @@ describe("receive code proofs", () => {
   });
 
   it("verifies the identity's own keys", async () => {
+    expect(code).toHaveLength(655);
     const material = computeIdentityFromDerivedSecret(identity);
     const keys = deriveShieldedHeirKeyMaterial(identity.derivedSecretField);
     const viewingKey = await deriveShieldedViewPublicKey(keys.hpkeIkm);
@@ -236,11 +239,17 @@ describe("receive code proofs", () => {
         expiresAt: 1n,
       });
       const credentials = [first, second].map((item) => decodeShieldedReceiveCredential(item.code));
+      expect(first.code).toHaveLength(629);
+      expect(second.code).toHaveLength(629);
       expect(credentials[0].viewingKey).toHaveLength(64);
       expect(credentials[1].viewingKey).toHaveLength(64);
       expect(credentials[0].viewingKey.slice(32)).not.toEqual(credentials[1].viewingKey.slice(32));
       expect(credentials[0].ownerCommitment).not.toBe(credentials[1].ownerCommitment);
       for (const credential of credentials) {
+        expect(readShieldedReceiveAddressMetadata(credential.viewingKey)).toEqual({
+          authorizationCounter: 0n,
+          expiresAt: 1n,
+        });
         expect(credential.ownerCommitment).toBe(
           computeShieldedValueOwnerCommitment(
             material.ownerSecret,
@@ -250,7 +259,7 @@ describe("receive code proofs", () => {
       }
       expect(credentials[0].authorizationAlias).toBe(credentials[1].authorizationAlias);
       const changedDiversifier = credentials[0].viewingKey.slice();
-      changedDiversifier[0] ^= 1;
+      changedDiversifier[16] ^= 1;
       const alteredCode = encodeShieldedReceiveCredential({
         ...credentials[0],
         viewingKey: changedDiversifier,
@@ -259,6 +268,24 @@ describe("receive code proofs", () => {
         ok: false,
         reason: "invalid",
       });
+      // Updating the address metadata and recomputing the transport checksum
+      // cannot upgrade or extend the original issuer proof.
+      for (const patch of [{ authorizationCounter: 1n }, { expiresAt: 2n }]) {
+        const changed = { ...credentials[0], ...patch };
+        const viewingKey = changed.viewingKey.slice();
+        viewingKey.set(
+          createShieldedReceiveDiversifier(
+            changed.authorizationCounter,
+            changed.expiresAt,
+            viewingKey.subarray(16, 32),
+          ),
+        );
+        const tampered = encodeShieldedReceiveCredential({ ...changed, viewingKey });
+        await expect(verifyShieldedReceiveCode(tampered)).resolves.toEqual({
+          ok: false,
+          reason: "invalid",
+        });
+      }
       const restored = await restore();
       const noteScope = {
         chainId: 31337n,
@@ -327,7 +354,12 @@ describe("receive code proofs", () => {
       rawPassphrase: "recipient passphrase",
       ...receiveOptions,
     });
-    expect(decodeShieldedReceiveCredential(result.code).authorizationCounter).toBe(5n);
+    const decoded = decodeShieldedReceiveCredential(result.code);
+    expect(decoded.authorizationCounter).toBe(5n);
+    expect(readShieldedReceiveAddressMetadata(decoded.viewingKey)).toEqual({
+      authorizationCounter: 5n,
+      expiresAt: 2_000_000_000n,
+    });
     expect(mocks.authorizationMode).toHaveBeenLastCalledWith("rebuild", {
       chainId: "31337",
       authorizationStateAddress: "0x2222222222222222222222222222222222222222",

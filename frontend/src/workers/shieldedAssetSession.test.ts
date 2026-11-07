@@ -20,6 +20,7 @@ import {
   encodeShieldedValueNotePayload,
   encryptShieldedNote,
   createShieldedLetterEnvelope,
+  createShieldedReceiveDiversifier,
   encryptShieldedLetter,
   computeShieldedLetterCiphertextHash,
   computeShieldedAuthorizationAlias,
@@ -662,7 +663,7 @@ describe("private letter recovery with original keys", () => {
   ) {
     const authorizationAlias = options.authorizationAlias ?? originalAlias;
     const envelope = createShieldedLetterEnvelope({ body: "Original private letter", salt: 17n, authorizationAlias });
-    const viewingKey = await deriveShieldedReceivePublicKey(keys.hpkeIkm);
+    const viewingKey = await deriveShieldedReceivePublicKey(keys.hpkeIkm, createShieldedReceiveDiversifier(0n, 1n));
     const ciphertext = await encryptShieldedLetter({ ...letterContext, messageId, recipientPublicKey: viewingKey, envelope });
     const ownerNonce = deriveShieldedReceiveOwnerNonce(viewingKey);
     const credential = { purpose: "receive" as const, authorizationAlias, ownerCommitment: computeShieldedValueOwnerCommitment(keys.ownerSecret, ownerNonce),
@@ -698,7 +699,7 @@ describe("private letter recovery with original keys", () => {
     const record = await archivedLetter(keys, keyMode, "10", {
       authorizationAlias: otherAlias,
       binding: { authorizationAlias: otherAlias, ownerCommitment: other.ownerCommitment,
-        viewingKey: await deriveShieldedReceivePublicKey(other.hpkeIkm), keyMode: 0 },
+        viewingKey: await deriveShieldedReceivePublicKey(other.hpkeIkm, createShieldedReceiveDiversifier(0n, 1n)), keyMode: 0 },
     });
     mocks.readLetters.mockResolvedValue([record]);
     const result = await session.call("recoverLetters", { context: letterContext });

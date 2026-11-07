@@ -18,6 +18,7 @@ import {
   computeShieldedSpendNullifier,
   computeShieldedValueNoteCommitment,
   createShieldedLetterEnvelope,
+  createShieldedReceiveDiversifier,
   decodeShieldedIndependentKey,
   decodeShieldedIndependentKeyMnemonic,
   decryptShieldedLetter,
@@ -36,6 +37,7 @@ import {
   prepareShieldedReceivePresentation,
   prepareShieldedIdentityCounterAuthorization,
   readArchiveBlob,
+  splitShieldedViewPublicKey,
   verifyShieldedNotePayload,
 } from "@deepfamily/protocol-core";
 import { buildShieldedFundingFixtures } from "../circuits/test/generate_shielded_funding_input.mjs";
@@ -111,7 +113,11 @@ describe("Receive presentation real-proof canonical pool and letter integration"
         const viewingKey = await deriveShieldedViewPublicKey(keys.hpkeIkm);
         const receiveViewingKey = await deriveShieldedReceivePublicKey(
           keys.hpkeIkm,
-          RECEIVE_PROOF_DIVERSIFIER,
+          createShieldedReceiveDiversifier(
+            0n,
+            BigInt(raw.credentialPublicSignals[2]),
+            hre.ethers.getBytes(RECEIVE_PROOF_DIVERSIFIER).subarray(16),
+          ),
         );
         const receiveNonce = deriveShieldedReceiveOwnerNonce(receiveViewingKey);
         const receiveOwnerCommitment = computeShieldedValueOwnerCommitment(
@@ -839,25 +845,48 @@ describe("Receive presentation real-proof canonical pool and letter integration"
             }),
           /revoked/u,
         );
+        const renewedViewingKey = await deriveShieldedReceivePublicKey(
+          restoredKeys[0].hpkeIkm,
+          createShieldedReceiveDiversifier(1n, receive.expiresAt),
+        );
+        const renewedOwnerCommitment = computeShieldedValueOwnerCommitment(
+          restoredKeys[0].ownerSecret,
+          deriveShieldedReceiveOwnerNonce(renewedViewingKey),
+        );
+        const renewedView = splitShieldedViewPublicKey(renewedViewingKey);
         const renewedIssuer = prover.circom("shielded_receive_credential", {
           ...privateIdentity,
           identityCommitment: String(fundCredential.identityCommitment),
           authorizationCounter: "1",
           expiresAt: String(receive.expiresAt),
-          ownerCommitment: String(receiveOwnerCommitment),
-          viewKeyLo: raw.credentialPublicSignals[4],
-          viewKeyHi: raw.credentialPublicSignals[5],
+          ownerCommitment: String(renewedOwnerCommitment),
+          viewKeyLo: String(renewedView.viewKeyLo),
+          viewKeyHi: String(renewedView.viewKeyHi),
           keyMode: String(keyMode),
           receiveCodeVersion: String(SHIELDED_RECEIVE_CREDENTIAL_VERSION),
           spendingSecret: String(restoredKeys[0].ownerSecret),
         });
+        const renewedCredential = {
+          ...receive,
+          authorizationCounter: 1n,
+          viewingKey: renewedViewingKey,
+          ownerCommitment: renewedOwnerCommitment,
+          proof: renewedIssuer.proof,
+        };
+        const renewedCiphertext = hre.ethers.hexlify(await encryptShieldedLetter({
+          chainId,
+          lettersAddress,
+          messageId: pendingId,
+          recipientPublicKey: renewedViewingKey,
+          envelope: pendingEnvelope,
+        }));
         const renewed = prepareShieldedReceivePresentation({
-          credential: { ...receive, authorizationCounter: 1n, proof: renewedIssuer.proof },
+          credential: renewedCredential,
           chainId,
           consumer: lettersAddress,
           action: 1n,
           messageId: pendingId,
-          payloadHash: hre.ethers.keccak256(pendingCiphertext),
+          payloadHash: hre.ethers.keccak256(renewedCiphertext),
           checkpointId: 2n,
           asOf: await now(),
           state: updatedCounterState,
@@ -873,13 +902,13 @@ describe("Receive presentation real-proof canonical pool and letter integration"
         };
         await recordTransaction(
           "renewedLetter",
-          letters.registerLetter(renewedDelivery, pendingCiphertext, renewedProof),
+          letters.registerLetter(renewedDelivery, renewedCiphertext, renewedProof),
         );
         records.push({
           messageId: pendingId,
           record: await letters.letterRecord(pendingId),
           envelope: pendingEnvelope,
-          ciphertext: hre.ethers.getBytes(pendingCiphertext),
+          ciphertext: hre.ethers.getBytes(renewedCiphertext),
         });
         // A letter proved one minute before the code expires still lands within its own
         // deadline. Once the code has expired no new proof can be prepared, while every
@@ -895,12 +924,12 @@ describe("Receive presentation real-proof canonical pool and letter integration"
             chainId,
             lettersAddress,
             messageId: lastId,
-            recipientPublicKey: receiveViewingKey,
+            recipientPublicKey: renewedViewingKey,
             envelope: lastEnvelope,
           }),
         );
         const lastRequest = {
-          credential: { ...receive, authorizationCounter: 1n, proof: renewedIssuer.proof },
+          credential: renewedCredential,
           chainId,
           consumer: lettersAddress,
           action: 1n,

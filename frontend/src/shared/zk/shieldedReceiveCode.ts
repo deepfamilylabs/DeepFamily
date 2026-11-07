@@ -6,6 +6,7 @@ import {
   computeShieldedOwnerCommitment,
   computeShieldedValueOwnerCommitment,
   computeShieldedReceiveCredentialFingerprint,
+  createShieldedReceiveDiversifier,
   canonicalizeFullName,
   computeIdentityFromDerivedSecret,
   decodeShieldedReceiveCredential,
@@ -94,7 +95,10 @@ export async function createShieldedReceiveCode(
   let ownerCommitment = keys.ownerCommitment;
   if (purpose === "receive") {
     for (;;) {
-      viewingKey = await deriveShieldedReceivePublicKey(keys.hpkeIkm);
+      viewingKey = await deriveShieldedReceivePublicKey(
+        keys.hpkeIkm,
+        createShieldedReceiveDiversifier(input.authorizationCounter, input.expiresAt),
+      );
       let nonce: bigint;
       try {
         nonce = deriveShieldedReceiveOwnerNonce(viewingKey);

@@ -5,6 +5,7 @@ import {
   deriveShieldedReceivePublicKey,
   deriveShieldedReceiveOwnerNonce,
   computeShieldedValueOwnerCommitment,
+  createShieldedReceiveDiversifier,
   encodeShieldedIndependentKey,
   encodePublicShieldedBudgetEnvelope,
 } from "@deepfamily/protocol-core";
@@ -146,9 +147,12 @@ const context: ShieldedWorkerContext = {
   assetKind: "native",
 };
 const secretKeys = deriveShieldedHeirKeyMaterial(13n);
-const receivingKey = hexlify(await deriveShieldedReceivePublicKey(secretKeys.hpkeIkm, new Uint8Array(32).fill(7)));
-function receiveCredential(purpose: "receive" | "fund" = "receive", overrides: { expiresAt?: bigint; authorizationCounter?: bigint } = {}) {
-  return { purpose, authorizationAlias: 17n, authorizationCounter: 0n, expiresAt: 2000000000n,
+async function receiveCredential(purpose: "receive" | "fund" = "receive", overrides: { expiresAt?: bigint; authorizationCounter?: bigint } = {}) {
+  const authorizationCounter = overrides.authorizationCounter ?? 0n;
+  const expiresAt = overrides.expiresAt ?? 2000000000n;
+  const receivingKey = hexlify(await deriveShieldedReceivePublicKey(secretKeys.hpkeIkm,
+    createShieldedReceiveDiversifier(authorizationCounter, expiresAt, new Uint8Array(16).fill(7))));
+  return { purpose, authorizationAlias: 17n, authorizationCounter, expiresAt,
     ...(purpose === "fund" ? { identityCommitment: 31n } : {}),
     ownerCommitment: purpose === "receive"
       ? computeShieldedValueOwnerCommitment(secretKeys.ownerSecret, deriveShieldedReceiveOwnerNonce(receivingKey))
@@ -158,7 +162,8 @@ function receiveCredential(purpose: "receive" | "fund" = "receive", overrides: {
     ...overrides,
   };
 }
-function verifiedCredential(credential = receiveCredential()) {
+async function verifiedCredential(credential?: Awaited<ReturnType<typeof receiveCredential>>) {
+  credential ??= await receiveCredential();
   mocks.decode.mockReturnValue(credential);
   mocks.verify.mockResolvedValue({
     ...credential,
@@ -229,10 +234,10 @@ function assertNoOpenings(value: unknown) {
   ])
     expect(serialized).not.toContain(secret);
 }
-beforeEach(() => {
+beforeEach(async () => {
   vi.clearAllMocks();
   mocks.decode.mockReset();
-  verifiedCredential();
+  await verifiedCredential();
   mocks.authorizationCounter = 0n;
   mocks.authorizationAsOf = 1000n;
   mocks.authorizationFailure = null;
@@ -729,7 +734,7 @@ describe("asset Worker preview and proof boundary", () => {
       );
       // Isolate issuer proof verification while retaining real spend planning,
       // purpose handling and authenticated authorization-tree witnesses.
-      verifiedCredential(receiveCredential(action === "fund" ? "fund" : "receive", overrides));
+      await verifiedCredential(await receiveCredential(action === "fund" ? "fund" : "receive", overrides));
       return session;
     };
     const useFinalSpend = () => {
@@ -744,7 +749,7 @@ describe("asset Worker preview and proof boundary", () => {
 
     it("rejects a proven credential for the wrong operation before preparing any merge", async () => {
       const session = await prepare();
-      verifiedCredential(receiveCredential(action === "fund" ? "receive" : "fund"));
+      await verifiedCredential(await receiveCredential(action === "fund" ? "receive" : "fund"));
       await expect(session.call("preview", request())).rejects.toThrow(/receive code|receiving code|budget receiving credential/i);
       expect(mocks.verify).toHaveBeenCalledOnce();
       expect(mocks.transfer).not.toHaveBeenCalled();

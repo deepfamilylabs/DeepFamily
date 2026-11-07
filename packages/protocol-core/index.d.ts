@@ -1295,7 +1295,7 @@ export interface ShieldedReceiveCredentialStatement {
   /** Present only in a Fund credential; omitted from a receive credential. */
   identityCommitment?: BigNumberish;
   ownerCommitment: BigNumberish;
-  /** 64-byte diversified address for receive; 32-byte X25519 public key for fund. */
+  /** Receive: counter[8] || expiry[8] || randomness[16] || point[32]; Fund: X25519 key[32]. */
   viewingKey: BytesLike;
   keyMode?: BigNumberish;
   receiveCodeVersion?: BigNumberish;
@@ -1304,6 +1304,17 @@ export function computeShieldedAuthorizationAlias(input: {
   identityCommitment: BigNumberish;
   derivedSecretField: BigNumberish;
 }): bigint;
+/** Two big-endian uint64 values followed by 16 random bytes; expiry must be nonzero. */
+export function createShieldedReceiveDiversifier(
+  authorizationCounter: BigNumberish,
+  expiresAt: BigNumberish,
+  randomness16?: BytesLike,
+): Uint8Array;
+/** Reads metadata only; does not verify the address point, its issuer proof, or its validity. */
+export function readShieldedReceiveAddressMetadata(viewingKey: BytesLike): {
+  authorizationCounter: bigint;
+  expiresAt: bigint;
+};
 export function buildShieldedReceiveCredentialPublicSignals(
   input: ShieldedReceiveCredentialStatement,
 ): bigint[];
