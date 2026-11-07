@@ -10,6 +10,7 @@ import {
   PanelButton,
   readShieldedAsset,
   resolveShieldedAssetPool,
+  waitForShieldedTransaction,
   type ShieldedAsset,
   type ShieldedPageModules,
   type ShieldedPanelNavigation,
@@ -78,23 +79,30 @@ function InheritanceContent() {
   const { t } = useTranslation();
   const config = useConfig();
   const wallet = useWallet();
-  const { busy: sessionBusy, identity } = useShieldedPageIdentitySession();
+  const { busy: sessionBusy, credentials, identity } = useShieldedPageIdentitySession();
   const currentSessionBusy = useRef(sessionBusy);
   currentSessionBusy.current = sessionBusy;
   const factoryAddress = getShieldedPoolFactoryAddress(config.chainId);
   const [selectedAssetAddress, setSelectedAddress] = useState(config.tokenAddress);
   // Each pool remounts its panel; public navigation carries the current task across.
   const [navigation, setNavigation] = useState<ShieldedPanelNavigation>(INITIAL_NAVIGATION);
-  // Unlocking another person remounts it from the start, so no draft, selection or
-  // task of the previous person carries over. Re-unlocking the same person keeps them.
-  const [person, setPerson] = useState({ commitment: "", epoch: 0 });
-  if (identity && identity.identityCommitment !== person.commitment) {
-    const switched = person.commitment !== "";
-    setPerson({
-      commitment: identity.identityCommitment,
-      epoch: person.epoch + (switched ? 1 : 0),
-    });
-    if (switched) setNavigation(INITIAL_NAVIGATION);
+  // Keep a known person across locks. Without identity proof capability, only
+  // the same credentials handle establishes that drafts still belong to them.
+  const [person, setPerson] = useState({ commitment: "", credentialsHandle: "", epoch: 0 });
+  if (identity || credentials) {
+    const sameCredentials = !!credentials && credentials.handle === person.credentialsHandle;
+    const sameIdentity = !!identity && identity.identityCommitment === person.commitment;
+    const differentIdentity =
+      !!identity && !!person.commitment && identity.identityCommitment !== person.commitment;
+    const switched =
+      !!(person.commitment || person.credentialsHandle) &&
+      (differentIdentity || (!sameCredentials && !sameIdentity));
+    const commitment = identity?.identityCommitment ?? (sameCredentials ? person.commitment : "");
+    const credentialsHandle = credentials?.handle ?? "";
+    if (commitment !== person.commitment || credentialsHandle !== person.credentialsHandle) {
+      setPerson({ commitment, credentialsHandle, epoch: person.epoch + (switched ? 1 : 0) });
+      if (switched) setNavigation(INITIAL_NAVIGATION);
+    }
   }
   const selectedAddress = selectedAssetAddress;
   const [importAddress, setImportAddress] = useState("");
@@ -283,10 +291,10 @@ function InheritanceContent() {
       }
       const factory = createShieldedPoolFactoryContract(factoryAddress, signer);
       const tx = await factory.createPool(asset.address);
-      const receipt = await tx.wait();
-      if (receipt?.status !== 1) {
+      const { transactionHash, receipt } = await waitForShieldedTransaction(tx);
+      if (receipt.status !== 1) {
         if (isCurrent())
-          setAssetError({ key: "shielded.transactionFailed", values: { hash: tx.hash } });
+          setAssetError({ key: "shielded.transactionFailed", values: { hash: transactionHash } });
         return;
       }
       // Re-read the canonical mapping after confirmation, including a concurrent creation.

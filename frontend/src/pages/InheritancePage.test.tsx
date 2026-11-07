@@ -2,7 +2,10 @@
 import React from "react";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { ShieldedPublicIdentity } from "../shared/workers/shieldedAssetWorkerTypes";
+import type {
+  ShieldedAssetSessionState,
+  ShieldedPublicIdentity,
+} from "../shared/workers/shieldedAssetWorkerTypes";
 import {
   useShieldedPageIdentitySession,
   type ShieldedPanelNavigation,
@@ -22,6 +25,21 @@ const otherIdentity: ShieldedPublicIdentity = {
   identityCommitment: "888",
   personHash: "0x" + "01".repeat(32),
 };
+
+function independentSession(handle = "credentials:test"): ShieldedAssetSessionState {
+  return {
+    credentials: { handle },
+    identity: null,
+    independentKey: {
+      ownerCommitment: "123",
+      viewingKey: `0x${"12".repeat(32)}`,
+      keyFingerprint: `0x${"34".repeat(32)}`,
+      rootSource: "random",
+      recoveryVerified: true,
+      recoveryPath: "shieldedKey",
+    },
+  };
+}
 
 const mocks = vi.hoisted(() => ({
   wallet: {
@@ -54,7 +72,10 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({
-    t: (key: string) => (mocks.language ? `${key}:${mocks.language}` : key),
+    t: (key: string, values?: { hash?: string }) =>
+      key === "shielded.transactionFailed" && values?.hash
+        ? `${key}:${values.hash}`
+        : mocks.language ? `${key}:${mocks.language}` : key,
   }),
 }));
 
@@ -148,6 +169,13 @@ vi.mock("../domains/inheritance/ui/ShieldedInheritancePanel", () => ({
         <button type="button" onClick={() => session.unlock(otherIdentity)}>
           unlock-other-test-session
         </button>
+        <button type="button" onClick={() => session.update({
+          credentials: { handle: "credentials:reunlocked" },
+          identity,
+          independentKey: null,
+        })}>
+          unlock-same-person-with-new-credentials
+        </button>
         <button type="button" onClick={session.lock}>
           lock-test-session
         </button>
@@ -159,22 +187,15 @@ vi.mock("../domains/inheritance/ui/ShieldedInheritancePanel", () => ({
         </button>
         <button
           type="button"
-          onClick={() =>
-            session.update({
-              credentials: { handle: "credentials:test" },
-              identity: null,
-              independentKey: {
-                ownerCommitment: "123",
-                viewingKey: `0x${"12".repeat(32)}`,
-                keyFingerprint: `0x${"34".repeat(32)}`,
-                rootSource: "random",
-                recoveryVerified: true,
-                recoveryPath: "shieldedKey",
-              },
-            })
-          }
+          onClick={() => session.update(independentSession())}
         >
           unlock-independent-key-without-identity-proof
+        </button>
+        <button
+          type="button"
+          onClick={() => session.update(independentSession("credentials:other"))}
+        >
+          unlock-other-independent-key-without-identity-proof
         </button>
         <input
           aria-label="private-workflow-draft"
@@ -462,6 +483,67 @@ describe("InheritancePage private pool entry", () => {
     expect(screen.getByTestId("shielded-navigation").textContent).toBe("identity:shield");
   });
 
+  it.each([
+    ["unlock-test-session", "unlock-other-independent-key-without-identity-proof"],
+    ["unlock-independent-key-without-identity-proof", "unlock-other-independent-key-without-identity-proof"],
+    ["unlock-independent-key-without-identity-proof", "unlock-other-test-session"],
+  ])("clears another person's drafts and task from %s to %s", async (first, second) => {
+    render(<InheritancePage />);
+    await screen.findByTestId("shielded-panel");
+    fireEvent.click(screen.getByRole("button", { name: first }));
+    const original = screen.getByTestId("shielded-panel");
+    fireEvent.click(screen.getByRole("button", { name: "select-independent-claim" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "private-workflow-draft" }), {
+      target: { value: "first person's withdrawal destination and amount" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "lock-test-session" }));
+    fireEvent.click(screen.getByRole("button", { name: second }));
+
+    expect(screen.getByTestId("shielded-panel")).not.toBe(original);
+    expect(
+      (screen.getByRole("textbox", { name: "private-workflow-draft" }) as HTMLInputElement).value,
+    ).toBe("");
+    expect(screen.getByTestId("shielded-navigation").textContent).toBe("identity:shield");
+    expect(mocks.panelUnmounted).toHaveBeenCalledOnce();
+  });
+
+  it("keeps the same known person's drafts through fresh credentials", async () => {
+    render(<InheritancePage />);
+    const original = await screen.findByTestId("shielded-panel");
+    fireEvent.click(screen.getByRole("button", { name: "unlock-test-session" }));
+    fireEvent.click(screen.getByRole("button", { name: "select-independent-claim" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "private-workflow-draft" }), {
+      target: { value: "same person's draft" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "lock-test-session" }));
+    fireEvent.click(screen.getByRole("button", { name: "unlock-same-person-with-new-credentials" }));
+
+    expect(screen.getByTestId("shielded-panel")).toBe(original);
+    expect(
+      (screen.getByRole("textbox", { name: "private-workflow-draft" }) as HTMLInputElement).value,
+    ).toBe("same person's draft");
+    expect(screen.getByTestId("shielded-navigation").textContent).toBe("independent:claim");
+    expect(mocks.panelUnmounted).not.toHaveBeenCalled();
+  });
+
+  it("keeps drafts when an independent-only session updates the same credentials", async () => {
+    render(<InheritancePage />);
+    const original = await screen.findByTestId("shielded-panel");
+    fireEvent.click(screen.getByRole("button", { name: "unlock-independent-key-without-identity-proof" }));
+    fireEvent.click(screen.getByRole("button", { name: "select-independent-claim" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "private-workflow-draft" }), {
+      target: { value: "same independent session's draft" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "unlock-independent-key-without-identity-proof" }));
+
+    expect(screen.getByTestId("shielded-panel")).toBe(original);
+    expect(
+      (screen.getByRole("textbox", { name: "private-workflow-draft" }) as HTMLInputElement).value,
+    ).toBe("same independent session's draft");
+    expect(screen.getByTestId("shielded-navigation").textContent).toBe("independent:claim");
+    expect(mocks.panelUnmounted).not.toHaveBeenCalled();
+  });
+
   it("locks during pool loading and ignores late responses after a protocol scope change", async () => {
     const { rerender } = render(<InheritancePage />);
     await screen.findByTestId("shielded-panel");
@@ -570,6 +652,77 @@ describe("InheritancePage private pool entry", () => {
     expect(mocks.createPool).toHaveBeenCalledWith(mocks.config.tokenAddress);
     expect(mocks.resolveShieldedAssetPool).toHaveBeenCalledTimes(2);
     expect(screen.getByTestId("shielded-pool").textContent).toBe(mocks.poolAddress);
+  });
+
+  it("opens the canonical pool after its creation transaction is repriced", async () => {
+    mocks.poolAddress = "";
+    mocks.createPool.mockResolvedValue({
+      hash: "0x1234",
+      wait: async () => {
+        mocks.poolAddress = "0x0000000000000000000000000000000000000020";
+        throw Object.assign(new Error("Transaction repriced"), {
+          code: "TRANSACTION_REPLACED",
+          cancelled: false,
+          reason: "repriced",
+          replacement: { hash: "0x5678" },
+          receipt: { status: 1 },
+        });
+      },
+    });
+    render(<InheritancePage />);
+    fireEvent.click(await screen.findByRole("button", { name: "shielded.assets.create" }));
+    await screen.findByTestId("shielded-panel");
+    expect(mocks.resolveShieldedAssetPool).toHaveBeenCalledTimes(2);
+    expect(screen.getByTestId("shielded-pool").textContent).toBe(mocks.poolAddress);
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("reports the replacement hash when a repriced pool creation fails", async () => {
+    mocks.poolAddress = "";
+    mocks.createPool.mockResolvedValue({
+      hash: "0x1234",
+      wait: async () => {
+        throw Object.assign(new Error("Transaction repriced"), {
+          code: "TRANSACTION_REPLACED",
+          cancelled: false,
+          reason: "repriced",
+          replacement: { hash: "0x5678" },
+          receipt: { status: 0 },
+        });
+      },
+    });
+    render(<InheritancePage />);
+    fireEvent.click(await screen.findByRole("button", { name: "shielded.assets.create" }));
+    await waitFor(() =>
+      expect(screen.getByRole("alert").textContent).toBe("shielded.transactionFailed:0x5678"),
+    );
+    expect(screen.queryByTestId("shielded-panel")).toBeNull();
+    expect(mocks.resolveShieldedAssetPool).toHaveBeenCalledOnce();
+    expect((screen.getByRole("button", { name: "shielded.assets.create" }) as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it("keeps the missing pool available for retry after cancelling its transaction", async () => {
+    mocks.poolAddress = "";
+    mocks.createPool.mockResolvedValue({
+      hash: "0x1234",
+      wait: async () => {
+        throw Object.assign(new Error("Pool creation cancelled"), {
+          code: "TRANSACTION_REPLACED",
+          cancelled: true,
+          reason: "cancelled",
+          replacement: { hash: "0x5678" },
+          receipt: { status: 1 },
+        });
+      },
+    });
+    render(<InheritancePage />);
+    fireEvent.click(await screen.findByRole("button", { name: "shielded.assets.create" }));
+    await waitFor(() =>
+      expect(screen.getByRole("alert").textContent).toBe("Pool creation cancelled"),
+    );
+    expect(screen.queryByTestId("shielded-panel")).toBeNull();
+    expect(mocks.resolveShieldedAssetPool).toHaveBeenCalledOnce();
+    expect((screen.getByRole("button", { name: "shielded.assets.create" }) as HTMLButtonElement).disabled).toBe(false);
   });
 
   it("preserves the missing-pool state when wallet creation is refused", async () => {

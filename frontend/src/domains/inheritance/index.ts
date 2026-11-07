@@ -6,6 +6,7 @@ export {
   resolveShieldedAssetPool,
 } from "./services/shieldedAssetRegistry";
 export type { ShieldedAsset } from "./services/shieldedAssetRegistry";
+export { waitForShieldedTransaction } from "./services/shieldedTransactionReceipt";
 export {
   ShieldedIdentitySessionProvider,
   useShieldedPageIdentitySession,
