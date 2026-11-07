@@ -10,12 +10,14 @@ import { poseidon3 } from "poseidon-lite";
 import { getBytes, keccak256 } from "ethers";
 import {
   SHIELDED_RECEIVE_CREDENTIAL_VERSION,
+  computeShieldedValueOwnerCommitment,
   decodeShieldedIndependentKey,
   deriveShieldedHeirKeyMaterial,
   deriveShieldedIndependentKeyIdentitySecret,
   deriveShieldedIndependentKeyMaterial,
   deriveShieldedViewPublicKey,
   deriveShieldedReceivePublicKey,
+  deriveShieldedReceiveOwnerNonce,
   encodeShieldedIndependentKeyMnemonic,
   splitShieldedViewPublicKey,
 } from "../packages/protocol-core/index.js";
@@ -107,11 +109,7 @@ export async function prepareReceiveProofFixtures(
       identityCommitment: String(identity),
       authorizationCounter: String(authorizationCounter),
       expiresAt: "1900000000",
-      ownerCommitment: String(keys.ownerCommitment),
       keyMode: String(keyMode),
-      identitySuiteId: "1",
-      independentKeySuiteId: "1",
-      independentKeyDerivationVersion: "1",
       receiveCodeVersion: String(SHIELDED_RECEIVE_CREDENTIAL_VERSION),
       spendingSecret: String(keys.ownerSecret),
     };
@@ -119,9 +117,21 @@ export async function prepareReceiveProofFixtures(
     for (const [purpose, source] of Object.entries(sourceNames)) {
       const viewingKey = viewingKeys[purpose];
       const view = splitShieldedViewPublicKey(viewingKey);
+      const ownerCommitment =
+        purpose === "receive"
+          ? computeShieldedValueOwnerCommitment(
+              keys.ownerSecret,
+              deriveShieldedReceiveOwnerNonce(viewingKey),
+            )
+          : keys.ownerCommitment;
       const vk = JSON.parse(fs.readFileSync(path.join(issuerDir, `${source}.vkey.json`), "utf8"));
       const proof = await snarkjs.groth16.fullProve(
-        { ...witness, viewKeyLo: String(view.viewKeyLo), viewKeyHi: String(view.viewKeyHi) },
+        {
+          ...witness,
+          ownerCommitment: String(ownerCommitment),
+          viewKeyLo: String(view.viewKeyLo),
+          viewKeyHi: String(view.viewKeyHi),
+        },
         path.join(issuerDir, `${source}.wasm`),
         path.join(issuerDir, `${source}_final.zkey`),
         undefined,
@@ -134,7 +144,7 @@ export async function prepareReceiveProofFixtures(
         authorizationAlias: alias,
         authorizationCounter,
         expiresAt: 1900000000n,
-        ownerCommitment: keys.ownerCommitment,
+        ownerCommitment,
         viewingKey,
         keyMode: BigInt(keyMode),
         ...(purpose === "fund" ? { identityCommitment: identity } : {}),

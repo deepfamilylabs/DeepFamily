@@ -5,6 +5,7 @@ import {
   initializeShieldedReceiveEncryption,
   deriveShieldedViewPublicKey,
   computeShieldedOwnerCommitment,
+  computeShieldedValueOwnerCommitment,
   computeShieldedSpendNullifier,
   computeShieldedAllocationKeyCommitment,
   getShieldedBudgetCommitments,
@@ -187,7 +188,9 @@ export async function recoverLocalShieldedWallet(
           )
             return null;
           if (
-            (note.kind === "value" && note.ownerCommitment !== keys.ownerCommitment) ||
+            (note.kind === "value" &&
+              note.ownerCommitment !==
+                computeShieldedValueOwnerCommitment(keys.ownerSecret, note.nonce)) ||
             (note.kind === "budget" &&
               ((note.binding !== "identity" && note.heirOwnerCommitment !== keys.ownerCommitment) ||
                 (expectedIdentityCommitment !== undefined &&

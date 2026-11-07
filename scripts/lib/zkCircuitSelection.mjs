@@ -19,14 +19,14 @@ export const RECEIVE_PRESENTATION_CIRCUITS = Object.freeze({
   receivePresentation: Object.freeze({
     kind: "receive",
     issuer: "receiveCredential",
-    hiddenInputs: 11,
+    hiddenInputs: 8,
     publicInputs: 11,
     contractName: "ReceivePresentationVerifier",
   }),
   fundReceivePresentation: Object.freeze({
     kind: "fund",
     issuer: "fundReceiveCredential",
-    hiddenInputs: 12,
+    hiddenInputs: 9,
     publicInputs: 11,
     contractName: "FundReceivePresentationVerifier",
   }),

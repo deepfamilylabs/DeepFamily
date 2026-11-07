@@ -5,11 +5,13 @@ import path from "node:path";
 import test from "node:test";
 import { shieldedCircuitSource } from "../../scripts/lib/zkCircuitSelection.mjs";
 import { WitnessCalculatorBuilder } from "circom_runtime";
-import { poseidon2 } from "poseidon-lite";
-import { CIRCOM_ARTIFACT_FLAGS, circomIncludeArguments } from "../../scripts/lib/circomToolchain.mjs";
+import { poseidon2, poseidon3 } from "poseidon-lite";
+import {
+  CIRCOM_ARTIFACT_FLAGS,
+  circomIncludeArguments,
+} from "../../scripts/lib/circomToolchain.mjs";
 import { assertConstraintViolation } from "./constraint_assertions.mjs";
 import {
-  computeShieldedOwnerCommitment,
   computeShieldedSpendNullifier,
   computeShieldedValueNoteCommitment,
   computeShieldedDummyInputNullifierForSlot,
@@ -18,11 +20,11 @@ import {
 const root = path.resolve(import.meta.dirname, "../..");
 const scope = { chainId: 31337n, poolAddress: "0x0000000000000000000000000000000000001234" };
 const secret = 5001n;
-const owner = computeShieldedOwnerCommitment(secret);
+const owner = (nonce) => poseidon3([1013n, secret, nonce]);
 const MAX = (1n << 128n) - 1n;
 const note = (amount, nonce, hash) =>
   computeShieldedValueNoteCommitment(
-    { ownerCommitment: owner, amount, nonce, ciphertextHashField: hash },
+    { ownerCommitment: owner(nonce), amount, nonce, ciphertextHashField: hash },
     scope,
   );
 function fixture(count, unshield = false, amounts = Array(count).fill(10n)) {
@@ -72,9 +74,12 @@ function fixture(count, unshield = false, amounts = Array(count).fill(10n)) {
     : {
         ...witness,
         receiveBindings: ["0", "0"],
-        receiveAuthorizationAliases: ["0", "0"], receiveSalts: ["0", "0"],
-        receiveKeyModes: ["0", "0"], receiveViewKeyLo: ["0", "0"], receiveViewKeyHi: ["0", "0"],
-        outputOwnerCommitments: [String(owner), String(owner)],
+        receiveAuthorizationAliases: ["0", "0"],
+        receiveSalts: ["0", "0"],
+        receiveKeyModes: ["0", "0"],
+        receiveViewKeyLo: ["0", "0"],
+        receiveViewKeyHi: ["0", "0"],
+        outputOwnerCommitments: outputNonces.map((nonce) => String(owner(nonce))),
         outputAmounts: outputAmounts.map(String),
         outputNonces: outputNonces.map(String),
       };
@@ -151,23 +156,20 @@ test("four-input VALUE constraints and canonical nullifiers", async (t) => {
       await transfer.calculateWitness(fixture(count), true);
       await unshield.calculateWitness(fixture(count, true), true);
     });
-  await t.test(
-    "all four inputs sum above uint128 while bounded outputs remain valid",
-    async () => {
-      const values = Array(4).fill(MAX / 4n);
-      values[0] += 4n;
-      const witness = fixture(4, false, values);
-      witness.outputAmounts = [String(MAX), "1"];
-      witness.outputCommitments = [String(note(MAX, 1001n, 201n)), String(note(1n, 1002n, 202n))];
-      await transfer.calculateWitness(witness, true);
-      await assertConstraintViolation(() =>
-        transfer.calculateWitness(fixture(4, false, Array(4).fill(MAX)), true),
-      );
-      await assertConstraintViolation(() =>
-        unshield.calculateWitness(fixture(4, true, Array(4).fill(MAX)), true),
-      );
-    },
-  );
+  await t.test("all four inputs sum above uint128 while bounded outputs remain valid", async () => {
+    const values = Array(4).fill(MAX / 4n);
+    values[0] += 4n;
+    const witness = fixture(4, false, values);
+    witness.outputAmounts = [String(MAX), "1"];
+    witness.outputCommitments = [String(note(MAX, 1001n, 201n)), String(note(1n, 1002n, 202n))];
+    await transfer.calculateWitness(witness, true);
+    await assertConstraintViolation(() =>
+      transfer.calculateWitness(fixture(4, false, Array(4).fill(MAX)), true),
+    );
+    await assertConstraintViolation(() =>
+      unshield.calculateWitness(fixture(4, true, Array(4).fill(MAX)), true),
+    );
+  });
   for (const [label, change] of [
     ["owner mixing", (w) => (w.inputOwnerSecrets[1] = "5002")],
     ["zero real amount", (w) => (w.inputAmounts[1] = "0")],

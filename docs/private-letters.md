@@ -43,16 +43,23 @@ The selected wallet's original viewing input deterministically recreates one
 viewing scalar; different bases produce different receiving public points for the
 same scalar. `dffund` continues to carry its fixed 32-byte X25519 key for budget
 funding and recovery. These are separate current purposes, not historical formats.
-Both credential packets are 405 bytes before Bech32m encoding.
+Both credential packets are 402 bytes before Bech32m encoding. Their two-byte
+header contains only the credential version and key mode. Version 1 fixes the
+identity suite, independent-key suite and independent-key derivation rules;
+those three constant identifiers are absent from the encoding and proof inputs.
 
 The two receive-circuit key limbs authenticate a domain-separated SHA-256 digest
 of the complete 64-byte ordinary receive address. Thus changing its diversifier
 or point changes the issuer statement and operation binding. Fund key limbs retain
-the raw X25519 encoding. Spending secrets, owner commitments, identity aliases,
-authorization counters and budget recipient keys keep their existing semantics.
-In particular, changing the public receiving point alone does not make complete
-codes unlinkable: their owner commitment and identity authorization alias remain
-stable as described above.
+the raw X25519 encoding. For an ordinary receive address `A`, its digest defines
+`ownerNonce = OS2IP_BE(SHA-256(AddressDomain || A)) mod Fr`, which must be nonzero.
+The ordinary credential owner is `Poseidon3(1013, ownerSecret, ownerNonce)`.
+Each fresh address therefore changes both the viewing public key and owner
+commitment, while retaining the original root spending secret. Budget credentials
+keep `Poseidon2(1013, ownerSecret)` and their fixed X25519 key. Identity aliases
+and authorization counters keep their existing semantics: complete codes remain
+linkable through their stable identity authorization alias, including across
+ordinary codes and budget credentials.
 
 Ordinary transfer notes and private letters encrypt with the diversified receiving
 address. Their ephemeral group point allows the recipient to derive the shared
@@ -63,6 +70,15 @@ before returning any payload. Recovery needs the original wallet credentials and
 for independent mode, the original independent root; it does not require saved
 codes, per-code private keys, diversifiers or an address index. Expiry and counter
 revocation do not participate in historical decryption.
+
+Every VALUE note authenticates its owner as
+`Poseidon3(1013, ownerSecret, noteNonce)`. An external receive-code transfer uses
+the address-derived `ownerNonce` as its note nonce. Self deposits, donor change,
+claim payouts and other own outputs choose fresh note nonces. Recovery recomputes
+the owner from the restored root spending secret and each decrypted note's nonce;
+different public owner commitments can therefore be spent together by the same
+root. Budget note and donor memo sizes remain unchanged, and BUDGET ownership
+continues to use the fixed two-input owner commitment.
 
 The complete byte-level specification, threat model, application acceptance rules
 and remaining security proof obligations are in
@@ -146,9 +162,12 @@ retry after reload.
 
 The Circom issuer authenticates the canonical identity and R derived from the
 original identity secrets, counter, expiry, owner, key mode and the complete viewing
-key. The two Circom presentation circuits check a 64-level sparse state
+key. The ordinary and Fund issuer statements contain 8 and 9 public signals,
+respectively. Their shared fields are alias, counter, expiry, owner, two viewing-key
+limbs, key mode and credential version; Fund additionally publishes identity.
+The two Circom presentation circuits check a 64-level sparse state
 dictionary and bind the actual operation. LinkG16 links an issuer proof and a
-presentation proof over the same hidden credential fields, then rerandomizes both
+presentation proof over the same 8 or 9 hidden credential fields, then rerandomizes both
 proofs before submission. Neither
 circuit evaluates pairing arithmetic or recursively verifies another proof.
 
@@ -165,8 +184,9 @@ the same randomized recipient commitment, including the heir identity for Fund.
 The pool verifies both atomically before spending notes or appending outputs. The
 presentation binds chain, pool, action, output slot and the hash of all actual action
 data. The original credential and issuer proof do not appear on chain. A zero receive
-commitment is allowed only where the business circuit proves the actual input owner
-is also the output owner; Shield remains a self-deposit operation.
+commitment is allowed only where the business circuit proves the output owner is
+derived from the input root spending secret and that output's nonce; Shield
+remains a self-deposit operation.
 
 `PrivateLetterArchive` uses the same authorization state as the canonical pool
 factory. It authenticates ciphertext, message ID, recipient commitment and the proof
@@ -193,9 +213,11 @@ and secrets are not persisted in ordinary application storage or sent to a prove
 service.
 
 Before displaying a decrypted letter, recovery recomputes the on-chain recipient
-binding using the session's owner commitment and key mode, the public receiving
+binding using the session's root spending secret and key mode, the public receiving
 key reconstructed during decryption, and the encrypted authorization alias and
-salt. A known session identity must also match that alias. Successful decryption
+salt. The reconstructed address digest supplies the nonce for the randomized
+owner commitment; the verifier does not reuse the wallet's fixed budget owner.
+A known session identity must also match that alias. Successful decryption
 alone does not establish that the presentation authorized this recipient; a
 mismatched binding is rejected. The encrypted alias lets an independent-key backup
 perform the same check without requiring the identity-derived key branch.

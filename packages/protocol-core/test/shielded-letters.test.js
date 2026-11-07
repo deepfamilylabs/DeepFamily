@@ -3,8 +3,12 @@ import assert from "node:assert/strict";
 import { getBytes, keccak256 } from "ethers";
 import { SNARK_SCALAR_FIELD } from "../constants.js";
 import { predictArchiveSegmentCount } from "../archive.js";
-import { deriveShieldedHeirKeyMaterial } from "../shielded-inheritance.js";
+import {
+  deriveShieldedHeirKeyMaterial,
+  computeShieldedValueOwnerCommitment,
+} from "../shielded-inheritance.js";
 import { deriveShieldedIndependentKeyMaterial } from "../shielded-independent-key.js";
+import { deriveShieldedReceiveOwnerNonce } from "../shielded-hpke.js";
 import { deriveShieldedReceivePublicKey } from "../shielded-receive-encryption.js";
 import {
   computeShieldedReceiveCredentialBinding,
@@ -48,11 +52,14 @@ async function decrypt(ciphertext, input = {}) {
 /** The inbox expectation for a letter really authorized for the wallet owning `viewingKey`. */
 function recipientFor(envelope, material = key, keyMode = 0n, viewingKey = publicKey) {
   return {
-    ownerCommitment: material.ownerCommitment,
+    ownerSecret: material.ownerSecret,
     keyMode,
     recipientBinding: computeShieldedReceiveRecipientBinding({
       authorizationAlias: envelope.authorizationAlias,
-      ownerCommitment: material.ownerCommitment,
+      ownerCommitment: computeShieldedValueOwnerCommitment(
+        material.ownerSecret,
+        deriveShieldedReceiveOwnerNonce(viewingKey),
+      ),
       keyMode,
       viewingKey,
       salt: envelope.salt,
@@ -360,7 +367,10 @@ test("recipient binding recovery matches the credential and supports both origin
     });
     const opening = {
       authorizationAlias: envelope.authorizationAlias,
-      ownerCommitment: material.ownerCommitment,
+      ownerCommitment: computeShieldedValueOwnerCommitment(
+        material.ownerSecret,
+        deriveShieldedReceiveOwnerNonce(viewingKey),
+      ),
       keyMode,
       viewingKey,
       salt: envelope.salt,
@@ -385,7 +395,7 @@ test("recipient binding recovery matches the credential and supports both origin
         await decrypt(ciphertext, {
           hpkeIkm: material.hpkeIkm,
           expectedRecipient: {
-            ownerCommitment: material.ownerCommitment,
+            ownerSecret: material.ownerSecret,
             keyMode,
             recipientBinding,
             ...(includeAlias ? { authorizationAlias: envelope.authorizationAlias } : {}),
@@ -422,7 +432,7 @@ test("inbox authorization rejects a letter encrypted to this wallet but proved f
   await assert.rejects(
     decrypt(ciphertext, {
       expectedRecipient: {
-        ownerCommitment: key.ownerCommitment,
+        ownerSecret: key.ownerSecret,
         keyMode: 0n,
         recipientBinding: otherBinding,
       },
@@ -463,19 +473,22 @@ test("every recipient-binding field comes from the authenticated opening or trus
   });
   const opening = {
     authorizationAlias: envelope.authorizationAlias,
-    ownerCommitment: key.ownerCommitment,
+    ownerCommitment: computeShieldedValueOwnerCommitment(
+      key.ownerSecret,
+      deriveShieldedReceiveOwnerNonce(publicKey),
+    ),
     keyMode: 0n,
     viewingKey: publicKey,
     salt: envelope.salt,
   };
   const expectedRecipient = {
-    ownerCommitment: key.ownerCommitment,
+    ownerSecret: key.ownerSecret,
     keyMode: 0n,
     recipientBinding: computeShieldedReceiveRecipientBinding(opening),
   };
   const ciphertext = await encrypt(envelope);
   for (const patch of [
-    { ownerCommitment: deriveShieldedHeirKeyMaterial(14n).ownerCommitment },
+    { ownerSecret: deriveShieldedHeirKeyMaterial(14n).ownerSecret },
     { keyMode: 1n },
     { authorizationAlias: 10n },
     { recipientBinding: 0n },
@@ -508,7 +521,7 @@ test("every recipient-binding field comes from the authenticated opening or trus
     );
   }
   const pending = decrypt(ciphertext, { expectedRecipient });
-  expectedRecipient.ownerCommitment = 1n;
+  expectedRecipient.ownerSecret = 1n;
   expectedRecipient.recipientBinding = 1n;
   assert.deepEqual(await pending, envelope);
 });

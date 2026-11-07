@@ -17,6 +17,7 @@ import {
   computeShieldedEnrollmentCommitment,
   computeShieldedPeriodNullifier,
   computeShieldedPolicyCommitment,
+  computeShieldedValueOwnerCommitment,
   createLineageTree,
   decryptShieldedNote,
   deriveShieldedHeirKeyMaterial,
@@ -295,7 +296,10 @@ describe("local shielded claim preparation", () => {
     const input = await fixture(1_200n, 100n, 30n, keys);
     const prepared = await prepareShieldedClaim(input);
     expect(prepared.outputs[0].note.keyMode).toBe(1n);
-    expect(prepared.outputs[1].note.ownerCommitment).toBe(keys.ownerCommitment);
+    expect(prepared.outputs[1].note.ownerCommitment).toBe(
+      computeShieldedValueOwnerCommitment(keys.ownerSecret, prepared.outputs[1].note.nonce),
+    );
+    expect(prepared.outputs[0].note).toHaveProperty("heirOwnerCommitment", keys.ownerCommitment);
     expect(prepared.witness.ownerSecret).toBe(keys.ownerSecret.toString());
     await expect(
       prepareShieldedClaim({
@@ -313,6 +317,24 @@ describe("local shielded claim preparation", () => {
     await expect(prepareShieldedClaim({ ...identityBound, keyMaterial: keys })).rejects.toThrow(
       "canonical identity keys",
     );
+  });
+
+  it("uses a fresh VALUE owner for each payout while retaining its budget owner", async () => {
+    const input = await fixture();
+    const first = await prepareShieldedClaim(input);
+    const second = await prepareShieldedClaim(input);
+    expect(first.outputs[0].note).toHaveProperty("heirOwnerCommitment", input.keys.ownerCommitment);
+    expect(second.outputs[0].note).toHaveProperty(
+      "heirOwnerCommitment",
+      input.keys.ownerCommitment,
+    );
+    expect(first.outputs[1].note.nonce).not.toBe(second.outputs[1].note.nonce);
+    expect(first.outputs[1].note.ownerCommitment).not.toBe(second.outputs[1].note.ownerCommitment);
+    for (const prepared of [first, second]) {
+      expect(prepared.outputs[1].note.ownerCommitment).toBe(
+        computeShieldedValueOwnerCommitment(input.keys.ownerSecret, prepared.outputs[1].note.nonce),
+      );
+    }
   });
   it("rejects a substituted viewing key for identity-derived claim authorization", async () => {
     const input = await fixture();
@@ -580,7 +602,12 @@ describe("local shielded claim preparation", () => {
         const inputPath = path.join(temporary, "input.json");
         const proofPath = path.join(temporary, "proof.json");
         const publicPath = path.join(temporary, "public.json");
-        for (const [keyMode, source] of [[0, "shielded_claim_32"], [1, "shielded_claim_32"], [0, "shielded_claim_64"], [1, "shielded_claim_64"]] as const) {
+        for (const [keyMode, source] of [
+          [0, "shielded_claim_32"],
+          [1, "shielded_claim_32"],
+          [0, "shielded_claim_64"],
+          [1, "shielded_claim_64"],
+        ] as const) {
           const keys =
             keyMode === 1
               ? await deriveShieldedIndependentKeyMaterial({
@@ -593,10 +620,17 @@ describe("local shielded claim preparation", () => {
             ...input,
             periodIndices: Array.from({ length: 3 }, (_, index) => BigInt(index)),
           });
-          const witness = source === "shielded_claim_32" ? { ...prepared.witness,
-            endorsementSiblings: (prepared.witness.endorsementSiblings as string[]).slice(0, 32),
-            trustedSiblings: (prepared.witness.trustedSiblings as string[]).slice(0, 32),
-          } : prepared.witness;
+          const witness =
+            source === "shielded_claim_32"
+              ? {
+                  ...prepared.witness,
+                  endorsementSiblings: (prepared.witness.endorsementSiblings as string[]).slice(
+                    0,
+                    32,
+                  ),
+                  trustedSiblings: (prepared.witness.trustedSiblings as string[]).slice(0, 32),
+                }
+              : prepared.witness;
           fs.writeFileSync(inputPath, JSON.stringify(witness));
           execFileSync(
             process.execPath,

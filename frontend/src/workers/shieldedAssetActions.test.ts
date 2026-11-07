@@ -3,6 +3,8 @@ import {
   deriveShieldedIndependentKeyMaterial,
   deriveShieldedHeirKeyMaterial,
   deriveShieldedReceivePublicKey,
+  deriveShieldedReceiveOwnerNonce,
+  computeShieldedValueOwnerCommitment,
   encodeShieldedIndependentKey,
   encodePublicShieldedBudgetEnvelope,
 } from "@deepfamily/protocol-core";
@@ -36,7 +38,7 @@ const mocks = vi.hoisted(() => ({
   invalidAuthorizationWitness: false,
   notes: [] as Array<{
     commitment: bigint;
-    note: { kind: "value"; amount: bigint; ownerCommitment: bigint };
+    note: { kind: "value"; amount: bigint; ownerCommitment: bigint; nonce: bigint };
   }>,
   lineage: "0x1111111111111111111111111111111111111111",
   verifier: "0x2222222222222222222222222222222222222222",
@@ -148,7 +150,10 @@ const receivingKey = hexlify(await deriveShieldedReceivePublicKey(secretKeys.hpk
 function receiveCredential(purpose: "receive" | "fund" = "receive", overrides: { expiresAt?: bigint; authorizationCounter?: bigint } = {}) {
   return { purpose, authorizationAlias: 17n, authorizationCounter: 0n, expiresAt: 2000000000n,
     ...(purpose === "fund" ? { identityCommitment: 31n } : {}),
-    ownerCommitment: 29n, viewingKey: purpose === "receive" ? receivingKey : `0x${"01".repeat(32)}`, keyMode: 0, identitySuiteId: 1, independentKeySuiteId: 1, independentKeyDerivationVersion: 1,
+    ownerCommitment: purpose === "receive"
+      ? computeShieldedValueOwnerCommitment(secretKeys.ownerSecret, deriveShieldedReceiveOwnerNonce(receivingKey))
+      : secretKeys.ownerCommitment,
+    viewingKey: purpose === "receive" ? receivingKey : `0x${"01".repeat(32)}`, keyMode: 0,
     proof: { protocol: "groth16", curve: "bn128", pi_a: ["1", "2", "1"], pi_b: [["1", "2"], ["3", "4"], ["1", "0"]], pi_c: ["1", "2", "1"] },
     ...overrides,
   };
@@ -279,7 +284,9 @@ beforeEach(() => {
     shards: new Map(),
     ownedNotes: new Map(
       mocks.notes
-        .filter((note) => note.note.ownerCommitment === input.keyMaterial.ownerCommitment)
+        .filter((note) => note.note.ownerCommitment === computeShieldedValueOwnerCommitment(
+          input.keyMaterial.ownerSecret, note.note.nonce,
+        ))
         .map((note) => [note.commitment, note]),
     ),
     spentNullifiers: new Set(),
@@ -317,8 +324,17 @@ async function withBothOwners() {
   });
   return session;
 }
-function value(commitment: bigint, amount: bigint, ownerCommitment: bigint) {
-  return { commitment, note: { kind: "value" as const, amount, ownerCommitment } };
+function value(commitment: bigint, amount: bigint, ownerSecret: bigint) {
+  const nonce = commitment + 100n;
+  return {
+    commitment,
+    note: {
+      kind: "value" as const,
+      amount,
+      ownerCommitment: computeShieldedValueOwnerCommitment(ownerSecret, nonce),
+      nonce,
+    },
+  };
 }
 async function timeBoundPreview(action: "fund" | "claim", stateReadMode?: "rebuild" | "chain") {
   const session = await unlocked();
@@ -326,7 +342,7 @@ async function timeBoundPreview(action: "fund" | "claim", stateReadMode?: "rebui
   prepared.data.asOf = 1000n;
   prepared.data.lineageCheckpointId = 7n;
   if (action === "fund") {
-    mocks.notes = [value(1n, 10n, secretKeys.ownerCommitment)];
+    mocks.notes = [value(1n, 10n, secretKeys.ownerSecret)];
     mocks.fund.mockResolvedValue(prepared);
   } else {
     prepared.data.periodNullifiers[0] = 91n;
@@ -403,9 +419,9 @@ describe("asset Worker preview and proof boundary", () => {
     it.each([true, false])("uses the pair only when no covering single is permitted: %s", async (allowPair) => {
       const session = await unlocked();
       mocks.notes = [
-        value(1n, 1n, secretKeys.ownerCommitment),
-        value(2n, 2n, secretKeys.ownerCommitment),
-        value(3n, 10n, secretKeys.ownerCommitment),
+        value(1n, 1n, secretKeys.ownerSecret),
+        value(2n, 2n, secretKeys.ownerSecret),
+        value(3n, 10n, secretKeys.ownerSecret),
       ];
       mocks.verify.mockResolvedValue({
         ok: true,
@@ -458,9 +474,9 @@ describe("asset Worker preview and proof boundary", () => {
   it("keeps funding to one donor input instead of merging an exact pair", async () => {
     const session = await unlocked();
     mocks.notes = [
-      value(1n, 1n, secretKeys.ownerCommitment),
-      value(2n, 2n, secretKeys.ownerCommitment),
-      value(3n, 10n, secretKeys.ownerCommitment),
+      value(1n, 1n, secretKeys.ownerSecret),
+      value(2n, 2n, secretKeys.ownerSecret),
+      value(3n, 10n, secretKeys.ownerSecret),
     ];
     const publicFund = preparedPublicFundOutputs([3n, 7n]);
     mocks.fund.mockResolvedValueOnce(publicFund);
@@ -646,10 +662,7 @@ describe("asset Worker preview and proof boundary", () => {
   });
   it("keeps a fresh funding policy handle stable across consolidation previews and checks input spends locally", async () => {
     const session = await unlocked();
-    mocks.notes = [1n, 2n].map((commitment) => ({
-      commitment,
-      note: { kind: "value", amount: 5n, ownerCommitment: secretKeys.ownerCommitment },
-    }));
+    mocks.notes = [1n, 2n].map((commitment) => value(commitment, 5n, secretKeys.ownerSecret));
     const request = {
       context,
       slot: "identity" as const,
@@ -712,7 +725,7 @@ describe("asset Worker preview and proof boundary", () => {
     const prepare = async (overrides: { expiresAt?: bigint; authorizationCounter?: bigint } = {}) => {
       const session = await unlocked();
       mocks.notes = Array.from({ length: 9 }, (_, index) =>
-        value(BigInt(index + 1), 1n, secretKeys.ownerCommitment),
+        value(BigInt(index + 1), 1n, secretKeys.ownerSecret),
       );
       // Isolate issuer proof verification while retaining real spend planning,
       // purpose handling and authenticated authorization-tree witnesses.
@@ -720,7 +733,7 @@ describe("asset Worker preview and proof boundary", () => {
       return session;
     };
     const useFinalSpend = () => {
-      mocks.notes = [value(1n, 9n, secretKeys.ownerCommitment)];
+      mocks.notes = [value(1n, 9n, secretKeys.ownerSecret)];
       if (action === "fund") {
         const prepared = preparedValueOutputs([9n, 0n], 0n, 2);
         prepared.data.asOf = 1000n;
@@ -857,8 +870,8 @@ describe("asset Worker preview and proof boundary", () => {
     async (action) => {
       const session = await withBothOwners();
       mocks.notes = [
-        value(1n, 4n, secretKeys.ownerCommitment),
-        value(2n, 10n, independentKeyMaterial.ownerCommitment),
+        value(1n, 4n, secretKeys.ownerSecret),
+        value(2n, 10n, independentKeyMaterial.ownerSecret),
       ];
       mocks.verify.mockResolvedValue({
         ok: true,
@@ -897,8 +910,8 @@ describe("asset Worker preview and proof boundary", () => {
     async (action) => {
       const session = await withBothOwners();
       mocks.notes = [
-        value(1n, 10n, secretKeys.ownerCommitment),
-        value(2n, 10n, independentKeyMaterial.ownerCommitment),
+        value(1n, 10n, secretKeys.ownerSecret),
+        value(2n, 10n, independentKeyMaterial.ownerSecret),
       ];
       mocks.verify.mockResolvedValue({
         ok: true,
@@ -934,7 +947,7 @@ describe("asset Worker preview and proof boundary", () => {
     "requires a restored independent key when the user selects it for %s",
     async (action) => {
       const session = await unlocked();
-      mocks.notes = [value(1n, 10n, secretKeys.ownerCommitment)];
+      mocks.notes = [value(1n, 10n, secretKeys.ownerSecret)];
       await expect(
         session.call("preview", {
           context,
@@ -955,8 +968,8 @@ describe("asset Worker preview and proof boundary", () => {
   it("spends explicitly selected independent-key notes with their original owner keys", async () => {
     const session = await withBothOwners();
     mocks.notes = [
-      value(1n, 10n, secretKeys.ownerCommitment),
-      value(2n, 10n, independentKeyMaterial.ownerCommitment),
+      value(1n, 10n, secretKeys.ownerSecret),
+      value(2n, 10n, independentKeyMaterial.ownerSecret),
     ];
     const preview = await session.call("preview", {
       context,
@@ -982,8 +995,8 @@ describe("asset Worker preview and proof boundary", () => {
   it("binds funding to the explicitly selected wallet and original owner keys", async () => {
     const session = await withBothOwners();
     mocks.notes = [
-      value(1n, 10n, secretKeys.ownerCommitment),
-      value(2n, 10n, independentKeyMaterial.ownerCommitment),
+      value(1n, 10n, secretKeys.ownerSecret),
+      value(2n, 10n, independentKeyMaterial.ownerSecret),
     ];
     const preview = await session.call("preview", {
       context,
@@ -1010,9 +1023,9 @@ describe("asset Worker preview and proof boundary", () => {
   it("keeps preparatory consolidation within the explicitly selected owner", async () => {
     const session = await withBothOwners();
     mocks.notes = [
-      value(1n, 100n, secretKeys.ownerCommitment),
+      value(1n, 100n, secretKeys.ownerSecret),
       ...Array.from({ length: 9 }, (_, index) =>
-        value(BigInt(index + 2), 1n, independentKeyMaterial.ownerCommitment),
+        value(BigInt(index + 2), 1n, independentKeyMaterial.ownerSecret),
       ),
     ];
     const preview = await session.call("preview", {
@@ -1043,8 +1056,8 @@ describe("asset Worker preview and proof boundary", () => {
     async (message) => {
       const session = await unlocked();
       mocks.notes = [
-        value(1n, 4n, secretKeys.ownerCommitment),
-        value(2n, 7n, secretKeys.ownerCommitment),
+        value(1n, 4n, secretKeys.ownerSecret),
+        value(2n, 7n, secretKeys.ownerSecret),
       ];
       mocks.fundingDestination.mockRejectedValueOnce(new Error(message));
       await expect(
@@ -1075,7 +1088,7 @@ describe("asset Worker preview and proof boundary", () => {
   ])("rejects withdrawal recipient %s before same-owner consolidation", async (publicRecipient) => {
     const session = await unlocked();
     mocks.notes = Array.from({ length: 9 }, (_, index) =>
-      value(BigInt(index + 1), 1n, secretKeys.ownerCommitment),
+      value(BigInt(index + 1), 1n, secretKeys.ownerSecret),
     );
     await expect(
       session.call("preview", {
@@ -1098,7 +1111,7 @@ describe("asset Worker preview and proof boundary", () => {
       const poolAddress = getAddress("0xabcdefabcdefabcdefabcdefabcdefabcdefabcd");
       mocks.pool = poolAddress;
       mocks.notes = Array.from({ length: 9 }, (_, index) =>
-        value(BigInt(index + 1), 1n, secretKeys.ownerCommitment),
+        value(BigInt(index + 1), 1n, secretKeys.ownerSecret),
       );
       await expect(
         session.call("preview", {
@@ -1119,7 +1132,7 @@ describe("asset Worker preview and proof boundary", () => {
   it("normalizes a valid withdrawal recipient before preparation", async () => {
     const session = await unlocked();
     const destination = "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd";
-    mocks.notes = [value(1n, 10n, secretKeys.ownerCommitment)];
+    mocks.notes = [value(1n, 10n, secretKeys.ownerSecret)];
     const preview = await session.call("preview", {
       context,
       slot: "identity",

@@ -4,11 +4,13 @@ import { fileURLToPath } from "node:url";
 import {
   computeIdentityFromDerivedSecret,
   computeShieldedAuthorizationAlias,
+  computeShieldedValueOwnerCommitment,
   computeShieldedReceiveRecipientBinding,
   buildShieldedIdentityAuthorizationState,
   decodeShieldedReceiveCredential,
   deriveShieldedHeirKeyMaterial,
   deriveShieldedIndependentKeyMaterial,
+  deriveShieldedReceiveOwnerNonce,
   deriveShieldedViewPublicKey,
   createShieldedLetterEnvelope,
   decryptShieldedLetter,
@@ -202,9 +204,6 @@ describe("receive code proofs", () => {
       viewingKey: hexlify(viewingKey),
       personHash: wrapIdentityCommitmentAsPersonHash(material.identityCommitment),
       keyMode: 0,
-      identitySuiteId: 1,
-      independentKeySuiteId: 1,
-      independentKeyDerivationVersion: 1,
       fingerprint: decodeShieldedReceiveCredential(code).fingerprint,
     });
   }, 60_000);
@@ -240,7 +239,15 @@ describe("receive code proofs", () => {
       expect(credentials[0].viewingKey).toHaveLength(64);
       expect(credentials[1].viewingKey).toHaveLength(64);
       expect(credentials[0].viewingKey.slice(32)).not.toEqual(credentials[1].viewingKey.slice(32));
-      expect(credentials[0].ownerCommitment).toBe(credentials[1].ownerCommitment);
+      expect(credentials[0].ownerCommitment).not.toBe(credentials[1].ownerCommitment);
+      for (const credential of credentials) {
+        expect(credential.ownerCommitment).toBe(
+          computeShieldedValueOwnerCommitment(
+            material.ownerSecret,
+            deriveShieldedReceiveOwnerNonce(credential.viewingKey),
+          ),
+        );
+      }
       expect(credentials[0].authorizationAlias).toBe(credentials[1].authorizationAlias);
       const changedDiversifier = credentials[0].viewingKey.slice();
       changedDiversifier[0] ^= 1;
@@ -286,7 +293,7 @@ describe("receive code proofs", () => {
         });
         const recipientBinding = computeShieldedReceiveRecipientBinding({
           authorizationAlias: envelope.authorizationAlias,
-          ownerCommitment: restored.ownerCommitment,
+          ownerCommitment: credentials[index].ownerCommitment,
           keyMode,
           viewingKey: recipientPublicKey,
           salt: envelope.salt,
@@ -297,7 +304,7 @@ describe("receive code proofs", () => {
             hpkeIkm: restored.hpkeIkm,
             ciphertext: letter,
             expectedRecipient: {
-              ownerCommitment: restored.ownerCommitment,
+              ownerSecret: restored.ownerSecret,
               keyMode,
               recipientBinding,
             },

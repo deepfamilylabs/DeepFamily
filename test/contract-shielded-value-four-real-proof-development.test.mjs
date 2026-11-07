@@ -12,7 +12,7 @@ import {
   buildShieldedPoolPublicInputs,
   computeShieldedCiphertextHashField,
   computeShieldedDummyInputNullifierForSlot,
-  computeShieldedOwnerCommitment,
+  computeShieldedValueOwnerCommitment,
   computeShieldedSpendNullifier,
   computeShieldedValueNoteCommitment,
   deriveShieldedViewPublicKey,
@@ -64,12 +64,16 @@ describe("development-key real proofs for four-input VALUE routes", function () 
         poolAddress: await pool.getAddress(),
       };
       const secret = 7001n;
-      const owner = computeShieldedOwnerCommitment(secret);
       const hpkeIkm = new Uint8Array(32).fill(17);
       const viewingKey = await deriveShieldedViewPublicKey(hpkeIkm);
       let nonce = 1n;
       const value = async (amount) => {
-        const note = { ownerCommitment: owner, amount, nonce: nonce++ };
+        const noteNonce = nonce++;
+        const note = {
+          ownerCommitment: computeShieldedValueOwnerCommitment(secret, noteNonce),
+          amount,
+          nonce: noteNonce,
+        };
         const ciphertext = await encryptShieldedNote({
           recipientPublicKey: viewingKey,
           payload: encodeShieldedValueNotePayload(note, scope),
@@ -233,7 +237,7 @@ describe("development-key real proofs for four-input VALUE routes", function () 
           receiveKeyModes: ["0", "0"],
           receiveViewKeyLo: ["0", "0"],
           receiveViewKeyHi: ["0", "0"],
-          outputOwnerCommitments: [String(owner), String(owner)],
+          outputOwnerCommitments: outputs.map((note) => String(note.ownerCommitment)),
           outputAmounts: ["20", "20"],
           outputNonces: outputs.map((note) => String(note.nonce)),
         },
@@ -256,7 +260,7 @@ describe("development-key real proofs for four-input VALUE routes", function () 
           receiveKeyModes: ["0", "0"],
           receiveViewKeyLo: ["0", "0"],
           receiveViewKeyHi: ["0", "0"],
-          outputOwnerCommitments: [String(owner), String(owner)],
+          outputOwnerCommitments: replayOutputs.map((note) => String(note.ownerCommitment)),
           outputAmounts: ["20", "0"],
           outputNonces: replayOutputs.map((note) => String(note.nonce)),
         },
@@ -287,7 +291,7 @@ describe("development-key real proofs for four-input VALUE routes", function () 
           receiveKeyModes: ["0", "0"],
           receiveViewKeyLo: ["0", "0"],
           receiveViewKeyHi: ["0", "0"],
-          outputOwnerCommitments: [String(owner), String(owner)],
+          outputOwnerCommitments: singleReplayOutputs.map((note) => String(note.ownerCommitment)),
           outputAmounts: ["10", "0"],
           outputNonces: singleReplayOutputs.map((note) => String(note.nonce)),
         },

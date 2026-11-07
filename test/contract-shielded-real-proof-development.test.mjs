@@ -26,7 +26,7 @@ import {
   computeShieldedDummyPeriodNullifier,
   computeShieldedEnrollmentCommitment,
   computeShieldedEnrollmentNullifier,
-  computeShieldedOwnerCommitment,
+  computeShieldedValueOwnerCommitment,
   computeShieldedPeriodNullifier,
   computeShieldedPolicyCommitment,
   computeShieldedScopedPurpose,
@@ -40,6 +40,8 @@ import {
   decryptShieldedNote,
   deriveShieldedHeirKeyMaterial,
   deriveShieldedViewPublicKey,
+  deriveShieldedReceivePublicKey,
+  deriveShieldedReceiveOwnerNonce,
   splitShieldedViewPublicKey,
   encodeShieldedBudgetNotePayload,
   encodeShieldedValueNotePayload,
@@ -336,9 +338,10 @@ async function encryptPayloadNote(input, payload) {
 }
 
 async function encryptValueNote(input) {
+  const ownerCommitment = computeShieldedValueOwnerCommitment(input.ownerSecret, input.nonce);
   const payload = encodeShieldedValueNotePayload(
     {
-      ownerCommitment: input.ownerCommitment,
+      ownerCommitment,
       amount: input.amount,
       nonce: input.nonce,
     },
@@ -347,14 +350,14 @@ async function encryptValueNote(input) {
   const encrypted = await encryptPayloadNote(input, payload);
   const commitment = computeShieldedValueNoteCommitment(
     {
-      ownerCommitment: input.ownerCommitment,
+      ownerCommitment,
       amount: input.amount,
       nonce: input.nonce,
       ciphertextHashField: encrypted.ciphertextHashField,
     },
     input,
   );
-  return { amount: input.amount, nonce: input.nonce, ...encrypted, commitment };
+  return { ownerCommitment, amount: input.amount, nonce: input.nonce, ...encrypted, commitment };
 }
 
 function compactMembership(proof) {
@@ -501,18 +504,18 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
         claimCount: 1,
       });
       const donorSecret = BigInt(fixture.initial.donorOwnerSecret);
-      const donorOwner = computeShieldedOwnerCommitment(donorSecret);
       const donorIkm = hre.ethers.getBytes(hre.ethers.zeroPadValue("0x9876", 32));
       const donorView = await deriveShieldedViewPublicKey(donorIkm);
       const keys = deriveShieldedHeirKeyMaterial(claimant.witness.derivedSecretField);
       const heirView = await deriveShieldedViewPublicKey(keys.hpkeIkm);
       const donorContext = {
-        ownerCommitment: donorOwner,
+        ownerSecret: donorSecret,
         viewingKey: donorView,
         chainId,
         poolAddress,
       };
       const heirContext = {
+        ownerSecret: keys.ownerSecret,
         ownerCommitment: keys.ownerCommitment,
         viewingKey: heirView,
         chainId,
@@ -1095,10 +1098,9 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
     const poolAddress = await pool.getAddress();
     const chainId = (await hre.ethers.provider.getNetwork()).chainId;
     const ownerSecret = 424242n;
-    const ownerCommitment = computeShieldedOwnerCommitment(ownerSecret);
     const hpkeIkm = hre.ethers.getBytes(hre.ethers.zeroPadValue("0x1234", 32));
     const viewingKey = await deriveShieldedViewPublicKey(hpkeIkm);
-    const noteInput = { ownerCommitment, viewingKey, chainId, poolAddress };
+    const noteInput = { ownerSecret, viewingKey, chainId, poolAddress };
     const initialNotes = await Promise.all([
       encryptValueNote({ ...noteInput, amount: 100n, nonce: 11n }),
       encryptValueNote({ ...noteInput, amount: 0n, nonce: 12n }),
@@ -1282,11 +1284,10 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
     const poolAddress = await pool.getAddress();
     const chainId = (await hre.ethers.provider.getNetwork()).chainId;
     const donorOwnerSecret = 424242n;
-    const donorOwnerCommitment = computeShieldedOwnerCommitment(donorOwnerSecret);
     const donorIkm = hre.ethers.getBytes(hre.ethers.zeroPadValue("0x1234", 32));
     const donorViewingKey = await deriveShieldedViewPublicKey(donorIkm);
     const donorNoteInput = {
-      ownerCommitment: donorOwnerCommitment,
+      ownerSecret: donorOwnerSecret,
       viewingKey: donorViewingKey,
       chainId,
       poolAddress,
@@ -1732,6 +1733,7 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
         { chainId, poolAddress, viewingKey: heirViewingKey },
       );
       const payoutNote = await encryptValueNote({
+        ownerSecret: heirKeys.ownerSecret,
         ownerCommitment: heirOwnerCommitment,
         viewingKey: heirViewingKey,
         chainId,
@@ -2273,12 +2275,11 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
       }
       for (let index = 0; index < 2; index += 1) {
         const ownerSecret = sourceOwners[index];
-        const ownerCommitment = computeShieldedOwnerCommitment(ownerSecret);
         const hpkeIkm = hre.ethers.getBytes(
           hre.ethers.zeroPadValue(index === 0 ? "0x1111" : "0x2222", 32),
         );
         const viewingKey = await deriveShieldedViewPublicKey(hpkeIkm);
-        const noteInput = { ownerCommitment, viewingKey, chainId, poolAddress };
+        const noteInput = { ownerSecret, viewingKey, chainId, poolAddress };
         const realNote = await encryptValueNote({
           ...noteInput,
           amount: sourceAmounts[index],
@@ -2334,17 +2335,19 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
           { ownerSecret: 4404n, amount: 60n, nonce: 32n, hpkeIkm: "0x4444" },
         ].map(async (recipient) => {
           const hpkeIkm = hre.ethers.getBytes(hre.ethers.zeroPadValue(recipient.hpkeIkm, 32));
-          const ownerCommitment = computeShieldedOwnerCommitment(recipient.ownerSecret);
-          const viewingKey = await deriveShieldedViewPublicKey(hpkeIkm);
+          const viewingKey = await deriveShieldedReceivePublicKey(hpkeIkm);
+          const nonce = deriveShieldedReceiveOwnerNonce(viewingKey);
+          const ownerCommitment = computeShieldedValueOwnerCommitment(recipient.ownerSecret, nonce);
           const note = await encryptValueNote({
             ownerCommitment,
             viewingKey,
             chainId,
             poolAddress,
             amount: recipient.amount,
-            nonce: recipient.nonce,
+            ownerSecret: recipient.ownerSecret,
+            nonce,
           });
-          return { ...recipient, hpkeIkm, viewingKey, ownerCommitment, note };
+          return { ...recipient, nonce, hpkeIkm, viewingKey, ownerCommitment, note };
         }),
       );
       const transferSpend = valueSpendInputs({
@@ -2446,17 +2449,22 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
           { ownerSecret: 3303n, amount: 15n, nonce: 42n, hpkeIkm: "0x3333" },
         ].map(async (destination) => {
           const hpkeIkm = hre.ethers.getBytes(hre.ethers.zeroPadValue(destination.hpkeIkm, 32));
-          const ownerCommitment = computeShieldedOwnerCommitment(destination.ownerSecret);
-          const viewingKey = await deriveShieldedViewPublicKey(hpkeIkm);
+          const viewingKey = await deriveShieldedReceivePublicKey(hpkeIkm);
+          const nonce = deriveShieldedReceiveOwnerNonce(viewingKey);
+          const ownerCommitment = computeShieldedValueOwnerCommitment(
+            destination.ownerSecret,
+            nonce,
+          );
           const note = await encryptValueNote({
             ownerCommitment,
             viewingKey,
             chainId,
             poolAddress,
             amount: destination.amount,
-            nonce: destination.nonce,
+            ownerSecret: destination.ownerSecret,
+            nonce,
           });
-          return { ...destination, hpkeIkm, viewingKey, ownerCommitment, note };
+          return { ...destination, nonce, hpkeIkm, viewingKey, ownerCommitment, note };
         }),
       );
       const singleSpend = valueSpendInputs({

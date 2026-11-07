@@ -3,6 +3,7 @@ import { Interface, getBytes, hexlify, type Contract } from "ethers";
 import {
   SHIELDED_POOL_PROTOCOL_VERSION,
   computeShieldedCiphertextHashField,
+  computeShieldedValueOwnerCommitment,
   computeShieldedAllocationKeyCommitment,
   computeShieldedNoteCommitmentFromPayload,
   computeShieldedSpendNullifier,
@@ -112,7 +113,7 @@ async function fixture() {
   const otherViewKey = await deriveShieldedViewPublicKey(otherKeys.hpkeIkm);
   const valuePayload = encodeShieldedValueNotePayload(
     {
-      ownerCommitment: keys.ownerCommitment,
+      ownerCommitment: computeShieldedValueOwnerCommitment(keys.ownerSecret, 29n),
       amount: 300n,
       nonce: 29n,
     },
@@ -142,7 +143,7 @@ async function fixture() {
     {
       payload: encodeShieldedValueNotePayload(
         {
-          ownerCommitment: otherKeys.ownerCommitment,
+          ownerCommitment: computeShieldedValueOwnerCommitment(otherKeys.ownerSecret, 37n),
           amount: 17n,
           nonce: 37n,
         },
@@ -260,33 +261,52 @@ describe("local shielded wallet recovery", () => {
     }
   });
 
-  it.each([0, 1] as const)("recovers transfers to multiple code public keys using only the restored mode-%s secret", async keyMode => {
-    const derive = () => keyMode === 0
-      ? Promise.resolve(identityKeyMaterial(13n))
-      : deriveShieldedIndependentKeyMaterial({
-          independentKeyRoot: new Uint8Array(32).fill(31),
-          independentKeyIdentitySecret: new Uint8Array(32).fill(47),
-        });
-    const keys = await derive();
-    const receivingKeys = await Promise.all([
-      deriveShieldedReceivePublicKey(keys.hpkeIkm),
-      deriveShieldedReceivePublicKey(keys.hpkeIkm),
-    ]);
-    expect(receivingKeys[0].slice(32)).not.toEqual(receivingKeys[1].slice(32));
-    const records = await Promise.all(receivingKeys.map(async (recipientPublicKey, index) => {
-      const payload = encodeShieldedValueNotePayload({
-        ownerCommitment: keys.ownerCommitment,
-        amount: BigInt(index + 1),
-        nonce: BigInt(index + 11),
-      }, context);
-      return { payload, ciphertext: await encryptShieldedNote({ ...context, recipientPublicKey, payload }) };
-    }));
-    const { pool, commitments } = await poolFromCiphertexts(records);
-    const restored = await derive();
-    const recovered = await recoverLocalShieldedWallet(pool, { keyMaterial: restored });
-    expect([...recovered.ownedNotes.keys()]).toEqual(commitments);
-    expect(listUnspentRecoveredShieldedNotes(recovered, restored).map(item => item.note.kind === "value" ? item.note.amount : 0n)).toEqual([1n, 2n]);
-  });
+  it.each([0, 1] as const)(
+    "recovers transfers to multiple code public keys using only the restored mode-%s secret",
+    async (keyMode) => {
+      const derive = () =>
+        keyMode === 0
+          ? Promise.resolve(identityKeyMaterial(13n))
+          : deriveShieldedIndependentKeyMaterial({
+              independentKeyRoot: new Uint8Array(32).fill(31),
+              independentKeyIdentitySecret: new Uint8Array(32).fill(47),
+            });
+      const keys = await derive();
+      const receivingKeys = await Promise.all([
+        deriveShieldedReceivePublicKey(keys.hpkeIkm),
+        deriveShieldedReceivePublicKey(keys.hpkeIkm),
+      ]);
+      expect(receivingKeys[0].slice(32)).not.toEqual(receivingKeys[1].slice(32));
+      const records = await Promise.all(
+        receivingKeys.map(async (recipientPublicKey, index) => {
+          const payload = encodeShieldedValueNotePayload(
+            {
+              ownerCommitment: computeShieldedValueOwnerCommitment(
+                keys.ownerSecret,
+                BigInt(index + 11),
+              ),
+              amount: BigInt(index + 1),
+              nonce: BigInt(index + 11),
+            },
+            context,
+          );
+          return {
+            payload,
+            ciphertext: await encryptShieldedNote({ ...context, recipientPublicKey, payload }),
+          };
+        }),
+      );
+      const { pool, commitments } = await poolFromCiphertexts(records);
+      const restored = await derive();
+      const recovered = await recoverLocalShieldedWallet(pool, { keyMaterial: restored });
+      expect([...recovered.ownedNotes.keys()]).toEqual(commitments);
+      expect(
+        listUnspentRecoveredShieldedNotes(recovered, restored).map((item) =>
+          item.note.kind === "value" ? item.note.amount : 0n,
+        ),
+      ).toEqual([1n, 2n]);
+    },
+  );
 
   it("requires explicit key material with an owner, HPKE input, and key mode", async () => {
     const { pool } = await fixture();
@@ -372,7 +392,11 @@ describe("local shielded wallet recovery", () => {
     };
     const payloads = [
       encodeShieldedValueNotePayload(
-        { ownerCommitment: keys.ownerCommitment, amount: 300n, nonce: 29n },
+        {
+          ownerCommitment: computeShieldedValueOwnerCommitment(keys.ownerSecret, 29n),
+          amount: 300n,
+          nonce: 29n,
+        },
         context,
       ),
       encodeShieldedBudgetNotePayload(budget, context),
@@ -519,7 +543,7 @@ describe("local shielded wallet recovery", () => {
     ).noteCommitment;
     const changePayload = encodeShieldedValueNotePayload(
       {
-        ownerCommitment: donor.ownerCommitment,
+        ownerCommitment: computeShieldedValueOwnerCommitment(donor.ownerSecret, 37n),
         amount: 0n,
         nonce: 37n,
         fundingMemo: {
@@ -690,7 +714,7 @@ describe("local shielded wallet recovery", () => {
 
     const forgedPayload = encodeShieldedValueNotePayload(
       {
-        ownerCommitment: donor.ownerCommitment,
+        ownerCommitment: computeShieldedValueOwnerCommitment(donor.ownerSecret, 38n),
         amount: 300n,
         nonce: 38n,
         fundingMemo: {

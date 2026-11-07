@@ -3,7 +3,8 @@ import {
   buildShieldedPoolPublicInputs,
   computeShieldedCiphertextHashField,
   computeShieldedDummyInputNullifierForSlot,
-  computeShieldedOwnerCommitment,
+  computeShieldedValueOwnerCommitment,
+  deriveShieldedReceiveOwnerNonce,
   computeShieldedSpendNullifier,
   computeShieldedValueNoteCommitment,
   decryptShieldedNote,
@@ -102,7 +103,7 @@ async function openValueInput(input: ShieldedValueInput, ctx: Context): Promise<
     amount: getBigInt(owned.note.amount),
     nonce: getBigInt(owned.note.nonce),
   };
-  if (note.ownerCommitment !== computeShieldedOwnerCommitment(keys.ownerSecret)) {
+  if (note.ownerCommitment !== computeShieldedValueOwnerCommitment(keys.ownerSecret, note.nonce)) {
     throw new Error("Input value note belongs to another owner");
   }
   if (note.amount <= 0n || note.amount > MAX_UINT128)
@@ -274,7 +275,9 @@ function valueInputCapacity(count: number): 1 | 4 {
 function valueInputWitness(opened: readonly OpenedValueInput[]): ShieldedWitness {
   const capacity = valueInputCapacity(opened.length);
   return {
-    inputEnabled: Array.from({ length: capacity }, (_, index) => (index < opened.length ? "1" : "0")),
+    inputEnabled: Array.from({ length: capacity }, (_, index) =>
+      index < opened.length ? "1" : "0",
+    ),
     inputOwnerSecrets: Array.from({ length: capacity }, (_, index) =>
       String(opened[index]?.ownerSecret ?? 0n),
     ),
@@ -350,6 +353,7 @@ export async function prepareShieldedPrivateTransfer(input: {
         if (!source) throw new Error("Invalid private transfer input owner index");
         return {
           ownerCommitment: source.ownerCommitment,
+          ownerSecret: source.ownerSecret,
           viewingKey: await deriveShieldedViewPublicKey(source.hpkeIkm),
           selfHpkeIkm: source.hpkeIkm,
         };
@@ -360,15 +364,23 @@ export async function prepareShieldedPrivateTransfer(input: {
       };
     }),
   )) as [
-    { ownerCommitment: bigint; viewingKey: Uint8Array; selfHpkeIkm?: string },
-    { ownerCommitment: bigint; viewingKey: Uint8Array; selfHpkeIkm?: string },
+    { ownerCommitment: bigint; viewingKey: Uint8Array; selfHpkeIkm?: string; ownerSecret?: bigint },
+    { ownerCommitment: bigint; viewingKey: Uint8Array; selfHpkeIkm?: string; ownerSecret?: bigint },
   ];
   const outputs = (await Promise.all(
     destinationKeys.map((destination, index) => {
+      const ownerSecret = destination.ownerSecret;
+      const nonce =
+        ownerSecret === undefined
+          ? deriveShieldedReceiveOwnerNonce(destination.viewingKey)
+          : generateShieldedRandomField();
       const note: ValueNote = {
-        ownerCommitment: destination.ownerCommitment,
+        ownerCommitment:
+          ownerSecret === undefined
+            ? destination.ownerCommitment
+            : computeShieldedValueOwnerCommitment(ownerSecret, nonce),
         amount: outputAmounts[index],
-        nonce: generateShieldedRandomField(),
+        nonce,
       };
       return encryptValueOutput(note, destination.viewingKey, ctx, destination.selfHpkeIkm);
     }),
@@ -393,12 +405,13 @@ export async function prepareShieldedPrivateTransfer(input: {
   const witness: ShieldedWitness = {
     ...publicInputs(SHIELDED_POOL_ACTION.PrivateTransfer, ctx, data),
     receiveBindings: ["0", "0"],
-    receiveAuthorizationAliases: ["0", "0"], receiveSalts: ["0", "0"],
-    receiveKeyModes: ["0", "0"], receiveViewKeyLo: ["0", "0"], receiveViewKeyHi: ["0", "0"],
+    receiveAuthorizationAliases: ["0", "0"],
+    receiveSalts: ["0", "0"],
+    receiveKeyModes: ["0", "0"],
+    receiveViewKeyLo: ["0", "0"],
+    receiveViewKeyHi: ["0", "0"],
     ...valueInputWitness(opened),
-    outputOwnerCommitments: decimal(
-      destinationKeys.map((destination) => destination.ownerCommitment),
-    ),
+    outputOwnerCommitments: decimal(outputs.map((output) => output.note.ownerCommitment)),
     outputAmounts: decimal(outputAmounts),
     outputNonces: decimal(outputs.map((output) => output.note.nonce)),
   };
@@ -454,6 +467,8 @@ export async function prepareShieldedUnshield(input: {
     },
     { ownerCommitment: opened.ownerCommitment, amount: 0n, nonce: generateShieldedRandomField() },
   ];
+  for (const note of notes)
+    note.ownerCommitment = computeShieldedValueOwnerCommitment(opened.ownerSecret, note.nonce);
   const outputs = (await Promise.all(
     notes.map((note) => encryptValueOutput(note, viewingKey, ctx, opened.hpkeIkm)),
   )) as [PreparedShieldedValueOutput, PreparedShieldedValueOutput];

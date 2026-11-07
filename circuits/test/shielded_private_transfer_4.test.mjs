@@ -8,8 +8,9 @@ import test from "node:test";
 import { circomIncludeArguments } from "../../scripts/lib/circomToolchain.mjs";
 import { shieldedCircuitSource } from "../../scripts/lib/zkCircuitSelection.mjs";
 import { WitnessCalculatorBuilder } from "circom_runtime";
-import { poseidon2 } from "poseidon-lite";
+import { poseidon2, poseidon3 } from "poseidon-lite";
 import {
+  SNARK_SCALAR_FIELD,
   computeShieldedCiphertextHashField,
   computeShieldedDummyInputNullifier,
   computeShieldedDummyInputNullifierForSlot,
@@ -24,7 +25,7 @@ const repoRoot = path.resolve(import.meta.dirname, "../..");
 const hash = (byte) =>
   computeShieldedCiphertextHashField(Uint8Array.from({ length: 512 }, () => byte));
 const strs = (values) => values.map((value) => BigInt(value).toString());
-const owner = (secret) => poseidon2([1013n, secret]);
+const owner = (secret, nonce) => poseidon3([1013n, secret, nonce]);
 const defaultScope = {
   chainId: 31337n,
   poolAddress: "0x0000000000000000000000000000000000001234",
@@ -45,12 +46,21 @@ function privateTransferFixture(scope = defaultScope) {
   const inputAmounts = [70n, 30n];
   const inputNonces = [3301n, 3302n];
   const inputCiphertextHashes = [hash(4), hash(5)];
-  const outputOwnerCommitments = [owner(6001n), owner(6002n)];
   const outputAmounts = [60n, 40n];
-  const outputNonces = [4401n, 4402n];
+  const outputNonces = [
+    (123n + (1n << 128n) * 789n) % SNARK_SCALAR_FIELD,
+    (456n + (1n << 128n) * 1011n) % SNARK_SCALAR_FIELD,
+  ];
+  const outputOwnerCommitments = [owner(6001n, outputNonces[0]), owner(6002n, outputNonces[1])];
   const outputHashes = [hash(6), hash(7)];
   const inputs = inputAmounts.map((amount, i) =>
-    valueNote(owner(inputOwnerSecrets[i]), amount, inputNonces[i], inputCiphertextHashes[i], scope),
+    valueNote(
+      owner(inputOwnerSecrets[i], inputNonces[i]),
+      amount,
+      inputNonces[i],
+      inputCiphertextHashes[i],
+      scope,
+    ),
   );
   const witness = {
     chainId: String(scope.chainId),
@@ -224,6 +234,23 @@ test("private transfer circuit", async (t) => {
       await transfer.valid(validTransfer);
       transfer.checkR1cs(validTransfer);
     });
+    await t.test("an external receipt fixes the diversified owner's note nonce", async () => {
+      for (const slot of [0, 1]) {
+        await transfer.invalid(
+          mutate(validTransfer, (w) => {
+            w.outputNonces[slot] = String(BigInt(w.outputNonces[slot]) + 1n);
+            w.outputCommitments[slot] = String(
+              valueNote(
+                BigInt(w.outputOwnerCommitments[slot]),
+                BigInt(w.outputAmounts[slot]),
+                BigInt(w.outputNonces[slot]),
+                BigInt(w.ciphertextHashes[slot]),
+              ),
+            );
+          }),
+        );
+      }
+    });
     await t.test("every external output is cross-bound to its authenticated receipt", async () => {
       for (const field of [
         "receiveBindings",
@@ -272,7 +299,7 @@ test("private transfer circuit", async (t) => {
           ])
             witness[field][slot] = "0";
           witness.outputOwnerCommitments[slot] = String(
-            owner(BigInt(witness.inputOwnerSecrets[0])),
+            owner(BigInt(witness.inputOwnerSecrets[0]), BigInt(witness.outputNonces[slot])),
           );
           witness.outputCommitments[slot] = String(
             valueNote(
@@ -284,9 +311,26 @@ test("private transfer circuit", async (t) => {
           );
         }
         await transfer.valid(witness);
+        // Reusing a source note's public owner with a fresh output nonce
+        // cannot qualify as a self output, even under the same root secret.
         await transfer.invalid(
           mutate(witness, (w) => {
-            w.outputOwnerCommitments[1] = String(owner(123456n));
+            w.outputOwnerCommitments[1] = String(
+              owner(BigInt(w.inputOwnerSecrets[0]), BigInt(w.inputNonces[0])),
+            );
+            w.outputCommitments[1] = String(
+              valueNote(
+                BigInt(w.outputOwnerCommitments[1]),
+                BigInt(w.outputAmounts[1]),
+                BigInt(w.outputNonces[1]),
+                BigInt(w.ciphertextHashes[1]),
+              ),
+            );
+          }),
+        );
+        await transfer.invalid(
+          mutate(witness, (w) => {
+            w.outputOwnerCommitments[1] = String(owner(123456n, BigInt(w.outputNonces[1])));
             w.outputCommitments[1] = String(
               valueNote(
                 BigInt(w.outputOwnerCommitments[1]),
@@ -313,7 +357,9 @@ test("private transfer circuit", async (t) => {
           "receiveViewKeyHi",
         ])
           witness[field][slot] = "0";
-        witness.outputOwnerCommitments[slot] = String(owner(BigInt(witness.inputOwnerSecrets[0])));
+        witness.outputOwnerCommitments[slot] = String(
+          owner(BigInt(witness.inputOwnerSecrets[0]), BigInt(witness.outputNonces[slot])),
+        );
         witness.outputCommitments[slot] = String(
           valueNote(
             BigInt(witness.outputOwnerCommitments[slot]),

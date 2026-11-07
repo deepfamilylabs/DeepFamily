@@ -721,6 +721,10 @@ export function deriveShieldedHeirKeyMaterial(derivedSecretField: BigNumberish):
   hpkeIkm: string;
 };
 export function computeShieldedOwnerCommitment(ownerSecret: BigNumberish): bigint;
+export function computeShieldedValueOwnerCommitment(
+  ownerSecret: BigNumberish,
+  nonce: BigNumberish,
+): bigint;
 export function computeShieldedValueNoteCommitment(
   input: {
     ownerCommitment: BigNumberish;
@@ -832,6 +836,7 @@ export function splitShieldedViewPublicKey(publicKey: BytesLike): {
   viewKeyLo: bigint;
 };
 export function deriveShieldedViewPublicKey(hpkeIkm: BytesLike): Promise<Uint8Array>;
+export function deriveShieldedReceiveOwnerNonce(publicKey: BytesLike): bigint;
 /** Initialize local receive encryption before scanning; rejects if its WASM runtime is unavailable. */
 export function initializeShieldedReceiveEncryption(): Promise<void>;
 /** Diversified ordinary receive address: 32-byte diversifier and canonical Ristretto public key. */
@@ -1257,7 +1262,7 @@ export function decryptShieldedLetter(
     expectedCiphertextHash?: BytesLike;
     /** Required: binds the decrypted opening to the verified archive record and local wallet. */
     expectedRecipient: {
-      ownerCommitment: BigNumberish;
+      ownerSecret: BigNumberish;
       keyMode: BigNumberish;
       recipientBinding: BigNumberish;
       /** Optional additional check when the original identity is available. */
@@ -1271,8 +1276,8 @@ export type ShieldedReceiveCredentialPurpose = "receive" | "fund";
 export const SHIELDED_RECEIVE_CREDENTIAL_VERSION: 1;
 export const SHIELDED_AUTHORIZATION_ALIAS_DOMAIN: bigint;
 export const SHIELDED_RECEIVE_CREDENTIAL_PUBLIC_SIGNAL_COUNTS: Readonly<{
-  receive: 11;
-  fund: 12;
+  receive: 8;
+  fund: 9;
 }>;
 export interface ShieldedReceiveCredentialProof {
   pi_a: [string, string, string];
@@ -1293,9 +1298,6 @@ export interface ShieldedReceiveCredentialStatement {
   /** 64-byte diversified address for receive; 32-byte X25519 public key for fund. */
   viewingKey: BytesLike;
   keyMode?: BigNumberish;
-  identitySuiteId?: BigNumberish;
-  independentKeySuiteId?: BigNumberish;
-  independentKeyDerivationVersion?: BigNumberish;
   receiveCodeVersion?: BigNumberish;
 }
 export function computeShieldedAuthorizationAlias(input: {
@@ -1322,9 +1324,6 @@ export function decodeShieldedReceiveCredential(code: string): {
   ownerCommitment: bigint;
   viewingKey: Uint8Array;
   keyMode: number;
-  identitySuiteId: number;
-  independentKeySuiteId: number;
-  independentKeyDerivationVersion: number;
   receiveCodeVersion: 1;
   fingerprint: string;
   publicSignals: bigint[];

@@ -27,8 +27,8 @@ afterEach(() => {
 
 describe("shielded proof public inputs", () => {
   it.each([
-    ["receiveCredential", "receive", 11],
-    ["fundReceiveCredential", "fund", 12],
+    ["receiveCredential", "receive", 8],
+    ["fundReceiveCredential", "fund", 9],
   ] as const)("rejects missing embedded keys for %s before downloading or proving", async (circuit, kind, count) => {
     const keys = SHIELDED_RECEIVE_CREDENTIAL_VERIFICATION_KEYS;
     const descriptor = Object.getOwnPropertyDescriptor(keys, kind)!;
@@ -66,10 +66,10 @@ describe("shielded proof public inputs", () => {
 
   it("checks each circuit against its own public-signal count", () => {
     for (const [circuit, count] of [
-      ["receiveCredential", 11],
-      ["fundReceiveCredential", 12],
-      ["receivePresentation", 22],
-      ["fundReceivePresentation", 23],
+      ["receiveCredential", 8],
+      ["fundReceiveCredential", 9],
+      ["receivePresentation", 19],
+      ["fundReceivePresentation", 20],
       ["identityCounterUpdate", 6],
       ["shield", 7],
       ["fund", 27],
@@ -244,7 +244,7 @@ describe("shielded proof public inputs", () => {
   });
 
   it("proves a receive presentation with existing Circom assets and its embedded verification key", async () => {
-    const expectedPublicSignals = Array.from({ length: 22 }, (_, i) => String(i));
+    const expectedPublicSignals = Array.from({ length: 19 }, (_, i) => String(i));
     const proof = { protocol: "groth16", curve: "bn128" };
     mocks.fullProve.mockResolvedValue({ proof, publicSignals: expectedPublicSignals });
     mocks.verify.mockResolvedValue(true);
@@ -272,7 +272,7 @@ describe("shielded proof public inputs", () => {
   });
 
   it("rejects a presentation that fails verification against the embedded key", async () => {
-    const expectedPublicSignals = Array(23).fill("0");
+    const expectedPublicSignals = Array(20).fill("0");
     mocks.fullProve.mockResolvedValue({ proof: {}, publicSignals: expectedPublicSignals });
     mocks.verify.mockResolvedValue(false);
     await expect(

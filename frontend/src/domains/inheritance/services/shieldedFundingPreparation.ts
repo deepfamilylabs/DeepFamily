@@ -14,7 +14,7 @@ import {
   computeShieldedCiphertextHashField,
   computeShieldedEnrollmentCommitment,
   computeShieldedEnrollmentNullifier,
-  computeShieldedOwnerCommitment,
+  computeShieldedValueOwnerCommitment,
   computeShieldedPolicyCommitment,
   computeShieldedSpendNullifier,
   computeShieldedBudgetUseNullifier,
@@ -338,7 +338,7 @@ function donorInput(input: CommonFundingInput, ownerSecret: bigint) {
   if (!owned || owned.note.kind !== "value")
     throw new Error("Donor must select a recovered value note");
   const note = owned.note;
-  if (note.ownerCommitment !== computeShieldedOwnerCommitment(ownerSecret)) {
+  if (note.ownerCommitment !== computeShieldedValueOwnerCommitment(ownerSecret, note.nonce)) {
     throw new Error("Donor value note belongs to another identity");
   }
   const hash = computeShieldedCiphertextHashField(owned.ciphertext);
@@ -423,7 +423,7 @@ async function encryptOutput<T extends ShieldedBudgetNotePayload | ShieldedValue
 
 async function fundingOutputs(input: {
   budget: ShieldedBudgetNotePayload;
-  donorOwnerCommitment: bigint;
+  donorOwnerSecret: bigint;
   donorChangeAmount: bigint;
   heirViewingKey?: Uint8Array;
   publicDelivery: boolean;
@@ -462,10 +462,11 @@ async function fundingOutputs(input: {
   // The donor's encrypted change backs up the budget and its private rule opening.
   // Public delivery never includes that opening; reloading the donor wallet can
   // still restore both the funding template and the original local policy.
+  const changeNonce = generateShieldedRandomField();
   const change: ShieldedValueNotePayload = {
-    ownerCommitment: input.donorOwnerCommitment,
+    ownerCommitment: computeShieldedValueOwnerCommitment(input.donorOwnerSecret, changeNonce),
     amount: input.donorChangeAmount,
-    nonce: generateShieldedRandomField(),
+    nonce: changeNonce,
     fundingMemo: {
       budgetCommitment: encryptedBudget.commitment,
       budgetNote: input.budget,
@@ -743,7 +744,7 @@ async function prepareInitialFunding(input: InitialFundingInput): Promise<Prepar
         };
   const outputs = await fundingOutputs({
     budget,
-    donorOwnerCommitment: ctx.keys.ownerCommitment,
+    donorOwnerSecret: ctx.keys.ownerSecret,
     donorChangeAmount: donor.note.amount - amount,
     heirViewingKey: heir.viewingKey ? getBytes(heir.viewingKey) : undefined,
     publicDelivery: input.budgetKind === 1,
@@ -941,7 +942,7 @@ async function prepareContinuationFunding(
         };
   const outputs = await fundingOutputs({
     budget,
-    donorOwnerCommitment: ctx.keys.ownerCommitment,
+    donorOwnerSecret: ctx.keys.ownerSecret,
     donorChangeAmount: donor.note.amount - amount,
     heirViewingKey: heir.viewingKey ? getBytes(heir.viewingKey) : undefined,
     publicDelivery: input.budgetKind === 1,

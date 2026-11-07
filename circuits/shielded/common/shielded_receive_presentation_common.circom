@@ -109,7 +109,7 @@ template ShieldedReceivePresentation(KIND) {
     var RECEIVE_PROOF_LIFETIME = 900;
     var OFFSET = 0;
     if (KIND == 2) OFFSET = 1;
-    var CREDENTIAL_COUNT = 11 + OFFSET;
+    var CREDENTIAL_COUNT = 8 + OFFSET;
     signal output credentialSignals[CREDENTIAL_COUNT];
     signal output operationSignals[11];
     signal input credentialPublicSignals[CREDENTIAL_COUNT];
@@ -153,13 +153,10 @@ template ShieldedReceivePresentation(KIND) {
     signal viewHi <== credentialPublicSignals[5 + OFFSET];
     signal mode <== credentialPublicSignals[6 + OFFSET];
     deadline === asOf + RECEIVE_PROOF_LIFETIME;
-    // Restate the issuer's fixed suite and key bounds so every prefix field
+    // Restate the issuer's fixed version and key bounds so every prefix field
     // participates in the presentation's public verification-key relation.
     mode * (1 - mode) === 0;
     credentialPublicSignals[7 + OFFSET] === 1;
-    credentialPublicSignals[8 + OFFSET] === 1;
-    credentialPublicSignals[9 + OFFSET] === 1;
-    credentialPublicSignals[10 + OFFSET] === 1;
     component viewLoBits = Num2Bits(128);
     viewLoBits.in <== viewLo;
     component viewHiBits = Num2Bits(128);

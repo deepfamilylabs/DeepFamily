@@ -276,9 +276,10 @@ function InheritanceContent() {
     setCreatingPool(true);
     setAssetError(null);
     try {
-      const [network, signerAddress] = await Promise.all([
+      const [network, signerAddress, fromBlock] = await Promise.all([
         signer.provider?.getNetwork(),
         signer.getAddress(),
+        signer.provider?.getBlockNumber(),
       ]);
       if (
         !isCurrent() ||
@@ -289,9 +290,14 @@ function InheritanceContent() {
         if (isCurrent()) setAssetError({ key: "shielded.walletChanged" });
         return;
       }
+      if (typeof fromBlock !== "number" || !Number.isSafeInteger(fromBlock) || fromBlock < 0)
+        throw new Error("Pool creation block is unavailable");
       const factory = createShieldedPoolFactoryContract(factoryAddress, signer);
       const tx = await factory.createPool(asset.address);
-      const { transactionHash, receipt } = await waitForShieldedTransaction(tx);
+      // ethers' contract response wrapper drops the signer's replacement scan anchor.
+      const { transactionHash, receipt } = await waitForShieldedTransaction(
+        tx.replaceableTransaction(fromBlock),
+      );
       if (receipt.status !== 1) {
         if (isCurrent())
           setAssetError({ key: "shielded.transactionFailed", values: { hash: transactionHash } });

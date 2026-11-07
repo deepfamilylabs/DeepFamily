@@ -86,8 +86,8 @@ describe("Receive circuit real-proof public bindings", function () {
   });
 
   for (const [kind, count] of [
-    ["receive", 22],
-    ["fund", 23],
+    ["receive", 19],
+    ["fund", 20],
   ]) {
     it(`${kind}: rejects mutation of all ${count} credential and operation signals`, async function () {
       const prepared = prepareReceivePresentationWitness(requests[kind]);
@@ -102,11 +102,11 @@ describe("Receive circuit real-proof public bindings", function () {
     });
   }
 
-  it("issuer proofs bind all 23 public signals and reject cross-purpose reuse", async function () {
+  it("issuer proofs bind all 17 public signals and reject cross-purpose reuse", async function () {
     const proofs = {};
     for (const [kind, count] of [
-      ["receive", 11],
-      ["fund", 12],
+      ["receive", 8],
+      ["fund", 9],
     ]) {
       const request = requests[kind];
       const data = {

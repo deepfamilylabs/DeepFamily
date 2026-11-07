@@ -202,6 +202,15 @@ export function computeShieldedOwnerCommitment(ownerSecret) {
   ]);
 }
 
+/** VALUE ownership is diversified by its recoverable note nonce; budgets retain their canonical owner. */
+export function computeShieldedValueOwnerCommitment(ownerSecret, nonce) {
+  return poseidon3([
+    SHIELDED_INHERITANCE_DOMAINS.ownerCommitment,
+    nonzeroField(ownerSecret, "ownerSecret"),
+    nonzeroField(nonce, "nonce"),
+  ]);
+}
+
 /** The caller must independently encrypt the full note to its recipient. */
 export function computeShieldedValueNoteCommitment(input, scope) {
   return poseidon5([

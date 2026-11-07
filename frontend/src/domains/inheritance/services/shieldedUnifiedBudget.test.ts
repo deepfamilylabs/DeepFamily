@@ -13,6 +13,7 @@ import {
   computeLineageParentsDigest,
   computeLineageTrustedLeaf,
   computeShieldedReceiveCredentialBinding,
+  computeShieldedValueOwnerCommitment,
   createLineageTree,
   deriveShieldedHeirKeyMaterial,
   deriveShieldedIndependentKeyMaterial,
@@ -260,7 +261,9 @@ async function fixture(periodDays = 30n, keyMode: 0 | 1 = 0) {
     }
     logs.push({
       ...iface.encodeEventLog(iface.getEvent("ActionExecuted")!, [
-        action, prepared.data.inputShardIds[0] ?? 0n, prepared.data.inputShardIds[1] ?? prepared.data.inputShardIds[0] ?? 0n,
+        action,
+        prepared.data.inputShardIds[0] ?? 0n,
+        prepared.data.inputShardIds[1] ?? prepared.data.inputShardIds[0] ?? 0n,
       ]),
       address: poolAddress,
       blockNumber: 10,
@@ -305,12 +308,13 @@ async function fixture(periodDays = 30n, keyMode: 0 | 1 = 0) {
     },
     { chainId, poolAddress },
   );
-  const childKeys = keyMode === 0
-    ? { ...deriveShieldedHeirKeyMaterial(childSecret), keyMode: 0 as const }
-    : await deriveShieldedIndependentKeyMaterial({
-        independentKeyRoot: new Uint8Array(32).fill(33),
-        independentKeyIdentitySecret: new Uint8Array(32).fill(44),
-      });
+  const childKeys =
+    keyMode === 0
+      ? { ...deriveShieldedHeirKeyMaterial(childSecret), keyMode: 0 as const }
+      : await deriveShieldedIndependentKeyMaterial({
+          independentKeyRoot: new Uint8Array(32).fill(33),
+          independentKeyIdentitySecret: new Uint8Array(32).fill(44),
+        });
   const childRecovery = { keyMaterial: childKeys, identityCommitment: childIC };
   const recipient = {
     purpose: "fund",
@@ -409,7 +413,9 @@ describe("unified budget recovery and claims", () => {
         expect(claimed.witness[name]).toBe("0");
       expect(claimed.outputs[0].note.binding).toBe("identity");
       expect(isPublicShieldedBudgetEnvelope(claimed.outputs[0].ciphertext)).toBe(false);
-      expect(claimed.outputs[1].note.ownerCommitment).toBe(f.childKeys.ownerCommitment);
+      expect(claimed.outputs[1].note.ownerCommitment).toBe(
+        computeShieldedValueOwnerCommitment(f.childKeys.ownerSecret, claimed.outputs[1].note.nonce),
+      );
       f.record(claimed, 2);
       const afterClaim = await recoverLocalShieldedWallet(f.pool, f.childRecovery);
       const live = listUnspentRecoveredShieldedNotes(afterClaim, f.childKeys);
@@ -448,7 +454,7 @@ describe("unified budget recovery and claims", () => {
           chainId,
           poolAddress,
           identity: f.identity,
-        keyMaterial: f.childKeys,
+          keyMaterial: f.childKeys,
           wallet: replenished,
           lineage: f.lineage,
           budgetCommitment: claimed.outputs[0].commitment,
@@ -459,96 +465,101 @@ describe("unified budget recovery and claims", () => {
     },
   );
 
-  it.each([0, 1] as const)("preserves private authorization while consuming only one budget in key mode %s", async (keyMode) => {
-    const f = await fixture(30n, keyMode);
-    await expect(
-      prepareShieldedFund({
+  it.each([0, 1] as const)(
+    "preserves private authorization while consuming only one budget in key mode %s",
+    async (keyMode) => {
+      const f = await fixture(30n, keyMode);
+      await expect(
+        prepareShieldedFund({
+          ...f.common,
+          fundMode: 0,
+          policy: f.policy,
+          lineage: f.lineage,
+          budgetPeriods: 1n,
+        }),
+      ).rejects.toThrow("current budget receiving credential");
+      const privateFund = await prepareShieldedFund({
         ...f.common,
+        recipient: f.recipient,
         fundMode: 0,
         policy: f.policy,
         lineage: f.lineage,
         budgetPeriods: 1n,
-      }),
-    ).rejects.toThrow("current budget receiving credential");
-    const privateFund = await prepareShieldedFund({
-      ...f.common,
-      recipient: f.recipient,
-      fundMode: 0,
-      policy: f.policy,
-      lineage: f.lineage,
-      budgetPeriods: 1n,
-    });
-    checkWitness("fund", privateFund.witness, f.recipient);
-    expect(privateFund.witness.publicBudget).toEqual(Array(10).fill("0"));
-    f.record(privateFund, 1);
-    const donor = await recoverLocalShieldedWallet(f.pool, {
-      keyMaterial: donorKeys,
-      identityCommitment: rootIC,
-    });
-    const budget = listRecoveredFundingTemplates(donor)[0];
-    await expect(
-      prepareShieldedFund({
+      });
+      checkWitness("fund", privateFund.witness, f.recipient);
+      expect(privateFund.witness.publicBudget).toEqual(Array(10).fill("0"));
+      f.record(privateFund, 1);
+      const donor = await recoverLocalShieldedWallet(f.pool, {
+        keyMaterial: donorKeys,
+        identityCommitment: rootIC,
+      });
+      const budget = listRecoveredFundingTemplates(donor)[0];
+      await expect(
+        prepareShieldedFund({
+          ...f.common,
+          wallet: donor,
+          donorCommitment: privateFund.outputs[1].commitment,
+          fundMode: 1,
+          budgetKind: 1,
+          budget,
+          budgetPeriods: 2n,
+        }),
+      ).rejects.toThrow("binding");
+      await expect(
+        prepareShieldedFund({
+          ...f.common,
+          wallet: donor,
+          donorCommitment: privateFund.outputs[1].commitment,
+          fundMode: 1,
+          budgetKind: 0,
+          budget,
+          budgetPeriods: 2n,
+        }),
+      ).rejects.toThrow("current budget receiving credential");
+      const privateRefill = await prepareShieldedFund({
         ...f.common,
+        recipient: f.recipient,
         wallet: donor,
         donorCommitment: privateFund.outputs[1].commitment,
         fundMode: 1,
-        budgetKind: 1,
+        budgetKind: 0,
         budget,
         budgetPeriods: 2n,
-      }),
-    ).rejects.toThrow("binding");
-    await expect(prepareShieldedFund({
-      ...f.common,
-      wallet: donor,
-      donorCommitment: privateFund.outputs[1].commitment,
-      fundMode: 1,
-      budgetKind: 0,
-      budget,
-      budgetPeriods: 2n,
-    })).rejects.toThrow("current budget receiving credential");
-    const privateRefill = await prepareShieldedFund({
-      ...f.common,
-      recipient: f.recipient,
-      wallet: donor,
-      donorCommitment: privateFund.outputs[1].commitment,
-      fundMode: 1,
-      budgetKind: 0,
-      budget,
-      budgetPeriods: 2n,
-    });
-    checkWitness("fund", privateRefill.witness, f.recipient);
-    f.record(privateRefill, 1);
-    f.mature();
-    const wallet = await recoverLocalShieldedWallet(f.pool, f.childRecovery);
-    const selection = selectClaimBudget(
-      listUnspentRecoveredShieldedNotes(wallet, f.childKeys),
-      wallet,
-      childSecret,
-      f.now,
-    );
-    expect(selection).not.toHaveProperty("secondBudget");
-    const claim = await prepareShieldedClaim({
-      chainId,
-      poolAddress,
-      identity: f.identity,
+      });
+      checkWitness("fund", privateRefill.witness, f.recipient);
+      f.record(privateRefill, 1);
+      f.mature();
+      const wallet = await recoverLocalShieldedWallet(f.pool, f.childRecovery);
+      const selection = selectClaimBudget(
+        listUnspentRecoveredShieldedNotes(wallet, f.childKeys),
+        wallet,
+        childSecret,
+        f.now,
+      );
+      expect(selection).not.toHaveProperty("secondBudget");
+      const claim = await prepareShieldedClaim({
+        chainId,
+        poolAddress,
+        identity: f.identity,
         keyMaterial: f.childKeys,
-      wallet,
-      lineage: f.lineage,
-      budgetCommitment: privateRefill.outputs[0].commitment,
-      asOf: f.now,
-      periodIndices: [0n, 1n],
-    });
-    checkWitness("claim", claim.witness);
-    expect(claim.witness.budgetKind).toBe("0");
-    expect(claim.witness).not.toHaveProperty("secondBudgetKind");
-    expect(claim.outputs[0].note).toMatchObject({
-      heirOwnerCommitment: f.childKeys.ownerCommitment,
-      remaining: 0n,
-      keyMode: BigInt(keyMode),
-    });
-    expect(wallet.ownedNotes.has(privateFund.outputs[0].commitment)).toBe(true);
-    expect(claim.data.inputNullifiers).toHaveLength(1);
-  });
+        wallet,
+        lineage: f.lineage,
+        budgetCommitment: privateRefill.outputs[0].commitment,
+        asOf: f.now,
+        periodIndices: [0n, 1n],
+      });
+      checkWitness("claim", claim.witness);
+      expect(claim.witness.budgetKind).toBe("0");
+      expect(claim.witness).not.toHaveProperty("secondBudgetKind");
+      expect(claim.outputs[0].note).toMatchObject({
+        heirOwnerCommitment: f.childKeys.ownerCommitment,
+        remaining: 0n,
+        keyMode: BigInt(keyMode),
+      });
+      expect(wallet.ownedNotes.has(privateFund.outputs[0].commitment)).toBe(true);
+      expect(claim.data.inputNullifiers).toHaveLength(1);
+    },
+  );
   it("ignores a malformed public envelope while recovering later private notes", async () => {
     const f = await fixture();
     const fund = await prepareShieldedFund({
@@ -567,13 +578,16 @@ describe("unified budget recovery and claims", () => {
       keyMaterial: f.childKeys,
       amount: 9n,
     });
-    f.record({
-      outputs: [
-        { commitment: 123456n, ciphertext: bad },
-        { commitment: 123457n, ciphertext: bad },
-      ],
-      data: { inputShardIds: [0n, 0n], inputNullifiers: [0n, 0n], periodNullifiers: [] },
-    }, 0);
+    f.record(
+      {
+        outputs: [
+          { commitment: 123456n, ciphertext: bad },
+          { commitment: 123457n, ciphertext: bad },
+        ],
+        data: { inputShardIds: [0n, 0n], inputNullifiers: [0n, 0n], periodNullifiers: [] },
+      },
+      0,
+    );
     f.record(own, 0);
     const wallet = await recoverLocalShieldedWallet(f.pool, f.childRecovery);
     expect(wallet.ownedNotes.has(123456n)).toBe(false);

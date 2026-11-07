@@ -40,7 +40,7 @@ const expected = Array.from({ length: 11 }, (_, index) => String(index + 1));
 const witness = { authorizationAlias: "900", siblings: Array(64).fill("0") };
 
 function prepare(kind = "receive") {
-  const commonInputs = Array(kind === "fund" ? 12 : 11).fill("900");
+  const commonInputs = Array(kind === "fund" ? 9 : 8).fill("900");
   const publicInputs = [...expected];
   const circuit = kind === "fund" ? "fundReceivePresentation" : "receivePresentation";
   const prepared = { witness, commonInputs, publicInputs, circuit };
@@ -117,10 +117,7 @@ describe("local receive presentation linking", () => {
   it("rejects missing pinned keys without fetching an alternative verifier", async () => {
     delete mocks.linkKeys.receive;
     await expect(
-      proveShieldedReceivePresentation(
-        { kind: "receive", credentialProof: issuerProof },
-        expected,
-      ),
+      proveShieldedReceivePresentation({ kind: "receive", credentialProof: issuerProof }, expected),
     ).rejects.toThrow("keys are missing");
     expect(mocks.prove).not.toHaveBeenCalled();
     expect(mocks.link).not.toHaveBeenCalled();
@@ -129,10 +126,7 @@ describe("local receive presentation linking", () => {
   it("does not return a transaction proof when linking verification fails", async () => {
     mocks.link.mockRejectedValue(new Error("Credential proof failed verification"));
     await expect(
-      proveShieldedReceivePresentation(
-        { kind: "receive", credentialProof: issuerProof },
-        expected,
-      ),
+      proveShieldedReceivePresentation({ kind: "receive", credentialProof: issuerProof }, expected),
     ).rejects.toThrow("Credential proof failed verification");
   });
 

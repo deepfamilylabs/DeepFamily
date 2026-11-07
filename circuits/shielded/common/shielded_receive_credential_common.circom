@@ -6,7 +6,8 @@ include "../../lib/identity.circom";
 // expiry. Presentation separately checks the current counter checkpoint and
 // binds the credential to an operation. Counter and expiry never change the
 // existing spending or decryption key derivation.
-template ShieldedReceiveCredential() {
+template ShieldedReceiveCredential(KIND) {
+    assert(KIND == 1 || KIND == 2);
     signal output authorizationAlias;
     signal input authorizationCounter;
     signal input expiresAt;
@@ -15,9 +16,6 @@ template ShieldedReceiveCredential() {
     signal input viewKeyLo;
     signal input viewKeyHi;
     signal input keyMode;
-    signal input identitySuiteId;
-    signal input independentKeySuiteId;
-    signal input independentKeyDerivationVersion;
     signal input receiveCodeVersion;
     signal input spendingSecret;
 
@@ -32,9 +30,6 @@ template ShieldedReceiveCredential() {
 
     component suite = AtomicSuiteCommitment();
     suite.suiteId <== suiteId;
-    identitySuiteId === suiteId;
-    independentKeySuiteId === 1;
-    independentKeyDerivationVersion === 1;
     receiveCodeVersion === 1;
     keyMode * (1 - keyMode) === 0;
 
@@ -61,10 +56,25 @@ template ShieldedReceiveCredential() {
     component spendNonzero = IsZero();
     spendNonzero.in <== spendingSecret;
     spendNonzero.out === 0;
-    component owner = Poseidon(2);
-    owner.inputs[0] <== 1013;
-    owner.inputs[1] <== spendingSecret;
-    owner.out === ownerCommitment;
+    if (KIND == 1) {
+        // Field arithmetic reduces the complete address digest modulo Fr.
+        // The receive transfer uses this same nonce for its VALUE opening.
+        signal ownerNonce <== viewKeyLo + 340282366920938463463374607431768211456 * viewKeyHi;
+        component nonceZero = IsZero();
+        nonceZero.in <== ownerNonce;
+        nonceZero.out === 0;
+        component owner = Poseidon(3);
+        owner.inputs[0] <== 1013;
+        owner.inputs[1] <== spendingSecret;
+        owner.inputs[2] <== ownerNonce;
+        owner.out === ownerCommitment;
+    } else {
+        // Budget credentials retain their fixed owner authorization.
+        component owner = Poseidon(2);
+        owner.inputs[0] <== 1013;
+        owner.inputs[1] <== spendingSecret;
+        owner.out === ownerCommitment;
+    }
 
     // Canonical across both purposes and both key modes. Neither spending
     // nor viewing keys enter the alias derivation.

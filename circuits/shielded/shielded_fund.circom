@@ -328,7 +328,7 @@ template ShieldedFund() {
     signal changeAmount <== donorAmount - budgetAmount;
     component change = ShieldedDonorChange();
     change.valueNoteTag <== donor.valueNoteTag;
-    change.ownerCommitment <== donor.ownerCommitment;
+    change.ownerSecret <== donorOwnerSecret;
     change.amount <== changeAmount;
     change.nonce <== changeNonce;
     change.ciphertextHash <== ciphertextHashes[1];

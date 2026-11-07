@@ -114,7 +114,7 @@ test("linked receive presentations preserve credential prefixes and complete ope
           const example = fixture(kind, { keyMode });
           const wires = await calc.calculateWitness(example.witness, 1);
           assert.deepEqual(wires.slice(1, example.publicSignals.length + 1), example.publicSignals);
-          assert.equal(example.publicSignals.length, kind === "fund" ? 23 : 22);
+          assert.equal(example.publicSignals.length, kind === "fund" ? 20 : 19);
         }
       });
     }
@@ -157,9 +157,6 @@ test("linked receive presentations preserve credential prefixes and complete ope
             [5 + offset, String(1n << 128n)],
             [6 + offset, "2"],
             [7 + offset, "2"],
-            [8 + offset, "2"],
-            [9 + offset, "2"],
-            [10 + offset, "2"],
           ]) {
             const changed = [...witness.credentialPublicSignals];
             changed[slot] = value;

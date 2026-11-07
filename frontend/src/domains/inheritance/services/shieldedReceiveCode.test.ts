@@ -44,7 +44,6 @@ const code = encodeShieldedReceiveCredential({
   authorizationCounter: 0n,
   expiresAt: 2_000_000_000n,
   keyMode: 0,
-  identitySuiteId: 1,
   identityCommitment: fixture.identityCommitment,
   ownerCommitment: 29n,
   viewingKey,

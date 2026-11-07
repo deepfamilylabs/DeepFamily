@@ -14,7 +14,11 @@ import {
 import { MAX_UINT64, SNARK_SCALAR_FIELD } from "./constants.js";
 import { ProtocolError, protocolAssert } from "./errors.js";
 import { assertAddress } from "./identity.js";
-import { generateShieldedRandomField } from "./shielded-inheritance.js";
+import {
+  generateShieldedRandomField,
+  computeShieldedValueOwnerCommitment,
+} from "./shielded-inheritance.js";
+import { deriveShieldedReceiveOwnerNonce } from "./shielded-hpke.js";
 import {
   assertShieldedReceivePublicKey,
   encryptShieldedReceivePayload,
@@ -325,7 +329,7 @@ export async function decryptShieldedLetter(input) {
     // alone are not authority: the binding must also open to the local owner,
     // key mode and public key reconstructed from this wallet's viewing seed.
     const expected = {
-      ownerCommitment: field(input.expectedRecipient.ownerCommitment, "ownerCommitment", true),
+      ownerSecret: field(input.expectedRecipient.ownerSecret, "ownerSecret", true),
       keyMode: bigintFrom(input.expectedRecipient.keyMode, "keyMode", 1n),
       recipientBinding: field(input.expectedRecipient.recipientBinding, "recipientBinding", true),
       ...(input.expectedRecipient.authorizationAlias === undefined
@@ -347,7 +351,10 @@ export async function decryptShieldedLetter(input) {
     const envelope = decodeShieldedLetterEnvelope(plaintext);
     const binding = computeShieldedReceiveRecipientBinding({
       authorizationAlias: envelope.authorizationAlias,
-      ownerCommitment: expected.ownerCommitment,
+      ownerCommitment: computeShieldedValueOwnerCommitment(
+        expected.ownerSecret,
+        deriveShieldedReceiveOwnerNonce(recipientPublicKey),
+      ),
       keyMode: expected.keyMode,
       viewingKey: recipientPublicKey,
       salt: envelope.salt,

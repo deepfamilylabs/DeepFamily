@@ -33,9 +33,10 @@ template ShieldedDonorValueInput() {
     component nonceNotZero = IsZero();
     nonceNotZero.in <== nonce;
     nonceNotZero.out === 0;
-    component owner = Poseidon(2);
+    component owner = Poseidon(3);
     owner.inputs[0] <== 1013;
     owner.inputs[1] <== ownerSecret;
+    owner.inputs[2] <== nonce;
     ownerCommitment <== owner.out;
     component noteTag = ShieldedScopedTag();
     noteTag.poolDomain <== poolDomain;
@@ -43,7 +44,7 @@ template ShieldedDonorValueInput() {
     valueNoteTag <== noteTag.tag;
     component note = Poseidon(5);
     note.inputs[0] <== noteTag.tag;
-    note.inputs[1] <== ownerCommitment;
+    note.inputs[1] <== owner.out;
     note.inputs[2] <== amount;
     note.inputs[3] <== nonce;
     note.inputs[4] <== ciphertextHash;
@@ -142,11 +143,16 @@ template ShieldedPrivateEnrollment() {
 // enclosing action, which fixes its purpose to 1014 and binds the real pool.
 template ShieldedDonorChange() {
     signal input valueNoteTag;
-    signal input ownerCommitment;
+    signal input ownerSecret;
     signal input amount;
     signal input nonce;
     signal input ciphertextHash;
     signal output noteCommitment;
+
+    component owner = Poseidon(3);
+    owner.inputs[0] <== 1013;
+    owner.inputs[1] <== ownerSecret;
+    owner.inputs[2] <== nonce;
 
     component amountBits = Num2Bits(128);
     amountBits.in <== amount;
@@ -155,7 +161,7 @@ template ShieldedDonorChange() {
     nonceNotZero.out === 0;
     component note = Poseidon(5);
     note.inputs[0] <== valueNoteTag;
-    note.inputs[1] <== ownerCommitment;
+    note.inputs[1] <== owner.out;
     note.inputs[2] <== amount;
     note.inputs[3] <== nonce;
     note.inputs[4] <== ciphertextHash;

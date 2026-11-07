@@ -3,6 +3,7 @@ import {
   buildShieldedHpkeAad,
   buildShieldedPoolPublicInputs,
   computeShieldedCiphertextHashField,
+  computeShieldedValueOwnerCommitment,
   computeShieldedValueNoteCommitment,
   decryptShieldedNote,
   deriveShieldedViewPublicKey,
@@ -190,8 +191,16 @@ export async function prepareShieldedShield(
     generateShieldedRandomField(),
   ];
   const notes: readonly [ShieldedValueNotePayload, ShieldedValueNotePayload] = [
-    { ownerCommitment: keys.ownerCommitment, amount: outputAmounts[0], nonce: outputNonces[0] },
-    { ownerCommitment: keys.ownerCommitment, amount: outputAmounts[1], nonce: outputNonces[1] },
+    {
+      ownerCommitment: computeShieldedValueOwnerCommitment(keys.ownerSecret, outputNonces[0]),
+      amount: outputAmounts[0],
+      nonce: outputNonces[0],
+    },
+    {
+      ownerCommitment: computeShieldedValueOwnerCommitment(keys.ownerSecret, outputNonces[1]),
+      amount: outputAmounts[1],
+      nonce: outputNonces[1],
+    },
   ];
   const outputs = (await Promise.all(
     notes.map((note) =>

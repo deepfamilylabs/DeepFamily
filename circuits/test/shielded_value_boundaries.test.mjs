@@ -10,7 +10,7 @@ import test from "node:test";
 import { circomIncludeArguments } from "../../scripts/lib/circomToolchain.mjs";
 import { shieldedCircuitSource } from "../../scripts/lib/zkCircuitSelection.mjs";
 import { WitnessCalculatorBuilder } from "circom_runtime";
-import { poseidon2, poseidon5 } from "poseidon-lite";
+import { poseidon2, poseidon3, poseidon5 } from "poseidon-lite";
 import {
   SNARK_SCALAR_FIELD,
   computeShieldedCiphertextHashField,
@@ -26,7 +26,7 @@ const field = (bytes) =>
   computeShieldedCiphertextHashField(Uint8Array.from({ length: 512 }, () => bytes));
 const asStrings = (values) => values.map((value) => BigInt(value).toString());
 const ownerSecret = 5001n;
-const ownerCommitment = poseidon2([1013n, ownerSecret]);
+const ownerCommitment = (nonce) => poseidon3([1013n, ownerSecret, nonce]);
 const defaultScope = {
   chainId: 31337n,
   poolAddress: "0x0000000000000000000000000000000000001234",
@@ -34,7 +34,7 @@ const defaultScope = {
 const valueNote = (amount, nonce, ciphertextHashField, scope = defaultScope) =>
   computeShieldedValueNoteCommitment(
     {
-      ownerCommitment,
+      ownerCommitment: ownerCommitment(nonce),
       amount,
       nonce,
       ciphertextHashField,
@@ -248,7 +248,7 @@ test("shield and unshield boundary circuits", async (t) => {
         amounts.map((amount, i) =>
           poseidon5([
             shieldedFixtureTag(1014n, defaultScope.chainId, defaultScope.poolAddress),
-            ownerCommitment,
+            ownerCommitment(BigInt(wrapped.outputNonces[i])),
             amount,
             BigInt(wrapped.outputNonces[i]),
             BigInt(wrapped.ciphertextHashes[i]),
@@ -311,7 +311,7 @@ test("shield and unshield boundary circuits", async (t) => {
       wrapped.outputCommitments[0] = String(
         poseidon5([
           shieldedFixtureTag(1014n, defaultScope.chainId, defaultScope.poolAddress),
-          ownerCommitment,
+          ownerCommitment(BigInt(wrapped.changeNonce)),
           BigInt(wrapped.changeAmount),
           BigInt(wrapped.changeNonce),
           BigInt(wrapped.ciphertextHashes[0]),

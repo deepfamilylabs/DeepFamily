@@ -8,6 +8,7 @@ import {
   canonicalizeFullName,
   computeShieldedAllocationKeyCommitment,
   computeShieldedPolicyCommitment,
+  computeShieldedValueOwnerCommitment,
   deriveIdentityMaterial,
   deriveShieldedHeirKeyMaterial,
   getShieldedBudgetCommitments,
@@ -690,7 +691,7 @@ export class ShieldedAssetSession {
     const identityCommitment = this.identity?.identityCommitment;
     return notes.some(({ note }) =>
       note.kind === "value"
-        ? note.amount > 0n && note.ownerCommitment === owner
+        ? note.amount > 0n && this.independentKeyMaterial !== null && note.ownerCommitment === computeShieldedValueOwnerCommitment(this.independentKeyMaterial.ownerSecret, note.nonce)
         : identityCommitment !== undefined &&
           note.binding !== "identity" &&
           getBigInt(note.keyMode ?? 0) === 1n &&
@@ -758,7 +759,7 @@ export class ShieldedAssetSession {
         try {
           const envelope = await decryptShieldedLetter({ chainId: ctx.chainId, lettersAddress: ctx.lettersAddress, messageId: record.messageId,
             hpkeIkm: keys.hpkeIkm, ciphertext: record.ciphertext, expectedCiphertextHash: record.ciphertextHash,
-            expectedRecipient: { ownerCommitment: keys.ownerCommitment, keyMode: keys.keyMode,
+            expectedRecipient: { ownerSecret: keys.ownerSecret, keyMode: keys.keyMode,
               recipientBinding: record.recipientBinding, ...(authorizationAlias !== undefined ? { authorizationAlias } : {}) } });
           letters.push({ messageId: record.messageId, body: envelope.body, registeredAt: record.registeredAt, transactionHash: record.transactionHash, slot });
           break;
@@ -862,7 +863,7 @@ export class ShieldedAssetSession {
           note.kind === "value"
             ? {
                 commitment: String(event.commitment),
-                ownerCommitment: String(note.ownerCommitment),
+                ownerCommitment: String(keys.ownerCommitment),
                 slot,
                 kind: "value",
                 amount: String(note.amount),
@@ -1365,7 +1366,7 @@ export class ShieldedAssetSession {
       const values = listUnspentRecoveredShieldedNotes(wallet, keys).filter(
         (event) =>
           event.note.kind === "value" &&
-          event.note.ownerCommitment === keys.ownerCommitment &&
+          event.note.ownerCommitment === computeShieldedValueOwnerCommitment(keys.ownerSecret, event.note.nonce) &&
           event.note.amount > 0n,
       );
       const plan = planShieldedValueSpend({

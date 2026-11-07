@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   computeShieldedCiphertextHashField,
+  computeShieldedValueOwnerCommitment,
+  deriveShieldedReceiveOwnerNonce,
   computeShieldedDummyInputNullifierForSlot,
   computeShieldedSpendNullifier,
   createLineageTree,
@@ -122,10 +124,14 @@ async function walletFixture(secondOwner = false, extraPairs = 0) {
 /** Keys from a receive code that the ZK worker has already verified. */
 async function recipientFixture(): Promise<VerifiedShieldedRecipient> {
   const keys = deriveShieldedHeirKeyMaterial(recipientSecret);
+  const viewingKey = await deriveShieldedReceivePublicKey(keys.hpkeIkm);
   return {
     identityCommitment: recipientIdentityCommitment,
-    ownerCommitment: keys.ownerCommitment,
-    viewingKey: hexlify(await deriveShieldedReceivePublicKey(keys.hpkeIkm)),
+    ownerCommitment: computeShieldedValueOwnerCommitment(
+      keys.ownerSecret,
+      deriveShieldedReceiveOwnerNonce(viewingKey),
+    ),
+    viewingKey: hexlify(viewingKey),
     personHash: wrapIdentityCommitmentAsPersonHash(recipientIdentityCommitment),
   } as VerifiedShieldedRecipient;
 }
@@ -283,8 +289,15 @@ describe("local private transfer and unshield preparation", () => {
     });
     expect(prepared.witness.inputEnabled).toEqual(["1", "1", "0", "0"]);
     expect(prepared.outputs.map((output) => output.note.amount)).toEqual([90n, 10n]);
-    expect(prepared.outputs[0].note.ownerCommitment).toBe(senderWallet.walletOwnerCommitment);
-    expect(planShieldedValueSpend({ notes, amount: 70n, maxInputs: 1 }).steps[0].kind).toBe("spend");
+    expect(prepared.outputs[0].note.ownerCommitment).toBe(
+      computeShieldedValueOwnerCommitment(
+        deriveShieldedHeirKeyMaterial(senderSecret).ownerSecret,
+        prepared.outputs[0].note.nonce,
+      ),
+    );
+    expect(planShieldedValueSpend({ notes, amount: 70n, maxInputs: 1 }).steps[0].kind).toBe(
+      "spend",
+    );
     expect(() => planShieldedValueSpend({ notes, amount: 101n, maxInputs: 1 })).toThrow("balance");
   });
 
@@ -334,7 +347,8 @@ describe("local private transfer and unshield preparation", () => {
           ? [{ commitment: owned.commitment, amount: owned.note.amount }]
           : [];
       });
-    const step = planShieldedValueSpend({ notes: unspentNotes(), amount: 110n, maxInputs: 1 }).steps[0];
+    const step = planShieldedValueSpend({ notes: unspentNotes(), amount: 110n, maxInputs: 1 })
+      .steps[0];
     expect(step.kind).toBe("merge");
     const prepared = await prepareShieldedPrivateTransfer({
       chainId,
@@ -354,7 +368,8 @@ describe("local private transfer and unshield preparation", () => {
     for (const nullifier of prepared.data.inputNullifiers)
       senderWallet.spentNullifiers.add(getBigInt(nullifier));
     await append(prepared.outputs);
-    const next = planShieldedValueSpend({ notes: unspentNotes(), amount: 110n, maxInputs: 1 }).steps[0];
+    const next = planShieldedValueSpend({ notes: unspentNotes(), amount: 110n, maxInputs: 1 })
+      .steps[0];
     expect(next.kind).toBe("spend");
     expect(next.inputCommitments).toEqual([String(prepared.outputs[0].commitment)]);
     await expect(
@@ -402,7 +417,10 @@ describe("local private transfer and unshield preparation", () => {
     expect(prepared.witness.inputEnabled).toEqual(["1", "1", "0", "0"]);
     expect(prepared.witness.outputAmounts).toEqual(["60", "40"]);
     expect(prepared.outputs[0].note.ownerCommitment).toBe(
-      deriveShieldedHeirKeyMaterial(recipientSecret).ownerCommitment,
+      computeShieldedValueOwnerCommitment(
+        deriveShieldedHeirKeyMaterial(recipientSecret).ownerSecret,
+        prepared.outputs[0].note.nonce,
+      ),
     );
     expect(prepared.outputs[0].ciphertext).toHaveLength(512);
     expect(prepared.outputs[1].ciphertext).toHaveLength(512);
@@ -621,7 +639,7 @@ describe("local private transfer and unshield preparation", () => {
         secondSecret,
         prepared.outputs[0].commitment,
       ),
-    ).toMatchObject({ ownerCommitment: receiver.ownerCommitment, amount: 60n });
+    ).toMatchObject({ ownerCommitment: prepared.outputs[0].note.ownerCommitment, amount: 60n });
   });
 
   it.each(["lowercase", "checksum"] as const)(

@@ -15,10 +15,14 @@ import {
   buildShieldedHpkeAad,
   decryptShieldedNote,
   deriveShieldedViewPublicKey,
+  deriveShieldedReceiveOwnerNonce,
   encryptShieldedNote,
   splitShieldedViewPublicKey,
 } from "../shielded-hpke.js";
-import { deriveShieldedHeirKeyMaterial } from "../shielded-inheritance.js";
+import {
+  computeShieldedValueOwnerCommitment,
+  deriveShieldedHeirKeyMaterial,
+} from "../shielded-inheritance.js";
 import { deriveShieldedIndependentKeyMaterial } from "../shielded-independent-key.js";
 import { computeShieldedReceiveRecipientBinding } from "../shielded-receive-presentation.js";
 import {
@@ -413,7 +417,7 @@ test("receive key, address and encryption operations preserve all caller-owned b
 });
 
 test("the same root recovers letters sent to independently generated receive public keys", async () => {
-  const { ownerCommitment } = deriveShieldedHeirKeyMaterial(13n);
+  const { ownerSecret } = deriveShieldedHeirKeyMaterial(13n);
   const letters = [];
   for (let index = 0; index < 3; index++) {
     const recipientPublicKey = await deriveShieldedReceivePublicKey(seed);
@@ -427,7 +431,10 @@ test("the same root recovers letters sent to independently generated receive pub
       ciphertext: await encryptShieldedLetter({ ...letterScope, recipientPublicKey, envelope }),
       recipientBinding: computeShieldedReceiveRecipientBinding({
         authorizationAlias: envelope.authorizationAlias,
-        ownerCommitment,
+        ownerCommitment: computeShieldedValueOwnerCommitment(
+          ownerSecret,
+          deriveShieldedReceiveOwnerNonce(recipientPublicKey),
+        ),
         keyMode: 0n,
         viewingKey: recipientPublicKey,
         salt: envelope.salt,
@@ -440,7 +447,7 @@ test("the same root recovers letters sent to independently generated receive pub
         ...letterScope,
         hpkeIkm: seed,
         ciphertext,
-        expectedRecipient: { ownerCommitment, keyMode: 0n, recipientBinding },
+        expectedRecipient: { ownerSecret, keyMode: 0n, recipientBinding },
       }),
       envelope,
     );

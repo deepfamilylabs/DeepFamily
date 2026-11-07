@@ -64,9 +64,9 @@ const publicSignalCount = (action) => {
     ? RECEIVE_PRESENTATION_CIRCUITS[action].hiddenInputs +
         RECEIVE_PRESENTATION_CIRCUITS[action].publicInputs
     : action === "receiveCredential"
-      ? 11
+      ? 8
       : action === "fundReceiveCredential"
-        ? 12
+        ? 9
         : action === "identityCounterUpdate"
           ? 6
           : SHIELDED_POOL_PUBLIC_SIGNAL_COUNTS[SHIELDED_POOL_ACTION[suffix(action)]];

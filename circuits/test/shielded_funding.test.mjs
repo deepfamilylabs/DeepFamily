@@ -72,7 +72,7 @@ function withFundingOutputs(
     ]),
     poseidon5([
       scoped(1014n),
-      poseidon2([1013n, BigInt(updated.donorOwnerSecret)]),
+      poseidon3([1013n, BigInt(updated.donorOwnerSecret), BigInt(updated.changeNonce)]),
       // Match field subtraction for negative change; the uint128 guard must reject it.
       ((change % SNARK_SCALAR_FIELD) + SNARK_SCALAR_FIELD) % SNARK_SCALAR_FIELD,
       BigInt(updated.changeNonce),
@@ -427,7 +427,7 @@ test("shielded initial Fund and continuation Fund constraints", async (t) => {
             ]),
             poseidon5([
               scoped(1014n),
-              second.ownerCommitment,
+              poseidon3([1013n, BigInt(continuation.ownerSecret), 123457n]),
               100n,
               123457n,
               BigInt(continuation.ciphertextHashes[1]),

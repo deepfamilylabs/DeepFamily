@@ -4,14 +4,18 @@ import { poseidon3 } from "poseidon-lite";
 import { bigintFrom, bytesToHex } from "./bytes.js";
 import { MAX_UINT64, SNARK_SCALAR_FIELD } from "./constants.js";
 import { protocolAssert } from "./errors.js";
-import { SHIELDED_RECEIVE_PUBLIC_KEY_BYTES, splitShieldedViewPublicKey } from "./shielded-hpke.js";
+import {
+  SHIELDED_RECEIVE_PUBLIC_KEY_BYTES,
+  deriveShieldedReceiveOwnerNonce,
+  splitShieldedViewPublicKey,
+} from "./shielded-hpke.js";
 import { receiveProofFromWords, receiveProofWords } from "./shielded-receive-proof-codec.js";
 
 export const SHIELDED_RECEIVE_CREDENTIAL_VERSION = 1;
 export const SHIELDED_AUTHORIZATION_ALIAS_DOMAIN = 202610210001n;
 export const SHIELDED_RECEIVE_CREDENTIAL_PUBLIC_SIGNAL_COUNTS = Object.freeze({
-  receive: 11,
-  fund: 12,
+  receive: 8,
+  fund: 9,
 });
 const PREFIX = Object.freeze({ receive: "dfrecv", fund: "dffund" });
 const MAX_FIELD = SNARK_SCALAR_FIELD - 1n;
@@ -65,18 +69,16 @@ export function buildShieldedReceiveCredentialPublicSignals(input) {
   );
   const { viewKeyLo, viewKeyHi } = splitShieldedViewPublicKey(viewingKey);
   invalid(viewKeyLo !== 0n || viewKeyHi !== 0n, "Viewing key must be nonzero");
+  if (purpose === "receive") deriveShieldedReceiveOwnerNonce(viewingKey);
   const mode = bigintFrom(input.keyMode ?? 0, "keyMode", 1n);
-  const metadata = [
-    input.identitySuiteId ?? 1,
-    input.independentKeySuiteId ?? 1,
-    input.independentKeyDerivationVersion ?? 1,
+  const version = bigintFrom(
     input.receiveCodeVersion ?? SHIELDED_RECEIVE_CREDENTIAL_VERSION,
-  ].map((value, index) => bigintFrom(value, `credentialMetadata[${index}]`, 255n));
+    "receiveCodeVersion",
+    255n,
+  );
   invalid(
-    metadata.every(
-      (value, index) => value === (index === 3 ? BigInt(SHIELDED_RECEIVE_CREDENTIAL_VERSION) : 1n),
-    ),
-    "Unsupported credential suite",
+    version === BigInt(SHIELDED_RECEIVE_CREDENTIAL_VERSION),
+    "Unsupported credential version",
   );
   const identity =
     purpose === "fund" ? [nonzeroField(input.identityCommitment, "identityCommitment")] : [];
@@ -84,7 +86,7 @@ export function buildShieldedReceiveCredentialPublicSignals(input) {
     purpose === "fund" || input.identityCommitment === undefined,
     "Receive credentials must not include an identity commitment",
   );
-  return [alias, counter, expiry, ...identity, owner, viewKeyLo, viewKeyHi, mode, ...metadata];
+  return [alias, counter, expiry, ...identity, owner, viewKeyLo, viewKeyHi, mode, version];
 }
 
 export function computeShieldedReceiveCredentialFingerprint(input) {
@@ -106,7 +108,7 @@ export function encodeShieldedReceiveCredential(input) {
   const offset = purpose === "fund" ? 1 : 0;
   const payload = getBytes(
     concat([
-      Uint8Array.of(SHIELDED_RECEIVE_CREDENTIAL_VERSION, Number(signals[6 + offset]), 1, 1, 1),
+      Uint8Array.of(SHIELDED_RECEIVE_CREDENTIAL_VERSION, Number(signals[6 + offset])),
       fixed(signals[0], 32),
       fixed(signals[1], 8),
       fixed(signals[2], 8),
@@ -126,7 +128,7 @@ export function decodeShieldedReceiveCredential(code) {
     const decoded = bech32m.decode(code.replace(/\s+/gu, ""), false);
     purpose = Object.keys(PREFIX).find((key) => PREFIX[key] === decoded.prefix);
     bytes = bech32m.fromWords(decoded.words);
-    if (!purpose || bytes[0] !== SHIELDED_RECEIVE_CREDENTIAL_VERSION || bytes.length !== 405)
+    if (!purpose || bytes[0] !== SHIELDED_RECEIVE_CREDENTIAL_VERSION || bytes.length !== 402)
       throw new Error();
   } catch {
     protocolAssert(
@@ -135,7 +137,7 @@ export function decodeShieldedReceiveCredential(code) {
       "Credential is incomplete or mistyped",
     );
   }
-  let offset = 5;
+  let offset = 2;
   const read = (width) => {
     const value = BigInt(bytesToHex(bytes.subarray(offset, offset + width)));
     offset += width;
@@ -151,9 +153,6 @@ export function decodeShieldedReceiveCredential(code) {
     ownerCommitment: read(32),
     viewingKey: bytes.slice(offset, offset + viewingKeyBytes),
     keyMode: bytes[1],
-    identitySuiteId: bytes[2],
-    independentKeySuiteId: bytes[3],
-    independentKeyDerivationVersion: bytes[4],
     receiveCodeVersion: SHIELDED_RECEIVE_CREDENTIAL_VERSION,
   };
   offset += viewingKeyBytes;

@@ -6,5 +6,5 @@ include "common/shielded_receive_credential_common.circom";
 // Fund credential cannot turn that proof into this distinct relation.
 component main {
     public [authorizationCounter, expiresAt, ownerCommitment, viewKeyLo, viewKeyHi,
-        keyMode, identitySuiteId, independentKeySuiteId, independentKeyDerivationVersion, receiveCodeVersion]
-} = ShieldedReceiveCredential();
+        keyMode, receiveCodeVersion]
+} = ShieldedReceiveCredential(1);

@@ -53,12 +53,21 @@ template ShieldedPrivateTransfer(CAPACITY) {
     inputs.totalAmount === outputs.totalAmount;
     component bindingZero[2];
     component receipt[2];
+    component selfOwner[2];
     for (var i = 0; i < 2; i++) {
         bindingZero[i] = IsZero();
         bindingZero[i].in <== receiveBindings[i];
-        // A zero authorization is permitted only for the actual input owner,
-        // including the zero-value dummy and change note.
-        bindingZero[i].out * (outputOwnerCommitments[i] - inputs.ownerCommitment) === 0;
+        // A zero authorization is permitted only for an output derived from
+        // the actual root spending secret and that output's own nonce.
+        selfOwner[i] = Poseidon(3);
+        selfOwner[i].inputs[0] <== 1013;
+        selfOwner[i].inputs[1] <== inputOwnerSecrets[0];
+        selfOwner[i].inputs[2] <== outputNonces[i];
+        bindingZero[i].out * (outputOwnerCommitments[i] - selfOwner[i].out) === 0;
+        // A receiving code authenticates its complete address digest. The
+        // same digest, reduced in the circuit field, diversifies its owner.
+        (1 - bindingZero[i].out) * (outputNonces[i] - receiveViewKeyLo[i]
+            - 340282366920938463463374607431768211456 * receiveViewKeyHi[i]) === 0;
         receipt[i] = ShieldedReceiveRecipientBinding();
         receipt[i].enabled <== 1 - bindingZero[i].out;
         receipt[i].authorizationAlias <== receiveAuthorizationAliases[i];

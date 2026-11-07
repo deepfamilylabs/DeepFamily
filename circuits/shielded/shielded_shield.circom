@@ -37,10 +37,7 @@ template ShieldedShield() {
     component ownerNotZero = IsZero();
     ownerNotZero.in <== ownerSecret;
     ownerNotZero.out === 0;
-    component owner = Poseidon(2);
-    owner.inputs[0] <== 1013;
-    owner.inputs[1] <== ownerSecret;
-
+    component owners[2];
     component outputAmountBits[2];
     component outputNonceNotZero[2];
     component notes[2];
@@ -50,9 +47,13 @@ template ShieldedShield() {
         outputNonceNotZero[i] = IsZero();
         outputNonceNotZero[i].in <== outputNonces[i];
         outputNonceNotZero[i].out === 0;
+        owners[i] = Poseidon(3);
+        owners[i].inputs[0] <== 1013;
+        owners[i].inputs[1] <== ownerSecret;
+        owners[i].inputs[2] <== outputNonces[i];
         notes[i] = Poseidon(5);
         notes[i].inputs[0] <== valueTag.tag;
-        notes[i].inputs[1] <== owner.out;
+        notes[i].inputs[1] <== owners[i].out;
         notes[i].inputs[2] <== outputAmounts[i];
         notes[i].inputs[3] <== outputNonces[i];
         notes[i].inputs[4] <== ciphertextHashes[i];

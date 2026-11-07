@@ -32,6 +32,7 @@ import {
   computeShieldedSpendNullifier,
   computeShieldedBudgetUseNullifier,
   computeShieldedValueNoteCommitment,
+  computeShieldedValueOwnerCommitment,
   decodeShieldedReceiveCredential,
   decodePublicShieldedBudgetEnvelope,
   encodePublicShieldedBudgetEnvelope,
@@ -40,6 +41,7 @@ import {
   deriveShieldedHeirKeyMaterial,
   deriveShieldedViewPublicKey,
   deriveShieldedReceivePublicKey,
+  deriveShieldedReceiveOwnerNonce,
   splitShieldedViewPublicKey,
   encodeShieldedBudgetNotePayload,
   encodeShieldedReceiveCredential,
@@ -220,8 +222,22 @@ export async function runShieldedAcceptanceSmoke({
       ...extra,
     };
     if (!proofs[action]) proofs[action] = metadata;
-    if (action === "claim" && !proofs.claim32 && Number(witness.endorsementDepth) <= 32 && Number(witness.trustedDepth) <= 32) {
-      await prove("claim32", { ...witness, endorsementSiblings: witness.endorsementSiblings.slice(0, 32), trustedSiblings: witness.trustedSiblings.slice(0, 32) }, publicSignals, { execution, ...extra });
+    if (
+      action === "claim" &&
+      !proofs.claim32 &&
+      Number(witness.endorsementDepth) <= 32 &&
+      Number(witness.trustedDepth) <= 32
+    ) {
+      await prove(
+        "claim32",
+        {
+          ...witness,
+          endorsementSiblings: witness.endorsementSiblings.slice(0, 32),
+          trustedSiblings: witness.trustedSiblings.slice(0, 32),
+        },
+        publicSignals,
+        { execution, ...extra },
+      );
     }
     return { ...generated, evidence: metadata };
   };
@@ -240,22 +256,43 @@ export async function runShieldedAcceptanceSmoke({
     assert.ok(block?.hash, "Authorization checkpoint block is unavailable");
     const overrides = { blockTag: block.number };
     const [stateRoot, checkpointId, proof] = await Promise.all([
-      contract.currentRoot(overrides), contract.currentCheckpointId(overrides),
+      contract.currentRoot(overrides),
+      contract.currentCheckpointId(overrides),
       contract.getCounterProof(alias, overrides),
     ]);
     assert.equal(typeof proof.isOld0, "boolean", "Authorization empty flag is not canonical");
     assert.equal(typeof proof.absent, "boolean", "Authorization absent flag is not canonical");
-    const authorizationWitness = verifyShieldedIdentityAuthorizationWitness({
-      authorizationAlias: alias, authorizationCounter: proof.authorizationCounter,
-      stateRoot: proof.stateRoot, depth: proof.depth, siblings: Array.from(proof.siblings),
-      oldKey: proof.oldKey, oldValue: proof.oldValue,
-      isOld0: proof.isOld0 ? 1n : 0n, absent: proof.absent ? 1n : 0n,
-    }, stateRoot, alias);
+    const authorizationWitness = verifyShieldedIdentityAuthorizationWitness(
+      {
+        authorizationAlias: alias,
+        authorizationCounter: proof.authorizationCounter,
+        stateRoot: proof.stateRoot,
+        depth: proof.depth,
+        siblings: Array.from(proof.siblings),
+        oldKey: proof.oldKey,
+        oldValue: proof.oldValue,
+        isOld0: proof.isOld0 ? 1n : 0n,
+        absent: proof.absent ? 1n : 0n,
+      },
+      stateRoot,
+      alias,
+    );
     const checkpoint = await contract.getCheckpoint(checkpointId, overrides);
-    assert.equal(BigInt(checkpoint.root), BigInt(stateRoot), "Authorization checkpoint root differs");
-    assert.ok(BigInt(checkpoint.createdAt) <= BigInt(block.timestamp), "Authorization checkpoint is future-dated");
+    assert.equal(
+      BigInt(checkpoint.root),
+      BigInt(stateRoot),
+      "Authorization checkpoint root differs",
+    );
+    assert.ok(
+      BigInt(checkpoint.createdAt) <= BigInt(block.timestamp),
+      "Authorization checkpoint is future-dated",
+    );
     assert.equal(BigInt(checkpoint.retiredAt), 0n, "Current authorization checkpoint is retired");
-    assert.equal((await provider.getBlock(block.number))?.hash, block.hash, "Authorization checkpoint reorganized");
+    assert.equal(
+      (await provider.getBlock(block.number))?.hash,
+      block.hash,
+      "Authorization checkpoint reorganized",
+    );
     return {
       authorizationWitness,
       authorizationStateRoot: stateRoot,
@@ -268,16 +305,22 @@ export async function runShieldedAcceptanceSmoke({
     const files = candidate.circuits[action];
     const alias = computeShieldedAuthorizationAlias(material);
     const checkpoint = await loadAuthorizationWitness(alias);
-    const viewingKey = purpose === "receive"
-      ? await deriveShieldedReceivePublicKey(keys.hpkeIkm)
-      : keys.viewingKey;
+    const viewingKey =
+      purpose === "receive" ? await deriveShieldedReceivePublicKey(keys.hpkeIkm) : keys.viewingKey;
+    const ownerCommitment =
+      purpose === "receive"
+        ? computeShieldedValueOwnerCommitment(
+            keys.ownerSecret,
+            deriveShieldedReceiveOwnerNonce(viewingKey),
+          )
+        : keys.ownerCommitment;
     const statement = {
       purpose,
       ...(purpose === "fund" ? { identityCommitment: material.identityCommitment } : {}),
       authorizationAlias: alias,
       authorizationCounter: checkpoint.authorizationWitness.authorizationCounter,
       expiresAt: checkpoint.asOf + 86400n,
-      ownerCommitment: keys.ownerCommitment,
+      ownerCommitment,
       viewingKey,
     };
     const signals = buildShieldedReceiveCredentialPublicSignals(statement);
@@ -289,13 +332,10 @@ export async function runShieldedAcceptanceSmoke({
         identityCommitment: String(material.identityCommitment),
         authorizationCounter: String(statement.authorizationCounter),
         expiresAt: String(statement.expiresAt),
-        ownerCommitment: String(keys.ownerCommitment),
+        ownerCommitment: String(ownerCommitment),
         viewKeyLo: String(view.viewKeyLo),
         viewKeyHi: String(view.viewKeyHi),
         keyMode: "0",
-        identitySuiteId: "1",
-        independentKeySuiteId: "1",
-        independentKeyDerivationVersion: "1",
         receiveCodeVersion: String(SHIELDED_RECEIVE_CREDENTIAL_VERSION),
         spendingSecret: String(keys.ownerSecret),
         nameField: String(material.nameField),
@@ -426,11 +466,11 @@ export async function runShieldedAcceptanceSmoke({
       wipeBytes(opened);
     }
   };
-  const valueNote = (keys, amount) => {
+  const valueNote = (keys, amount, nonce = generateShieldedRandomField()) => {
     const note = {
-      ownerCommitment: keys.ownerCommitment,
+      ownerCommitment: computeShieldedValueOwnerCommitment(keys.ownerSecret, nonce),
       amount,
-      nonce: generateShieldedRandomField(),
+      nonce,
     };
     return encrypt(keys, note, encodeShieldedValueNotePayload, (ciphertextHashField) =>
       computeShieldedValueNoteCommitment({ ...note, ciphertextHashField }, scope),
@@ -1180,7 +1220,10 @@ export async function runShieldedAcceptanceSmoke({
       inputCiphertextHashes: [String(source.ciphertextHashField), ...Array(capacity - 1).fill("0")],
       inputDepths: [membership.depth, ...Array(capacity - 1).fill("0")],
       inputIndices: [membership.index, ...Array(capacity - 1).fill("0")],
-      inputSiblings: [membership.siblings, ...Array.from({ length: capacity - 1 }, () => Array(32).fill("0"))],
+      inputSiblings: [
+        membership.siblings,
+        ...Array.from({ length: capacity - 1 }, () => Array(32).fill("0")),
+      ],
     });
     const valueData = (source, membership, outputNotes, capacity = 1) => ({
       ...zeroData(),
@@ -1199,26 +1242,49 @@ export async function runShieldedAcceptanceSmoke({
       ...outputs(outputNotes),
     });
 
-    const proveFourInputValue = async (action, source, membership, outputNotes, openings, external = {}, credentials) => {
+    const proveFourInputValue = async (
+      action,
+      source,
+      membership,
+      outputNotes,
+      openings,
+      external = {},
+      credentials,
+    ) => {
       const data = valueData(source, membership, outputNotes, 4);
-      const receiverWitness = credentials ? await authorizeReceivers(action, data, credentials) : {};
+      const receiverWitness = credentials
+        ? await authorizeReceivers(action, data, credentials)
+        : {};
       const inputs = publicInputsFor(action, data, external);
-      return prove(`${action}4`, {
-        ...inputs.witness,
-        ...receiverWitness,
-        ...valuePrivateInputs(source, membership, 4),
-        ...openings,
-      }, inputs.signals, { execution: "verifier-call" });
+      return prove(
+        `${action}4`,
+        {
+          ...inputs.witness,
+          ...receiverWitness,
+          ...valuePrivateInputs(source, membership, 4),
+          ...openings,
+        },
+        inputs.signals,
+        { execution: "verifier-call" },
+      );
     };
 
     const transferCredentials = [await receiveCodeFor(childMaterial, childKeys, "receive"), null];
     const transferOutputs = await Promise.all([
-      valueNote({ ...heirKeys, viewingKey: transferCredentials[0].viewingKey }, 400n),
+      valueNote(
+        { ...heirKeys, viewingKey: transferCredentials[0].viewingKey },
+        400n,
+        deriveShieldedReceiveOwnerNonce(transferCredentials[0].viewingKey),
+      ),
       valueNote(donorKeys, 100n),
     ]);
     const transferPath = await notePath(publicFundChange);
     const transferData = valueData(publicFundChange, transferPath, transferOutputs);
-    const transferReceiverWitness = await authorizeReceivers("privateTransfer", transferData, transferCredentials);
+    const transferReceiverWitness = await authorizeReceivers(
+      "privateTransfer",
+      transferData,
+      transferCredentials,
+    );
     const transferInputs = publicInputsFor("privateTransfer", transferData);
     const transferProof = await prove(
       "privateTransfer",
@@ -1232,11 +1298,19 @@ export async function runShieldedAcceptanceSmoke({
       },
       transferInputs.signals,
     );
-    await proveFourInputValue("privateTransfer", publicFundChange, transferPath, transferOutputs, {
-      outputOwnerCommitments: decimals(transferOutputs.map((note) => note.ownerCommitment)),
-      outputAmounts: decimals(transferOutputs.map((note) => note.amount)),
-      outputNonces: decimals(transferOutputs.map((note) => note.nonce)),
-    }, {}, transferCredentials);
+    await proveFourInputValue(
+      "privateTransfer",
+      publicFundChange,
+      transferPath,
+      transferOutputs,
+      {
+        outputOwnerCommitments: decimals(transferOutputs.map((note) => note.ownerCommitment)),
+        outputAmounts: decimals(transferOutputs.map((note) => note.amount)),
+        outputNonces: decimals(transferOutputs.map((note) => note.nonce)),
+      },
+      {},
+      transferCredentials,
+    );
     await submit("privateTransfer", transferData, transferProof, transferOutputs);
 
     const unshieldSource = transferOutputs[0];
@@ -1261,11 +1335,18 @@ export async function runShieldedAcceptanceSmoke({
       },
       unshieldInputs.signals,
     );
-    await proveFourInputValue("unshield", unshieldSource, unshieldPath, unshieldOutputs, {
-      changeAmount: "300",
-      changeNonce: String(unshieldOutputs[0].nonce),
-      dummyNonce: String(unshieldOutputs[1].nonce),
-    }, { amount: unshieldedAmount, recipient: signerAddress });
+    await proveFourInputValue(
+      "unshield",
+      unshieldSource,
+      unshieldPath,
+      unshieldOutputs,
+      {
+        changeAmount: "300",
+        changeNonce: String(unshieldOutputs[0].nonce),
+        dummyNonce: String(unshieldOutputs[1].nonce),
+      },
+      { amount: unshieldedAmount, recipient: signerAddress },
+    );
     await submit("unshield", unshieldData, unshieldProof, unshieldOutputs, {
       amount: unshieldedAmount,
       recipient: signerAddress,

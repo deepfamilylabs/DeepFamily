@@ -135,7 +135,7 @@ export function buildShieldedClaimFixture({
   ]);
   const payoutOutput = poseidon5([
     scoped(1014n),
-    ownerCommitment,
+    poseidon3([1013n, ownerSecret, payoutNonce]),
     payout,
     payoutNonce,
     payoutOutputCiphertextHash,
@@ -180,9 +180,7 @@ export function buildShieldedClaimFixture({
     ownerSecret: decimal(ownerSecret),
     heirViewKeyLo: decimal(viewKeyLo),
     heirViewKeyHi: decimal(viewKeyHi),
-    inputBudgetIsClaim: [
-      budgetKind === 0 && budgetOrigin === "claim" ? "1" : "0",
-    ],
+    inputBudgetIsClaim: [budgetKind === 0 && budgetOrigin === "claim" ? "1" : "0"],
     policyCommitmentInput: decimal(policy),
     enrollmentCommitmentInput: decimal(enrollment),
     policySalt: requiresOpening ? decimal(policySalt) : "0",

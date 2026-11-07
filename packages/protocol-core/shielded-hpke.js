@@ -8,7 +8,7 @@ import {
   copyBytes,
   wipeBytes,
 } from "./bytes.js";
-import { MAX_UINT64 } from "./constants.js";
+import { MAX_UINT64, SNARK_SCALAR_FIELD } from "./constants.js";
 import { ProtocolError, protocolAssert } from "./errors.js";
 import { assertAddress } from "./identity.js";
 import { SHIELDED_CIPHERTEXT_BYTES } from "./shielded-inheritance.js";
@@ -78,6 +78,23 @@ export function splitShieldedViewPublicKey(publicKey) {
     viewKeyHi: BigInt(bytesToHex(bytes.subarray(0, 16))),
     viewKeyLo: BigInt(bytesToHex(bytes.subarray(16, 32))),
   };
+}
+
+/** The complete receive address already authenticates this recoverable VALUE ownership nonce. */
+export function deriveShieldedReceiveOwnerNonce(publicKey) {
+  protocolAssert(
+    getBytes(publicKey).length === SHIELDED_RECEIVE_PUBLIC_KEY_BYTES,
+    "INVALID_SHIELDED_RECEIVE_PUBLIC_KEY",
+    "A diversified receive address is required",
+  );
+  const { viewKeyLo, viewKeyHi } = splitShieldedViewPublicKey(publicKey);
+  const nonce = (viewKeyLo + (viewKeyHi << 128n)) % SNARK_SCALAR_FIELD;
+  protocolAssert(
+    nonce !== 0n,
+    "INVALID_SHIELDED_RECEIVE_OWNER_NONCE",
+    "Receive ownership nonce must be nonzero",
+  );
+  return nonce;
 }
 
 /**

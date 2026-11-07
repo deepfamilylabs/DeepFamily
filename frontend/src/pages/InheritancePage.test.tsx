@@ -2,6 +2,7 @@
 import React from "react";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { Contract, Signature, TransactionResponse, type Provider, type TransactionRequest } from "ethers";
 import type {
   ShieldedAssetSessionState,
   ShieldedPublicIdentity,
@@ -224,6 +225,67 @@ function chooseAsset(name: string) {
   fireEvent.click(screen.getByRole("option", { name }));
 }
 
+function poolCreationTransaction(wait: () => Promise<{ status: number }>) {
+  return {
+    hash: "0x1234",
+    wait,
+    replaceableTransaction: vi.fn(() => ({ hash: "0x1234", wait })),
+  };
+}
+
+/** Use ethers' actual Contract wrapper and wait implementation; only RPC responses are fake. */
+function replacedPoolCreation(outcome: "repriced" | "failed" | "cancelled") {
+  const originalHash = `0x${"11".repeat(32)}`;
+  const replacementHash = `0x${"22".repeat(32)}`;
+  const sender = mocks.wallet.address!;
+  let blockNumber = 1;
+  let replacement: TransactionResponse;
+  const rpc = {
+    getNetwork: async () => ({ chainId: 31337n }),
+    getBlockNumber: vi.fn(async () => blockNumber),
+    getTransactionCount: async () => 1,
+    getTransaction: async () => null,
+    getTransactionReceipt: async (hash: string) => {
+      if (hash !== replacementHash) return null;
+      if (outcome === "repriced")
+        mocks.poolAddress = "0x0000000000000000000000000000000000000020";
+      return { status: outcome === "failed" ? 0 : 1, blockNumber: 2 };
+    },
+    getBlock: vi.fn(async (number: number) => ({
+      length: number === 2 ? 1 : 0,
+      *[Symbol.iterator]() { if (number === 2) yield replacementHash; },
+      getTransaction: async () => replacement,
+    })),
+    on: vi.fn(async () => {}),
+    off: vi.fn(async () => {}),
+    once: vi.fn(async () => {}),
+  };
+  const provider = rpc as unknown as Provider;
+  const sendTransaction = vi.fn(async (request: TransactionRequest) => {
+    const fields = {
+      blockNumber: null, blockHash: null, index: 0, hash: originalHash,
+      type: 2, to: mocks.factoryAddress, from: sender, nonce: 0,
+      gasLimit: 100000n, gasPrice: 1n, maxPriorityFeePerGas: 1n, maxFeePerGas: 2n,
+      data: request.data!, value: 0n, chainId: 31337n, accessList: [], authorizationList: null,
+      signature: Signature.from({ r: `0x${"01".repeat(32)}`, s: `0x${"02".repeat(32)}`, v: 27 }),
+    };
+    replacement = new TransactionResponse({
+      ...fields, hash: replacementHash, blockNumber: 2,
+      ...(outcome === "cancelled" ? { to: sender, data: "0x" } : {}),
+    }, provider);
+    blockNumber = 2;
+    return new TransactionResponse(fields, provider).replaceableTransaction(1);
+  });
+  const factory = new Contract(
+    mocks.factoryAddress,
+    ["function createPool(address) returns (address)"],
+    { provider, sendTransaction },
+  );
+  mocks.wallet.signer = { provider, getAddress: async () => sender };
+  mocks.createPool.mockImplementation((address: string) => factory.createPool(address));
+  return { rpc, sendTransaction, replacementHash };
+}
+
 describe("InheritancePage private pool entry", () => {
   beforeEach(() => {
     mocks.language = "";
@@ -233,7 +295,10 @@ describe("InheritancePage private pool entry", () => {
     mocks.config.rpcUrl = "http://127.0.0.1:8545";
     mocks.config.contractAddress = "0x0000000000000000000000000000000000000002";
     mocks.wallet.signer = {
-      provider: { getNetwork: async () => ({ chainId: 31337n }) },
+      provider: {
+        getNetwork: async () => ({ chainId: 31337n }),
+        getBlockNumber: async () => 20,
+      },
       getAddress: async () => mocks.wallet.address,
     };
     mocks.factoryAddress = "0x0000000000000000000000000000000000000007";
@@ -269,7 +334,7 @@ describe("InheritancePage private pool entry", () => {
       });
     mocks.createPool
       .mockReset()
-      .mockResolvedValue({ hash: "0x1234", wait: async () => ({ status: 1 }) });
+      .mockResolvedValue(poolCreationTransaction(async () => ({ status: 1 })));
     mocks.poolAddress = "0x0000000000000000000000000000000000000004";
     mocks.poolIndex = mocks.familyIndex;
     mocks.poolToken = mocks.config.tokenAddress;
@@ -639,13 +704,10 @@ describe("InheritancePage private pool entry", () => {
 
   it("creates a missing ERC-20 pool and reloads its canonical factory registration after confirmation", async () => {
     mocks.poolAddress = "";
-    mocks.createPool.mockResolvedValue({
-      hash: "0x1234",
-      wait: async () => {
-        mocks.poolAddress = "0x0000000000000000000000000000000000000020";
-        return { status: 1 };
-      },
-    });
+    mocks.createPool.mockResolvedValue(poolCreationTransaction(async () => {
+      mocks.poolAddress = "0x0000000000000000000000000000000000000020";
+      return { status: 1 };
+    }));
     render(<InheritancePage />);
     fireEvent.click(await screen.findByRole("button", { name: "shielded.assets.create" }));
     await screen.findByTestId("shielded-panel");
@@ -654,24 +716,16 @@ describe("InheritancePage private pool entry", () => {
     expect(screen.getByTestId("shielded-pool").textContent).toBe(mocks.poolAddress);
   });
 
-  it("opens the canonical pool after its creation transaction is repriced", async () => {
+  it("detects a repriced ethers contract transaction and opens its canonical pool", async () => {
     mocks.poolAddress = "";
-    mocks.createPool.mockResolvedValue({
-      hash: "0x1234",
-      wait: async () => {
-        mocks.poolAddress = "0x0000000000000000000000000000000000000020";
-        throw Object.assign(new Error("Transaction repriced"), {
-          code: "TRANSACTION_REPLACED",
-          cancelled: false,
-          reason: "repriced",
-          replacement: { hash: "0x5678" },
-          receipt: { status: 1 },
-        });
-      },
-    });
+    const { rpc, sendTransaction } = replacedPoolCreation("repriced");
     render(<InheritancePage />);
     fireEvent.click(await screen.findByRole("button", { name: "shielded.assets.create" }));
     await screen.findByTestId("shielded-panel");
+    // The anchor was read before sending, so even an immediately mined replacement is found.
+    expect(rpc.getBlockNumber.mock.invocationCallOrder[0]).toBeLessThan(sendTransaction.mock.invocationCallOrder[0]);
+    expect(rpc.getBlock).toHaveBeenCalledWith(1, true);
+    expect(rpc.getBlock).toHaveBeenCalledWith(2, true);
     expect(mocks.resolveShieldedAssetPool).toHaveBeenCalledTimes(2);
     expect(screen.getByTestId("shielded-pool").textContent).toBe(mocks.poolAddress);
     expect(screen.queryByRole("alert")).toBeNull();
@@ -679,22 +733,11 @@ describe("InheritancePage private pool entry", () => {
 
   it("reports the replacement hash when a repriced pool creation fails", async () => {
     mocks.poolAddress = "";
-    mocks.createPool.mockResolvedValue({
-      hash: "0x1234",
-      wait: async () => {
-        throw Object.assign(new Error("Transaction repriced"), {
-          code: "TRANSACTION_REPLACED",
-          cancelled: false,
-          reason: "repriced",
-          replacement: { hash: "0x5678" },
-          receipt: { status: 0 },
-        });
-      },
-    });
+    const { replacementHash } = replacedPoolCreation("failed");
     render(<InheritancePage />);
     fireEvent.click(await screen.findByRole("button", { name: "shielded.assets.create" }));
     await waitFor(() =>
-      expect(screen.getByRole("alert").textContent).toBe("shielded.transactionFailed:0x5678"),
+      expect(screen.getByRole("alert").textContent).toBe(`shielded.transactionFailed:${replacementHash}`),
     );
     expect(screen.queryByTestId("shielded-panel")).toBeNull();
     expect(mocks.resolveShieldedAssetPool).toHaveBeenCalledOnce();
@@ -703,22 +746,11 @@ describe("InheritancePage private pool entry", () => {
 
   it("keeps the missing pool available for retry after cancelling its transaction", async () => {
     mocks.poolAddress = "";
-    mocks.createPool.mockResolvedValue({
-      hash: "0x1234",
-      wait: async () => {
-        throw Object.assign(new Error("Pool creation cancelled"), {
-          code: "TRANSACTION_REPLACED",
-          cancelled: true,
-          reason: "cancelled",
-          replacement: { hash: "0x5678" },
-          receipt: { status: 1 },
-        });
-      },
-    });
+    replacedPoolCreation("cancelled");
     render(<InheritancePage />);
     fireEvent.click(await screen.findByRole("button", { name: "shielded.assets.create" }));
     await waitFor(() =>
-      expect(screen.getByRole("alert").textContent).toBe("Pool creation cancelled"),
+      expect(screen.getByRole("alert").textContent).toContain("transaction was replaced"),
     );
     expect(screen.queryByTestId("shielded-panel")).toBeNull();
     expect(mocks.resolveShieldedAssetPool).toHaveBeenCalledOnce();
@@ -744,7 +776,7 @@ describe("InheritancePage private pool entry", () => {
       const network = deferred<{ chainId: bigint }>();
       const getNetwork = vi.fn(() => network.promise);
       mocks.wallet.signer = {
-        provider: { getNetwork },
+        provider: { getNetwork, getBlockNumber: async () => 20 },
         getAddress: async () => mocks.wallet.address,
       };
       const { rerender, unmount } = render(<InheritancePage />);
@@ -782,7 +814,7 @@ describe("InheritancePage private pool entry", () => {
     async (status) => {
       mocks.poolAddress = "";
       const confirmation = deferred<{ status: number }>();
-      mocks.createPool.mockResolvedValue({ hash: "0x1234", wait: () => confirmation.promise });
+      mocks.createPool.mockResolvedValue(poolCreationTransaction(() => confirmation.promise));
       const { rerender } = render(<InheritancePage />);
       fireEvent.click(await screen.findByRole("button", { name: "shielded.assets.create" }));
       await waitFor(() => expect(mocks.createPool).toHaveBeenCalledOnce());

@@ -46,6 +46,7 @@ export type ShieldedWorkerContext = {
 };
 export type ShieldedNoteSummary = {
   commitment: string;
+  /** Canonical wallet marker for UI selection; a VALUE note's actual owner is nonce-diversified. */
   ownerCommitment: string;
   slot: ShieldedKeySlot;
   kind: "value" | "budget";

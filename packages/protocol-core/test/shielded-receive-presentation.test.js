@@ -57,7 +57,7 @@ test("presentation authenticates an operation without publishing its reusable cr
   assert.equal(result.deadline, result.publicSignals[9]);
   assert.equal(result.publicSignals[10], computeShieldedReceiveCredentialBinding(request));
   assert.equal(result.request.kind, "receive");
-  assert.equal(result.request.credentialPublicSignals.length, 11);
+  assert.equal(result.request.credentialPublicSignals.length, 8);
   assert.equal(result.publicSignals.includes(credential.authorizationAlias), false);
   assert.equal(result.publicSignals.includes(credential.ownerCommitment), false);
   assert.equal(result.publicSignals.includes(credential.expiresAt), false);

@@ -7,5 +7,5 @@ include "common/shielded_receive_credential_common.circom";
 // credential fields private inside the operation proof.
 component main {
     public [authorizationCounter, expiresAt, identityCommitment, ownerCommitment, viewKeyLo, viewKeyHi,
-        keyMode, identitySuiteId, independentKeySuiteId, independentKeyDerivationVersion, receiveCodeVersion]
-} = ShieldedReceiveCredential();
+        keyMode, receiveCodeVersion]
+} = ShieldedReceiveCredential(2);

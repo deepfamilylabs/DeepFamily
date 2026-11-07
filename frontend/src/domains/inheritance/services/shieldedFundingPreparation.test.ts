@@ -11,6 +11,7 @@ import {
   computeLineageParentsDigest,
   computeLineageTrustedLeaf,
   computeShieldedReceiveCredentialBinding,
+  computeShieldedValueOwnerCommitment,
   emptyShieldedReceiveAuthorizations,
   createLineageTree,
   decodeShieldedNotePayload,
@@ -624,6 +625,12 @@ describe("local unified funding preparation", () => {
     expect(prepared.witness.oldBudgetSiblings).toEqual(Array(32).fill("0"));
     expect(prepared.witness).not.toHaveProperty("policyNonce");
     const change = await open(prepared.outputs[1].ciphertext, donorSecret);
+    expect(prepared.outputs[1].note.ownerCommitment).toBe(
+      computeShieldedValueOwnerCommitment(
+        fixture.common.keyMaterial.ownerSecret,
+        prepared.outputs[1].note.nonce,
+      ),
+    );
     expect(change.kind === "value" && change.fundingMemo?.allocationKey).toBe(
       fixture.policy.allocationKey,
     );
@@ -703,6 +710,15 @@ describe("local unified funding preparation", () => {
     expect(additionalFunding.witness.fundMode).toBe("1");
     expect(additionalFunding.witness.budgetPeriods).toBe("3");
     expect(additionalFunding.witness.heirIdentityCommitment).toBe(String(heirIdentity));
+    expect(additionalFunding.outputs[1].note.ownerCommitment).not.toBe(
+      initialFunding.outputs[1].note.ownerCommitment,
+    );
+    expect(additionalFunding.outputs[1].note.ownerCommitment).toBe(
+      computeShieldedValueOwnerCommitment(
+        fixture.common.keyMaterial.ownerSecret,
+        additionalFunding.outputs[1].note.nonce,
+      ),
+    );
     expect(await open(additionalFunding.outputs[0].ciphertext, heirSecret)).toMatchObject({
       kind: "budget",
       remaining: 30n,

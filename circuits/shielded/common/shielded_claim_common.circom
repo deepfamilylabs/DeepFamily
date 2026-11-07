@@ -364,9 +364,13 @@ template ShieldedClaim(LINEAGE_DEPTH) {
     nextBudget.ciphertextHash <== ciphertextHashes[0];
     nextBudget.commitment === outputCommitments[0];
 
+    component payoutOwner = Poseidon(3);
+    payoutOwner.inputs[0] <== 1013;
+    payoutOwner.inputs[1] <== ownerSecret;
+    payoutOwner.inputs[2] <== payoutNonce;
     component payoutNote = Poseidon(5);
     payoutNote.inputs[0] <== valueTag.tag;
-    payoutNote.inputs[1] <== ownerCommitment.out;
+    payoutNote.inputs[1] <== payoutOwner.out;
     payoutNote.inputs[2] <== payout;
     payoutNote.inputs[3] <== payoutNonce;
     payoutNote.inputs[4] <== ciphertextHashes[1];

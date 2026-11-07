@@ -13,6 +13,7 @@ import {
   computeShieldedDummyPeriodNullifier,
   computeShieldedPeriodNullifier,
   computeShieldedSpendNullifier,
+  computeShieldedValueOwnerCommitment,
   computeShieldedValueNoteCommitment,
   decryptShieldedNote,
   deriveShieldedViewPublicKey,
@@ -307,10 +308,11 @@ export async function prepareShieldedClaim(
     remaining: batch.remaining,
     nonce: generateShieldedRandomField(),
   };
+  const payoutNonce = generateShieldedRandomField();
   const payoutOutput: ShieldedValueNotePayload = {
-    ownerCommitment: keys.ownerCommitment,
+    ownerCommitment: computeShieldedValueOwnerCommitment(keys.ownerSecret, payoutNonce),
     amount: batch.amount,
-    nonce: generateShieldedRandomField(),
+    nonce: payoutNonce,
   };
   const outputs = (await Promise.all([
     encryptOwnOutput(

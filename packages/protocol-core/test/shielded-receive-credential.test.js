@@ -6,8 +6,10 @@ import {
   buildShieldedReceiveCredentialPublicSignals,
   computeShieldedAuthorizationAlias,
   computeShieldedReceiveCredentialFingerprint,
+  computeShieldedValueOwnerCommitment,
   decodeShieldedReceiveCredential,
   deriveShieldedReceivePublicKey,
+  deriveShieldedReceiveOwnerNonce,
   encodeShieldedReceiveCredential,
 } from "../index.js";
 
@@ -32,7 +34,10 @@ const base = {
   authorizationAlias: computeShieldedAuthorizationAlias(identity),
   authorizationCounter: 0n,
   expiresAt: 1900000000n,
-  ownerCommitment: 23n,
+  ownerCommitment: computeShieldedValueOwnerCommitment(
+    13n,
+    deriveShieldedReceiveOwnerNonce(receiveKey),
+  ),
   viewingKey: receiveKey,
   proof,
 };
@@ -41,7 +46,7 @@ test("receive transport carries canonical R, counter and expiry without identity
   const encoded = encodeShieldedReceiveCredential(base);
   const decoded = decodeShieldedReceiveCredential(encoded);
   assert.match(encoded, /^dfrecv1/u);
-  assert.equal(bech32m.fromWords(bech32m.decode(encoded, false).words).length, 405);
+  assert.equal(bech32m.fromWords(bech32m.decode(encoded, false).words).length, 402);
   assert.equal(decoded.purpose, "receive");
   assert.equal(SHIELDED_RECEIVE_CREDENTIAL_VERSION, 1);
   assert.equal(decoded.receiveCodeVersion, 1);
@@ -49,7 +54,13 @@ test("receive transport carries canonical R, counter and expiry without identity
   assert.equal(bech32m.fromWords(bech32m.decode(encoded, false).words)[0], 1);
   assert.equal("identityCommitment" in decoded, false);
   assert.deepEqual(decoded.publicSignals, buildShieldedReceiveCredentialPublicSignals(base));
-  assert.equal(decoded.publicSignals.length, 11);
+  assert.equal(decoded.publicSignals.length, 8);
+  for (const field of [
+    "identitySuiteId",
+    "independentKeySuiteId",
+    "independentKeyDerivationVersion",
+  ])
+    assert.equal(Object.hasOwn(decoded, field), false);
   assert.equal(decoded.authorizationAlias, base.authorizationAlias);
   assert.equal(decoded.authorizationCounter, 0n);
   assert.equal(decoded.expiresAt, base.expiresAt);
@@ -72,13 +83,13 @@ test("Fund purpose authenticates I and shares the same R across key modes", () =
     const decoded = decodeShieldedReceiveCredential(code);
     assert.match(code, /^dffund1/u);
     assert.equal(decoded.purpose, "fund");
-    assert.equal(decoded.publicSignals.length, 12);
+    assert.equal(decoded.publicSignals.length, 9);
     assert.equal(decoded.publicSignals[3], 19n);
     assert.equal(decoded.authorizationAlias, base.authorizationAlias);
     assert.equal(decoded.identityCommitment, 19n);
     assert.deepEqual(decoded.publicSignals, buildShieldedReceiveCredentialPublicSignals(input));
     const packet = bech32m.fromWords(bech32m.decode(code, false).words);
-    const stripped = new Uint8Array([...packet.slice(0, 53), ...packet.slice(85)]);
+    const stripped = new Uint8Array([...packet.slice(0, 50), ...packet.slice(82)]);
     // Structural stripping cannot preserve the original verified public vector.
     assert.throws(() =>
       decodeShieldedReceiveCredential(bech32m.encode("dfrecv", bech32m.toWords(stripped), false)),
@@ -145,18 +156,25 @@ test("credential parsing accepts only the fresh-v1 format and canonical fields",
   assert.throws(() => decodeShieldedReceiveCredential(null));
 });
 
-test("receive addresses bind their diversifier and point without changing owner or alias", async () => {
+test("receive addresses diversify their owner commitment while retaining the identity alias", async () => {
   const changed = await deriveShieldedReceivePublicKey(
     new Uint8Array(32).fill(17),
     new Uint8Array(32).fill(3),
   );
   const first = decodeShieldedReceiveCredential(encodeShieldedReceiveCredential(base));
   const second = decodeShieldedReceiveCredential(
-    encodeShieldedReceiveCredential({ ...base, viewingKey: changed }),
+    encodeShieldedReceiveCredential({
+      ...base,
+      viewingKey: changed,
+      ownerCommitment: computeShieldedValueOwnerCommitment(
+        13n,
+        deriveShieldedReceiveOwnerNonce(changed),
+      ),
+    }),
   );
   assert.notDeepEqual(first.viewingKey, second.viewingKey);
   assert.equal(first.authorizationAlias, second.authorizationAlias);
-  assert.equal(first.ownerCommitment, second.ownerCommitment);
+  assert.notEqual(first.ownerCommitment, second.ownerCommitment);
   assert.notDeepEqual(first.publicSignals.slice(4, 6), second.publicSignals.slice(4, 6));
   const changedDiversifier = receiveKey.slice();
   changedDiversifier[0] ^= 1;

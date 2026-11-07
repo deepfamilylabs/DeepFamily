@@ -26,9 +26,6 @@ export type VerifiedShieldedRecipient = {
   readonly viewingKey: string;
   readonly personHash?: string;
   readonly keyMode: 0 | 1;
-  readonly identitySuiteId: number;
-  readonly independentKeySuiteId: number;
-  readonly independentKeyDerivationVersion: number;
   readonly fingerprint: string;
   readonly [verifiedRecipient]: true;
 };
@@ -54,10 +51,12 @@ export async function verifyShieldedReceiveCode(code: string): Promise<VerifiedS
     { timeoutMs: RECEIVE_CODE_TIMEOUT_MS },
   );
   if (!result.ok) throw new ShieldedReceiveCodeError(result.reason);
-  const identityCommitment = result.identityCommitment === undefined ? undefined : getBigInt(result.identityCommitment);
+  const identityCommitment =
+    result.identityCommitment === undefined ? undefined : getBigInt(result.identityCommitment);
   if (
-    identityCommitment !== undefined && wrapIdentityCommitmentAsPersonHash(identityCommitment).toLowerCase() !==
-    result.personHash?.toLowerCase()
+    identityCommitment !== undefined &&
+    wrapIdentityCommitmentAsPersonHash(identityCommitment).toLowerCase() !==
+      result.personHash?.toLowerCase()
   ) {
     throw new ShieldedReceiveCodeError("invalid");
   }
@@ -71,9 +70,6 @@ export async function verifyShieldedReceiveCode(code: string): Promise<VerifiedS
     viewingKey: result.viewingKey,
     personHash: result.personHash,
     keyMode: result.keyMode,
-    identitySuiteId: result.identitySuiteId,
-    independentKeySuiteId: result.independentKeySuiteId,
-    independentKeyDerivationVersion: result.independentKeyDerivationVersion,
     fingerprint: result.fingerprint,
   } as VerifiedShieldedRecipient;
 }
@@ -87,7 +83,8 @@ export function peekShieldedReceiveCodePersonHash(code: string): string | null {
   try {
     const decoded = decodeShieldedReceiveCredential(code);
     return decoded.purpose === "fund" && decoded.identityCommitment !== undefined
-      ? wrapIdentityCommitmentAsPersonHash(decoded.identityCommitment) : null;
+      ? wrapIdentityCommitmentAsPersonHash(decoded.identityCommitment)
+      : null;
   } catch {
     return null;
   }
@@ -98,7 +95,12 @@ export async function createShieldedReceiveCodeForRecipient(credentials: {
   identity: IdentityFields;
   rawPassphrase: string;
   purpose?: "receive" | "fund";
-  context: { rpcUrl: string; chainId: string; factoryAddress: string; stateReadMode?: ShieldedStateReadMode };
+  context: {
+    rpcUrl: string;
+    chainId: string;
+    factoryAddress: string;
+    stateReadMode?: ShieldedStateReadMode;
+  };
   expiresAt: string;
 }): Promise<string> {
   const passphraseError = getFundingPassphraseError(credentials.rawPassphrase);

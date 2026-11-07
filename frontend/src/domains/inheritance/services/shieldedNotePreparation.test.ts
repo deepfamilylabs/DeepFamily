@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   computeShieldedCiphertextHashField,
+  computeShieldedValueOwnerCommitment,
   decryptShieldedNote,
   deriveShieldedHeirKeyMaterial,
   verifyShieldedNotePayload,
@@ -11,7 +12,11 @@ import { prepareShieldedShield } from "./shieldedNotePreparation";
 const chainId = 1030n;
 const poolAddress = "0x1111111111111111111111111111111111111111";
 const derivedSecretField = 7654321n;
-const identity = { chainId, poolAddress, keyMaterial: deriveShieldedHeirKeyMaterial(derivedSecretField) };
+const identity = {
+  chainId,
+  poolAddress,
+  keyMaterial: deriveShieldedHeirKeyMaterial(derivedSecretField),
+};
 
 describe("local shield preparation", () => {
   it("rejects the removed derived-secret-only input shape", async () => {
@@ -32,8 +37,14 @@ describe("local shield preparation", () => {
     expect(prepared.witness.outputAmounts).toEqual(["100", "0"]);
     expect(prepared.data.inputRoots).toEqual([0n, 0n]);
     expect(prepared.outputs[0].note.nonce).not.toBe(prepared.outputs[1].note.nonce);
+    expect(prepared.outputs[0].note.ownerCommitment).not.toBe(
+      prepared.outputs[1].note.ownerCommitment,
+    );
     expect(prepared.outputs[0].commitment).not.toBe(prepared.outputs[1].commitment);
     for (const output of prepared.outputs) {
+      expect(output.note.ownerCommitment).toBe(
+        computeShieldedValueOwnerCommitment(identity.keyMaterial.ownerSecret, output.note.nonce),
+      );
       expect(output.ciphertext).toHaveLength(512);
       expect(output.ciphertextHashField).toBe(
         computeShieldedCiphertextHashField(output.ciphertext),
@@ -66,9 +77,9 @@ describe("local shield preparation", () => {
     { ...identity.keyMaterial, ownerCommitment: identity.keyMaterial.ownerCommitment + 1n },
     { ...identity.keyMaterial, hpkeIkm: "0x1234" },
   ])("rejects inconsistent explicit independent keys before encrypting", async (keyMaterial) => {
-    await expect(
-      prepareShieldedShield({ ...identity, keyMaterial, amount: 100n }),
-    ).rejects.toThrow("key material is inconsistent");
+    await expect(prepareShieldedShield({ ...identity, keyMaterial, amount: 100n })).rejects.toThrow(
+      "key material is inconsistent",
+    );
   });
 
   it("normalizes explicit numeric key fields", async () => {
@@ -81,7 +92,12 @@ describe("local shield preparation", () => {
       },
       amount: 100n,
     });
-    expect(prepared.outputs[0].note.ownerCommitment).toBe(identity.keyMaterial.ownerCommitment);
+    expect(prepared.outputs[0].note.ownerCommitment).toBe(
+      computeShieldedValueOwnerCommitment(
+        identity.keyMaterial.ownerSecret,
+        prepared.outputs[0].note.nonce,
+      ),
+    );
     expect(prepared.witness.ownerSecret).toBe(identity.keyMaterial.ownerSecret.toString());
   });
 

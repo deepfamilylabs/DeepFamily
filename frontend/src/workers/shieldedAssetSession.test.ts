@@ -11,6 +11,8 @@ import {
   encodeShieldedIndependentKey,
   encodeShieldedIndependentKeyMnemonic,
   computeShieldedSpendNullifier,
+  computeShieldedValueOwnerCommitment,
+  deriveShieldedReceiveOwnerNonce,
   computeShieldedCiphertextHashField,
   computeShieldedNoteCommitmentFromPayload,
   createLineageTree,
@@ -423,14 +425,14 @@ function assertPublic(value: unknown) {
 }
 
 function recoveryHistory(
-  ownerCommitment: bigint,
+  keys: { ownerCommitment: bigint; ownerSecret: bigint },
   options: { amount?: bigint; valueOwner?: bigint; budgetOnly?: boolean } = {},
 ) {
   const value = {
     commitment: 71n,
     note: {
       kind: "value",
-      ownerCommitment: options.valueOwner ?? ownerCommitment,
+      ownerCommitment: options.valueOwner ?? computeShieldedValueOwnerCommitment(keys.ownerSecret, 97n),
       amount: options.amount ?? 100n,
       nonce: 97n,
     },
@@ -441,7 +443,7 @@ function recoveryHistory(
       kind: "budget",
       binding: "owner",
       keyMode: 1n,
-      heirOwnerCommitment: ownerCommitment,
+      heirOwnerCommitment: keys.ownerCommitment,
       heirIdentityCommitment: 31n,
       remaining: 1200n,
       amountPerPeriod: 100n,
@@ -459,7 +461,7 @@ function recoveryHistory(
     blockHash: `0x${"aa".repeat(32)}`,
     shards: new Map(),
     spentNullifiers: new Set(),
-    walletOwnerCommitment: ownerCommitment,
+    walletOwnerCommitment: keys.ownerCommitment,
     walletKeyMode: 1,
     fundingTemplates: new Map(),
     shieldedPolicies: new Map(),
@@ -510,7 +512,7 @@ async function authenticatedBudgetHistory(
   const unrelatedViewingKey = await deriveShieldedViewPublicKey(unrelatedKeys.hpkeIkm);
   async function unrelatedOutput(nonce: bigint) {
     const payload = encodeShieldedValueNotePayload(
-      { ownerCommitment: unrelatedKeys.ownerCommitment, amount: 0n, nonce },
+      { ownerCommitment: computeShieldedValueOwnerCommitment(unrelatedKeys.ownerSecret, nonce), amount: 0n, nonce },
       scope,
     );
     const ciphertext = await encryptShieldedNote({
@@ -650,7 +652,7 @@ describe("private letter recovery with original keys", () => {
 
   const originalAlias = computeShieldedAuthorizationAlias({ derivedSecretField: 13n, identityCommitment: 31n });
   async function archivedLetter(
-    keys: { hpkeIkm: string; ownerCommitment: bigint },
+    keys: { hpkeIkm: string; ownerSecret: bigint },
     keyMode: 0 | 1,
     messageId: string,
     options: {
@@ -662,7 +664,8 @@ describe("private letter recovery with original keys", () => {
     const envelope = createShieldedLetterEnvelope({ body: "Original private letter", salt: 17n, authorizationAlias });
     const viewingKey = await deriveShieldedReceivePublicKey(keys.hpkeIkm);
     const ciphertext = await encryptShieldedLetter({ ...letterContext, messageId, recipientPublicKey: viewingKey, envelope });
-    const credential = { purpose: "receive" as const, authorizationAlias, ownerCommitment: keys.ownerCommitment,
+    const ownerNonce = deriveShieldedReceiveOwnerNonce(viewingKey);
+    const credential = { purpose: "receive" as const, authorizationAlias, ownerCommitment: computeShieldedValueOwnerCommitment(keys.ownerSecret, ownerNonce),
       viewingKey, keyMode, authorizationCounter: 0n, expiresAt: 1n, ...options.binding };
     const recipientBinding = String(computeShieldedReceiveCredentialBinding({ credential, salt: envelope.salt }));
     return { messageId, ciphertext, ciphertextHash: computeShieldedLetterCiphertextHash(ciphertext), recipientBinding,
@@ -1067,7 +1070,7 @@ describe("independent-key credentials and async installation boundary", () => {
     const rejected = expect(late).rejects.toThrow("replaced or locked");
     await vi.waitFor(() => expect(finish).toBeTypeOf("function"));
     const current = await session.call("unlockIdentity", identityParams());
-    finish(recoveryHistory(keys.ownerCommitment));
+    finish(recoveryHistory(keys));
     await rejected;
     expect(session.state()).toEqual(current);
     const internals = session as unknown as { wallets: Map<string, unknown>; summary: unknown };
@@ -1376,7 +1379,7 @@ describe("ephemeral asset Worker independent key lifecycle", () => {
     const emptyRecovery = mocks.recover.getMockImplementation()!;
     mocks.recover.mockImplementation(async (pool, input, options) =>
       input.keyMaterial.keyMode === 1
-        ? recoveryHistory(keys.ownerCommitment)
+        ? recoveryHistory(keys)
         : emptyRecovery(pool, input, options),
     );
     await session.call(
@@ -1869,7 +1872,7 @@ describe("ephemeral asset Worker independent key lifecycle", () => {
         backupRequired: true,
         recoveryVerified: false,
       });
-      mocks.recover.mockResolvedValue(recoveryHistory(keys.ownerCommitment));
+      mocks.recover.mockResolvedValue(recoveryHistory(keys));
       await signatureSession.call("recover", { context });
       expect(signatureSession.state().independentKey).toMatchObject({
         backupRequired: true,
@@ -2033,7 +2036,7 @@ describe("ephemeral asset Worker independent key lifecycle", () => {
             commitment: 71n,
             note: {
               kind: "value",
-              ownerCommitment: input.keyMaterial.ownerCommitment,
+              ownerCommitment: computeShieldedValueOwnerCommitment(input.keyMaterial.ownerSecret, 97n),
               amount: 100n,
               nonce: 97n,
             },
@@ -2107,7 +2110,7 @@ describe("ephemeral asset Worker independent key lifecycle", () => {
             commitment: 71n,
             note: {
               kind: "value",
-              ownerCommitment: input.keyMaterial.ownerCommitment,
+              ownerCommitment: computeShieldedValueOwnerCommitment(input.keyMaterial.ownerSecret, 97n),
               amount: 100n,
               nonce: 97n,
             },
@@ -2263,7 +2266,7 @@ describe("ephemeral asset Worker independent key lifecycle", () => {
           amount: "100",
         }),
       ).rejects.toThrow("Verify recovery");
-      mocks.recover.mockResolvedValue(recoveryHistory(keys.ownerCommitment));
+      mocks.recover.mockResolvedValue(recoveryHistory(keys));
       const confirmed = await session.call("recover", { context });
       expect(confirmed.sessionState?.independentKey).toMatchObject({
         recoveryVerified: true,
@@ -2339,7 +2342,7 @@ describe("ephemeral asset Worker independent key lifecycle", () => {
       independentKeyRoot: generated.independentKeyRoot,
       independentKeyIdentitySecret,
     });
-    const spent = recoveryHistory(keys.ownerCommitment);
+    const spent = recoveryHistory(keys);
     spent.spentNullifiers.add(
       computeShieldedSpendNullifier(
         { ownerSecret: keys.ownerSecret, noteCommitment: 71n },
@@ -2347,9 +2350,9 @@ describe("ephemeral asset Worker independent key lifecycle", () => {
       ),
     );
     for (const insufficient of [
-      recoveryHistory(keys.ownerCommitment, { amount: 0n }),
-      recoveryHistory(keys.ownerCommitment, { budgetOnly: true }),
-      recoveryHistory(keys.ownerCommitment, { valueOwner: keys.ownerCommitment + 1n }),
+      recoveryHistory(keys, { amount: 0n }),
+      recoveryHistory(keys, { budgetOnly: true }),
+      recoveryHistory(keys, { valueOwner: keys.ownerCommitment + 1n }),
       spent,
     ]) {
       mocks.recover.mockResolvedValue(insufficient);
@@ -2373,7 +2376,7 @@ describe("ephemeral asset Worker independent key lifecycle", () => {
           71n,
           {
             commitment: 71n,
-            note: { kind: "value", ownerCommitment: keys.ownerCommitment, amount: 100n },
+            note: { kind: "value", ownerCommitment: computeShieldedValueOwnerCommitment(keys.ownerSecret, 97n), amount: 100n, nonce: 97n },
           },
         ],
       ]),
@@ -2428,8 +2431,8 @@ describe("ephemeral asset Worker independent key lifecycle", () => {
       mocks.discoverPools.mockResolvedValue(discovered());
       mocks.recover.mockImplementation(async (pool) =>
         pool === otherPool
-          ? recoveryHistory(keys.ownerCommitment)
-          : recoveryHistory(keys.ownerCommitment, { amount: 0n }),
+          ? recoveryHistory(keys)
+          : recoveryHistory(keys, { amount: 0n }),
       );
       const result = await session.call("discover", { context });
       expect(result.complete).toBe(false);
@@ -2458,7 +2461,7 @@ describe("ephemeral asset Worker independent key lifecycle", () => {
           discovered(failure === "reorganized" ? `0x${"bb".repeat(32)}` : undefined),
         );
         mocks.recover.mockResolvedValue(
-          recoveryHistory(keys.ownerCommitment, failure === "zeroValue" ? { amount: 0n } : {}),
+          recoveryHistory(keys, failure === "zeroValue" ? { amount: 0n } : {}),
         );
         const discovery = session.call("discover", { context });
         if (failure === "reorganized") await expect(discovery).rejects.toThrow("reorganized");

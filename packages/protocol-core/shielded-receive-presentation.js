@@ -211,8 +211,8 @@ export function prepareShieldedReceivePresentation(input) {
  */
 export function prepareReceivePresentationWitness(request) {
   const kinds = {
-    receive: ["receivePresentation", 11],
-    fund: ["fundReceivePresentation", 12],
+    receive: ["receivePresentation", 8],
+    fund: ["fundReceivePresentation", 9],
   };
   check(request && Object.hasOwn(kinds, request.kind), "Unsupported receive presentation kind");
   const [circuit, count] = kinds[request.kind];

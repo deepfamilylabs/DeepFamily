@@ -40,9 +40,9 @@ export function buildShieldedFundingFixtures({
   const { viewKeyLo, viewKeyHi } = shieldedFixtureViewLimbs(viewingKey, budgetKind);
   const oldView = shieldedFixtureViewLimbs(oldViewingKey, oldBudgetKind);
   const donorOwnerSecret = 424242n;
-  const donorOwnerCommitment = poseidon2([1013n, donorOwnerSecret]);
   donorAmount = BigInt(donorAmount);
   const donorNonce = 101n;
+  const donorOwnerCommitment = poseidon3([1013n, donorOwnerSecret, donorNonce]);
   const donorCiphertextHash = 102n;
   const donorNote = poseidon5([
     scoped(1014n),
@@ -108,7 +108,7 @@ export function buildShieldedFundingFixtures({
   const changeCiphertextHash = 110n;
   const outputChange = poseidon5([
     scoped(1014n),
-    donorOwnerCommitment,
+    poseidon3([1013n, donorOwnerSecret, changeNonce]),
     donorAmount - fundedAmount,
     changeNonce,
     changeCiphertextHash,

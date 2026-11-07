@@ -51,7 +51,7 @@ const readReceiveLinkKeys = (required: boolean) => {
   }
   for (const kind of ['receive', 'fund']) {
     const key = keys[kind]
-    const commonSignals = kind === 'fund' ? 12 : 11
+    const commonSignals = kind === 'fund' ? 9 : 8
     if (key?.verificationKey?.protocol !== 'groth16' ||
       key.verificationKey.nPublic !== commonSignals + 11 ||
       !Array.isArray(key.deltaG1) || key.deltaG1.length !== 3 ||

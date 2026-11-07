@@ -7,9 +7,8 @@ import test from "node:test";
 import { circomIncludeArguments } from "../../scripts/lib/circomToolchain.mjs";
 import { shieldedCircuitSource } from "../../scripts/lib/zkCircuitSelection.mjs";
 import { WitnessCalculatorBuilder } from "circom_runtime";
-import { poseidon2 } from "poseidon-lite";
+import { poseidon2, poseidon3 } from "poseidon-lite";
 import {
-  computeShieldedOwnerCommitment,
   computeShieldedSpendNullifier,
   computeShieldedValueNoteCommitment,
   computeShieldedDummyInputNullifierForSlot,
@@ -19,10 +18,10 @@ import { assertConstraintViolation } from "./constraint_assertions.mjs";
 const root = path.resolve(import.meta.dirname, "../..");
 const scope = { chainId: 31337n, poolAddress: "0x0000000000000000000000000000000000001234" };
 const secret = 5001n;
-const owner = computeShieldedOwnerCommitment(secret);
+const owner = (nonce) => poseidon3([1013n, secret, nonce]);
 const note = (amount, nonce, ciphertextHashField) =>
   computeShieldedValueNoteCommitment(
-    { ownerCommitment: owner, amount, nonce, ciphertextHashField },
+    { ownerCommitment: owner(nonce), amount, nonce, ciphertextHashField },
     scope,
   );
 function fixture(exit = false, capacity = 1, amount = 100n) {
@@ -71,7 +70,7 @@ function fixture(exit = false, capacity = 1, amount = 100n) {
         receiveKeyModes: ["0", "0"],
         receiveViewKeyLo: ["0", "0"],
         receiveViewKeyHi: ["0", "0"],
-        outputOwnerCommitments: [String(owner), String(owner)],
+        outputOwnerCommitments: [String(owner(301n)), String(owner(302n))],
         outputAmounts: amounts.map(String),
         outputNonces: ["301", "302"],
       };

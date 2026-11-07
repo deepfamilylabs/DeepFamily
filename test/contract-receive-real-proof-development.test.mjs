@@ -13,7 +13,7 @@ import {
   computeShieldedBudgetNoteCommitment,
   computeShieldedBudgetUseNullifier,
   computeShieldedEnrollmentCommitment,
-  computeShieldedOwnerCommitment,
+  computeShieldedValueOwnerCommitment,
   computeShieldedReceiveRecipientBinding,
   computeShieldedSpendNullifier,
   computeShieldedValueNoteCommitment,
@@ -27,6 +27,7 @@ import {
   deriveShieldedIndependentKeyMaterial,
   deriveShieldedViewPublicKey,
   deriveShieldedReceivePublicKey,
+  deriveShieldedReceiveOwnerNonce,
   emptyShieldedReceiveAuthorizations,
   encodeShieldedBudgetNotePayload,
   encodeShieldedValueNotePayload,
@@ -112,6 +113,11 @@ describe("Receive presentation real-proof canonical pool and letter integration"
           keys.hpkeIkm,
           RECEIVE_PROOF_DIVERSIFIER,
         );
+        const receiveNonce = deriveShieldedReceiveOwnerNonce(receiveViewingKey);
+        const receiveOwnerCommitment = computeShieldedValueOwnerCommitment(
+          keys.ownerSecret,
+          receiveNonce,
+        );
         const commonCredential = {
           authorizationAlias: BigInt(raw.credentialPublicSignals[0]),
           authorizationCounter: 0n,
@@ -123,6 +129,7 @@ describe("Receive presentation real-proof canonical pool and letter integration"
         const receive = {
           ...commonCredential,
           purpose: "receive",
+          ownerCommitment: receiveOwnerCommitment,
           viewingKey: receiveViewingKey,
           proof: raw.credentialProof,
         };
@@ -205,10 +212,11 @@ describe("Receive presentation real-proof canonical pool and letter integration"
           scope,
         );
         const donorSecret = BigInt(fixture.initial.donorOwnerSecret);
-        const donorOwner = computeShieldedOwnerCommitment(donorSecret);
-        const value = (amount, nonce, byte, ownerCommitment = donorOwner) => {
+        const value = (amount, nonce, byte) => {
+          const ownerCommitment = computeShieldedValueOwnerCommitment(donorSecret, nonce);
           const ciphertext = `0x${byte.repeat(512)}`;
           return {
+            ownerCommitment,
             amount,
             nonce,
             ciphertext,
@@ -443,7 +451,7 @@ describe("Receive presentation real-proof canonical pool and letter integration"
         const transferRoot = (await pool.noteShard(0)).root;
         const transferPath = membership(await pool.getNoteMerkleProof(0, donorLeaf));
         const externalPayload = encodeShieldedValueNotePayload(
-          { ownerCommitment: heirOwnerCommitment, amount: 100n, nonce: 201n },
+          { ownerCommitment: receiveOwnerCommitment, amount: 100n, nonce: receiveNonce },
           scope,
         );
         const externalCiphertext = hre.ethers.hexlify(
@@ -456,14 +464,14 @@ describe("Receive presentation real-proof canonical pool and letter integration"
         externalPayload.fill(0);
         const external = {
           amount: 100n,
-          nonce: 201n,
+          nonce: receiveNonce,
           ciphertext: externalCiphertext,
           ciphertextHashField: hashField(externalCiphertext),
           commitment: computeShieldedValueNoteCommitment(
             {
-              ownerCommitment: heirOwnerCommitment,
+              ownerCommitment: receiveOwnerCommitment,
               amount: 100n,
-              nonce: 201n,
+              nonce: receiveNonce,
               ciphertextHashField: hashField(externalCiphertext),
             },
             scope,
@@ -513,9 +521,12 @@ describe("Receive presentation real-proof canonical pool and letter integration"
             inputDepths: first(transferPath.depth),
             inputIndices: first(transferPath.index),
             inputSiblings: [transferPath.siblings],
-            outputOwnerCommitments: [String(keys.ownerCommitment), String(donorOwner)],
+            outputOwnerCommitments: [
+              String(receiveOwnerCommitment),
+              String(selfChange.ownerCommitment),
+            ],
             outputAmounts: ["100", String(selfChange.amount)],
-            outputNonces: ["201", "202"],
+            outputNonces: [String(receiveNonce), "202"],
             receiveAuthorizationAliases: [String(receive.authorizationAlias), "0"],
             receiveSalts: [String(transferSalt), "0"],
             receiveKeyModes: [String(keyMode), "0"],
@@ -606,7 +617,7 @@ describe("Receive presentation real-proof canonical pool and letter integration"
             expectedCiphertextHash: record.blob.payloadHash,
             expectedRecipient: {
               authorizationAlias: receive.authorizationAlias,
-              ownerCommitment: keys.ownerCommitment,
+              ownerSecret: keys.ownerSecret,
               keyMode,
               recipientBinding: record.recipientBinding,
             },
@@ -626,6 +637,10 @@ describe("Receive presentation real-proof canonical pool and letter integration"
           authorizationAlias: receive.authorizationAlias,
         });
         const otherAddress = await deriveShieldedReceivePublicKey(otherRecipient.hpkeIkm);
+        const otherReceiveOwnerCommitment = computeShieldedValueOwnerCommitment(
+          otherRecipient.ownerSecret,
+          deriveShieldedReceiveOwnerNonce(otherAddress),
+        );
         const mismatchedCiphertext = hre.ethers.hexlify(
           await encryptShieldedLetter({
             chainId,
@@ -666,11 +681,11 @@ describe("Receive presentation real-proof canonical pool and letter integration"
             ciphertext: mismatchedCiphertext,
             expectedCiphertextHash: mismatchedRecord.blob.payloadHash,
             expectedRecipient: {
-              ownerCommitment: otherRecipient.ownerCommitment,
+              ownerSecret: otherRecipient.ownerSecret,
               keyMode: 0,
               recipientBinding: computeShieldedReceiveRecipientBinding({
                 authorizationAlias: mismatchedEnvelope.authorizationAlias,
-                ownerCommitment: otherRecipient.ownerCommitment,
+                ownerCommitment: otherReceiveOwnerCommitment,
                 keyMode: 0,
                 viewingKey: otherAddress,
                 salt: mismatchedEnvelope.salt,
@@ -688,7 +703,7 @@ describe("Receive presentation real-proof canonical pool and letter integration"
             ciphertext: mismatchedCiphertext,
             expectedCiphertextHash: mismatchedRecord.blob.payloadHash,
             expectedRecipient: {
-              ownerCommitment: otherRecipient.ownerCommitment,
+              ownerSecret: otherRecipient.ownerSecret,
               keyMode: 0,
               recipientBinding: mismatchedRecord.recipientBinding,
             },
@@ -829,13 +844,10 @@ describe("Receive presentation real-proof canonical pool and letter integration"
           identityCommitment: String(fundCredential.identityCommitment),
           authorizationCounter: "1",
           expiresAt: String(receive.expiresAt),
-          ownerCommitment: String(restoredKeys[0].ownerCommitment),
+          ownerCommitment: String(receiveOwnerCommitment),
           viewKeyLo: raw.credentialPublicSignals[4],
           viewKeyHi: raw.credentialPublicSignals[5],
           keyMode: String(keyMode),
-          identitySuiteId: "1",
-          independentKeySuiteId: "1",
-          independentKeyDerivationVersion: "1",
           receiveCodeVersion: String(SHIELDED_RECEIVE_CREDENTIAL_VERSION),
           spendingSecret: String(restoredKeys[0].ownerSecret),
         });
@@ -955,7 +967,13 @@ describe("Receive presentation real-proof canonical pool and letter integration"
             );
             assert.equal(recoveredTransfer.note.kind, "value");
             assert.equal(recoveredTransfer.note.amount, 100n);
-            assert.equal(recoveredTransfer.note.ownerCommitment, heirOwnerCommitment);
+            assert.equal(
+              recoveredTransfer.note.ownerCommitment,
+              computeShieldedValueOwnerCommitment(
+                restored.ownerSecret,
+                recoveredTransfer.note.nonce,
+              ),
+            );
           } finally {
             transferPayload.fill(0);
           }
@@ -1001,7 +1019,7 @@ describe("Receive presentation real-proof canonical pool and letter integration"
                 ciphertext,
                 expectedCiphertextHash: record.blob.payloadHash,
                 expectedRecipient: {
-                  ownerCommitment: restored.ownerCommitment,
+                  ownerSecret: restored.ownerSecret,
                   keyMode,
                   recipientBinding: record.recipientBinding,
                 },
@@ -1036,7 +1054,7 @@ describe("Receive presentation real-proof canonical pool and letter integration"
                 ciphertext,
                 expectedCiphertextHash: record.blob.payloadHash,
                 expectedRecipient: {
-                  ownerCommitment: identityDerivedKeys.ownerCommitment,
+                  ownerSecret: identityDerivedKeys.ownerSecret,
                   keyMode: 0,
                   recipientBinding: record.recipientBinding,
                 },

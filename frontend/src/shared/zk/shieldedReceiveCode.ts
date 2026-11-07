@@ -4,6 +4,7 @@ import {
   buildShieldedReceiveCredentialPublicSignals,
   computeShieldedAuthorizationAlias,
   computeShieldedOwnerCommitment,
+  computeShieldedValueOwnerCommitment,
   computeShieldedReceiveCredentialFingerprint,
   canonicalizeFullName,
   computeIdentityFromDerivedSecret,
@@ -11,6 +12,7 @@ import {
   deriveIdentityMaterial,
   deriveShieldedHeirKeyMaterial,
   deriveShieldedReceivePublicKey,
+  deriveShieldedReceiveOwnerNonce,
   deriveShieldedViewPublicKey,
   encodeShieldedReceiveCredential,
   wipeBytes,
@@ -57,15 +59,14 @@ export type ShieldedReceiveCodeCheck =
       viewingKey: string;
       personHash?: string;
       keyMode: 0 | 1;
-      identitySuiteId: number;
-      independentKeySuiteId: number;
-      independentKeyDerivationVersion: number;
       fingerprint: string;
     }
   | { ok: false; reason: "malformed" | "invalid" };
 
 /** Derive the payment keys and prove that this identity chose them. */
-export async function createShieldedReceiveCode(input: ShieldedReceiveCodeIdentity): Promise<{ code: string; personHash: string; fingerprint: string }> {
+export async function createShieldedReceiveCode(
+  input: ShieldedReceiveCodeIdentity,
+): Promise<{ code: string; personHash: string; fingerprint: string }> {
   const material = computeIdentityFromDerivedSecret(input);
   const identityKeys = deriveShieldedHeirKeyMaterial(material.derivedSecretField);
   const keyMode = input.keyMode;
@@ -89,19 +90,33 @@ export async function createShieldedReceiveCode(input: ShieldedReceiveCodeIdenti
   )
     throw new Error("Identity receive mode requires canonical identity keys");
   const purpose = input.purpose ?? "receive";
-  const viewingKey = purpose === "receive"
-    ? await deriveShieldedReceivePublicKey(keys.hpkeIkm)
-    : await deriveShieldedViewPublicKey(keys.hpkeIkm);
+  let viewingKey: Uint8Array;
+  let ownerCommitment = keys.ownerCommitment;
+  if (purpose === "receive") {
+    for (;;) {
+      viewingKey = await deriveShieldedReceivePublicKey(keys.hpkeIkm);
+      let nonce: bigint;
+      try {
+        nonce = deriveShieldedReceiveOwnerNonce(viewingKey);
+      } catch (error) {
+        if ((error as { code?: string }).code === "INVALID_SHIELDED_RECEIVE_OWNER_NONCE") continue;
+        throw error;
+      }
+      ownerCommitment = computeShieldedValueOwnerCommitment(keys.ownerSecret, nonce);
+      break;
+    }
+  } else {
+    viewingKey = await deriveShieldedViewPublicKey(keys.hpkeIkm);
+  }
   const statement = {
     purpose,
     authorizationAlias: computeShieldedAuthorizationAlias(material),
     authorizationCounter: input.authorizationCounter,
     expiresAt: input.expiresAt,
     ...(purpose === "fund" ? { identityCommitment: material.identityCommitment } : {}),
-    ownerCommitment: keys.ownerCommitment,
+    ownerCommitment,
     viewingKey,
     keyMode,
-    identitySuiteId: material.identitySuiteId,
   };
   const publicSignals = buildShieldedReceiveCredentialPublicSignals(statement);
   const { proof } = await generateShieldedProof({
@@ -110,13 +125,10 @@ export async function createShieldedReceiveCode(input: ShieldedReceiveCodeIdenti
       identityCommitment: String(material.identityCommitment),
       authorizationCounter: String(input.authorizationCounter),
       expiresAt: String(input.expiresAt),
-      ownerCommitment: String(keys.ownerCommitment),
+      ownerCommitment: String(ownerCommitment),
       viewKeyLo: String(publicSignals[purpose === "fund" ? 5 : 4]),
       viewKeyHi: String(publicSignals[purpose === "fund" ? 6 : 5]),
       keyMode,
-      identitySuiteId: material.identitySuiteId,
-      independentKeySuiteId: 1,
-      independentKeyDerivationVersion: 1,
       receiveCodeVersion: SHIELDED_RECEIVE_CREDENTIAL_VERSION,
       spendingSecret: keys.ownerSecret.toString(),
       nameField: material.nameField.toString(),
@@ -257,9 +269,6 @@ export async function verifyShieldedReceiveCode(code: string): Promise<ShieldedR
       ? {}
       : { personHash: wrapIdentityCommitmentAsPersonHash(decoded.identityCommitment) }),
     keyMode: decoded.keyMode as 0 | 1,
-    identitySuiteId: decoded.identitySuiteId,
-    independentKeySuiteId: decoded.independentKeySuiteId,
-    independentKeyDerivationVersion: decoded.independentKeyDerivationVersion,
     fingerprint: decoded.fingerprint,
   };
 }

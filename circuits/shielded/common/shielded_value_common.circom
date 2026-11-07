@@ -35,10 +35,6 @@ template ShieldedValueInputs(CAPACITY) {
     dummyTag.poolDomain <== poolDomain;
     dummyTag.purpose <== 1021;
 
-    component owner = Poseidon(2);
-    owner.inputs[0] <== 1013;
-    owner.inputs[1] <== inputOwnerSecrets[0];
-    ownerCommitment <== owner.out;
     component ownerNonzero = IsZero();
     ownerNonzero.in <== inputOwnerSecrets[0];
     ownerNonzero.out === 0;
@@ -47,6 +43,7 @@ template ShieldedValueInputs(CAPACITY) {
     component amountBits[CAPACITY];
     component amountZero[CAPACITY];
     component nonceZero[CAPACITY];
+    component owners[CAPACITY];
     component note[CAPACITY];
     component membership[CAPACITY];
     component spend[CAPACITY];
@@ -73,9 +70,15 @@ template ShieldedValueInputs(CAPACITY) {
         nonceZero[i] = IsZero();
         nonceZero[i].in <== inputNonces[i];
         inputEnabled[i] * nonceZero[i].out === 0;
+        // Notes share a root spending secret while their public owner
+        // commitments are diversified by each note's authenticated nonce.
+        owners[i] = Poseidon(3);
+        owners[i].inputs[0] <== 1013;
+        owners[i].inputs[1] <== inputOwnerSecrets[0];
+        owners[i].inputs[2] <== inputNonces[i];
         note[i] = Poseidon(5);
         note[i].inputs[0] <== valueTag.tag;
-        note[i].inputs[1] <== owner.out;
+        note[i].inputs[1] <== owners[i].out;
         note[i].inputs[2] <== inputAmounts[i];
         note[i].inputs[3] <== inputNonces[i];
         note[i].inputs[4] <== inputCiphertextHashes[i];
@@ -94,6 +97,7 @@ template ShieldedValueInputs(CAPACITY) {
         spend[i].inputs[2] <== note[i].out;
         sums[i + 1] <== sums[i] + inputAmounts[i];
     }
+    ownerCommitment <== owners[0].out;
     spend[0].out === inputNullifiers[0];
     if (CAPACITY > 1) {
         // Slot one preserves the existing small-capacity dummy; all further slots
