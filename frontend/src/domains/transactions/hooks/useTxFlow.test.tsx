@@ -104,4 +104,75 @@ describe("useTxFlow", () => {
     expect(result.current.result).toBe("second");
     expect(result.current.error).toBeNull();
   });
+
+  it("returns background confirmation after reset without restoring the old UI", async () => {
+    const confirmation = createDeferred<string>();
+    const { result } = renderHook(() =>
+      useTxFlow(async () => confirmation.promise, { allowBackgroundCompletion: true }),
+    );
+    let pending!: Promise<string>;
+    act(() => {
+      pending = result.current.runOrThrow();
+    });
+    act(() => result.current.reset());
+    await act(async () => {
+      confirmation.resolve("confirmed");
+      await expect(pending).resolves.toBe("confirmed");
+    });
+    expect(result.current.status).toBe("idle");
+    expect(result.current.result).toBeNull();
+  });
+
+  it("returns an older background result without overwriting a newer run", async () => {
+    const first = createDeferred<string>();
+    const runner: TxFlowRunner<string, [number]> = async (_update, run) =>
+      run === 1 ? first.promise : "new result";
+    const { result } = renderHook(() => useTxFlow(runner, { allowBackgroundCompletion: true }));
+    let pending!: Promise<string>;
+    act(() => {
+      pending = result.current.runOrThrow(1);
+    });
+    await act(async () => {
+      await result.current.runOrThrow(2);
+    });
+    await act(async () => {
+      first.resolve("old result");
+      await expect(pending).resolves.toBe("old result");
+    });
+    expect(result.current.result).toBe("new result");
+    expect(result.current.status).toBe("success");
+  });
+
+  it("delivers background confirmation after unmount", async () => {
+    const confirmation = createDeferred<string>();
+    const { result, unmount } = renderHook(() =>
+      useTxFlow(async () => confirmation.promise, { allowBackgroundCompletion: true }),
+    );
+    let pending!: Promise<string>;
+    act(() => {
+      pending = result.current.runOrThrow();
+    });
+    unmount();
+    confirmation.resolve("confirmed");
+    await expect(pending).resolves.toBe("confirmed");
+  });
+
+  it("preserves background failure without replacing the reset UI", async () => {
+    const confirmation = createDeferred<string>();
+    const failure = new Error("transaction reverted");
+    const { result } = renderHook(() =>
+      useTxFlow(async () => confirmation.promise, { allowBackgroundCompletion: true }),
+    );
+    let pending!: Promise<string>;
+    act(() => {
+      pending = result.current.runOrThrow();
+    });
+    act(() => result.current.reset());
+    await act(async () => {
+      confirmation.reject(failure);
+      await expect(pending).rejects.toBe(failure);
+    });
+    expect(result.current.status).toBe("idle");
+    expect(result.current.error).toBeNull();
+  });
 });

@@ -5,6 +5,14 @@ import type { TransactionPhase } from "./transactionPhase";
 
 let sequence = 0;
 
+export type TransactionSettlement = {
+  phase: Extract<TransactionPhase, "done" | "failed">;
+  transactionHash?: string;
+  error?: FriendlyError | null;
+};
+
+const nextEntryId = () => `tx-${Date.now()}-${++sequence}`;
+
 /**
  * Reports one modal's run to the transaction centre.
  *
@@ -13,10 +21,9 @@ let sequence = 0;
  * the two never disagree. Returning to the form starts a new entry rather than
  * rewriting the old one: a second attempt is a second transaction.
  *
- * The returned `settle` is the part that outlives the modal. Once a transaction
- * is away it keeps working whether or not anyone is watching, and the phase this
- * hook mirrors stops updating the moment the modal unmounts — so the outcome is
- * reported through a closure over the provider instead, which is still there.
+ * Capture a settlement callback before asynchronous work starts. It holds the
+ * entry's identity even after the modal returns to the form, starts another run,
+ * or unmounts. The legacy `settle` callback follows the current modal entry.
  */
 export function useTransactionCenterEntry(input: {
   kind: TransactionKind;
@@ -38,23 +45,42 @@ export function useTransactionCenterEntry(input: {
       return;
     }
     if (!idRef.current) {
-      sequence += 1;
-      idRef.current = `tx-${Date.now()}-${sequence}`;
+      idRef.current = nextEntryId();
     }
-    upsert({ id: idRef.current, kind, label, phase, transactionHash, error });
+    upsert({
+      id: idRef.current,
+      kind,
+      label,
+      phase,
+      ...(transactionHash !== undefined ? { transactionHash } : {}),
+      ...(error !== undefined ? { error } : {}),
+    });
+  }, [error, kind, label, phase, transactionHash, upsert]);
+
+  const captureSettlement = useCallback(() => {
+    if (!upsert) return (_outcome: TransactionSettlement) => {};
+    const id = idRef.current ?? (idRef.current = nextEntryId());
+    // A submission can start before its busy phase has reached the effect.
+    upsert({
+      id,
+      kind,
+      label,
+      phase: phase === "form" || phase === "blocked" ? "busy" : phase,
+      ...(transactionHash !== undefined ? { transactionHash } : {}),
+      ...(error !== undefined ? { error } : {}),
+    });
+    return (outcome: TransactionSettlement) => {
+      upsert({ id, kind, label, ...outcome });
+    };
   }, [error, kind, label, phase, transactionHash, upsert]);
 
   const settle = useCallback(
-    (outcome: {
-      phase: Extract<TransactionPhase, "done" | "failed">;
-      transactionHash?: string;
-      error?: FriendlyError | null;
-    }) => {
+    (outcome: TransactionSettlement) => {
       if (!upsert || !idRef.current) return;
       upsert({ id: idRef.current, kind, label, ...outcome });
     },
     [kind, label, upsert],
   );
 
-  return { settle };
+  return { settle, captureSettlement };
 }

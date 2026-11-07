@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { formatGroth16ProofForContract, type PersonData } from "../../../../../shared/zk/zk";
 import { decodePersonRelationPublicSignals } from "../../../../../shared/zk/publicSignalSpecs";
 import { PERSON_RELATION_PROOF_DESCRIPTOR } from "../../../../../shared/zk/proofDescriptors";
@@ -26,8 +26,19 @@ export type AddVersionProofStep =
 
 export function usePersonCommitmentProof(t: AddVersionT) {
   const [proofStep, setProofStep] = useState<AddVersionProofStep>("");
+  const generationRef = useRef(0);
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      generationRef.current += 1;
+    };
+  }, []);
 
   const reset = useCallback(() => {
+    generationRef.current += 1;
     setProofStep("");
   }, []);
 
@@ -40,6 +51,15 @@ export function usePersonCommitmentProof(t: AddVersionT) {
       contentDigestLo,
       contentDigestHi,
     }: GeneratePersonCommitmentProofArgs) => {
+      const generation = ++generationRef.current;
+      const assertCurrent = () => {
+        if (!mountedRef.current || generationRef.current !== generation) {
+          throw Object.assign(new Error("Add Version proof generation was cancelled"), {
+            code: "ADD_VERSION_PREVIEW_REJECTED",
+          });
+        }
+      };
+      assertCurrent();
       setProofStep("generating");
 
       const { proof, publicSignals } = await zkWorkerCall(
@@ -58,6 +78,7 @@ export function usePersonCommitmentProof(t: AddVersionT) {
         { timeoutMs: 240_000 },
       );
 
+      assertCurrent();
       setProofStep("verifying");
 
       const { ok: isValid } = await zkWorkerCall(
@@ -65,6 +86,7 @@ export function usePersonCommitmentProof(t: AddVersionT) {
         { proof, publicSignals },
         { timeoutMs: 120_000 },
       );
+      assertCurrent();
       if (!isValid) {
         throw new Error(
           t("addVersion.proofVerificationFailed", "Generated proof verification failed"),

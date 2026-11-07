@@ -213,125 +213,356 @@ describe("AddVersion secret-state boundary", () => {
     vi.restoreAllMocks();
   });
 
-  it("retains only ciphertext/public proof state across an uncertain send and caches no secret", async () => {
-    let secretInput: string = secrets.rawPassphrase;
-    const clearSecretInputs = vi.fn(() => {
-      secretInput = "";
-    });
-    const calculator = {
-      getPublicFormData: () => ({
-        fullName: "Ada Lovelace",
-        gender: 2,
-        birthYear: 1815,
-        birthMonth: 12,
-        birthDay: 10,
-        isBirthBC: false,
-        hasPassphrase: true,
+  it.each([
+    {
+      name: "an uncertain send",
+      error: new Error("uncertain RPC timeout after broadcast"),
+      background: "foreground",
+      allowBackground: false,
+    },
+    {
+      name: "a cancelled preview",
+      error: Object.assign(new Error("preview cancelled"), {
+        code: "ADD_VERSION_PREVIEW_REJECTED",
       }),
-      getSecretInputs: () => ({ passphrase: secretInput }),
-      clearSecretInputs,
-    } as any;
-    const personCalcRef = { current: calculator };
-    const fatherCalcRef = { current: null };
-    const motherCalcRef = { current: null };
-    const submissionPackageRef = {
-      current: null as RetryableAddVersionSubmission | null,
-    };
-    const cacheValidatedPersonVersion = vi.fn();
-    const resolveIdentityMaterial = vi.fn(async (current: unknown) =>
-      current
-        ? {
-            personData: {
+      background: "foreground",
+      allowBackground: false,
+    },
+    {
+      name: "a rejected wallet request",
+      error: Object.assign(new Error("wallet rejected"), { code: "ACTION_REJECTED" }),
+      background: "foreground",
+      allowBackground: false,
+    },
+    {
+      name: "an EIP-1193 wallet rejection",
+      error: Object.assign(new Error("wallet rejected"), { code: 4001 }),
+      background: "foreground",
+      allowBackground: false,
+    },
+    {
+      name: "an uncertain send followed by ordinary close and reopening",
+      error: new Error("RPC timeout"),
+      background: "closed",
+      allowBackground: false,
+    },
+    {
+      name: "an uncertain send followed by unmounting",
+      error: new Error("RPC timeout"),
+      background: "unmounted",
+      allowBackground: false,
+    },
+    {
+      name: "an uncertain send followed by explicit background continuation",
+      error: new Error("RPC timeout"),
+      background: "closed",
+      allowBackground: true,
+    },
+    {
+      name: "explicit background continuation followed by unmounting",
+      error: new Error("RPC timeout"),
+      background: "unmounted",
+      allowBackground: true,
+    },
+  ])(
+    "retries the exact ciphertext/public package after $name and caches no secret",
+    async ({ error, background, allowBackground }) => {
+      let secretInput: string = secrets.rawPassphrase;
+      const clearSecretInputs = vi.fn(() => {
+        secretInput = "";
+      });
+      const calculator = {
+        getPublicFormData: () => ({
+          fullName: "Ada Lovelace",
+          gender: 2,
+          birthYear: 1815,
+          birthMonth: 12,
+          birthDay: 10,
+          isBirthBC: false,
+          hasPassphrase: true,
+        }),
+        getSecretInputs: () => ({ passphrase: secretInput }),
+        clearSecretInputs,
+      } as any;
+      const personCalcRef = { current: calculator };
+      const fatherCalcRef = { current: null };
+      const motherCalcRef = { current: null };
+      const submissionPackageRef = {
+        current: null as RetryableAddVersionSubmission | null,
+      };
+      const cacheValidatedPersonVersion = vi.fn();
+      const defaultCache = vi.fn();
+      const capturedSettlement = vi.fn();
+      const onSubmissionDiscarded = vi.fn();
+      const onSuccess = vi.fn();
+      const toastSuccess = vi.fn();
+      const toastError = vi.fn();
+      const invalidateByTx = vi.fn();
+      const setSuccessResult = vi.fn();
+      const setIsSubmitting = vi.fn();
+      const submissionAttemptRef = { current: 0 };
+      const completionPolicyRef = { current: { allowBackground: false } };
+      const resolveIdentityMaterial = vi.fn(async (current: unknown) =>
+        current
+          ? {
+              personData: {
+                fullName: "Ada Lovelace",
+                gender: 2,
+                birthYear: 1815,
+                birthMonth: 12,
+                birthDay: 10,
+                isBirthBC: false,
+                identitySuiteId: 1,
+                derivedSecretField: BigInt(secrets.derivedSecretField),
+              },
+              personHash: PERSON_HASH,
+              identitySuiteId: 1,
+              identityCommitment: 11n,
+              derivedSecretField: BigInt(secrets.derivedSecretField),
+              identityPasswordInputHex: secrets.identityPasswordInputHex,
+              identitySaltHex: secrets.identitySaltHex,
+              derivedSecretHex: secrets.derivedSecretHex,
+            }
+          : null,
+      );
+      const generatePersonCommitmentProof = vi.fn(async (input: any) => {
+        expect(input.personData.derivedSecretField.toString()).toBe(secrets.derivedSecretField);
+        expect(input.contentDigestLo).toBe(secrets.contentDigestLo);
+        expect(input.contentDigestHi).toBe(secrets.contentDigestHi);
+        return {
+          proof: {
+            circuitId: 1,
+            proofEncodingId: 1,
+            proofData: "0x1234",
+            proverWitness: secrets.proverWitness,
+            derivedSecretField: secrets.derivedSecretField,
+          },
+          publicSignals: {
+            identityCommitment: 11n,
+            fatherIdentityCommitment: 0n,
+            motherIdentityCommitment: 0n,
+            submitterAndSelfSuiteId: BigInt(SUBMITTER) | (1n << 160n),
+            versionCommitment: VERSION_COMMITMENT,
+            contentDigest: secrets.contentDigest,
+            roleWitness: secrets.roleWitness,
+          },
+        };
+      });
+      const successfulResult = {
+        hash: PERSON_HASH,
+        index: 1,
+        rewardAmount: 0,
+        transactionHash: "0xadd",
+        blockNumber: 456,
+        events: {
+          PersonHashZKVerified: { personHash: PERSON_HASH, prover: SUBMITTER },
+          PersonVersionAdded: {
+            personHash: PERSON_HASH,
+            versionIndex: 1,
+            addedBy: SUBMITTER,
+            timestamp: 123,
+            fatherHash: ZERO_HASH,
+            fatherVersionIndex: 0,
+            motherHash: ZERO_HASH,
+            motherVersionIndex: 0,
+            versionCommitment: VERSION_COMMITMENT.toString(),
+          },
+          MetadataStored: {
+            personHash: PERSON_HASH,
+            versionIndex: 1,
+            pointer: POINTER,
+            payloadHash: PAYLOAD_HASH,
+            segmentCount: 1,
+            payloadLength: 20,
+          },
+          TokenRewardDistributed: null,
+        },
+      };
+      let resolveSecondReceipt!: (value: typeof successfulResult) => void;
+      const runAddVersionOrThrow = vi
+        .fn()
+        .mockImplementationOnce(async (args: unknown) => {
+          expect(secretInput).toBe("");
+          expectNoSecretSentinels(args);
+          throw error;
+        })
+        .mockImplementationOnce(async (args: unknown) => {
+          expect(secretInput).toBe("");
+          expectNoSecretSentinels(args);
+          if (background !== "foreground") {
+            return new Promise<typeof successfulResult>((resolve) => {
+              resolveSecondReceipt = resolve;
+            });
+          }
+          return successfulResult;
+        });
+      const signer = { getAddress: vi.fn(async () => SUBMITTER) } as any;
+
+      const { result, unmount } = renderHook(() =>
+        useAddVersionSubmit({
+          t: ((_key: string, fallback?: string) => fallback ?? _key) as any,
+          signer,
+          isContractReady: true,
+          rpcUrl: "https://rpc.example",
+          chainId: 71,
+          contractAddress: CONTRACT,
+          readerAddress: READER,
+          allConsentsChecked: true,
+          personCalcRef,
+          fatherCalcRef,
+          motherCalcRef,
+          resolveIdentityMaterial,
+          buildMetadataPayload: () => ({
+            schema: "deepfamily/person-version@1.0",
+            person: {
               fullName: "Ada Lovelace",
               gender: 2,
               birthYear: 1815,
               birthMonth: 12,
               birthDay: 10,
               isBirthBC: false,
-              identitySuiteId: 1,
-              derivedSecretField: BigInt(secrets.derivedSecretField),
+              personHash: PERSON_HASH,
             },
-            personHash: PERSON_HASH,
-            identitySuiteId: 1,
-            identityCommitment: 11n,
-            derivedSecretField: BigInt(secrets.derivedSecretField),
-            identityPasswordInputHex: secrets.identityPasswordInputHex,
-            identitySaltHex: secrets.identitySaltHex,
-            derivedSecretHex: secrets.derivedSecretHex,
-          }
-        : null,
-    );
-    const generatePersonCommitmentProof = vi.fn(async (input: any) => {
-      expect(input.personData.derivedSecretField.toString()).toBe(secrets.derivedSecretField);
-      expect(input.contentDigestLo).toBe(secrets.contentDigestLo);
-      expect(input.contentDigestHi).toBe(secrets.contentDigestHi);
-      return {
-        proof: {
-          circuitId: 1,
-          proofEncodingId: 1,
-          proofData: "0x1234",
-          proverWitness: secrets.proverWitness,
-          derivedSecretField: secrets.derivedSecretField,
-        },
-        publicSignals: {
-          identityCommitment: 11n,
-          fatherIdentityCommitment: 0n,
-          motherIdentityCommitment: 0n,
-          submitterAndSelfSuiteId: BigInt(SUBMITTER) | (1n << 160n),
-          versionCommitment: VERSION_COMMITMENT,
-          contentDigest: secrets.contentDigest,
-          roleWitness: secrets.roleWitness,
-        },
-      };
-    });
-    const successfulResult = {
-      hash: PERSON_HASH,
-      index: 1,
-      rewardAmount: 0,
-      transactionHash: "0xadd",
-      blockNumber: 456,
-      events: {
-        PersonHashZKVerified: { personHash: PERSON_HASH, prover: SUBMITTER },
-        PersonVersionAdded: {
-          personHash: PERSON_HASH,
-          versionIndex: 1,
-          addedBy: SUBMITTER,
-          timestamp: 123,
-          fatherHash: ZERO_HASH,
-          fatherVersionIndex: 0,
-          motherHash: ZERO_HASH,
-          motherVersionIndex: 0,
-          versionCommitment: VERSION_COMMITMENT.toString(),
-        },
-        MetadataStored: {
-          personHash: PERSON_HASH,
-          versionIndex: 1,
-          pointer: POINTER,
-          payloadHash: PAYLOAD_HASH,
-          segmentCount: 1,
-          payloadLength: 20,
-        },
-        TokenRewardDistributed: null,
-      },
-    };
-    const runAddVersionOrThrow = vi
-      .fn()
-      .mockImplementationOnce(async (args: unknown) => {
-        expect(secretInput).toBe("");
-        expectNoSecretSentinels(args);
-        throw new Error("uncertain RPC timeout after broadcast");
-      })
-      .mockImplementationOnce(async (args: unknown) => {
-        expect(secretInput).toBe("");
-        expectNoSecretSentinels(args);
-        return successfulResult;
-      });
-    const signer = { getAddress: vi.fn(async () => SUBMITTER) } as any;
+            parents: { father: null, mother: null },
+            tag: "private revision",
+            biography: "encrypted biography",
+          }),
+          generatePersonCommitmentProof,
+          setProofStep: vi.fn(),
+          runAddVersionOrThrow,
+          cacheValidatedPersonVersion: defaultCache,
+          captureValidatedPersonVersionCache: () => cacheValidatedPersonVersion,
+          toastSuccess,
+          toastError,
+          invalidateByTx,
+          onSuccess,
+          setConsentError: vi.fn(),
+          setErrorResult: vi.fn(),
+          setSuccessResult,
+          setIsSubmitting,
+          submissionPackageRef,
+          submissionAttemptRef,
+          completionPolicyRef,
+          onSubmissionDiscarded,
+          settleTransaction: mocks.settleTransaction,
+          captureSettlement: () => capturedSettlement,
+        }),
+      );
 
+      await act(async () => {
+        await result.current({
+          fatherVersionIndex: "",
+          motherVersionIndex: "",
+          tag: "private revision",
+          biography: "encrypted biography",
+        });
+      });
+
+      expect(submissionPackageRef.current).not.toBeNull();
+      expect(onSubmissionDiscarded).not.toHaveBeenCalled();
+      expectNoSecretSentinels(submissionPackageRef.current);
+      expect(clearSecretInputs).toHaveBeenCalledTimes(1);
+      expect(mocks.terminateCryptoWorkerIfIdle).toHaveBeenCalledTimes(1);
+      expect(mocks.terminateZkWorkerIfIdle).toHaveBeenCalledTimes(1);
+      expect(cacheValidatedPersonVersion).not.toHaveBeenCalled();
+      expectNoSecretSentinels({
+        localStorage: { ...localStorage },
+        sessionStorage: { ...sessionStorage },
+      });
+
+      const firstTransactionArgs = runAddVersionOrThrow.mock.calls[0][0];
+      const retryInput = {
+        fatherVersionIndex: "" as const,
+        motherVersionIndex: "" as const,
+        tag: "private revision",
+        biography: "encrypted biography",
+      };
+      let nextSubmission: RetryableAddVersionSubmission | null = null;
+      if (background === "foreground") {
+        await act(async () => {
+          await result.current(retryInput);
+        });
+      } else {
+        let pending!: Promise<void>;
+        act(() => {
+          pending = result.current(retryInput);
+        });
+        await vi.waitFor(() => expect(runAddVersionOrThrow).toHaveBeenCalledTimes(2));
+        const successWrites = setSuccessResult.mock.calls.length;
+        const submittingWrites = setIsSubmitting.mock.calls.length;
+        completionPolicyRef.current.allowBackground = allowBackground;
+        submissionAttemptRef.current += 1;
+        // A reopened form owns a new policy object; the old task keeps only
+        // the explicit decision made for its original submission.
+        completionPolicyRef.current = { allowBackground: false };
+        if (background === "unmounted") unmount();
+        else nextSubmission = { ...submissionPackageRef.current!, draftKey: "a new version" };
+        submissionPackageRef.current = nextSubmission;
+        resolveSecondReceipt(successfulResult);
+        await act(async () => {
+          await pending;
+        });
+        expect(setSuccessResult).toHaveBeenCalledTimes(successWrites);
+        expect(setIsSubmitting).toHaveBeenCalledTimes(submittingWrites);
+      }
+
+      expect(runAddVersionOrThrow.mock.calls[1][0]).toBe(firstTransactionArgs);
+      expect(submissionPackageRef.current).toBe(nextSubmission);
+      expect(onSubmissionDiscarded).not.toHaveBeenCalled();
+      expect(resolveIdentityMaterial).toHaveBeenCalledTimes(3);
+      expect(generatePersonCommitmentProof).toHaveBeenCalledTimes(1);
+      expect(mocks.cryptoWorkerCall).toHaveBeenCalledTimes(4);
+      const completesLocally = background === "foreground" || allowBackground;
+      expect(cacheValidatedPersonVersion).toHaveBeenCalledTimes(completesLocally ? 1 : 0);
+      expect(toastSuccess).toHaveBeenCalledTimes(completesLocally ? 1 : 0);
+      expect(invalidateByTx).toHaveBeenCalledTimes(completesLocally ? 1 : 0);
+      expect(defaultCache).not.toHaveBeenCalled();
+      expect(mocks.settleTransaction).not.toHaveBeenCalled();
+      expect(capturedSettlement).toHaveBeenLastCalledWith({
+        phase: "done",
+        transactionHash: "0xadd",
+      });
+      expect(onSuccess).toHaveBeenCalledTimes(background === "foreground" ? 1 : 0);
+      if (completesLocally) {
+        expectNoSecretSentinels(cacheValidatedPersonVersion.mock.calls[0][0]);
+      } else {
+        expect(mocks.reader.getVersionDetails).not.toHaveBeenCalled();
+      }
+      expectNoSecretSentinels({
+        localStorage: { ...localStorage },
+        sessionStorage: { ...sessionStorage },
+      });
+    },
+  );
+
+  it("stops an old identity job without clearing the reopened form or replacing its package", async () => {
+    const submissionAttemptRef = { current: 0 };
+    const clearSecretInputs = vi.fn();
+    const personCalcRef = {
+      current: {
+        getPublicFormData: () => ({ fullName: "Ada Lovelace" }),
+        getSecretInputs: vi.fn(() => ({ passphrase: secrets.rawPassphrase })),
+        clearSecretInputs,
+      },
+    } as any;
+    const submissionPackageRef = { current: null as RetryableAddVersionSubmission | null };
+    let resolveIdentity!: (value: any) => void;
+    const resolveIdentityMaterial = vi.fn(
+      () =>
+        new Promise<any>((resolve) => {
+          resolveIdentity = resolve;
+        }),
+    );
+    const buildMetadataPayload = vi.fn();
+    const runAddVersionOrThrow = vi.fn();
+    const setIsSubmitting = vi.fn();
+    const onSubmissionDiscarded = vi.fn();
+    const toastError = vi.fn();
+    const capturedSettlement = vi.fn();
     const { result } = renderHook(() =>
       useAddVersionSubmit({
         t: ((_key: string, fallback?: string) => fallback ?? _key) as any,
-        signer,
+        signer: { getAddress: vi.fn(async () => SUBMITTER) } as any,
         isContractReady: true,
         rpcUrl: "https://rpc.example",
         chainId: 71,
@@ -339,197 +570,191 @@ describe("AddVersion secret-state boundary", () => {
         readerAddress: READER,
         allConsentsChecked: true,
         personCalcRef,
-        fatherCalcRef,
-        motherCalcRef,
-        resolveIdentityMaterial,
-        buildMetadataPayload: () => ({
-          schema: "deepfamily/person-version@1.0",
-          person: {
-            fullName: "Ada Lovelace",
-            gender: 2,
-            birthYear: 1815,
-            birthMonth: 12,
-            birthDay: 10,
-            isBirthBC: false,
-            personHash: PERSON_HASH,
-          },
-          parents: { father: null, mother: null },
-          tag: "private revision",
-          biography: "encrypted biography",
-        }),
-        generatePersonCommitmentProof,
-        setProofStep: vi.fn(),
-        runAddVersionOrThrow,
-        cacheValidatedPersonVersion,
-        toastSuccess: vi.fn(),
-        toastError: vi.fn(),
-        invalidateByTx: vi.fn(),
-        setConsentError: vi.fn(),
-        setErrorResult: vi.fn(),
-        setSuccessResult: vi.fn(),
-        setIsSubmitting: vi.fn(),
-        submissionPackageRef,
-      settleTransaction: mocks.settleTransaction,
-      }),
-    );
-
-    await act(async () => {
-      await result.current({
-        fatherVersionIndex: "",
-        motherVersionIndex: "",
-        tag: "private revision",
-        biography: "encrypted biography",
-      });
-    });
-
-    expect(submissionPackageRef.current).not.toBeNull();
-    expectNoSecretSentinels(submissionPackageRef.current);
-    expect(clearSecretInputs).toHaveBeenCalledTimes(1);
-    expect(mocks.terminateCryptoWorkerIfIdle).toHaveBeenCalledTimes(1);
-    expect(mocks.terminateZkWorkerIfIdle).toHaveBeenCalledTimes(1);
-    expect(cacheValidatedPersonVersion).not.toHaveBeenCalled();
-    expectNoSecretSentinels({
-      localStorage: { ...localStorage },
-      sessionStorage: { ...sessionStorage },
-    });
-
-    const firstTransactionArgs = runAddVersionOrThrow.mock.calls[0][0];
-    await act(async () => {
-      await result.current({
-        fatherVersionIndex: "",
-        motherVersionIndex: "",
-        tag: "private revision",
-        biography: "encrypted biography",
-      });
-    });
-
-    expect(runAddVersionOrThrow.mock.calls[1][0]).toBe(firstTransactionArgs);
-    expect(submissionPackageRef.current).toBeNull();
-    expect(resolveIdentityMaterial).toHaveBeenCalledTimes(3);
-    expect(generatePersonCommitmentProof).toHaveBeenCalledTimes(1);
-    expect(mocks.cryptoWorkerCall).toHaveBeenCalledTimes(4);
-    expect(cacheValidatedPersonVersion).toHaveBeenCalledTimes(1);
-    expectNoSecretSentinels(cacheValidatedPersonVersion.mock.calls[0][0]);
-    expectNoSecretSentinels({
-      localStorage: { ...localStorage },
-      sessionStorage: { ...sessionStorage },
-    });
-  });
-
-  it("discards a frozen retry package instead of sending it after the network changes", async () => {
-    const formInput = {
-      fatherVersionIndex: "" as const,
-      motherVersionIndex: "" as const,
-      tag: "private revision",
-      biography: "encrypted biography",
-    };
-    const publicPerson = {
-      fullName: "Ada Lovelace",
-      gender: 2,
-      birthYear: 1815,
-      birthMonth: 12,
-      birthDay: 10,
-      isBirthBC: false,
-      hasPassphrase: true,
-    };
-    const { hasPassphrase: _hasPassphrase, ...publicIdentity } = publicPerson;
-    const submissionPackageRef = {
-      current: {
-        draftKey: JSON.stringify({
-          data: addVersionSchema.parse(formInput),
-          person: publicIdentity,
-          father: null,
-          mother: null,
-        }),
-        scope: createAddVersionTransactionScope({
-          chainId: 71,
-          contractAddress: CONTRACT,
-          readerAddress: READER,
-          submitterAddress: SUBMITTER,
-        }),
-        confirmationRpcUrl: "https://rpc.example",
-        args: {
-          proof: { circuitId: 1, proofEncodingId: 1, proofData: "0x1234" },
-          publicSignals: {
-            identityCommitment: 11n,
-            fatherIdentityCommitment: 0n,
-            motherIdentityCommitment: 0n,
-            submitterAndSelfSuiteId: BigInt(SUBMITTER) | (1n << 160n),
-            versionCommitment: VERSION_COMMITMENT,
-          },
-          fatherVersionIndex: 0,
-          motherVersionIndex: 0,
-          metadataEnvelope: new Uint8Array(20),
-        },
-        versionCommitment: VERSION_COMMITMENT,
-        payloadHash: PAYLOAD_HASH,
-        validated: {} as any,
-        personHash: PERSON_HASH,
-        fatherHash: ZERO_HASH,
-        motherHash: ZERO_HASH,
-        broadcastConfirmed: false,
-      } satisfies RetryableAddVersionSubmission,
-    };
-    const runAddVersionOrThrow = vi.fn();
-    const resolveIdentityMaterial = vi.fn();
-    const generatePersonCommitmentProof = vi.fn();
-    const setErrorResult = vi.fn();
-    const signer = {
-      getAddress: vi.fn(async () => SUBMITTER),
-      provider: { send: vi.fn(async () => "0x48") },
-    } as any;
-    const personCalcRef = {
-      current: {
-        getPublicFormData: () => publicPerson,
-        getSecretInputs: () => ({ passphrase: "" }),
-        clearSecretInputs: vi.fn(),
-      },
-    } as any;
-
-    const { result } = renderHook(() =>
-      useAddVersionSubmit({
-        t: ((_key: string, fallback?: string) => fallback ?? _key) as any,
-        signer,
-        isContractReady: true,
-        rpcUrl: "https://rpc.example",
-        chainId: 72,
-        contractAddress: CONTRACT,
-        readerAddress: READER,
-        allConsentsChecked: true,
-        personCalcRef,
         fatherCalcRef: { current: null },
         motherCalcRef: { current: null },
         resolveIdentityMaterial,
-        buildMetadataPayload: vi.fn(),
-        generatePersonCommitmentProof,
+        buildMetadataPayload,
+        generatePersonCommitmentProof: vi.fn(),
         setProofStep: vi.fn(),
         runAddVersionOrThrow,
         cacheValidatedPersonVersion: vi.fn(),
         toastSuccess: vi.fn(),
-        toastError: vi.fn(),
+        toastError,
         invalidateByTx: vi.fn(),
         setConsentError: vi.fn(),
-        setErrorResult,
+        setErrorResult: vi.fn(),
         setSuccessResult: vi.fn(),
-        setIsSubmitting: vi.fn(),
+        setIsSubmitting,
         submissionPackageRef,
-      settleTransaction: mocks.settleTransaction,
+        submissionAttemptRef,
+        onSubmissionDiscarded,
+        settleTransaction: mocks.settleTransaction,
+        captureSettlement: () => capturedSettlement,
       }),
     );
-
+    let pending!: Promise<void>;
+    act(() => {
+      pending = result.current({
+        fatherVersionIndex: "",
+        motherVersionIndex: "",
+        tag: "",
+        biography: "",
+      });
+    });
+    await vi.waitFor(() => expect(resolveIdentityMaterial).toHaveBeenCalledOnce());
+    submissionAttemptRef.current += 1;
+    const nextSubmission = { draftKey: "a new version" } as RetryableAddVersionSubmission;
+    submissionPackageRef.current = nextSubmission;
+    resolveIdentity({ personHash: PERSON_HASH });
     await act(async () => {
-      await result.current(formInput);
+      await pending;
     });
 
-    expect(submissionPackageRef.current).toBeNull();
-    expect(runAddVersionOrThrow).not.toHaveBeenCalled();
-    expect(resolveIdentityMaterial).not.toHaveBeenCalled();
-    expect(generatePersonCommitmentProof).not.toHaveBeenCalled();
+    expect(submissionPackageRef.current).toBe(nextSubmission);
+    expect(resolveIdentityMaterial).toHaveBeenCalledOnce();
+    expect(buildMetadataPayload).not.toHaveBeenCalled();
     expect(mocks.cryptoWorkerCall).not.toHaveBeenCalled();
-    expect(setErrorResult).toHaveBeenCalledWith(
-      expect.objectContaining({ retryable: expect.any(Boolean) }),
+    expect(runAddVersionOrThrow).not.toHaveBeenCalled();
+    expect(clearSecretInputs).not.toHaveBeenCalled();
+    expect(setIsSubmitting).toHaveBeenCalledExactlyOnceWith(true);
+    expect(onSubmissionDiscarded).not.toHaveBeenCalled();
+    expect(toastError).not.toHaveBeenCalled();
+    expect(capturedSettlement).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ phase: "failed", error: expect.any(Object) }),
     );
   });
+
+  it.each([
+    { name: "network changes", chainId: 72, changedDraft: false, reverted: false },
+    { name: "draft changes", chainId: 71, changedDraft: true, reverted: false },
+    { name: "transaction reverts", chainId: 71, changedDraft: false, reverted: true },
+  ])(
+    "requires renewed consent when the frozen retry package is discarded after $name",
+    async ({ chainId, changedDraft, reverted }) => {
+      const formInput = {
+        fatherVersionIndex: "" as const,
+        motherVersionIndex: "" as const,
+        tag: "private revision",
+        biography: "encrypted biography",
+      };
+      const publicPerson = {
+        fullName: "Ada Lovelace",
+        gender: 2,
+        birthYear: 1815,
+        birthMonth: 12,
+        birthDay: 10,
+        isBirthBC: false,
+        hasPassphrase: true,
+      };
+      const { hasPassphrase: _hasPassphrase, ...publicIdentity } = publicPerson;
+      const submissionPackageRef = {
+        current: {
+          draftKey: JSON.stringify({
+            data: addVersionSchema.parse(formInput),
+            person: publicIdentity,
+            father: null,
+            mother: null,
+          }),
+          scope: createAddVersionTransactionScope({
+            chainId: 71,
+            contractAddress: CONTRACT,
+            readerAddress: READER,
+            submitterAddress: SUBMITTER,
+          }),
+          confirmationRpcUrl: "https://rpc.example",
+          args: {
+            proof: { circuitId: 1, proofEncodingId: 1, proofData: "0x1234" },
+            publicSignals: {
+              identityCommitment: 11n,
+              fatherIdentityCommitment: 0n,
+              motherIdentityCommitment: 0n,
+              submitterAndSelfSuiteId: BigInt(SUBMITTER) | (1n << 160n),
+              versionCommitment: VERSION_COMMITMENT,
+            },
+            fatherVersionIndex: 0,
+            motherVersionIndex: 0,
+            metadataEnvelope: new Uint8Array(20),
+          },
+          versionCommitment: VERSION_COMMITMENT,
+          payloadHash: PAYLOAD_HASH,
+          validated: {} as any,
+          personHash: PERSON_HASH,
+          fatherHash: ZERO_HASH,
+          motherHash: ZERO_HASH,
+          broadcastConfirmed: false,
+        } satisfies RetryableAddVersionSubmission,
+      };
+      const runAddVersionOrThrow = vi.fn();
+      if (reverted) {
+        runAddVersionOrThrow.mockRejectedValue(
+          Object.assign(new Error("transaction reverted"), { code: "CALL_EXCEPTION" }),
+        );
+      }
+      const onSubmissionDiscarded = vi.fn();
+      const resolveIdentityMaterial = vi.fn();
+      const generatePersonCommitmentProof = vi.fn();
+      const setErrorResult = vi.fn();
+      const signer = {
+        getAddress: vi.fn(async () => SUBMITTER),
+        provider: { send: vi.fn(async () => `0x${chainId.toString(16)}`) },
+      } as any;
+      const personCalcRef = {
+        current: {
+          getPublicFormData: () => publicPerson,
+          getSecretInputs: () => ({ passphrase: "" }),
+          clearSecretInputs: vi.fn(),
+        },
+      } as any;
+
+      const { result } = renderHook(() =>
+        useAddVersionSubmit({
+          t: ((_key: string, fallback?: string) => fallback ?? _key) as any,
+          signer,
+          isContractReady: true,
+          rpcUrl: "https://rpc.example",
+          chainId,
+          contractAddress: CONTRACT,
+          readerAddress: READER,
+          allConsentsChecked: true,
+          personCalcRef,
+          fatherCalcRef: { current: null },
+          motherCalcRef: { current: null },
+          resolveIdentityMaterial,
+          buildMetadataPayload: vi.fn(),
+          generatePersonCommitmentProof,
+          setProofStep: vi.fn(),
+          runAddVersionOrThrow,
+          cacheValidatedPersonVersion: vi.fn(),
+          toastSuccess: vi.fn(),
+          toastError: vi.fn(),
+          invalidateByTx: vi.fn(),
+          setConsentError: vi.fn(),
+          setErrorResult,
+          setSuccessResult: vi.fn(),
+          setIsSubmitting: vi.fn(),
+          submissionPackageRef,
+          onSubmissionDiscarded,
+          settleTransaction: mocks.settleTransaction,
+        }),
+      );
+
+      await act(async () => {
+        await result.current(
+          changedDraft ? { ...formInput, biography: "changed biography" } : formInput,
+        );
+      });
+
+      expect(submissionPackageRef.current).toBeNull();
+      expect(onSubmissionDiscarded).toHaveBeenCalledTimes(1);
+      expect(runAddVersionOrThrow).toHaveBeenCalledTimes(reverted ? 1 : 0);
+      expect(resolveIdentityMaterial).not.toHaveBeenCalled();
+      expect(generatePersonCommitmentProof).not.toHaveBeenCalled();
+      expect(mocks.cryptoWorkerCall).not.toHaveBeenCalled();
+      expect(setErrorResult).toHaveBeenCalledWith(
+        expect.objectContaining({ retryable: expect.any(Boolean) }),
+      );
+    },
+  );
 
   it("does not read anchors or cache after scope changes while a receipt is pending", async () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
@@ -636,7 +861,7 @@ describe("AddVersion secret-state boundary", () => {
         setSuccessResult,
         setIsSubmitting: vi.fn(),
         submissionPackageRef,
-      settleTransaction: mocks.settleTransaction,
+        settleTransaction: mocks.settleTransaction,
       }),
     );
 

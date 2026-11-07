@@ -4,6 +4,10 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-libra
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import AddVersionModal from "./AddVersionModal";
 import { formSectionsHidden, precedesFormSections } from "./transactionPhaseContract";
+import {
+  TransactionCenterProvider,
+  useTransactionCenter,
+} from "../context/TransactionCenterContext";
 
 const personHash = `0x${"ab".repeat(32)}`;
 const submitter = "0x00000000000000000000000000000000000000aa";
@@ -71,6 +75,8 @@ const mocks = vi.hoisted(() => ({
   terminateZkWorkerIfIdle: vi.fn(),
   clearSecretInputs: vi.fn(),
   secretInputRead: vi.fn(),
+  fatherPresent: false,
+  motherPresent: false,
   personGateway: {
     listVersionEndorsements: vi.fn(async () => ({
       versionIndices: [] as number[],
@@ -198,49 +204,108 @@ vi.mock("../../person", () => ({
     const isParent = props.initialValues?.fullName === "";
     const role = !isParent ? "person" : props.initialValues?.gender === 1 ? "father" : "mother";
     const secretRef = useRef("identity-passphrase");
-    const publicFormData = isParent
-      ? {
-          fullName: "",
-          gender: props.initialValues?.gender ?? 0,
-          birthYear: 0,
-          birthMonth: 0,
-          birthDay: 0,
-          isBirthBC: false,
-        }
-      : {
-          fullName: "Ada Lovelace",
-          gender: 2,
-          birthYear: 1815,
-          birthMonth: 12,
-          birthDay: 10,
-          isBirthBC: false,
-        };
+    const secretInputRef = useRef<HTMLInputElement | null>(null);
+    const originalParentName =
+      role === "father" && mocks.fatherPresent
+        ? "Charles Babbage"
+        : role === "mother" && mocks.motherPresent
+          ? "Annabella Byron"
+          : "";
+    const publicFormDataRef = useRef(
+      isParent
+        ? {
+            fullName: originalParentName,
+            gender: props.initialValues?.gender ?? 0,
+            birthYear: 0,
+            birthMonth: 0,
+            birthDay: 0,
+            isBirthBC: false,
+          }
+        : {
+            fullName: "Ada Lovelace",
+            gender: 2,
+            birthYear: 1815,
+            birthMonth: 12,
+            birthDay: 10,
+            isBirthBC: false,
+          },
+    );
+    const publicFormData = publicFormDataRef.current;
+    const publishParentHash = () => {
+      if (!isParent) return;
+      const identity = publicFormDataRef.current;
+      if (!identity.fullName) {
+        props.onComputedHashChange?.("");
+        return;
+      }
+      const originalIdentity =
+        identity.fullName === originalParentName &&
+        identity.birthYear === 0 &&
+        secretRef.current === "identity-passphrase";
+      const hashByte =
+        role === "father" ? (originalIdentity ? "cd" : "ce") : originalIdentity ? "ef" : "f0";
+      props.onComputedHashChange?.(`0x${hashByte.repeat(32)}`);
+    };
     useImperativeHandle(ref, () => ({
       getSecretInputs: () => {
         mocks.secretInputRead(role);
         return { passphrase: secretRef.current };
       },
-      getPublicFormData: () => publicFormData,
+      getPublicFormData: () => publicFormDataRef.current,
       passphrasesMatch: () => true,
       clearSecretInputs: () => {
         secretRef.current = "";
+        if (secretInputRef.current) secretInputRef.current.value = "";
         mocks.clearSecretInputs(role);
+        props.onPublicFormChange?.({ ...publicFormDataRef.current, hasPassphrase: false });
+        props.onComputedHashChange?.("");
       },
     }));
 
     useEffect(() => {
       props.onPublicFormChange?.(publicFormData);
       props.onPassphraseChange?.();
+      publishParentHash();
     }, []);
 
     return (
       <div data-testid="person-hash-calculator">
+        {isParent && (
+          <>
+            <input
+              aria-label={`${role} identity name test input`}
+              defaultValue={publicFormData.fullName}
+              onChange={(event) => {
+                publicFormDataRef.current = {
+                  ...publicFormDataRef.current,
+                  fullName: event.currentTarget.value,
+                };
+                props.onPublicFormChange?.(publicFormDataRef.current);
+                publishParentHash();
+              }}
+            />
+            <input
+              aria-label={`${role} identity birth year test input`}
+              defaultValue={publicFormData.birthYear}
+              onChange={(event) => {
+                publicFormDataRef.current = {
+                  ...publicFormDataRef.current,
+                  birthYear: Number(event.currentTarget.value),
+                };
+                props.onPublicFormChange?.(publicFormDataRef.current);
+                publishParentHash();
+              }}
+            />
+          </>
+        )}
         <input
+          ref={secretInputRef}
           aria-label={`${role} identity passphrase test input`}
           defaultValue={secretRef.current}
           onChange={(event) => {
             secretRef.current = event.currentTarget.value;
             props.onPassphraseChange?.();
+            publishParentHash();
           }}
         />
       </div>
@@ -248,15 +313,37 @@ vi.mock("../../person", () => ({
   }),
 }));
 
-function addVersionModalElement() {
+function addVersionModalElement(isOpen = true) {
   return (
     <AddVersionModal
-      isOpen
+      isOpen={isOpen}
       onClose={mocks.onClose}
       onSuccess={mocks.onSuccess}
       onEndorse={mocks.onEndorse}
     />
   );
+}
+
+function TransactionRecords() {
+  const centre = useTransactionCenter();
+  return <output data-testid="transaction-records">{JSON.stringify(centre?.records)}</output>;
+}
+
+function modalWithTransactionCentre(isOpen = true) {
+  return (
+    <TransactionCenterProvider>
+      {addVersionModalElement(isOpen)}
+      <TransactionRecords />
+    </TransactionCenterProvider>
+  );
+}
+
+function transactionRecords() {
+  return JSON.parse(screen.getByTestId("transaction-records").textContent || "[]") as {
+    id: string;
+    phase: string;
+    transactionHash?: string;
+  }[];
 }
 
 function renderAddVersionModal() {
@@ -279,16 +366,76 @@ async function fillRequiredFields() {
     fireEvent.change(screen.getByPlaceholderText("e.g. From the family register"), {
       target: { value: "verified" },
     });
-    fireEvent.change(
-      screen.getByPlaceholderText(
-        "Life story, deeds, family memories…",
-      ),
-      {
-        target: { value: "private biography" },
-      },
-    );
+    fireEvent.change(screen.getByPlaceholderText("Life story, deeds, family memories…"), {
+      target: { value: "private biography" },
+    });
   });
   await checkConsentBoxes();
+}
+
+async function prepareFailedParentSubmission(role: "father" | "mother") {
+  const originalHash = `0x${(role === "father" ? "cd" : "ef").repeat(32)}`;
+  const changedHash = `0x${(role === "father" ? "ce" : "f0").repeat(32)}`;
+  mocks[role === "father" ? "fatherPresent" : "motherPresent"] = true;
+  const versionForHash = (hash: unknown) => (hash === changedHash ? 7 : 4);
+  mocks.personGateway.listVersionEndorsements.mockImplementation(async (...args: unknown[]) => ({
+    versionIndices: [versionForHash(args[0])],
+    endorsementCounts: [7],
+    tokenIds: [0],
+    totalVersions: versionForHash(args[0]),
+    hasMore: false,
+    nextOffset: 0,
+  }));
+  mocks.personGateway.listPersonVersionsPage.mockImplementation(async (...args: unknown[]) => ({
+    versions: [{ versionIndex: versionForHash(args[0]), addedBy: submitter, timestamp: 1 }],
+    totalVersions: versionForHash(args[0]),
+    hasMore: false,
+    nextOffset: 0,
+  }));
+  mocks.addVersionRunOrThrow.mockRejectedValue(new Error("RPC timeout while waiting for receipt"));
+  renderAddVersionModal();
+  await waitFor(() =>
+    expect(mocks.personGateway.listVersionEndorsements).toHaveBeenCalledWith(originalHash, 0, 100),
+  );
+  await fillRequiredFields();
+  await act(async () => {
+    fireEvent.click(screen.getByRole("button", { name: /Add Version/i }));
+  });
+  await waitFor(() => expect(mocks.toastError).toHaveBeenCalledOnce());
+  const firstArgs = mocks.addVersionRunOrThrow.mock.calls[0][0];
+  expect(firstArgs[`${role}VersionIndex`]).toBe(4);
+  fireEvent.click(screen.getByRole("button", { name: /Back to edit/i }));
+  expect(mocks.personGateway.listVersionEndorsements).not.toHaveBeenCalledWith(changedHash, 0, 100);
+  return { firstArgs, changedHash };
+}
+
+async function expectFreshParentSubmission(
+  role: "father" | "mother",
+  firstArgs: unknown,
+  changedHash: string,
+) {
+  await waitFor(() =>
+    expect(mocks.personGateway.listVersionEndorsements).toHaveBeenCalledWith(changedHash, 0, 100),
+  );
+  const consent = screen.getByRole("checkbox", {
+    name: /guess the passphrase offline/i,
+  }) as HTMLInputElement;
+  expect(consent.checked).toBe(false);
+  fireEvent.click(consent);
+  await waitFor(() =>
+    expect(
+      (screen.getByRole("button", { name: /Add Version/i }) as HTMLButtonElement).disabled,
+    ).toBe(false),
+  );
+  await act(async () => {
+    fireEvent.click(screen.getByRole("button", { name: /Add Version/i }));
+  });
+  await waitFor(() => expect(mocks.addVersionRunOrThrow).toHaveBeenCalledTimes(2));
+  expect(mocks.addVersionRunOrThrow.mock.calls[1][0]).not.toBe(firstArgs);
+  expect(mocks.addVersionRunOrThrow.mock.calls[1][0][`${role}VersionIndex`]).toBe(7);
+  expect(
+    mocks.cryptoWorkerCall.mock.calls.filter(([method]) => method === "deriveIdentityMaterialV1"),
+  ).toHaveLength(4);
 }
 
 describe("AddVersionModal", () => {
@@ -297,6 +444,9 @@ describe("AddVersionModal", () => {
     mocks.addVersionRunOrThrow.mockReset();
     mocks.addVersionFlow = { status: "idle" };
     mocks.addVersionReset.mockReset();
+    mocks.addVersionReset.mockImplementation(() => {
+      mocks.addVersionFlow.status = "idle";
+    });
     mocks.confirmTransactionPreview = null;
     mocks.invalidateByTx.mockReset();
     mocks.toastSuccess.mockReset();
@@ -312,6 +462,22 @@ describe("AddVersionModal", () => {
     mocks.terminateZkWorkerIfIdle.mockReturnValue(true);
     mocks.clearSecretInputs.mockReset();
     mocks.secretInputRead.mockReset();
+    mocks.fatherPresent = false;
+    mocks.motherPresent = false;
+    mocks.personGateway.listVersionEndorsements.mockReset().mockResolvedValue({
+      versionIndices: [],
+      endorsementCounts: [],
+      tokenIds: [],
+      totalVersions: 0,
+      hasMore: false,
+      nextOffset: 0,
+    });
+    mocks.personGateway.listPersonVersionsPage.mockReset().mockResolvedValue({
+      versions: [],
+      totalVersions: 0,
+      hasMore: false,
+      nextOffset: 0,
+    });
     mocks.cacheValidatedPersonVersion.mockReset();
     mocks.cacheValidatedPersonVersion.mockResolvedValue(undefined);
     mocks.captureMetadataCacheRevision.mockReset();
@@ -733,6 +899,287 @@ describe("AddVersionModal", () => {
     expect(mocks.onSuccess).toHaveBeenCalledWith(flowResult);
   });
 
+  it("reuses the encrypted package after cancelling preview without rebuilding an empty-passphrase identity", async () => {
+    const flowResult = successfulFlowResult();
+    mocks.addVersionRunOrThrow
+      .mockImplementationOnce(async () => {
+        const approved = await mocks.confirmTransactionPreview?.({
+          envelopeBytes: 20,
+          payloadBytes: 20,
+          segmentCount: 1,
+          canonicalPayload: "0x1234",
+          payloadHash,
+          estimated: true,
+          estimatedGas: 100n,
+          gasLimit: 120n,
+          estimatedFee: 1n,
+          maximumFee: 2n,
+          nativeSymbol: "ETH",
+        });
+        if (!approved)
+          throw Object.assign(new Error("cancelled"), { code: "ADD_VERSION_PREVIEW_REJECTED" });
+        return flowResult;
+      })
+      .mockResolvedValueOnce(flowResult);
+    render(modalWithTransactionCentre());
+    await fillRequiredFields();
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /Add Version/i }));
+    });
+    fireEvent.click(await screen.findByRole("button", { name: "Cancel Submission" }));
+    await waitFor(() =>
+      expect(
+        (screen.getByRole("button", { name: /Add Version/i }) as HTMLButtonElement).disabled,
+      ).toBe(false),
+    );
+    const firstArgs = mocks.addVersionRunOrThrow.mock.calls[0][0];
+    expect(transactionRecords()).toMatchObject([{ phase: "failed" }]);
+    expect(mocks.toastError).not.toHaveBeenCalled();
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /Add Version/i }));
+    });
+    await waitFor(() => expect(mocks.toastSuccess).toHaveBeenCalledOnce());
+    expect(mocks.addVersionRunOrThrow.mock.calls[1][0]).toBe(firstArgs);
+    expect(
+      mocks.cryptoWorkerCall.mock.calls.filter(([method]) => method === "deriveIdentityMaterialV1"),
+    ).toHaveLength(1);
+    expect(
+      mocks.cryptoWorkerCall.mock.calls.filter(
+        ([method]) => method === "encryptPersonVersionEnvelopeV1",
+      ),
+    ).toHaveLength(1);
+    expect(transactionRecords()).toMatchObject([
+      { phase: "done", transactionHash: "0xadd" },
+      { phase: "failed" },
+    ]);
+  });
+
+  it("keeps the selected parent version after secret cleanup and retries the same package", async () => {
+    mocks.fatherPresent = true;
+    mocks.personGateway.listVersionEndorsements.mockResolvedValue({
+      versionIndices: [4],
+      endorsementCounts: [7],
+      tokenIds: [0],
+      totalVersions: 1,
+      hasMore: false,
+      nextOffset: 0,
+    });
+    mocks.personGateway.listPersonVersionsPage.mockResolvedValue({
+      versions: [{ versionIndex: 4, addedBy: submitter, timestamp: 1 }],
+      totalVersions: 1,
+      hasMore: false,
+      nextOffset: 0,
+    });
+    mocks.addVersionRunOrThrow.mockRejectedValue(
+      new Error("RPC timeout while waiting for receipt"),
+    );
+    renderAddVersionModal();
+    await waitFor(() => expect(mocks.personGateway.listVersionEndorsements).toHaveBeenCalled());
+    await fillRequiredFields();
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /Add Version/i }));
+    });
+    await waitFor(() => expect(mocks.toastError).toHaveBeenCalledOnce());
+    const firstArgs = mocks.addVersionRunOrThrow.mock.calls[0][0];
+    expect(firstArgs.fatherVersionIndex).toBe(4);
+    fireEvent.click(screen.getByRole("button", { name: /Back to edit/i }));
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /Add Version/i }));
+    });
+    await waitFor(() => expect(mocks.addVersionRunOrThrow).toHaveBeenCalledTimes(2));
+    expect(mocks.addVersionRunOrThrow.mock.calls[1][0]).toBe(firstArgs);
+    expect(
+      mocks.cryptoWorkerCall.mock.calls.filter(([method]) => method === "deriveIdentityMaterialV1"),
+    ).toHaveLength(2);
+  });
+
+  it.each(["father", "mother"] as const)(
+    "queries the new %s identity and rebuilds after a manual passphrase edit",
+    async (role) => {
+      const { firstArgs, changedHash } = await prepareFailedParentSubmission(role);
+      fireEvent.change(screen.getByLabelText(`${role} identity passphrase test input`), {
+        target: { value: "replacement-parent-passphrase" },
+      });
+      await expectFreshParentSubmission(role, firstArgs, changedHash);
+    },
+  );
+
+  it.each(["father", "mother"] as const)(
+    "discards the old %s package when its name is cleared, passphrase edited and name restored",
+    async (role) => {
+      const { firstArgs, changedHash } = await prepareFailedParentSubmission(role);
+      const nameInput = screen.getByLabelText(
+        `${role} identity name test input`,
+      ) as HTMLInputElement;
+      const originalName = nameInput.value;
+      fireEvent.change(nameInput, { target: { value: "" } });
+      fireEvent.change(screen.getByLabelText(`${role} identity passphrase test input`), {
+        target: { value: "replacement-parent-passphrase" },
+      });
+      fireEvent.change(nameInput, { target: { value: originalName } });
+      await expectFreshParentSubmission(role, firstArgs, changedHash);
+    },
+  );
+
+  it.each([
+    ["father", "name", "A different father"],
+    ["mother", "name", "A different mother"],
+    ["father", "birth year", "1791"],
+    ["mother", "birth year", "1792"],
+  ] as const)(
+    "immediately requeries the %s after editing its %s while a package is prepared",
+    async (role, field, value) => {
+      const { changedHash } = await prepareFailedParentSubmission(role);
+      fireEvent.change(screen.getByLabelText(`${role} identity ${field} test input`), {
+        target: { value },
+      });
+      await waitFor(() =>
+        expect(mocks.personGateway.listVersionEndorsements).toHaveBeenCalledWith(
+          changedHash,
+          0,
+          100,
+        ),
+      );
+      expect(mocks.addVersionRunOrThrow).toHaveBeenCalledOnce();
+      expect(
+        (
+          screen.getByRole("checkbox", {
+            name: /guess the passphrase offline/i,
+          }) as HTMLInputElement
+        ).checked,
+      ).toBe(false);
+    },
+  );
+
+  it("requires renewed passphrase consent after discarding a terminally failed package", async () => {
+    mocks.addVersionRunOrThrow.mockRejectedValue(
+      Object.assign(new Error("insufficient funds"), { code: "INSUFFICIENT_FUNDS" }),
+    );
+    renderAddVersionModal();
+    await fillRequiredFields();
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /Add Version/i }));
+    });
+    fireEvent.click(await screen.findByRole("button", { name: /Back to edit/i }));
+    expect(
+      (screen.getByRole("checkbox", { name: /guess the passphrase offline/i }) as HTMLInputElement)
+        .checked,
+    ).toBe(false);
+    expect(
+      (screen.getByRole("button", { name: /Add Version/i }) as HTMLButtonElement).disabled,
+    ).toBe(true);
+  });
+
+  it("settles background confirmation with its original cache revision without changing a reopened form", async () => {
+    let confirm!: (result: ReturnType<typeof successfulFlowResult>) => void;
+    mocks.addVersionRunOrThrow.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          confirm = resolve;
+        }),
+    );
+    const view = render(modalWithTransactionCentre());
+    await fillRequiredFields();
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /Add Version/i }));
+    });
+    await waitFor(() => expect(mocks.addVersionRunOrThrow).toHaveBeenCalledOnce());
+    mocks.addVersionFlow.status = "confirming";
+    view.rerender(modalWithTransactionCentre());
+    const originalId = transactionRecords()[0].id;
+    fireEvent.click(screen.getByRole("button", { name: /Continue in background/i }));
+    view.rerender(modalWithTransactionCentre(false));
+    view.rerender(modalWithTransactionCentre());
+    mocks.captureMetadataCacheRevision.mockReturnValue(22);
+    await act(async () => {
+      confirm(successfulFlowResult());
+    });
+    await waitFor(() => expect(mocks.toastSuccess).toHaveBeenCalledOnce());
+    expect(transactionRecords()).toMatchObject([
+      { id: originalId, phase: "done", transactionHash: "0xadd" },
+    ]);
+    expect(mocks.cacheValidatedPersonVersion).toHaveBeenCalledWith(expect.any(Object), 11);
+    expect(mocks.invalidateByTx).toHaveBeenCalledOnce();
+    expect(mocks.toastError).not.toHaveBeenCalled();
+    expect(mocks.onSuccess).not.toHaveBeenCalled();
+    expect(formSectionsHidden()).toBe(false);
+    expect(screen.queryByText("Transaction Successful")).toBeNull();
+  });
+
+  it("ordinary close resets and cancels local completion while recording an already-sent transaction", async () => {
+    let confirm!: (result: ReturnType<typeof successfulFlowResult>) => void;
+    mocks.addVersionRunOrThrow.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          confirm = resolve;
+        }),
+    );
+    const view = render(modalWithTransactionCentre());
+    await fillRequiredFields();
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /Add Version/i }));
+    });
+    await waitFor(() => expect(mocks.addVersionRunOrThrow).toHaveBeenCalledOnce());
+    mocks.addVersionFlow.status = "confirming";
+    view.rerender(modalWithTransactionCentre());
+    const originalId = transactionRecords()[0].id;
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    expect(mocks.addVersionReset).toHaveBeenCalled();
+    view.rerender(modalWithTransactionCentre(false));
+    view.rerender(modalWithTransactionCentre());
+    await act(async () => {
+      confirm(successfulFlowResult());
+    });
+    await waitFor(() =>
+      expect(transactionRecords()).toMatchObject([
+        { id: originalId, phase: "done", transactionHash: "0xadd" },
+      ]),
+    );
+    expect(mocks.readerContract.getVersionDetails).not.toHaveBeenCalled();
+    expect(mocks.cacheValidatedPersonVersion).not.toHaveBeenCalled();
+    expect(mocks.invalidateByTx).not.toHaveBeenCalled();
+    expect(mocks.toastSuccess).not.toHaveBeenCalled();
+    expect(mocks.toastError).not.toHaveBeenCalled();
+    expect(mocks.onSuccess).not.toHaveBeenCalled();
+    expect(formSectionsHidden()).toBe(false);
+    expect(
+      (screen.getByPlaceholderText("e.g. From the family register") as HTMLInputElement).value,
+    ).toBe("");
+    expect(
+      screen.getAllByRole("checkbox").every((checkbox) => !(checkbox as HTMLInputElement).checked),
+    ).toBe(true);
+  });
+
+  it("close during Reader verification cancels enrichment even if the delayed read fails", async () => {
+    let rejectRead!: (reason: Error) => void;
+    mocks.readerContract.getVersionDetails.mockImplementationOnce(
+      () =>
+        new Promise((_resolve, reject) => {
+          rejectRead = reject;
+        }),
+    );
+    mocks.addVersionRunOrThrow.mockResolvedValueOnce(successfulFlowResult());
+    const view = render(modalWithTransactionCentre());
+    await fillRequiredFields();
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /Add Version/i }));
+    });
+    await waitFor(() => expect(mocks.readerContract.getVersionDetails).toHaveBeenCalledOnce());
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    view.rerender(modalWithTransactionCentre(false));
+    await act(async () => {
+      rejectRead(new Error("Reader unavailable after close"));
+    });
+    await waitFor(() =>
+      expect(transactionRecords()).toMatchObject([{ phase: "done", transactionHash: "0xadd" }]),
+    );
+    expect(mocks.cacheValidatedPersonVersion).not.toHaveBeenCalled();
+    expect(mocks.invalidateByTx).not.toHaveBeenCalled();
+    expect(mocks.toastError).not.toHaveBeenCalled();
+    expect(mocks.toastSuccess).not.toHaveBeenCalled();
+    expect(mocks.onSuccess).not.toHaveBeenCalled();
+  });
+
   it("builds a new package when a passphrase is edited after an uncertain send failure", async () => {
     const flowResult = successfulFlowResult();
     mocks.addVersionRunOrThrow
@@ -832,7 +1279,11 @@ describe("AddVersionModal", () => {
       // A spinner here would claim the flow is working when it is the user's
       // turn, which reads as a step already under way.
       const marks = Array.from(document.querySelectorAll("ol li")).map(
-        (li) => li.querySelector("svg")?.getAttribute("class")?.match(/lucide-([a-z-]+)/)?.[1] ?? "dot",
+        (li) =>
+          li
+            .querySelector("svg")
+            ?.getAttribute("class")
+            ?.match(/lucide-([a-z-]+)/)?.[1] ?? "dot",
       );
       const confirmIndex = marks.length - 2;
       expect(marks[confirmIndex]).toBe("arrow-right");

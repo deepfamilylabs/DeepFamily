@@ -358,6 +358,206 @@ describe("useAddVersionFlow", () => {
     expect(mocks.createDeepFamilyContract).not.toHaveBeenCalled();
   });
 
+  it.each(["reset", "unmount"] as const)(
+    "declines a delayed preview after the request is cancelled by %s",
+    async (cancel) => {
+      let resolveEstimate!: () => void;
+      const pendingEstimate = new Promise<void>((resolve) => {
+        resolveEstimate = resolve;
+      });
+      const confirmTransactionPreview = vi.fn(async () => true);
+      const walletRequest = vi.fn();
+      mocks.executeAddVersionFlow.mockImplementation(async (params) => {
+        await pendingEstimate;
+        if (!(await params.confirmTransactionPreview({}))) {
+          throw Object.assign(new Error("Preview declined"), {
+            code: "ADD_VERSION_PREVIEW_REJECTED",
+          });
+        }
+        await params.assertWalletScope();
+        walletRequest();
+        return {};
+      });
+      const hook = renderHook(() => useAddVersionFlow({ confirmTransactionPreview }));
+      let pending!: Promise<any>;
+      act(() => {
+        pending = hook.result.current.runOrThrow(flowArgs);
+      });
+      await vi.waitFor(() => expect(mocks.executeAddVersionFlow).toHaveBeenCalledOnce());
+      act(() => {
+        if (cancel === "reset") hook.result.current.reset();
+        else hook.unmount();
+      });
+      await act(async () => {
+        resolveEstimate();
+        await expect(pending).rejects.toMatchObject({ code: "ADD_VERSION_PREVIEW_REJECTED" });
+      });
+
+      expect(confirmTransactionPreview).not.toHaveBeenCalled();
+      expect(walletRequest).not.toHaveBeenCalled();
+    },
+  );
+
+  it("declines an approved preview if its request was reset while awaiting the decision", async () => {
+    let resolveDecision!: (approved: boolean) => void;
+    const confirmTransactionPreview = vi.fn(
+      () =>
+        new Promise<boolean>((resolve) => {
+          resolveDecision = resolve;
+        }),
+    );
+    const walletRequest = vi.fn();
+    mocks.executeAddVersionFlow.mockImplementation(async (params) => {
+      if (!(await params.confirmTransactionPreview({}))) {
+        throw Object.assign(new Error("Preview declined"), {
+          code: "ADD_VERSION_PREVIEW_REJECTED",
+        });
+      }
+      await params.assertWalletScope();
+      walletRequest();
+      return {};
+    });
+    const { result } = renderHook(() => useAddVersionFlow({ confirmTransactionPreview }));
+    let pending!: Promise<any>;
+    act(() => {
+      pending = result.current.runOrThrow(flowArgs);
+    });
+    await vi.waitFor(() => expect(confirmTransactionPreview).toHaveBeenCalledOnce());
+    act(() => result.current.reset());
+    await act(async () => {
+      resolveDecision(true);
+      await expect(pending).rejects.toMatchObject({ code: "ADD_VERSION_PREVIEW_REJECTED" });
+    });
+
+    expect(walletRequest).not.toHaveBeenCalled();
+  });
+
+  it("stops before sending when reset occurs during the final wallet scope RPC", async () => {
+    let resolveWalletChain!: (value: string) => void;
+    mocks.wallet.signer.provider.send.mockResolvedValueOnce("0x7b").mockImplementationOnce(
+      () =>
+        new Promise<string>((resolve) => {
+          resolveWalletChain = resolve;
+        }),
+    );
+    const walletRequest = vi.fn();
+    mocks.executeAddVersionFlow.mockImplementation(async (params) => {
+      await params.assertWalletScope();
+      walletRequest();
+      return {};
+    });
+    const { result } = renderHook(() => useAddVersionFlow());
+    let pending!: Promise<any>;
+    act(() => {
+      pending = result.current.runOrThrow(flowArgs);
+    });
+    await vi.waitFor(() => expect(mocks.wallet.signer.provider.send).toHaveBeenCalledTimes(2));
+    act(() => result.current.reset());
+    await act(async () => {
+      resolveWalletChain("0x7b");
+      await expect(pending).rejects.toMatchObject({ code: "ADD_VERSION_PREVIEW_REJECTED" });
+    });
+
+    expect(walletRequest).not.toHaveBeenCalled();
+  });
+
+  it.each(["reset", "unmount", "reset then change Reader"] as const)(
+    "returns the confirmed broadcast result after %s without updating the closed flow",
+    async (close) => {
+      let resolveReceipt!: (value: any) => void;
+      const pendingReceipt = new Promise((resolve) => {
+        resolveReceipt = resolve;
+      });
+      const transactionHash = `0x${"77".repeat(32)}`;
+      const serviceResult = {
+        hash: "0xperson",
+        index: 1,
+        rewardAmount: 0,
+        transactionHash,
+        blockNumber: 10,
+        events: {
+          PersonHashZKVerified: null,
+          PersonVersionAdded: null,
+          MetadataStored: null,
+          TokenRewardDistributed: null,
+        },
+      };
+      mocks.executeAddVersionFlow.mockImplementation(async (params) => {
+        await params.assertWalletScope();
+        params.onTransactionSubmitted(transactionHash);
+        return pendingReceipt;
+      });
+      const hook = renderHook(() => useAddVersionFlow());
+      let pending!: Promise<any>;
+      act(() => {
+        pending = hook.result.current.runOrThrow(flowArgs);
+      });
+      await vi.waitFor(() => expect(hook.result.current.status).toBe("confirming"));
+      act(() => {
+        if (close === "unmount") hook.unmount();
+        else hook.result.current.reset();
+      });
+      if (close === "reset then change Reader") {
+        mocks.config.readerAddress = "0x0000000000000000000000000000000000000fed";
+        hook.rerender();
+      }
+      await act(async () => {
+        resolveReceipt(serviceResult);
+        await expect(pending).resolves.toBe(serviceResult);
+      });
+
+      if (close !== "unmount") {
+        expect(hook.result.current.status).toBe("idle");
+        expect(hook.result.current.result).toBeNull();
+      }
+    },
+  );
+
+  it("keeps a newer package's reconciliation hash when an older background transaction completes", async () => {
+    let resolveOldReceipt!: (value: any) => void;
+    const pendingOldReceipt = new Promise((resolve) => {
+      resolveOldReceipt = resolve;
+    });
+    const oldHash = `0x${"88".repeat(32)}`;
+    const replacementHash = `0x${"99".repeat(32)}`;
+    const newHash = `0x${"aa".repeat(32)}`;
+    const newerArgs = { ...flowArgs, metadataEnvelope: new Uint8Array([1, 2, 3]) };
+    const oldResult = { transactionHash: replacementHash };
+    const newResult = { transactionHash: newHash };
+    let reportOldHash!: (hash: string) => void;
+    mocks.executeAddVersionFlow
+      .mockImplementationOnce(async (params) => {
+        reportOldHash = params.onTransactionSubmitted;
+        reportOldHash(oldHash);
+        return pendingOldReceipt;
+      })
+      .mockImplementationOnce(async (params) => {
+        params.onTransactionSubmitted(newHash);
+        throw new Error("New transaction receipt timeout");
+      })
+      .mockResolvedValueOnce(newResult);
+    const { result } = renderHook(() => useAddVersionFlow());
+    let oldPending!: Promise<any>;
+    act(() => {
+      oldPending = result.current.runOrThrow(flowArgs);
+    });
+    await vi.waitFor(() => expect(result.current.status).toBe("confirming"));
+    act(() => result.current.reset());
+    await act(async () => {
+      await expect(result.current.runOrThrow(newerArgs)).rejects.toThrow("receipt timeout");
+    });
+    await act(async () => {
+      reportOldHash(replacementHash);
+      resolveOldReceipt(oldResult);
+      await expect(oldPending).resolves.toBe(oldResult);
+    });
+    await act(async () => {
+      await expect(result.current.runOrThrow(newerArgs)).resolves.toBe(newResult);
+    });
+
+    expect(mocks.executeAddVersionFlow.mock.calls[2][0].reconcileTransactionHash).toBe(newHash);
+  });
+
   it("fails before contract creation when wallet or contract config is missing", async () => {
     mocks.wallet.signer = null;
 

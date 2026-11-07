@@ -39,6 +39,9 @@ const SUPERSEDED = "Transaction flow was superseded by a newer request";
 
 export type UseTxFlowOptions<TError = unknown> = {
   normalizeError?: (error: unknown) => TError;
+  /** Return a confirmed result to its caller after reset/unmount, without updating UI state.
+   * The runner must guard every pre-send boundary with update.isCurrent(). */
+  allowBackgroundCompletion?: boolean;
 };
 
 export type UseTxFlowReturn<TResult, TArgs extends unknown[], TError = unknown> = TxFlowState<
@@ -60,8 +63,8 @@ export function useTxFlow<TResult = unknown, TArgs extends unknown[] = [], TErro
 
   const runIdRef = useRef(0);
 
-  // An unmounted flow supersedes its own in-flight run: nothing left can show
-  // the outcome, so it must not write state or report success to a caller.
+  // Unmount supersedes UI updates. A runner that explicitly supports background
+  // completion can still return its confirmed result to the original caller.
   useEffect(
     () => () => {
       runIdRef.current += 1;
@@ -69,6 +72,7 @@ export function useTxFlow<TResult = unknown, TArgs extends unknown[] = [], TErro
     [],
   );
   const normalizeError = options.normalizeError;
+  const allowBackgroundCompletion = options.allowBackgroundCompletion === true;
   const toFlowError = useCallback(
     (err: unknown): TError => (normalizeError ? normalizeError(err) : (err as TError)),
     [normalizeError],
@@ -145,6 +149,7 @@ export function useTxFlow<TResult = unknown, TArgs extends unknown[] = [], TErro
         const flowResult = await runner(guardedUpdate(thisRunId), ...args);
 
         if (runIdRef.current !== thisRunId) {
+          if (allowBackgroundCompletion) return flowResult;
           throw new Error(SUPERSEDED);
         }
 
@@ -163,7 +168,7 @@ export function useTxFlow<TResult = unknown, TArgs extends unknown[] = [], TErro
         throw err;
       }
     },
-    [runner, resetState, toFlowError, guardedUpdate],
+    [allowBackgroundCompletion, runner, resetState, toFlowError, guardedUpdate],
   );
 
   return { status, stepMessage, error, txHash, receipt, result, reset, run, runOrThrow };

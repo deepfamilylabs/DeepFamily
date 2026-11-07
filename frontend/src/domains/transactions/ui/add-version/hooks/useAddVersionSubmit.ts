@@ -1,5 +1,5 @@
 import { ethers } from "ethers";
-import { useCallback, useRef, type MutableRefObject } from "react";
+import { useCallback, useEffect, useRef, type MutableRefObject } from "react";
 import {
   DFM1_MAX_ENVELOPE_BYTES,
   ZERO_BYTES32,
@@ -100,12 +100,19 @@ interface UseAddVersionSubmitArgs {
   setSuccessResult: (value: AddVersionSuccessResultView | null) => void;
   setIsSubmitting: (value: boolean) => void;
   submissionPackageRef: MutableRefObject<RetryableAddVersionSubmission | null>;
+  submissionAttemptRef?: MutableRefObject<number>;
+  /** Only an explicit background action may continue local completion after close. */
+  completionPolicyRef?: MutableRefObject<{ allowBackground: boolean }>;
+  /** Cleared secret inputs must be reviewed again before rebuilding a discarded package. */
+  onSubmissionDiscarded?: () => void;
+  captureValidatedPersonVersionCache?: () => UseAddVersionSubmitArgs["cacheValidatedPersonVersion"];
   /** Records the outcome even if this modal is gone by the time it lands. */
   settleTransaction: (outcome: {
     phase: "done" | "failed";
     transactionHash?: string;
     error?: any;
   }) => void;
+  captureSettlement?: () => UseAddVersionSubmitArgs["settleTransaction"];
 }
 
 export interface RetryableAddVersionSubmission {
@@ -216,12 +223,9 @@ function isDefinitelyNotRetryable(error: unknown): boolean {
   const code = value.code ?? value.error?.code;
   const reason = String(value.reason ?? value.shortMessage ?? value.message ?? "");
   return (
-    code === 4001 ||
-    code === "ACTION_REJECTED" ||
     code === "INSUFFICIENT_FUNDS" ||
     code === "CALL_EXCEPTION" ||
     code === ADD_VERSION_SCOPE_CHANGED ||
-    code === "ADD_VERSION_PREVIEW_REJECTED" ||
     code === "TRANSACTION_RECONCILIATION_MISMATCH" ||
     reason.includes("DuplicateVersionCommitment")
   );
@@ -335,8 +339,20 @@ export function useAddVersionSubmit({
   setSuccessResult,
   setIsSubmitting,
   submissionPackageRef,
+  submissionAttemptRef,
+  completionPolicyRef,
+  onSubmissionDiscarded,
+  captureValidatedPersonVersionCache,
   settleTransaction,
+  captureSettlement,
 }: UseAddVersionSubmitArgs) {
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
   const latestRuntimeScopeRef = useRef({
     signer,
     chainId,
@@ -347,6 +363,19 @@ export function useAddVersionSubmit({
 
   return useCallback(
     async (data: AddVersionFormInput) => {
+      const attempt = submissionAttemptRef?.current;
+      const completionPolicy = completionPolicyRef?.current;
+      const isCurrentAttempt = () =>
+        mountedRef.current && attempt === submissionAttemptRef?.current;
+      const canComplete = () => isCurrentAttempt() || completionPolicy?.allowBackground === true;
+      const assertCurrentAttempt = () => {
+        if (!isCurrentAttempt()) {
+          throw Object.assign(new Error("Add Version submission was cancelled before handoff"), {
+            code: "ADD_VERSION_PREVIEW_REJECTED",
+          });
+        }
+      };
+      if (!isCurrentAttempt()) return;
       if (!allConsentsChecked) {
         setConsentError(
           t(
@@ -391,6 +420,8 @@ export function useAddVersionSubmit({
         father: fatherCalcRef.current,
         mother: motherCalcRef.current,
       });
+      const settle = captureSettlement?.() ?? settleTransaction;
+      const cacheValidated = captureValidatedPersonVersionCache?.() ?? cacheValidatedPersonVersion;
 
       setSuccessResult(null);
       setErrorResult(null);
@@ -408,8 +439,12 @@ export function useAddVersionSubmit({
       let zkWorkStarted = false;
       let cryptoWorkerReleased = false;
       let zkWorkerReleased = false;
+      let activeSubmission: RetryableAddVersionSubmission | null = null;
+      let handedOff = false;
+      let confirmedTransactionHash: string | null = null;
 
       const submitPrepared = async (submission: RetryableAddVersionSubmission) => {
+        assertCurrentAttempt();
         const assertCurrentScope = async () => {
           const current = latestRuntimeScopeRef.current;
           if (!current.signer) throw addVersionScopeChangedError();
@@ -423,12 +458,24 @@ export function useAddVersionSubmit({
         };
 
         await assertCurrentScope();
+        assertCurrentAttempt();
         setProofStep("handoff");
+        handedOff = true;
         const result = await runAddVersionOrThrow(submission.args);
         // A receipt now proves this exact package is on-chain. Never retry it,
         // even if a subsequent Reader/cache check fails.
         submission.broadcastConfirmed = true;
+        confirmedTransactionHash = result.transactionHash;
+        const finishCancelledConfirmation = () => {
+          if (canComplete()) return false;
+          // Closing cancels local completion, but an exact confirmed transaction
+          // still belongs in its original public transaction record.
+          settle({ phase: "done", transactionHash: result.transactionHash });
+          return true;
+        };
+        if (finishCancelledConfirmation()) return;
         await assertCurrentScope();
+        if (finishCancelledConfirmation()) return;
 
         const confirmationProvider = getReadonlyProvider(
           submission.confirmationRpcUrl,
@@ -454,7 +501,9 @@ export function useAddVersionSubmit({
           expectedPayloadHash: submission.payloadHash,
           expectedPayloadLength: submission.args.metadataEnvelope.length,
         });
+        if (finishCancelledConfirmation()) return;
         await assertCurrentScope();
+        if (finishCancelledConfirmation()) return;
         const anchors = {
           personHash: result.hash,
           versionIndex: result.index,
@@ -485,25 +534,32 @@ export function useAddVersionSubmit({
           identitySuiteId: submission.validated.identitySuiteId,
         });
         await assertCurrentScope();
-        cacheValidatedPersonVersion(node);
-        submissionPackageRef.current = null;
+        if (finishCancelledConfirmation()) return;
+        cacheValidated(node);
+        if (isCurrentAttempt() && submissionPackageRef.current === submission) {
+          submissionPackageRef.current = null;
+        }
 
         toastSuccess(t("contract.addVersionSuccess", "Person version added successfully"));
-        settleTransaction({ phase: "done", transactionHash: result.transactionHash });
-        setSuccessResult(buildAddVersionSuccessResultView(result));
-        setProofStep("");
+        settle({ phase: "done", transactionHash: result.transactionHash });
+        if (isCurrentAttempt()) {
+          setSuccessResult(buildAddVersionSuccessResultView(result));
+          setProofStep("");
+        }
         invalidateByTx({
           events: { PersonVersionAdded: result.events?.PersonVersionAdded || null },
           hints: { personHash: result.hash, versionIndex: result.index },
         });
-        onSuccess?.(result);
+        if (isCurrentAttempt()) onSuccess?.(result);
       };
 
       try {
         const existingSubmission = submissionPackageRef.current;
         if (existingSubmission) {
+          activeSubmission = existingSubmission;
           if (existingSubmission.draftKey !== draftKey) {
             submissionPackageRef.current = null;
+            onSubmissionDiscarded?.();
             throw new Error(
               t(
                 "addVersion.changedAfterPreparation",
@@ -516,6 +572,7 @@ export function useAddVersionSubmit({
         }
 
         const submitterAddress = await signer.getAddress();
+        assertCurrentAttempt();
         const scope = createAddVersionTransactionScope({
           chainId,
           contractAddress,
@@ -527,11 +584,14 @@ export function useAddVersionSubmit({
         // identity job finishes before the next role is sent to the worker.
         cryptoWorkStarted = true;
         personIdentity = await resolveIdentityMaterial(personCalcRef.current);
+        assertCurrentAttempt();
         if (!personIdentity) {
           throw new Error(t("addVersion.personInfoRequired", "Please fill in person information"));
         }
         fatherIdentity = await resolveIdentityMaterial(fatherCalcRef.current);
+        assertCurrentAttempt();
         motherIdentity = await resolveIdentityMaterial(motherCalcRef.current);
+        assertCurrentAttempt();
         if (!fatherIdentity && processedData.fatherVersionIndex !== 0) {
           throw new Error("A father version index requires complete father identity fields");
         }
@@ -554,6 +614,7 @@ export function useAddVersionSubmit({
           },
           { timeoutMs: 120_000 },
         );
+        assertCurrentAttempt();
         const versionCommitment = BigInt(prepared.versionCommitment);
         const fatherHash = fatherIdentity?.personHash ?? ZERO_BYTES32;
         const motherHash = motherIdentity?.personHash ?? ZERO_BYTES32;
@@ -572,6 +633,7 @@ export function useAddVersionSubmit({
         if (await deepFamily.versionExists(personIdentity.personHash, versionHash)) {
           throw duplicateVersionError();
         }
+        assertCurrentAttempt();
 
         const context: MetadataContextInput = {
           chainId: scope.chainId,
@@ -589,6 +651,7 @@ export function useAddVersionSubmit({
           { metadata },
           { timeoutMs: 120_000 },
         );
+        assertCurrentAttempt();
         setProofStep("preparing");
 
         zkWorkStarted = true;
@@ -603,6 +666,7 @@ export function useAddVersionSubmit({
           proof: copyProofEnvelope(generated.proof),
           publicSignals: copyAddVersionPublicSignals(generated.publicSignals),
         }));
+        assertCurrentAttempt();
         if (BigInt(publicSignals.versionCommitment) !== versionCommitment) {
           throw new Error("Relation proof versionCommitment does not match canonical metadata");
         }
@@ -618,6 +682,7 @@ export function useAddVersionSubmit({
           },
           { timeoutMs: 240_000 },
         );
+        assertCurrentAttempt();
         const metadataEnvelope = ethers.getBytes(encrypted.envelopeHex);
         if (
           metadataEnvelope.length > DFM1_MAX_ENVELOPE_BYTES ||
@@ -640,6 +705,7 @@ export function useAddVersionSubmit({
           },
           { timeoutMs: 300_000 },
         );
+        assertCurrentAttempt();
         if (
           validatedWorkerResult.versionCommitment !== versionCommitment.toString() ||
           !sameHex(validatedWorkerResult.payloadHash, encrypted.payloadHash)
@@ -677,6 +743,8 @@ export function useAddVersionSubmit({
           motherHash,
           broadcastConfirmed: false,
         };
+        assertCurrentAttempt();
+        activeSubmission = submission;
         submissionPackageRef.current = submission;
 
         // From this point only the immutable public package and a separately
@@ -696,27 +764,48 @@ export function useAddVersionSubmit({
         zkWorkerReleased = terminateZkWorkerIfIdle();
         await submitPrepared(submission);
       } catch (error) {
-        const retained = submissionPackageRef.current;
-        if (retained?.broadcastConfirmed || isDefinitelyNotRetryable(error)) {
-          submissionPackageRef.current = null;
-        }
-        if ((error as any)?.code === "ADD_VERSION_PREVIEW_REJECTED") {
-          setProofStep("");
+        if (!canComplete() && confirmedTransactionHash !== null) {
+          settle({ phase: "done", transactionHash: confirmedTransactionHash });
           return;
         }
-        console.error("Add version failed:", sanitizeErrorForLogging(error));
+        const retained = submissionPackageRef.current;
+        if (
+          isCurrentAttempt() &&
+          retained !== null &&
+          retained === activeSubmission &&
+          (retained.broadcastConfirmed || isDefinitelyNotRetryable(error))
+        ) {
+          submissionPackageRef.current = null;
+          onSubmissionDiscarded?.();
+        }
+        if (
+          (error as any)?.code === "ADD_VERSION_PREVIEW_REJECTED" ||
+          (!isCurrentAttempt() && !handedOff)
+        ) {
+          const cancellation = Object.assign(
+            new Error("Add Version submission cancelled before wallet request"),
+            { code: "ADD_VERSION_PREVIEW_REJECTED" },
+          );
+          settle({ phase: "failed", error: getFriendlyError(cancellation, t) });
+          if (isCurrentAttempt()) setProofStep("");
+          return;
+        }
         const friendly = getFriendlyError(error, t);
-        settleTransaction({ phase: "failed", error: friendly });
+        settle({ phase: "failed", error: friendly });
+        if (!canComplete()) return;
+        console.error("Add version failed:", sanitizeErrorForLogging(error));
         toastError(
           t("contract.addVersionFailed", "Failed to add person version") + ": " + friendly.message,
         );
-        setErrorResult({
-          type: friendly.type || "UNKNOWN_ERROR",
-          message: friendly.message,
-          details: friendly.details,
-          retryable: friendly.retryable,
-        });
-        setProofStep("");
+        if (isCurrentAttempt()) {
+          setErrorResult({
+            type: friendly.type || "UNKNOWN_ERROR",
+            message: friendly.message,
+            details: friendly.details,
+            retryable: friendly.retryable,
+          });
+          setProofStep("");
+        }
       } finally {
         rawPassphrase = "";
         personIdentity = null;
@@ -727,14 +816,17 @@ export function useAddVersionSubmit({
         validatedWorkerResult = null;
         if (cryptoWorkStarted && !cryptoWorkerReleased) terminateCryptoWorkerIfIdle();
         if (zkWorkStarted && !zkWorkerReleased) terminateZkWorkerIfIdle();
-        setIsSubmitting(false);
+        if (isCurrentAttempt()) setIsSubmitting(false);
       }
     },
     [
       allConsentsChecked,
       buildMetadataPayload,
       cacheValidatedPersonVersion,
+      captureSettlement,
+      captureValidatedPersonVersionCache,
       chainId,
+      completionPolicyRef,
       contractAddress,
       fatherCalcRef,
       generatePersonCommitmentProof,
@@ -742,6 +834,7 @@ export function useAddVersionSubmit({
       isContractReady,
       motherCalcRef,
       onSuccess,
+      onSubmissionDiscarded,
       personCalcRef,
       readerAddress,
       rpcUrl,
@@ -752,8 +845,10 @@ export function useAddVersionSubmit({
       setIsSubmitting,
       setProofStep,
       setSuccessResult,
+      settleTransaction,
       signer,
       submissionPackageRef,
+      submissionAttemptRef,
       t,
       toastError,
       toastSuccess,

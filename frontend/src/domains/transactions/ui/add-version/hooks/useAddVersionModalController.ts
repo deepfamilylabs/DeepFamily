@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useTranslation } from "react-i18next";
@@ -87,6 +87,17 @@ function calculatorHasIdentity(calc: PersonHashCalculatorHandle | null): boolean
   return safeCanonicalizeFullName(calc?.getPublicFormData().fullName || "").length > 0;
 }
 
+function identityFieldsKey(info: PersonInfoPublic): string {
+  return JSON.stringify([
+    info.fullName,
+    info.gender,
+    info.birthYear,
+    info.birthMonth,
+    info.birthDay,
+    info.isBirthBC,
+  ]);
+}
+
 export function useAddVersionModalController({
   isOpen,
   onClose,
@@ -104,23 +115,34 @@ export function useAddVersionModalController({
   const [transactionPreview, setTransactionPreview] = useState<AddVersionTransactionPreview | null>(
     null,
   );
+  const modalOpenRef = useRef(isOpen);
+  modalOpenRef.current = isOpen;
+  const submissionAttemptRef = useRef(0);
+  const completionPolicyRef = useRef({ allowBackground: false });
   const transactionPreviewDecisionRef = useRef<((approved: boolean) => void) | null>(null);
-  const confirmTransactionPreview = useCallback(
-    (preview: AddVersionTransactionPreview) =>
-      new Promise<boolean>((resolve) => {
-        // There must only be one wallet-bound package awaiting a decision.
-        transactionPreviewDecisionRef.current?.(false);
-        transactionPreviewDecisionRef.current = resolve;
-        setTransactionPreview(preview);
-      }),
-    [],
-  );
+  const confirmTransactionPreview = useCallback((preview: AddVersionTransactionPreview) => {
+    if (!modalOpenRef.current) return Promise.resolve(false);
+    return new Promise<boolean>((resolve) => {
+      // There must only be one wallet-bound package awaiting a decision.
+      transactionPreviewDecisionRef.current?.(false);
+      transactionPreviewDecisionRef.current = resolve;
+      setTransactionPreview(preview);
+    });
+  }, []);
   const decideTransactionPreview = useCallback((approved: boolean) => {
     const resolve = transactionPreviewDecisionRef.current;
     transactionPreviewDecisionRef.current = null;
     setTransactionPreview(null);
     resolve?.(approved);
   }, []);
+  useEffect(
+    () => () => {
+      submissionAttemptRef.current += 1;
+      transactionPreviewDecisionRef.current?.(false);
+      transactionPreviewDecisionRef.current = null;
+    },
+    [],
+  );
   const {
     status: addVersionStatus,
     reset: resetAddVersionFlow,
@@ -149,6 +171,11 @@ export function useAddVersionModalController({
   const [motherPassphraseConfirmed, setMotherPassphraseConfirmed] = useState(true);
   const motherCalcRef = useRef<PersonHashCalculatorHandle | null>(null);
   const submissionPackageRef = useRef<RetryableAddVersionSubmission | null>(null);
+  const identityFieldsKeysRef = useRef<Record<AddVersionIdentityRole, string | null>>({
+    person: null,
+    father: null,
+    mother: null,
+  });
   // Tracks the hash each parent's version index was last decided for, so an
   // arriving lookup never overrules a choice the user already made.
   const autoAppliedVersionHashRef = useRef<Record<ParentKind, string | null>>({
@@ -189,11 +216,12 @@ export function useAddVersionModalController({
 
   // The hash is derived from the passphrase alone, so an unconfirmed passphrase
   // would query versions of an identity the user has not vouched for yet.
+  const frozenSubmission = submissionPackageRef.current;
   const fatherVersionLookup = usePersonVersionOptions(
-    fatherPassphraseConfirmed ? fatherHash : null,
+    frozenSubmission ? frozenSubmission.fatherHash : fatherPassphraseConfirmed ? fatherHash : null,
   );
   const motherVersionLookup = usePersonVersionOptions(
-    motherPassphraseConfirmed ? motherHash : null,
+    frozenSubmission ? frozenSubmission.motherHash : motherPassphraseConfirmed ? motherHash : null,
   );
 
   const watchedValues = watch();
@@ -231,7 +259,7 @@ export function useAddVersionModalController({
     isBusy: isSubmitting,
   });
 
-  const { settle: settleTransaction } = useTransactionCenterEntry({
+  const { settle: settleTransaction, captureSettlement } = useTransactionCenterEntry({
     kind: "addVersion",
     label: t("addVersion.title", "Add Version"),
     phase,
@@ -242,6 +270,8 @@ export function useAddVersionModalController({
 
   const resetBusinessState = useCallback(
     (options?: { remountCalculators?: boolean }) => {
+      submissionAttemptRef.current += 1;
+      completionPolicyRef.current = { allowBackground: false };
       reset();
       setPersonInfo(null);
       setFatherInfo(null);
@@ -253,6 +283,7 @@ export function useAddVersionModalController({
       autoAppliedVersionHashRef.current = { father: null, mother: null };
       decideTransactionPreview(false);
       submissionPackageRef.current = null;
+      identityFieldsKeysRef.current = { person: null, father: null, mother: null };
       confirmedCacheRevisionRef.current = null;
       setIsSubmitting(false);
       resetCommitmentProof();
@@ -289,9 +320,17 @@ export function useAddVersionModalController({
   }, [isOpen, resetBusinessState]);
 
   const handleClose = useCallback(() => {
+    modalOpenRef.current = false;
     resetBusinessState();
     requestFrameClose();
   }, [requestFrameClose, resetBusinessState]);
+
+  const handleRunInBackground = useCallback(() => {
+    // This permission belongs to the original attempt. Reset creates a fresh
+    // policy for the next form, while that attempt keeps this explicit choice.
+    completionPolicyRef.current.allowBackground = true;
+    handleClose();
+  }, [handleClose]);
 
   const handleContinueAdding = useCallback(() => {
     resetBusinessState({ remountCalculators: true });
@@ -299,22 +338,37 @@ export function useAddVersionModalController({
 
   const updatePassphraseRisk = useCallback(
     (role: AddVersionIdentityRole, calc: PersonHashCalculatorHandle | null) => {
-      // Do not even read a null parent's secret input. If the parent later
-      // becomes non-null, onParentInfoChange takes the first risk snapshot.
-      if (role !== "person" && !calculatorHasIdentity(calc)) return;
       // A wallet/RPC retry may reuse only the exact passphrase-derived package
       // the user already reviewed. Any later secret edit starts a new attempt;
       // otherwise draftKey (deliberately free of secrets) would silently reuse
       // an envelope encrypted under the previous passphrase.
+      const hadPreparedSubmission = submissionPackageRef.current !== null;
       submissionPackageRef.current = null;
+      // An optional parent's empty name does not make a real secret edit safe
+      // to ignore: the name can subsequently be restored to its old value.
+      if (role !== "person" && !calculatorHasIdentity(calc) && !hadPreparedSubmission) return;
       setConsents(invalidateAddVersionPassphraseConsents);
     },
     [],
   );
 
-  const updateParentInfo = useCallback(
-    (role: ParentKind, value: PersonInfoPublic, calc: PersonHashCalculatorHandle | null) => {
-      if (role === "father") setFatherInfo(value);
+  const updateIdentityInfo = useCallback(
+    (role: AddVersionIdentityRole, value: PersonInfoPublic) => {
+      const previousKey = identityFieldsKeysRef.current[role];
+      const nextKey = identityFieldsKey(value);
+      identityFieldsKeysRef.current[role] = nextKey;
+      // Public identity edits change the person too. Ignore hasPassphrase-only
+      // notifications from automatic secret cleanup, which is not a new draft.
+      if (
+        previousKey !== null &&
+        previousKey !== nextKey &&
+        submissionPackageRef.current !== null
+      ) {
+        submissionPackageRef.current = null;
+        setConsents(invalidateAddVersionPassphraseConsents);
+      }
+      if (role === "person") setPersonInfo(value);
+      else if (role === "father") setFatherInfo(value);
       else setMotherInfo(value);
     },
     [],
@@ -371,6 +425,10 @@ export function useAddVersionModalController({
   }, [fatherPresent, motherPresent]);
 
   useEffect(() => {
+    // Clearing secret inputs changes the calculators' live hashes. The frozen
+    // package still refers to the user's original parent versions until they
+    // explicitly edit it or start a fresh submission.
+    if (isSubmitting || submissionPackageRef.current) return;
     for (const [role, lookup, field] of [
       ["father", fatherVersionLookup, "fatherVersionIndex"],
       ["mother", motherVersionLookup, "motherVersionIndex"],
@@ -383,7 +441,7 @@ export function useAddVersionModalController({
       autoAppliedVersionHashRef.current[role] = update.decidedForHash;
       setValue(field, update.versionIndex);
     }
-  }, [fatherVersionLookup, motherVersionLookup, setValue]);
+  }, [fatherVersionLookup, isSubmitting, motherVersionLookup, setValue]);
 
   const handleParentVersionIndexChange = useCallback(
     (role: ParentKind, value: number) => {
@@ -409,15 +467,13 @@ export function useAddVersionModalController({
     [consentError],
   );
 
-  const cacheConfirmedAfterTransaction = useCallback(
-    (node: Parameters<typeof cacheConfirmedPersonVersion>[0]) => {
+  const captureValidatedPersonVersionCache = useCallback(() => {
+    const revision = confirmedCacheRevisionRef.current ?? -1;
+    return (node: Parameters<typeof cacheConfirmedPersonVersion>[0]) => {
       // Public anchors were verified immediately before this callback. The
       // cache reports projection, reconciliation and durability failures as a
       // rejected promise, preserving the confirmed chain transaction's result.
-      const persistence = cacheConfirmedPersonVersion(
-        node,
-        confirmedCacheRevisionRef.current ?? -1,
-      );
+      const persistence = cacheConfirmedPersonVersion(node, revision);
       void persistence.catch((error: unknown) => {
         if (isDevMode()) {
           console.warn("Confirmed person-version cache update failed", {
@@ -425,9 +481,16 @@ export function useAddVersionModalController({
           });
         }
       });
-    },
-    [cacheConfirmedPersonVersion],
+    };
+  }, [cacheConfirmedPersonVersion]);
+  const cacheConfirmedAfterTransaction = useCallback(
+    (node: Parameters<typeof cacheConfirmedPersonVersion>[0]) =>
+      captureValidatedPersonVersionCache()(node),
+    [captureValidatedPersonVersionCache],
   );
+  const onSubmissionDiscarded = useCallback(() => {
+    setConsents(invalidateAddVersionPassphraseConsents);
+  }, []);
 
   const submitAddVersion = useAddVersionSubmit({
     t,
@@ -456,11 +519,17 @@ export function useAddVersionModalController({
     setSuccessResult,
     setIsSubmitting,
     submissionPackageRef,
+    submissionAttemptRef,
+    completionPolicyRef,
+    onSubmissionDiscarded,
     settleTransaction,
+    captureSettlement,
+    captureValidatedPersonVersionCache,
   });
 
   const onSubmit = useCallback(
     async (data: AddVersionFormInput) => {
+      completionPolicyRef.current = { allowBackground: false };
       // A retryable package has already passed this exact consent snapshot and
       // its secret inputs were deliberately erased before the wallet/RPC wait.
       // Retry validation belongs to the frozen package path in useAddVersionSubmit.
@@ -502,7 +571,7 @@ export function useAddVersionModalController({
       formResetKey,
       personCalcRef,
       initialPersonData,
-      onPersonInfoChange: setPersonInfo,
+      onPersonInfoChange: (value: PersonInfoPublic) => updateIdentityInfo("person", value),
       onPassphraseChange: handlePersonPassphraseChange,
     },
     fatherSection: {
@@ -516,8 +585,7 @@ export function useAddVersionModalController({
       versionLookup: fatherVersionLookup,
       passphraseConfirmed: fatherPassphraseConfirmed,
       onExpandedChange: setFatherExpanded,
-      onInfoChange: (value: PersonInfoPublic) =>
-        updateParentInfo("father", value, fatherCalcRef.current),
+      onInfoChange: (value: PersonInfoPublic) => updateIdentityInfo("father", value),
       onComputedHashChange: setFatherHash,
       onVersionIndexChange: (value: number) => handleParentVersionIndexChange("father", value),
       onPassphraseChange: handleFatherPassphraseChange,
@@ -534,8 +602,7 @@ export function useAddVersionModalController({
       versionLookup: motherVersionLookup,
       passphraseConfirmed: motherPassphraseConfirmed,
       onExpandedChange: setMotherExpanded,
-      onInfoChange: (value: PersonInfoPublic) =>
-        updateParentInfo("mother", value, motherCalcRef.current),
+      onInfoChange: (value: PersonInfoPublic) => updateIdentityInfo("mother", value),
       onComputedHashChange: setMotherHash,
       onVersionIndexChange: (value: number) => handleParentVersionIndexChange("mother", value),
       onPassphraseChange: handleMotherPassphraseChange,
@@ -608,9 +675,9 @@ export function useAddVersionModalController({
       personInfo,
       allConsentsChecked,
       isParentVersionLookupPending,
-      // Only once the transaction is away. Before that, closing cancels, so
-      // offering to "continue in background" would be a lie.
-      onRunInBackground: addVersionStatus === "confirming" ? handleClose : undefined,
+      // Closing always resets the modal. Only this explicit action permits
+      // local cache/notification work to continue for an already-sent transaction.
+      onRunInBackground: addVersionStatus === "confirming" ? handleRunInBackground : undefined,
       transactionPreview,
       onTransactionPreviewDecision: decideTransactionPreview,
       onClose: handleClose,
