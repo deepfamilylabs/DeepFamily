@@ -8,7 +8,7 @@ import { safeCanonicalizeFullName } from "../../../../../shared/identity/fullNam
 import { useResponsiveModalMode } from "../../../../../shared/ui";
 import { useWallet } from "../../../../wallet";
 import { useContractClient } from "../../../hooks/useContractClient";
-import { useEndorsedVersionIndex } from "../../../hooks/useEndorsedVersionIndex";
+import { useEndorsedVersionLookup } from "../../../hooks/useEndorsedVersionIndex";
 import { usePersonVersionOptions } from "../../../hooks/usePersonVersionOptions";
 import { reconcileMintVersionSelection } from "../model/mintVersionSelection";
 import { useTreeGraphData, useTreeMutations } from "../../../../tree";
@@ -70,8 +70,19 @@ export function useMintNftModalController({
   const { markVersionMinted } = useTreeMutations();
   const { nodesData } = useTreeGraphData();
   const mintNFTSchema = useMemo(() => createMintNFTSchema(t), [t]);
-  const { transactionPreview, confirmTransactionPreview, decideTransactionPreview } =
+  const modalOpenRef = useRef(isOpen);
+  modalOpenRef.current = isOpen;
+  const submissionAttemptRef = useRef(0);
+  const { transactionPreview, confirmTransactionPreview: requestTransactionPreview, decideTransactionPreview } =
     useTransactionPreviewDecision<ArchiveTransactionPreview>();
+  const confirmTransactionPreview = useCallback(
+    (preview: ArchiveTransactionPreview) =>
+      modalOpenRef.current ? requestTransactionPreview(preview) : Promise.resolve(false),
+    [requestTransactionPreview],
+  );
+  useEffect(() => () => {
+    submissionAttemptRef.current += 1;
+  }, []);
   const {
     status: mintNftStatus,
     reset: resetMintNftFlow,
@@ -105,7 +116,7 @@ export function useMintNftModalController({
   } = useTransactionTargetSelection({ isOpen });
   const targetVersionIndex = versionIndex;
   const hasTargetInputs = hasValidTarget;
-  const endorsedVersionIndex = useEndorsedVersionIndex(
+  const endorsedVersionLookup = useEndorsedVersionLookup(
     isOpen && isPersonHashFormatValid ? targetPersonHash : null,
     address,
     endorsementReader,
@@ -129,11 +140,19 @@ export function useMintNftModalController({
   }, [hasValidTarget, nodesData, targetPersonHash, targetVersionIndex]);
 
   const isDesktop = useResponsiveModalMode();
-  const { entered, requestClose: handleClose } = useTransactionModalFrameState({
+  const requestCancellation = useCallback(() => {
+    modalOpenRef.current = false;
+    submissionAttemptRef.current += 1;
+    decideTransactionPreview(false);
+    resetDisclosureProof();
+    resetMintNftFlow();
+    onClose();
+  }, [decideTransactionPreview, onClose, resetDisclosureProof, resetMintNftFlow]);
+  const { entered, requestClose: requestFrameClose } = useTransactionModalFrameState({
     isOpen,
     isDesktop,
     modalId: "MintNFTModal",
-    onClose,
+    onClose: requestCancellation,
   });
 
   const targetStatus = useMintTargetStatus({
@@ -201,15 +220,16 @@ export function useMintNftModalController({
     isBlocked: isAlreadyMinted,
   });
 
-  const { settle: settleTransaction } = useTransactionCenterEntry({
+  const { settle: settleTransaction, captureSettlement } = useTransactionCenterEntry({
     kind: "mint",
     label: t("mintNFT.title", "Mint NFT"),
     phase,
-    transactionHash: successResult?.transactionHash,
+    transactionHash: successResult?.transactionHash ?? errorResult?.transactionHash,
     error: errorResult,
   });
 
   const resetBusinessState = useCallback(() => {
+    submissionAttemptRef.current += 1;
     reset();
     seedTarget("", 1);
     setPersonInfo(null);
@@ -233,8 +253,15 @@ export function useMintNftModalController({
     decideTransactionPreview,
   ]);
 
+  const handleClose = useCallback(() => {
+    modalOpenRef.current = false;
+    resetBusinessState();
+    requestFrameClose();
+  }, [requestFrameClose, resetBusinessState]);
+
   useEffect(() => {
     if (isOpen) {
+      submissionAttemptRef.current += 1;
       const nextHash = initialPersonHash || "";
       const nextIndex = initialVersionIndex || 0;
       seedTarget(nextHash, nextIndex);
@@ -263,9 +290,14 @@ export function useMintNftModalController({
   // version a lookup preselects is a minting rule, not a shared one.
   useEffect(() => {
     applyVersionDecision(
-      reconcileMintVersionSelection(versionLookup, getDecidedVersionHash(), endorsedVersionIndex),
+      reconcileMintVersionSelection(
+        versionLookup,
+        getDecidedVersionHash(),
+        endorsedVersionLookup.versionIndex,
+        endorsedVersionLookup.status === "ready",
+      ),
     );
-  }, [applyVersionDecision, endorsedVersionIndex, getDecidedVersionHash, versionLookup]);
+  }, [applyVersionDecision, endorsedVersionLookup, getDecidedVersionHash, versionLookup]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -275,12 +307,15 @@ export function useMintNftModalController({
     if (!changed) return;
 
     previousTargetRef.current = { hash: targetPersonHash, index: targetVersionIndex };
+    submissionAttemptRef.current += 1;
+    decideTransactionPreview(false);
+    resetDisclosureProof();
     setSuccessResult(null);
     setErrorResult(null);
     setConsentError(null);
     didPatchCacheRef.current = false;
     resetMintNftFlow();
-  }, [isOpen, resetMintNftFlow, targetPersonHash, targetVersionIndex]);
+  }, [decideTransactionPreview, isOpen, resetDisclosureProof, resetMintNftFlow, targetPersonHash, targetVersionIndex]);
 
   const toggleConsent = useCallback(
     (key: keyof MintConsents) => {
@@ -336,6 +371,9 @@ export function useMintNftModalController({
     setSuccessResult,
     setShowEndorseConfirm,
     settleTransaction,
+    captureSettlement,
+    modalOpenRef,
+    submissionAttemptRef,
   });
 
   return {
@@ -391,13 +429,12 @@ export function useMintNftModalController({
           {
             id: "proof",
             label: t("transaction.stepProof", "Generate zero-knowledge proof"),
-            // Says what the label cannot: how long, and what it needs from you.
             detail:
               proofStep === "verifying"
                 ? t("mintNFT.verifyingProof", "Verifying zero-knowledge proof...")
                 : t(
-                    "transaction.proofDuration",
-                    "This can take 30–60 seconds; keep this tab active.",
+                    "transaction.proofGenerationHint",
+                    "Keep this page open while the proof is generated.",
                   ),
           },
           {
@@ -419,8 +456,8 @@ export function useMintNftModalController({
           },
         ],
         currentId: timelineStep,
-        failed: phase === "failed",
-        complete: phase === "done",
+        failed: phase === "failed" && !errorResult?.transactionConfirmed,
+        complete: phase === "done" || errorResult?.transactionConfirmed === true,
         // This step stops for the user; it must not look like work in progress.
         awaiting: phase === "review",
       }),
@@ -440,9 +477,6 @@ export function useMintNftModalController({
       hasTargetInputs,
       hasValidTarget,
       hasVerifiedTargetEnvelope: targetSelfSuiteId !== null,
-      // Only once the transaction is away. Before that, closing cancels, so
-      // offering to "continue in background" would be a lie.
-      onRunInBackground: mintNftStatus === "confirming" ? handleClose : undefined,
       transactionPreview,
       onTransactionPreviewDecision: decideTransactionPreview,
       onClose: handleClose,

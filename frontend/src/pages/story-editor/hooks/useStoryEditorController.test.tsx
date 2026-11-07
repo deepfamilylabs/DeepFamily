@@ -385,3 +385,28 @@ describe("story preview scope", () => {
     },
   );
 });
+
+
+it.each([
+  ["append", "read"], ["append", "mismatch"], ["seal", "read"], ["seal", "mismatch"],
+] as const)("refreshes confirmed %s after %s failure without resubmitting", async (operation, failure) => {
+  const records = [record(0)];
+  mocks.storyQuery.data = { records, metadata: metadata(records) };
+  const flow = operation === "append" ? mocks.addFlow : mocks.sealFlow;
+  flow.runOrThrow.mockRejectedValueOnce(Object.assign(new Error("readback failed"), {
+    transactionConfirmed: true, transactionHash: "0xconfirmed", verificationFailure: failure,
+  }));
+  const { result } = renderHook(() => useStoryEditorController());
+  if (operation === "append") {
+    act(() => result.current.form.updateContent("Public draft"));
+    await act(async () => result.current.form.submit());
+  } else await act(async () => result.current.seal.execute());
+  const error = operation === "append" ? result.current.form.error : result.current.seal.error;
+  expect(error).toContain("The transaction is confirmed");
+  expect(error).toContain(failure === "read" ? "Refresh the page" : "did not pass verification");
+  expect(error).toContain("Transaction: 0xconfirmed");
+  expect(flow.runOrThrow).toHaveBeenCalledOnce();
+  expect(mocks.storyQuery.refetch).toHaveBeenCalledWith({ keepData: true });
+  expect(mocks.queryClient.clear).toHaveBeenCalledWith("story:7");
+  expect(mocks.toast.success).not.toHaveBeenCalled();
+});

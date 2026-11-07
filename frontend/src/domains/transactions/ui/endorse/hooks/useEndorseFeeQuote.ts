@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ethers } from "ethers";
 import { createDeepTokenContract } from "../../../../../shared/clients/contractFactory";
 import type { EndorseFeeQuote, ExecuteEndorseFlowResult } from "../model/endorseTypes";
@@ -24,8 +24,28 @@ const defaultFeeQuote = {
 
 export function useEndorseFeeQuote({ isOpen, address, contract }: UseEndorseFeeQuoteArgs) {
   const [quote, setQuote] = useState(defaultFeeQuote);
+  const scopeRef = useRef({ address, contract, isOpen });
+  scopeRef.current = { address, contract, isOpen };
+  const quoteScopeRef = useRef(scopeRef.current);
+  const isCurrentScope = useCallback(
+    () =>
+      scopeRef.current.address === address &&
+      scopeRef.current.contract === contract &&
+      scopeRef.current.isOpen === isOpen,
+    [address, contract, isOpen],
+  );
+  // Hide an old wallet's balance in the render before the loading effect runs.
+  const visibleQuote =
+    isOpen &&
+    quoteScopeRef.current.address === address &&
+    quoteScopeRef.current.contract === contract &&
+    quoteScopeRef.current.isOpen === isOpen
+      ? quote
+      : defaultFeeQuote;
 
   useEffect(() => {
+    quoteScopeRef.current = { address, contract, isOpen };
+    setQuote(defaultFeeQuote);
     if (!isOpen || !address || !contract || !contract.runner) return;
     let cancelled = false;
 
@@ -75,39 +95,50 @@ export function useEndorseFeeQuote({ isOpen, address, contract }: UseEndorseFeeQ
   }, [address, contract, isOpen]);
 
   /** The fee the submission actually read, so the panel stops showing a stale one. */
-  const applyFeeQuote = useCallback((next: EndorseFeeQuote) => {
-    setQuote((current) => ({
-      ...current,
-      loaded: true,
-      deepTokenFee: next.feeFormatted,
-      deepTokenFeeRaw: next.fee,
-      deepTokenDecimals: next.decimals,
-      deepTokenSymbol: next.symbol,
-    }));
-  }, []);
-
-  const applySuccessResult = useCallback((result: Extract<ExecuteEndorseFlowResult, { alreadyEndorsed: false }>) => {
-    setQuote((current) => {
-      const nextBalance = result.balanceBefore - result.fee;
-      return {
+  const applyFeeQuote = useCallback(
+    (next: EndorseFeeQuote) => {
+      if (!isCurrentScope()) return;
+      setQuote((current) => ({
         ...current,
-        deepTokenFee: result.feeFormatted,
-        deepTokenFeeRaw: result.fee,
-        deepTokenDecimals: result.decimals,
-        deepTokenSymbol: result.symbol,
-        userDeepBalance: nextBalance >= 0n ? ethers.formatUnits(nextBalance, result.decimals) : current.userDeepBalance,
-        userDeepBalanceRaw: nextBalance >= 0n ? nextBalance : current.userDeepBalanceRaw,
-      };
-    });
-  }, []);
+        loaded: true,
+        deepTokenFee: next.feeFormatted,
+        deepTokenFeeRaw: next.fee,
+        deepTokenDecimals: next.decimals,
+        deepTokenSymbol: next.symbol,
+      }));
+    },
+    [isCurrentScope],
+  );
+
+  const applySuccessResult = useCallback(
+    (result: Extract<ExecuteEndorseFlowResult, { alreadyEndorsed: false }>) => {
+      if (!isCurrentScope()) return;
+      setQuote((current) => {
+        const nextBalance = result.balanceBefore - result.fee;
+        return {
+          ...current,
+          deepTokenFee: result.feeFormatted,
+          deepTokenFeeRaw: result.fee,
+          deepTokenDecimals: result.decimals,
+          deepTokenSymbol: result.symbol,
+          userDeepBalance:
+            nextBalance >= 0n
+              ? ethers.formatUnits(nextBalance, result.decimals)
+              : current.userDeepBalance,
+          userDeepBalanceRaw: nextBalance >= 0n ? nextBalance : current.userDeepBalanceRaw,
+        };
+      });
+    },
+    [isCurrentScope],
+  );
 
   return useMemo(
     () => ({
-      ...quote,
-      canAffordEndorsement: quote.userDeepBalanceRaw >= quote.deepTokenFeeRaw,
+      ...visibleQuote,
+      canAffordEndorsement: visibleQuote.userDeepBalanceRaw >= visibleQuote.deepTokenFeeRaw,
       applyFeeQuote,
       applySuccessResult,
     }),
-    [applyFeeQuote, applySuccessResult, quote],
+    [applyFeeQuote, applySuccessResult, visibleQuote],
   );
 }

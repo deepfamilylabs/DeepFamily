@@ -9,7 +9,7 @@ import {
 import { getFriendlyError, type FriendlyError } from "../../../../../shared/lib/errors";
 import { useTxFlow, type TxFlowRunner } from "../../../hooks/useTxFlow";
 import { mintBiographyTransaction } from "../../../services/mintBiographyTransaction";
-import type { ArchiveTransactionPreview } from "../../../services/archiveTransaction";
+import { archivePreviewRejectedError, type ArchiveTransactionPreview } from "../../../services/archiveTransaction";
 import { executeMintFlow } from "../../../services/mintNftService";
 import { getReadonlyProvider } from "../../../../../shared/clients/providerRegistry";
 import type { ExecuteMintFlowResult, MintNftFlowArgs } from "../model/mintNftTypes";
@@ -35,6 +35,7 @@ export function useMintNftFlow(options: UseMintNftFlowOptions = {}) {
       update("validating", t("mintNFT.checkingEndorsement", "Checking endorsement status..."));
 
       const contract = createDeepFamilyContract(contractAddress, signer);
+      const readbackProvider = rpcUrl ? getReadonlyProvider(rpcUrl, chainId) : signer.provider;
 
       const mintPersonVersionNFT = async (
         proof: any,
@@ -49,6 +50,12 @@ export function useMintNftFlow(options: UseMintNftFlowOptions = {}) {
         return mintBiographyTransaction({
           contract,
           signer,
+          readbackProvider,
+          assertActive: () => {
+            if (!update.isCurrent()) {
+              throw archivePreviewRejectedError("Mint cancelled before wallet request");
+            }
+          },
           personHash: args.personHash,
           args: [
             proof,
@@ -62,12 +69,16 @@ export function useMintNftFlow(options: UseMintNftFlowOptions = {}) {
           // An abandoned run has nobody left to answer, and no custodian means
           // nobody can approve. Both are refusals — never a silent pass through
           // to the wallet, and never a decision left hanging.
-          confirm: async (preview) =>
-            update.isCurrent() ? ((await confirmTransactionPreview?.(preview)) ?? false) : false,
+          confirm: async (preview) => {
+            if (!update.isCurrent()) return false;
+            const approved = (await confirmTransactionPreview?.(preview)) ?? false;
+            return update.isCurrent() && approved;
+          },
           // Past the point of no return: the transaction is away, so an
           // abandoned run must carry on to the receipt and the readback rather
           // than abort here and leave a mint nobody verified.
-          onSubmitted: () => {
+          onSubmitted: (transactionHash) => {
+            args.onTransactionSubmitted?.(transactionHash);
             if (update.isCurrent()) {
               update("confirming", t("mintNFT.waitingConfirmation", "Waiting for confirmation..."));
             }
@@ -77,7 +88,7 @@ export function useMintNftFlow(options: UseMintNftFlowOptions = {}) {
 
       const getVersionDetails = readerAddress
         ? async (personHash: string, versionIndex: number) => {
-            const readContract = createDeepFamilyReaderContract(readerAddress, signer);
+            const readContract = createDeepFamilyReaderContract(readerAddress, readbackProvider);
             return await readContract.getVersionDetails(personHash, versionIndex);
           }
         : undefined;
@@ -87,7 +98,7 @@ export function useMintNftFlow(options: UseMintNftFlowOptions = {}) {
         // See useMintNftModalController: the wallet provider can answer from a
         // cached block right after the endorsement, so read it from the app's RPC.
         endorsementReader: rpcUrl
-          ? createDeepFamilyContract(contractAddress, getReadonlyProvider(rpcUrl, chainId))
+          ? createDeepFamilyContract(contractAddress, readbackProvider)
           : undefined,
         address,
         personHash: args.personHash,
@@ -117,5 +128,6 @@ export function useMintNftFlow(options: UseMintNftFlowOptions = {}) {
 
   return useTxFlow<ExecuteMintFlowResult, [MintNftFlowArgs], FriendlyError>(runner, {
     normalizeError: (error) => getFriendlyError(error, t),
+    allowBackgroundCompletion: true,
   });
 }

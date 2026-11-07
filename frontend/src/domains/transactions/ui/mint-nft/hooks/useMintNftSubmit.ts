@@ -1,4 +1,4 @@
-import { useCallback, type MutableRefObject } from "react";
+import { useCallback, useEffect, useRef, type MutableRefObject } from "react";
 import {
   getFriendlyError,
   isArchivePreviewRejected,
@@ -21,6 +21,7 @@ import type {
   MintPersonInfo,
 } from "../model/mintNftTypes";
 import { buildMintNFTSuccessResultView, toMintNFTErrorResult } from "../model/mintNftResultView";
+import type { TransactionSettlement } from "../../shared/useTransactionCenterEntry";
 
 type GenerateDisclosureProof = (args: {
   address: string;
@@ -67,12 +68,10 @@ interface UseMintNftSubmitArgs {
   setErrorResult: (value: MintNFTErrorResultView | null) => void;
   setSuccessResult: (value: MintNFTSuccessResultView | null) => void;
   setShowEndorseConfirm: (value: boolean) => void;
-  /** Records the outcome even if this modal is gone by the time it lands. */
-  settleTransaction: (outcome: {
-    phase: "done" | "failed";
-    transactionHash?: string;
-    error?: any;
-  }) => void;
+  modalOpenRef: MutableRefObject<boolean>;
+  submissionAttemptRef: MutableRefObject<number>;
+  settleTransaction: (outcome: TransactionSettlement) => void;
+  captureSettlement: (options?: { newEntry?: boolean }) => (outcome: TransactionSettlement) => void;
 }
 
 export function useMintNftSubmit({
@@ -100,9 +99,26 @@ export function useMintNftSubmit({
   setSuccessResult,
   setShowEndorseConfirm,
   settleTransaction,
+  captureSettlement,
+  modalOpenRef,
+  submissionAttemptRef,
 }: UseMintNftSubmitArgs) {
+  const mountedRef = useRef(true);
+  const runtimeScopeRef = useRef({ address, contract });
+  runtimeScopeRef.current = { address, contract };
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
+
   return useCallback(
     async (data: MintNFTFormValues) => {
+      if (!mountedRef.current || !modalOpenRef.current) return;
+      const attempt = ++submissionAttemptRef.current;
+      const isCurrentAttempt = () =>
+        mountedRef.current && modalOpenRef.current && attempt === submissionAttemptRef.current;
+      const isSameScope = () =>
+        runtimeScopeRef.current.address === address && runtimeScopeRef.current.contract === contract;
       const calculator = personCalcRef.current;
       if (!allConsentsChecked) {
         setConsentError(
@@ -198,6 +214,9 @@ export function useMintNftSubmit({
 
       setSuccessResult(null);
       setErrorResult(null);
+      const settle = captureSettlement({ newEntry: true }) ?? settleTransaction;
+      let handedOff = false;
+      let transactionHash: string | undefined;
 
       try {
         const proof = await generateDisclosureProof({
@@ -206,16 +225,18 @@ export function useMintNftSubmit({
           formData: data,
           targetPersonHash,
           selfSuiteId: targetSelfSuiteId!,
-          getPassphrase: () => personCalcRef.current?.getSecretInputs().passphrase || "",
+          getPassphrase: () => calculator.getSecretInputs().passphrase,
         });
+        if (!isCurrentAttempt()) {
+          throw Object.assign(new Error("Mint submission cancelled before wallet request"), {
+            code: "ARCHIVE_PREVIEW_REJECTED",
+          });
+        }
 
         // The proof, core info and token URI are built, so the passphrase is
         // not needed again. Clear the secret input before any wallet or RPC
         // wait, the same point add-version clears at.
-        // The proof, core info and token URI are built, so the passphrase is
-        // not needed again. Clear the secret input before any wallet or RPC
-        // wait, the same point add-version clears at.
-        personCalcRef.current?.clearSecretInputs();
+        calculator.clearSecretInputs();
 
         const finalPersonHash = targetPersonHash || proof.computedPersonHash;
         if (!finalPersonHash) {
@@ -223,6 +244,7 @@ export function useMintNftSubmit({
         }
         const finalVersionIndex = targetVersionIndex || 1;
 
+        handedOff = true;
         const mintResult = await runMintNftOrThrow({
           personHash: finalPersonHash,
           versionIndex: finalVersionIndex,
@@ -233,10 +255,12 @@ export function useMintNftSubmit({
           coreInfo: proof.coreInfo,
           storyTitle: data.storyTitle,
           story: data.story,
+          onTransactionSubmitted: (hash) => { transactionHash = hash; },
         });
 
         if (mintResult.requiresEndorsement) {
-          setShowEndorseConfirm(true);
+          settle({ phase: "failed", error: getFriendlyError(new Error("Endorsement required"), t) });
+          if (isCurrentAttempt()) setShowEndorseConfirm(true);
           return;
         }
 
@@ -245,6 +269,8 @@ export function useMintNftSubmit({
           { requiresEndorsement: false }
         >;
         const tokenId = successfulResult.tokenId;
+        settle({ phase: "done", transactionHash: successfulResult.transactionHash, error: null });
+        if (!isCurrentAttempt() || !isSameScope()) return;
 
         if (
           !didPatchCacheRef.current &&
@@ -265,11 +291,7 @@ export function useMintNftSubmit({
           } catch {}
         }
 
-        settleTransaction({
-          phase: "done",
-          transactionHash: successfulResult.transactionHash,
-        });
-
+        if (!isCurrentAttempt() || !isSameScope()) return;
         setSuccessResult(
           buildMintNFTSuccessResultView({
             result: successfulResult,
@@ -284,26 +306,55 @@ export function useMintNftSubmit({
           onSuccess?.(tokenId);
         }
       } catch (error) {
-        // Closing the fee preview sent nothing: no failure to show or record,
-        // the same as add-version.
-        if (isArchivePreviewRejected(error)) return;
+        const knownHash = (error as any)?.transactionHash ?? transactionHash;
+        const transactionConfirmed = (error as any)?.transactionConfirmed === true;
+        const verificationFailure = transactionConfirmed
+          ? ((error as any)?.verificationFailure === "read" ? "read" : "mismatch")
+          : undefined;
+        if (!isCurrentAttempt() && transactionConfirmed && knownHash) {
+          settle({ phase: "done", transactionHash: knownHash, error: null });
+          return;
+        }
+        if (isArchivePreviewRejected(error) || (!isCurrentAttempt() && !handedOff)) {
+          const cancellation = Object.assign(new Error("Mint submission cancelled before wallet request"), {
+            code: "ARCHIVE_PREVIEW_REJECTED",
+          });
+          settle({ phase: "failed", error: getFriendlyError(cancellation, t) });
+          return;
+        }
+        const original = getFriendlyError(error, t);
+        const friendly = transactionConfirmed
+          ? { ...original, message: verificationFailure === "read"
+            ? t(
+              "mintNFT.detailsReadFailed",
+              "The mint transaction is confirmed. Refresh the page to load its details.",
+            )
+            : t(
+              "mintNFT.verificationMismatch",
+              "The retrieved data did not pass verification. Check the transaction details.",
+            ), retryable: false }
+          : original;
+        settle({ phase: "failed", transactionHash: knownHash, error: friendly });
+        if (!isCurrentAttempt() || !isSameScope()) return;
         console.error("Mint NFT failed:", sanitizeErrorForLogging(error));
-        const friendly = getFriendlyError(error, t);
-        settleTransaction({ phase: "failed", error: friendly });
         setErrorResult({
           type: friendly.reason || friendly.type || "UNKNOWN_ERROR",
           message: friendly.message,
-          details: friendly.details,
+          details: [friendly.details, knownHash ? `${t("transaction.rowTransaction", "Transaction")}: ${knownHash}` : ""].filter(Boolean).join("\n"),
           retryable: friendly.retryable,
+          transactionHash: knownHash,
+          transactionConfirmed,
+          verificationFailure,
         });
       } finally {
-        resetDisclosureProof();
+        if (isCurrentAttempt()) resetDisclosureProof();
       }
     },
     [
       address,
       allConsentsChecked,
       contract,
+      captureSettlement,
       didPatchCacheRef,
       generateDisclosureProof,
       hasTargetInputs,
@@ -311,6 +362,7 @@ export function useMintNftSubmit({
       isAlreadyMinted,
       isEndorsed,
       markVersionMinted,
+      modalOpenRef,
       onSuccess,
       personCalcRef,
       personInfo,
@@ -321,6 +373,7 @@ export function useMintNftSubmit({
       setShowEndorseConfirm,
       setSuccessResult,
       settleTransaction,
+      submissionAttemptRef,
       t,
       targetPersonHash,
       targetSelfSuiteId,

@@ -141,11 +141,32 @@ export function isStaleStoryError(error: any): boolean {
   return reason === "StoryIndexMismatch" || reason === "StoryHeadMismatch";
 }
 
+function confirmedStoryError(
+  error: any,
+  t: (key: string, fallback: string) => string,
+): string | undefined {
+  if (error?.transactionConfirmed !== true) return undefined;
+  const message = error.verificationFailure === "read"
+    ? t(
+        "storyRecordEditor.confirmedReadFailed",
+        "The transaction is confirmed. Refresh the page to load its details.",
+      )
+    : t(
+        "storyRecordEditor.confirmedVerificationMismatch",
+        "The transaction is confirmed, but the retrieved data did not pass verification. Check the transaction details.",
+      );
+  return [
+    message,
+    error.transactionHash
+      ? `${t("transaction.rowTransaction", "Transaction")}: ${error.transactionHash}` : "",
+  ].filter(Boolean).join("\n");
+}
+
 export function mapStorySubmitError(
   error: any,
   t: (key: string, fallback: string) => string,
 ): string {
-  return getFriendlyErrorMessage(
+  return confirmedStoryError(error, t) ?? getFriendlyErrorMessage(
     error,
     t as any,
     t("storyRecordEditor.operationFailed", "Operation failed"),
@@ -157,7 +178,7 @@ export function mapStorySealError(
   error: any,
   t: (key: string, fallback: string) => string,
 ): string {
-  return getFriendlyErrorMessage(
+  return confirmedStoryError(error, t) ?? getFriendlyErrorMessage(
     error,
     t as any,
     t("storyRecordEditor.sealFailed", "Seal failed"),

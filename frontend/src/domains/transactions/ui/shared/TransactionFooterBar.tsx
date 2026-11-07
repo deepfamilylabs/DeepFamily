@@ -15,11 +15,6 @@ export type TransactionFooterSlots = {
   failed: { onClose: () => void; onBackToEdit: () => void };
   /** Still working the form — including while busy. */
   active: React.ReactNode;
-  /**
-   * Closes the modal without abandoning the flow. Offered only once the
-   * transaction is away: before that, closing still cancels.
-   */
-  onRunInBackground?: () => void;
 };
 
 /**
@@ -43,7 +38,6 @@ export function TransactionFooterBar({
   slots: TransactionFooterSlots;
 }) {
   const { t } = useTranslation();
-  const backgroundLabel = t("transaction.runInBackground", "Continue in background");
 
   return (
     <div className="grid grid-cols-[2fr_3fr] *:last:odd:col-span-2 sm:flex gap-2.5 px-5 py-3.5 bg-surface border-t border-hairline pb-[calc(0.875rem+env(safe-area-inset-bottom))]">
@@ -63,15 +57,7 @@ export function TransactionFooterBar({
       case "blocked":
         return slots.blocked ?? slots.active;
       case "busy":
-        // Nothing is being asked of the user any more, and the flow no longer
-        // needs this modal to finish — so say so, rather than make them wait.
-        return slots.onRunInBackground ? (
-          <TransactionButton onClick={slots.onRunInBackground} className="flex-1">
-            {backgroundLabel}
-          </TransactionButton>
-        ) : (
-          slots.active
-        );
+        return slots.active;
       case "failed":
         return (
           <>

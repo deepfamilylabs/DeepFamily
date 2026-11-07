@@ -13,7 +13,11 @@ const mocks = vi.hoisted(() => ({
   config: {
     contractAddress: "0x0000000000000000000000000000000000000abc",
     readerAddress: "0x0000000000000000000000000000000000000def",
+    rpcUrl: undefined as string | undefined,
+    chainId: undefined as number | undefined,
   },
+  readonlyProvider: { id: "fixed-rpc" },
+  getReadonlyProvider: vi.fn(),
   tx: { hash: "0xtx" },
   receipt: { transactionHash: "0xtx", blockNumber: 10 },
   contract: {
@@ -44,6 +48,10 @@ vi.mock("react-i18next", () => ({
 vi.mock("../../../../../shared/clients/contractFactory", () => ({
   createDeepFamilyContract: mocks.createDeepFamilyContract,
   createDeepFamilyReaderContract: mocks.createDeepFamilyReaderContract,
+}));
+
+vi.mock("../../../../../shared/clients/providerRegistry", () => ({
+  getReadonlyProvider: mocks.getReadonlyProvider,
 }));
 
 vi.mock("../../../api/txGateway", () => ({
@@ -139,6 +147,9 @@ describe("useMintNftFlow", () => {
     mocks.wallet.address = "0x00000000000000000000000000000000000000aa";
     mocks.config.contractAddress = "0x0000000000000000000000000000000000000abc";
     mocks.config.readerAddress = "0x0000000000000000000000000000000000000def";
+    mocks.config.rpcUrl = undefined;
+    mocks.config.chainId = undefined;
+    mocks.getReadonlyProvider.mockReset().mockReturnValue(mocks.readonlyProvider);
     mocks.contract.mintPersonVersionNFT.mockReset();
     mocks.contract.getVersionDetails.mockReset();
     mocks.createDeepFamilyContract.mockReset();
@@ -336,9 +347,10 @@ describe("useMintNftFlow", () => {
       // the receipt wait and the verification after it still have to happen.
       await act(async () => {
         walletSend.resolve();
-        await pending.catch(() => undefined);
+        await expect(pending).resolves.toBe(mocks.receipt);
       });
       expect(verifiedAfterSubmission).toHaveBeenCalledTimes(1);
+      expect(hook.result.current.result).toBeNull();
     },
   );
 
@@ -374,4 +386,47 @@ describe("useMintNftFlow", () => {
       expect(hook.result.current.transactionPreview).toBeNull();
     },
   );
+
+  it("checks cancellation again after an approved preview", async () => {
+    const previewDecision = deferred();
+    const confirm = vi.fn(async () => { await previewDecision.promise; return true; });
+    let serviceInput: any;
+    mocks.executeMintFlow.mockImplementation(invokeMint);
+    mocks.mintBiographyTransaction.mockImplementation(async (input) => {
+      serviceInput = input;
+      return input.confirm({ payloadBytes: 0 });
+    });
+    const hook = renderHook(() => useMintNftFlow({ confirmTransactionPreview: confirm }));
+    let pending!: Promise<unknown>;
+    act(() => { pending = hook.result.current.runOrThrow(flowArgs); });
+    await vi.waitFor(() => expect(confirm).toHaveBeenCalledOnce());
+    act(() => hook.result.current.reset());
+    await act(async () => {
+      previewDecision.resolve();
+      await expect(pending).resolves.toBe(false);
+    });
+    expect(() => serviceInput.assertActive()).toThrow(/cancelled/);
+  });
+
+  it("uses the captured fixed RPC for all post-submit reads and publishes replacement hashes", async () => {
+    mocks.config.rpcUrl = "http://original-rpc.invalid";
+    mocks.config.chainId = 31337;
+    const onTransactionSubmitted = vi.fn();
+    mocks.executeMintFlow.mockImplementation(async (params) => {
+      const receipt = await invokeMint(params);
+      await params.getVersionDetails(flowArgs.personHash, flowArgs.versionIndex);
+      return receipt;
+    });
+    mocks.mintBiographyTransaction.mockImplementation(async (input) => {
+      expect(input.readbackProvider).toBe(mocks.readonlyProvider);
+      input.onSubmitted("0xoriginal");
+      input.onSubmitted("0xreplacement");
+      return mocks.receipt;
+    });
+    const hook = renderHook(() => useMintNftFlow());
+    await act(async () => { await hook.result.current.runOrThrow({ ...flowArgs, onTransactionSubmitted }); });
+    expect(mocks.getReadonlyProvider).toHaveBeenCalledWith("http://original-rpc.invalid", 31337);
+    expect(mocks.createDeepFamilyReaderContract).toHaveBeenCalledWith(mocks.config.readerAddress, mocks.readonlyProvider);
+    expect(onTransactionSubmitted.mock.calls).toEqual([["0xoriginal"], ["0xreplacement"]]);
+  });
 });

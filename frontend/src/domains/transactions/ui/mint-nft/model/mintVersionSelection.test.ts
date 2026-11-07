@@ -30,6 +30,20 @@ describe("reconcileMintVersionSelection", () => {
     ).toEqual({ decidedForHash: HASH, versionIndex: 2 });
   });
 
+  it("waits for the endorsement query when the version list arrives first", () => {
+    const readyLookup = lookup({ versions: [version(1, 9), version(2, 1)], totalVersions: 2 });
+    const waiting = reconcileMintVersionSelection(readyLookup, null, 0, false);
+    expect(waiting).toBeNull();
+    expect(reconcileMintVersionSelection(readyLookup, waiting?.decidedForHash ?? null, 2, true))
+      .toEqual({ decidedForHash: HASH, versionIndex: 2 });
+  });
+
+  it("keeps an explicit selection when the pending endorsement query finishes", () => {
+    const readyLookup = lookup({ versions: [version(1, 9), version(2, 1)], totalVersions: 2 });
+    expect(reconcileMintVersionSelection(readyLookup, HASH, 0, false)).toBeNull();
+    expect(reconcileMintVersionSelection(readyLookup, HASH, 2, true)).toBeNull();
+  });
+
   it("leaves the choice open when the wallet endorsed nothing", () => {
     expect(
       reconcileMintVersionSelection(

@@ -1,3 +1,5 @@
+import { waitForExactTransactionReceipt } from "./exactTransactionReceipt";
+
 export type EnsureAllowanceOptions = {
   tokenContract: {
     allowance: (owner: string, spender: string) => Promise<bigint>;
@@ -9,6 +11,8 @@ export type EnsureAllowanceOptions = {
   owner: string;
   spender: string;
   required: bigint;
+  /** Cancels a pending allowance read before it can open the wallet. */
+  assertActive?: () => void;
 };
 
 export type EnsureAllowanceResult = {
@@ -23,8 +27,10 @@ export async function ensureAllowance({
   owner,
   spender,
   required,
+  assertActive,
 }: EnsureAllowanceOptions): Promise<EnsureAllowanceResult> {
   const currentAllowance = await tokenContract.allowance(owner, spender);
+  assertActive?.();
   if (currentAllowance >= required) {
     return {
       approved: false,
@@ -34,12 +40,12 @@ export async function ensureAllowance({
   }
 
   const tx = await tokenContract.approve(spender, required);
-  await tx.wait();
+  const { transactionHash } = await waitForExactTransactionReceipt({ transaction: tx });
 
   return {
     approved: true,
     currentAllowance,
     required,
-    approvalTxHash: tx.hash,
+    approvalTxHash: transactionHash,
   };
 }

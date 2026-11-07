@@ -47,6 +47,7 @@ export type ExecuteEndorseFlowParams = {
   quotedFee?: bigint;
   onStageChange?: (stage: EndorseServiceStage) => void;
   onFeeQuoteChange?: (quote: EndorseFeeQuote) => void;
+  assertActive?: () => void;
 };
 
 export type ExecuteEndorseFlowResult =
@@ -100,8 +101,10 @@ export async function executeEndorseFlow({
   quotedFee,
   onStageChange,
   onFeeQuoteChange,
+  assertActive,
 }: ExecuteEndorseFlowParams): Promise<ExecuteEndorseFlowResult> {
   const endorsedIdx = await contract.endorsedVersionIndex(personHash, address);
+  assertActive?.();
   if (Number(endorsedIdx) === Number(versionIndex)) {
     return { alreadyEndorsed: true };
   }
@@ -137,6 +140,7 @@ export async function executeEndorseFlow({
   // button. Publish what the chain says now, then make a drift the user's
   // decision instead of silently approving and spending the new amount.
   const feeFormatted = ethers.formatUnits(fee, decimals);
+  assertActive?.();
   onFeeQuoteChange?.({ fee, feeFormatted, decimals, symbol });
   if (quotedFee !== undefined && fee !== quotedFee) {
     throw attachErrorCode(
@@ -165,6 +169,7 @@ export async function executeEndorseFlow({
       owner: address,
       spender,
       required: fee,
+      assertActive,
     });
     approvalTxHash = approval.approvalTxHash;
   }
@@ -178,6 +183,7 @@ export async function executeEndorseFlow({
     label: "endorseVersion",
   });
 
+  assertActive?.();
   const receipt = await endorseVersion(
     personHash,
     versionIndex,

@@ -12,6 +12,7 @@ import {
   createArchiveInterface,
 } from "../../../shared/clients/contractFactory";
 import { parseReceiptEvents, waitForTransactionReceipt } from "../api/txGateway";
+import { readConfirmedDetails, verifyConfirmedDetails } from "./confirmedTransactionError";
 
 import {
   assertBlobRefMatches,
@@ -468,11 +469,13 @@ export async function executeAddVersionFlow({
       versionCommitment: publicSignals.versionCommitment,
       metadataEnvelope,
     });
-    const ref = await archive.metadataRef(expectedPersonHash, result.index, {
-      blockTag: receipt.blockNumber,
+    return verifyConfirmedDetails(result.transactionHash, async () => {
+      const ref = await readConfirmedDetails(result.transactionHash, () =>
+        archive.metadataRef(expectedPersonHash, result.index, { blockTag: receipt.blockNumber }),
+      );
+      assertBlobRefMatches(ref, result.events.MetadataStored!);
+      return result;
     });
-    assertBlobRefMatches(ref, result.events.MetadataStored!);
-    return result;
   }
 
   const verifierRegistryFn = preflightContract?.verifierRegistry;
@@ -595,9 +598,13 @@ export async function executeAddVersionFlow({
     versionCommitment: publicSignals.versionCommitment,
     metadataEnvelope,
   });
-  const ref = await archive.metadataRef(expectedPersonHash, result.index, {
-    blockTag: finalTransaction.receipt.blockNumber,
+  return verifyConfirmedDetails(result.transactionHash, async () => {
+    const ref = await readConfirmedDetails(result.transactionHash, () =>
+      archive.metadataRef(expectedPersonHash, result.index, {
+        blockTag: finalTransaction.receipt.blockNumber,
+      }),
+    );
+    assertBlobRefMatches(ref, result.events.MetadataStored!);
+    return result;
   });
-  assertBlobRefMatches(ref, result.events.MetadataStored!);
-  return result;
 }

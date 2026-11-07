@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ethers } from "ethers";
 import { useTranslation } from "react-i18next";
 import {
@@ -11,6 +11,7 @@ import { decodeDisclosureBindingPublicSignals } from "../../../../../shared/zk/p
 import { cryptoWorkerCall } from "../../../../../shared/workers/cryptoWorkerClient";
 import { zkWorkerCall } from "../../../../../shared/workers/zkWorkerClient";
 import { safeCanonicalizeFullName } from "../../../../../shared/identity/fullName";
+import { ARCHIVE_PREVIEW_REJECTED } from "../../../../../shared/lib/errors";
 import type { MintNFTFormValues, MintPersonInfo } from "../model/mintNftTypes";
 
 interface GenerateDisclosureProofArgs {
@@ -32,8 +33,19 @@ export type DisclosureProofStep = "" | "preparing" | "generating" | "verifying" 
 export function useDisclosureProof() {
   const { t } = useTranslation();
   const [proofStep, setProofStep] = useState<DisclosureProofStep>("");
+  const generationRef = useRef(0);
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      generationRef.current += 1;
+    };
+  }, []);
 
   const reset = useCallback(() => {
+    generationRef.current += 1;
     setProofStep("");
   }, []);
 
@@ -46,6 +58,15 @@ export function useDisclosureProof() {
       selfSuiteId,
       getPassphrase,
     }: GenerateDisclosureProofArgs) => {
+      const generation = ++generationRef.current;
+      const assertCurrent = () => {
+        if (!mountedRef.current || generationRef.current !== generation) {
+          throw Object.assign(new Error("Mint proof generation was cancelled"), {
+            code: ARCHIVE_PREVIEW_REJECTED,
+          });
+        }
+      };
+      assertCurrent();
       setProofStep("preparing");
 
       const normalizedFullName = safeCanonicalizeFullName(personInfo.fullName || "");
@@ -69,6 +90,7 @@ export function useDisclosureProof() {
         },
         { timeoutMs: 240_000 },
       );
+      assertCurrent();
       const canonicalFullName = identity.identity.fullName;
       const derivedSecretField = BigInt(identity.derivedSecretField);
       const identityCommitment = BigInt(identity.identityCommitment);
@@ -135,12 +157,14 @@ export function useDisclosureProof() {
         { timeoutMs: 240_000 },
       );
 
+      assertCurrent();
       setProofStep("verifying");
       const { ok: isProofValid } = await zkWorkerCall(
         "verifyDisclosureBindingProof",
         { proof: generatedProof, publicSignals },
         { timeoutMs: 120_000 },
       );
+      assertCurrent();
       if (!isProofValid) {
         throw new Error(
           t("mintNFT.proofVerificationFailed", "Generated proof verification failed"),

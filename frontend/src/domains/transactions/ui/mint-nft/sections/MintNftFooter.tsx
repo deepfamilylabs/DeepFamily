@@ -19,7 +19,6 @@ export interface MintNftFooterProps {
   hasVerifiedTargetEnvelope: boolean;
   transactionPreview: ArchiveTransactionPreview | null;
   onTransactionPreviewDecision: (approved: boolean) => void;
-  onRunInBackground?: () => void;
   onClose: () => void;
   onBackToEdit: () => void;
   onContinueMinting: () => void;
@@ -40,7 +39,6 @@ export function MintNftFooter({
   hasVerifiedTargetEnvelope,
   transactionPreview,
   onTransactionPreviewDecision,
-  onRunInBackground,
   onClose,
   onBackToEdit,
   onContinueMinting,
@@ -50,7 +48,6 @@ export function MintNftFooter({
     <TransactionFooterBar
       phase={phase}
       slots={{
-        onRunInBackground,
         failed: { onClose, onBackToEdit },
         done: successResult ? (
           <>

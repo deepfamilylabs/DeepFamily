@@ -22,6 +22,7 @@ import {
   type ValidatedPersonVersionV1Result,
 } from "../../../../../shared/workers/cryptoWorkerClient";
 import { terminateZkWorkerIfIdle } from "../../../../../shared/workers/zkWorkerClient";
+import { readConfirmedDetails } from "../../../services/confirmedTransactionError";
 import { getFriendlyError, sanitizeErrorForLogging } from "../../../../../shared/lib/errors";
 import type { ProofEnvelope } from "../../../../../shared/zk/zk";
 import {
@@ -101,8 +102,6 @@ interface UseAddVersionSubmitArgs {
   setIsSubmitting: (value: boolean) => void;
   submissionPackageRef: MutableRefObject<RetryableAddVersionSubmission | null>;
   submissionAttemptRef?: MutableRefObject<number>;
-  /** Only an explicit background action may continue local completion after close. */
-  completionPolicyRef?: MutableRefObject<{ allowBackground: boolean }>;
   /** Cleared secret inputs must be reviewed again before rebuilding a discarded package. */
   onSubmissionDiscarded?: () => void;
   captureValidatedPersonVersionCache?: () => UseAddVersionSubmitArgs["cacheValidatedPersonVersion"];
@@ -219,7 +218,8 @@ function buildDraftKey(input: {
 
 function isDefinitelyNotRetryable(error: unknown): boolean {
   const value = error && typeof error === "object" ? (error as Record<string, any>) : {};
-  if (value.transactionReconciliationFinal === true) return true;
+  if (value.transactionReconciliationFinal === true || value.transactionConfirmed === true)
+    return true;
   const code = value.code ?? value.error?.code;
   const reason = String(value.reason ?? value.shortMessage ?? value.message ?? "");
   return (
@@ -260,12 +260,15 @@ async function verifyConfirmedVersion(input: {
 }) {
   const deepFamily = createDeepFamilyContract(input.contractAddress, input.runner);
   const reader = createDeepFamilyReaderContract(input.readerAddress, input.runner);
-  const [configuredArchive, readerDeepFamily, readerArchive, rawDetails] = await Promise.all([
-    deepFamily.archive(),
-    reader.DEEP_FAMILY(),
-    reader.ARCHIVE(),
-    reader.getVersionDetails(input.result.hash, input.result.index),
-  ]);
+  const [configuredArchive, readerDeepFamily, readerArchive, rawDetails] = await readConfirmedDetails(
+    input.result.transactionHash,
+    () => Promise.all([
+      deepFamily.archive(),
+      reader.DEEP_FAMILY(),
+      reader.ARCHIVE(),
+      reader.getVersionDetails(input.result.hash, input.result.index),
+    ]),
+  );
   if (
     !sameHex(configuredArchive, readerArchive) ||
     !sameHex(readerDeepFamily, input.contractAddress)
@@ -340,7 +343,6 @@ export function useAddVersionSubmit({
   setIsSubmitting,
   submissionPackageRef,
   submissionAttemptRef,
-  completionPolicyRef,
   onSubmissionDiscarded,
   captureValidatedPersonVersionCache,
   settleTransaction,
@@ -364,10 +366,8 @@ export function useAddVersionSubmit({
   return useCallback(
     async (data: AddVersionFormInput) => {
       const attempt = submissionAttemptRef?.current;
-      const completionPolicy = completionPolicyRef?.current;
       const isCurrentAttempt = () =>
         mountedRef.current && attempt === submissionAttemptRef?.current;
-      const canComplete = () => isCurrentAttempt() || completionPolicy?.allowBackground === true;
       const assertCurrentAttempt = () => {
         if (!isCurrentAttempt()) {
           throw Object.assign(new Error("Add Version submission was cancelled before handoff"), {
@@ -467,14 +467,14 @@ export function useAddVersionSubmit({
         submission.broadcastConfirmed = true;
         confirmedTransactionHash = result.transactionHash;
         const finishCancelledConfirmation = () => {
-          if (canComplete()) return false;
+          if (isCurrentAttempt()) return false;
           // Closing cancels local completion, but an exact confirmed transaction
           // still belongs in its original public transaction record.
           settle({ phase: "done", transactionHash: result.transactionHash });
           return true;
         };
         if (finishCancelledConfirmation()) return;
-        await assertCurrentScope();
+        await readConfirmedDetails(result.transactionHash, assertCurrentScope);
         if (finishCancelledConfirmation()) return;
 
         const confirmationProvider = getReadonlyProvider(
@@ -502,7 +502,7 @@ export function useAddVersionSubmit({
           expectedPayloadLength: submission.args.metadataEnvelope.length,
         });
         if (finishCancelledConfirmation()) return;
-        await assertCurrentScope();
+        await readConfirmedDetails(result.transactionHash, assertCurrentScope);
         if (finishCancelledConfirmation()) return;
         const anchors = {
           personHash: result.hash,
@@ -533,7 +533,7 @@ export function useAddVersionSubmit({
           formatVersion: submission.validated.formatVersion,
           identitySuiteId: submission.validated.identitySuiteId,
         });
-        await assertCurrentScope();
+        await readConfirmedDetails(result.transactionHash, assertCurrentScope);
         if (finishCancelledConfirmation()) return;
         cacheValidated(node);
         if (isCurrentAttempt() && submissionPackageRef.current === submission) {
@@ -764,8 +764,14 @@ export function useAddVersionSubmit({
         zkWorkerReleased = terminateZkWorkerIfIdle();
         await submitPrepared(submission);
       } catch (error) {
-        if (!canComplete() && confirmedTransactionHash !== null) {
-          settle({ phase: "done", transactionHash: confirmedTransactionHash });
+        const transactionHash = (error as any)?.transactionHash ?? confirmedTransactionHash;
+        const transactionConfirmed =
+          confirmedTransactionHash !== null || (error as any)?.transactionConfirmed === true;
+        const verificationFailure = transactionConfirmed
+          ? ((error as any)?.verificationFailure === "read" ? "read" : "mismatch")
+          : undefined;
+        if (!isCurrentAttempt() && transactionConfirmed && transactionHash) {
+          settle({ phase: "done", transactionHash, error: null });
           return;
         }
         const retained = submissionPackageRef.current;
@@ -790,19 +796,42 @@ export function useAddVersionSubmit({
           if (isCurrentAttempt()) setProofStep("");
           return;
         }
-        const friendly = getFriendlyError(error, t);
-        settle({ phase: "failed", error: friendly });
-        if (!canComplete()) return;
+        const original = getFriendlyError(error, t);
+        const friendly = transactionConfirmed
+          ? {
+              ...original,
+              message: verificationFailure === "read"
+                ? t(
+                    "addVersion.detailsReadFailed",
+                    "The version transaction is confirmed. Refresh the page to load its details.",
+                  )
+                : t(
+                    "addVersion.verificationMismatch",
+                    "The transaction is confirmed, but the retrieved data did not pass verification. Check the transaction details.",
+                  ),
+              retryable: false,
+            }
+          : original;
+        settle({ phase: "failed", transactionHash, error: friendly });
+        if (!isCurrentAttempt()) return;
         console.error("Add version failed:", sanitizeErrorForLogging(error));
         toastError(
-          t("contract.addVersionFailed", "Failed to add person version") + ": " + friendly.message,
+          transactionConfirmed
+            ? friendly.message
+            : t("contract.addVersionFailed", "Failed to add person version") + ": " + friendly.message,
         );
         if (isCurrentAttempt()) {
           setErrorResult({
             type: friendly.type || "UNKNOWN_ERROR",
             message: friendly.message,
-            details: friendly.details,
+            details: [
+              friendly.details,
+              transactionHash ? `${t("transaction.rowTransaction", "Transaction")}: ${transactionHash}` : "",
+            ].filter(Boolean).join("\n"),
             retryable: friendly.retryable,
+            transactionHash,
+            transactionConfirmed,
+            verificationFailure,
           });
           setProofStep("");
         }
@@ -826,7 +855,6 @@ export function useAddVersionSubmit({
       captureSettlement,
       captureValidatedPersonVersionCache,
       chainId,
-      completionPolicyRef,
       contractAddress,
       fatherCalcRef,
       generatePersonCommitmentProof,

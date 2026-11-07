@@ -40,7 +40,14 @@ export function AddVersionStatusPanel({
         },
         timeline,
         done: successResult ? <AddVersionSuccessResult t={t} successResult={successResult} /> : null,
-        failed: { title: t("addVersion.failed", "Transaction Failed"), error: errorResult },
+        failed: {
+          title: errorResult?.transactionConfirmed
+            ? errorResult.verificationFailure === "read"
+              ? t("addVersion.detailsReadFailedTitle", "Transaction Confirmed; Details Unavailable")
+              : t("addVersion.verificationMismatchTitle", "Transaction Confirmed; Data Verification Failed")
+            : t("addVersion.failed", "Transaction Failed"),
+          error: errorResult,
+        },
       }}
     />
   );

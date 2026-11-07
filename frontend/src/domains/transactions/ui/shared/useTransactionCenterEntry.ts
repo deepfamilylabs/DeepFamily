@@ -57,17 +57,19 @@ export function useTransactionCenterEntry(input: {
     });
   }, [error, kind, label, phase, transactionHash, upsert]);
 
-  const captureSettlement = useCallback(() => {
+  const captureSettlement = useCallback((options?: { newEntry?: boolean }) => {
     if (!upsert) return (_outcome: TransactionSettlement) => {};
-    const id = idRef.current ?? (idRef.current = nextEntryId());
+    const id = options?.newEntry
+      ? (idRef.current = nextEntryId())
+      : (idRef.current ?? (idRef.current = nextEntryId()));
     // A submission can start before its busy phase has reached the effect.
     upsert({
       id,
       kind,
       label,
-      phase: phase === "form" || phase === "blocked" ? "busy" : phase,
-      ...(transactionHash !== undefined ? { transactionHash } : {}),
-      ...(error !== undefined ? { error } : {}),
+      phase: options?.newEntry || phase === "form" || phase === "blocked" ? "busy" : phase,
+      ...(!options?.newEntry && transactionHash !== undefined ? { transactionHash } : {}),
+      ...(!options?.newEntry && error !== undefined ? { error } : {}),
     });
     return (outcome: TransactionSettlement) => {
       upsert({ id, kind, label, ...outcome });

@@ -1,6 +1,6 @@
 import { computeVersionHash, packSubmitterAndSelfSuiteId } from "@deepfamily/protocol-core";
 import { ethers } from "ethers";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   createDeepFamilyInterface,
   createArchiveInterface,
@@ -8,17 +8,14 @@ import {
 import { wrapIdentityCommitmentAsPersonHash } from "../../../shared/zk/zk";
 import { executeAddVersionFlow, type AddVersionPublicSignals } from "./addVersionService";
 
+const archiveMock = vi.hoisted(() => ({ metadataRef: vi.fn() }));
+
 vi.mock("../../../shared/clients/contractFactory", async () => ({
   ...(await vi.importActual<typeof import("../../../shared/clients/contractFactory")>(
     "../../../shared/clients/contractFactory",
   )),
   createArchiveContract: () => ({
-    metadataRef: async () => ({
-      pointer: "0x0000000000000000000000000000000000000b10",
-      payloadHash: ethers.keccak256(metadataEnvelope()),
-      payloadLength: 20n,
-      segmentCount: 1n,
-    }),
+    metadataRef: (...args: any[]) => archiveMock.metadataRef(...args),
   }),
 }));
 
@@ -37,6 +34,15 @@ const metadataEnvelope = (selfSuiteId = 1): Uint8Array => {
   envelope[19] = selfSuiteId & 0xff;
   return envelope;
 };
+
+beforeEach(() => {
+  archiveMock.metadataRef.mockReset().mockResolvedValue({
+    pointer: "0x0000000000000000000000000000000000000b10",
+    payloadHash: ethers.keccak256(metadataEnvelope()),
+    payloadLength: 20n,
+    segmentCount: 1n,
+  });
+});
 
 const proof = { circuitId: 1, proofEncodingId: 1, proofData: "0x1234" } as const;
 
@@ -946,5 +952,36 @@ describe("addVersionService fresh-v1 flow", () => {
         },
       },
     });
+  });
+});
+
+
+describe("Add Version confirmation readback", () => {
+  it.each([
+    [false, "read"], [true, "read"], [false, "mismatch"], [true, "mismatch"],
+  ] as const)("preserves confirmation after readback failure (reconciled: %s, failure: %s)", async (reconciled, failure) => {
+    const signals = rootSignals();
+    const envelope = metadataEnvelope();
+    if (failure === "read") archiveMock.metadataRef.mockRejectedValueOnce(new Error("metadataRef RPC unavailable"));
+    else archiveMock.metadataRef.mockResolvedValueOnce({pointer: ethers.ZeroAddress, payloadHash: ethers.ZeroHash, payloadLength: 1n, segmentCount: 1n});
+    const submit = submitMethod();
+    const options = {
+      submitContract: {
+        runner: {provider: {
+          getNetwork: async () => ({chainId: 31337n}),
+          getBlock: async () => ({gasLimit: 30000000n}),
+          getFeeData: async () => ({gasPrice: 1n}),
+        }},
+        addPersonVersion: submit,
+      },
+      preflightContract: preflightContract(),
+      contractAddress: CONTRACT, submitterAddress: SUBMITTER,
+      proof, publicSignals: signals, fatherVersionIndex: 0, motherVersionIndex: 0, metadataEnvelope: envelope,
+      ...(reconciled ? {reconcileTransactionHash: "0xtxhash", getTransactionReceipt: async () => receiptFor([proof, signals, 0, 0, envelope])} : {}),
+    };
+    await expect(executeAddVersionFlow(options)).rejects.toMatchObject({
+      transactionHash: "0xtxhash", transactionConfirmed: true, verificationFailure: failure,
+    });
+    expect(submit).toHaveBeenCalledTimes(reconciled ? 0 : 1);
   });
 });

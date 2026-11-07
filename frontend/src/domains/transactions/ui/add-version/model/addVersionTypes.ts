@@ -96,4 +96,7 @@ export interface AddVersionErrorResultView {
   message: string;
   details: string;
   retryable?: boolean;
+  transactionHash?: string;
+  transactionConfirmed?: boolean;
+  verificationFailure?: "read" | "mismatch";
 }

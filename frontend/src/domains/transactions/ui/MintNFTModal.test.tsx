@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ethers } from "ethers";
 import MintNFTModal from "./MintNFTModal";
 import { formSectionsHidden, precedesFormSections } from "./transactionPhaseContract";
+import { TransactionCenterProvider, useTransactionCenter } from "../context/TransactionCenterContext";
 
 const personHash = `0x${"12".repeat(32)}`;
 const ownerAddress = "0x00000000000000000000000000000000000000aa";
@@ -112,6 +113,7 @@ vi.mock("../../../shared/zk/zk", () => ({
 }));
 
 vi.mock("../../../shared/lib/errors", () => ({
+  ARCHIVE_PREVIEW_REJECTED: "ARCHIVE_PREVIEW_REJECTED",
   getFriendlyError: (error: any) => ({
     type: error?.type || "UNKNOWN_ERROR",
     reason: error?.reason || error?.code,
@@ -196,6 +198,34 @@ function renderMintModal(overrides: Partial<React.ComponentProps<typeof MintNFTM
   return { ...result, refresh: () => result.rerender(mintModalElement(overrides)) };
 }
 
+function TransactionRecords() {
+  return <output data-testid="mint-transaction-records">{JSON.stringify(useTransactionCenter()?.records)}</output>;
+}
+
+function renderMintWithRecords() {
+  const wrapper = ({ children }: { children: React.ReactNode }) => (
+    <TransactionCenterProvider>{children}<TransactionRecords /></TransactionCenterProvider>
+  );
+  const result = render(mintModalElement(), { wrapper });
+  return { ...result, refresh: () => result.rerender(mintModalElement()) };
+}
+
+function transactionRecords() {
+  return JSON.parse(screen.getByTestId("mint-transaction-records").textContent || "[]");
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (error: unknown) => void;
+  const promise = new Promise<T>((done, fail) => { resolve = done; reject = fail; });
+  return { promise, resolve, reject };
+}
+
+function successfulMint(tokenId = 77, transactionHash = "0xmint") {
+  return { requiresEndorsement: false, tokenId, transactionHash, blockNumber: 123,
+    event: null, receipt: { hash: transactionHash } };
+}
+
 async function checkAllConsents() {
   for (const checkbox of screen.getAllByRole("checkbox")) {
     await act(async () => {
@@ -215,6 +245,12 @@ describe("MintNFTModal", () => {
     mocks.getVersionDetails.mockReset();
     mocks.getMetadataCode.mockReset();
     mocks.endorsedVersionIndex.mockReset();
+    mocks.personGateway.listVersionEndorsements.mockReset().mockResolvedValue({
+      versionIndices: [], endorsementCounts: [], tokenIds: [], totalVersions: 0, hasMore: false, nextOffset: 0,
+    });
+    mocks.personGateway.listPersonVersionsPage.mockReset().mockResolvedValue({
+      versions: [], totalVersions: 0, hasMore: false, nextOffset: 0,
+    });
     mocks.contract = {
       endorsedVersionIndex: mocks.endorsedVersionIndex,
     };
@@ -300,6 +336,189 @@ describe("MintNFTModal", () => {
   afterEach(() => {
     cleanup();
     vi.restoreAllMocks();
+  });
+
+  it.each(["derive", "generate", "verify"] as const)(
+    "discards a closed attempt during %s without touching the reopened calculator",
+    async (stage) => {
+      const identity = await mocks.cryptoWorkerCall();
+      mocks.cryptoWorkerCall.mockClear();
+      const gate = deferred<any>();
+      const originalZk = mocks.zkWorkerCall.getMockImplementation()!;
+      const method = stage === "generate" ? "generateDisclosureBindingProof" : "verifyDisclosureBindingProof";
+      if (stage === "derive") mocks.cryptoWorkerCall.mockReturnValue(gate.promise);
+      else mocks.zkWorkerCall.mockImplementation((name, ...args) => name === method ? gate.promise : originalZk(name, ...args));
+      const view = renderMintModal();
+      await waitForMintableTarget();
+      await checkAllConsents();
+      await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Mint NFT" })); });
+      await waitFor(() => stage === "derive"
+        ? expect(mocks.cryptoWorkerCall).toHaveBeenCalledTimes(1)
+        : expect(mocks.zkWorkerCall).toHaveBeenCalledWith(method, expect.anything(), expect.anything()));
+      view.rerender(mintModalElement({ isOpen: false }));
+      view.rerender(mintModalElement());
+      await waitForMintableTarget();
+      fireEvent.change(screen.getByLabelText("mint identity passphrase test input"), { target: { value: "new form secret" } });
+      await act(async () => { gate.resolve(stage === "derive" ? identity : stage === "generate"
+        ? { proof: { pi_a: [], pi_b: [], pi_c: [] }, publicSignals: ["1", "99", "2", "3"] }
+        : { ok: true }); });
+      expect(mocks.clearSecretInputs).not.toHaveBeenCalled();
+      expect(mocks.mintRunOrThrow).not.toHaveBeenCalled();
+      expect(mocks.markVersionMinted).not.toHaveBeenCalled();
+      expect(mocks.onSuccess).not.toHaveBeenCalled();
+      expect(screen.queryByRole("alert")).toBeNull();
+      expect(screen.queryByRole("group", { name: "Review before opening your wallet" })).toBeNull();
+    },
+  );
+
+  it("settles only the original public receipt after ordinary close", async () => {
+    const mint = deferred<any>();
+    mocks.mintRunOrThrow.mockReturnValue(mint.promise);
+    const view = renderMintWithRecords();
+    await waitForMintableTarget();
+    await checkAllConsents();
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Mint NFT" })); });
+    await waitFor(() => expect(mocks.mintRunOrThrow).toHaveBeenCalledTimes(1));
+    const id = transactionRecords()[0].id;
+    view.rerender(mintModalElement({ isOpen: false }));
+    view.rerender(mintModalElement());
+    await waitForMintableTarget();
+    await act(async () => { mint.resolve(successfulMint()); });
+    expect(transactionRecords()).toMatchObject([{ id, phase: "done", transactionHash: "0xmint" }]);
+    expect(mocks.markVersionMinted).not.toHaveBeenCalled();
+    expect(mocks.onSuccess).not.toHaveBeenCalled();
+    expect(screen.queryByText("NFT Minted Successfully")).toBeNull();
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("settles a closed mint without changing the next attempt or writing its cache", async () => {
+    const oldMint = deferred<any>();
+    const nextMint = deferred<any>();
+    mocks.mintRunOrThrow.mockReturnValueOnce(oldMint.promise).mockReturnValueOnce(nextMint.promise);
+    const view = renderMintWithRecords();
+    await waitForMintableTarget();
+    await checkAllConsents();
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Mint NFT" })); });
+    await waitFor(() => expect(mocks.mintRunOrThrow).toHaveBeenCalledTimes(1));
+    const oldId = transactionRecords()[0].id;
+    mocks.mintFlow.status = "confirming";
+    view.refresh();
+    expect(screen.queryByRole("button", { name: "Continue in background" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    view.rerender(mintModalElement({ isOpen: false }));
+    mocks.mintFlow.status = "idle";
+    view.rerender(mintModalElement());
+    await waitForMintableTarget();
+    await checkAllConsents();
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Mint NFT" })); });
+    await waitFor(() => expect(mocks.mintRunOrThrow).toHaveBeenCalledTimes(2));
+    const nextId = transactionRecords().find((record: any) => record.id !== oldId).id;
+    await act(async () => { oldMint.resolve(successfulMint()); });
+    expect(mocks.markVersionMinted).not.toHaveBeenCalled();
+    expect(mocks.onSuccess).not.toHaveBeenCalled();
+    expect(transactionRecords().find((record: any) => record.id === oldId)).toMatchObject({ phase: "done", transactionHash: "0xmint" });
+    expect(transactionRecords().find((record: any) => record.id === nextId)).toMatchObject({ phase: "busy" });
+    expect(screen.queryByText("NFT Minted Successfully")).toBeNull();
+    await act(async () => { nextMint.resolve(successfulMint(78, "0xnext")); });
+    expect(mocks.markVersionMinted).toHaveBeenCalledTimes(1);
+    expect(mocks.onSuccess).toHaveBeenCalledWith(78);
+    expect(transactionRecords().find((record: any) => record.id === nextId)).toMatchObject({ phase: "done", transactionHash: "0xnext" });
+  });
+
+  it("keeps a late failure out of the reopened form and preserves its original hash", async () => {
+    const mint = deferred<any>();
+    mocks.mintRunOrThrow.mockReturnValue(mint.promise);
+    const view = renderMintWithRecords();
+    await waitForMintableTarget();
+    await checkAllConsents();
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Mint NFT" })); });
+    await waitFor(() => expect(mocks.mintRunOrThrow).toHaveBeenCalledTimes(1));
+    view.rerender(mintModalElement({ isOpen: false }));
+    view.rerender(mintModalElement());
+    await waitForMintableTarget();
+    await act(async () => { mint.reject(Object.assign(new Error("receipt unavailable"), { transactionHash: "0xpending" })); });
+    expect(transactionRecords()).toMatchObject([{ phase: "failed", transactionHash: "0xpending" }]);
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(mocks.onSuccess).not.toHaveBeenCalled();
+  });
+
+  it("keeps a confirmed public receipt after ordinary close even if readback later fails", async () => {
+    const mint = deferred<any>();
+    mocks.mintRunOrThrow.mockReturnValue(mint.promise);
+    const view = renderMintWithRecords();
+    await waitForMintableTarget();
+    await checkAllConsents();
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Mint NFT" })); });
+    await waitFor(() => expect(mocks.mintRunOrThrow).toHaveBeenCalledTimes(1));
+    view.rerender(mintModalElement({ isOpen: false }));
+    view.rerender(mintModalElement());
+    await waitForMintableTarget();
+    await act(async () => { mint.reject(Object.assign(new Error("readback unavailable"), {
+      transactionHash: "0xconfirmed", transactionConfirmed: true, verificationFailure: "read",
+    })); });
+    expect(transactionRecords()).toMatchObject([{ phase: "done", transactionHash: "0xconfirmed" }]);
+    expect(mocks.markVersionMinted).not.toHaveBeenCalled();
+    expect(mocks.onSuccess).not.toHaveBeenCalled();
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("tracks the public receipt after leaving the page and changing wallets without local writes", async () => {
+    const mint = deferred<any>();
+    mocks.mintRunOrThrow.mockReturnValue(mint.promise);
+    const view = renderMintWithRecords();
+    await waitForMintableTarget();
+    await checkAllConsents();
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Mint NFT" })); });
+    await waitFor(() => expect(mocks.mintRunOrThrow).toHaveBeenCalledTimes(1));
+    mocks.mintFlow.status = "confirming";
+    view.refresh();
+    expect(screen.queryByRole("button", { name: "Continue in background" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    view.rerender(<></>);
+    mocks.address = "0x00000000000000000000000000000000000000bb";
+    view.rerender(<></>);
+    await act(async () => { mint.resolve(successfulMint()); });
+    expect(transactionRecords()).toMatchObject([{ phase: "done", transactionHash: "0xmint" }]);
+    expect(mocks.markVersionMinted).not.toHaveBeenCalled();
+    expect(mocks.onSuccess).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { kind: "read", title: "Transaction Confirmed; Details Unavailable",
+      message: "The mint transaction is confirmed. Refresh the page to load its details." },
+    { kind: "mismatch", title: "Transaction Confirmed; Data Verification Failed",
+      message: "The retrieved data did not pass verification. Check the transaction details." },
+    { kind: undefined, title: "Transaction Confirmed; Data Verification Failed",
+      message: "The retrieved data did not pass verification. Check the transaction details." },
+  ])("distinguishes a confirmed mint's $kind error and retains its hash", async ({ kind, title, message }) => {
+    mocks.mintRunOrThrow.mockRejectedValue(Object.assign(new Error("readback unavailable"), {
+      transactionConfirmed: true, transactionHash: "0xconfirmed", verificationFailure: kind,
+    }));
+    renderMintWithRecords();
+    await waitForMintableTarget();
+    await checkAllConsents();
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Mint NFT" })); });
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toContain(title);
+    expect(alert.textContent).toContain(message);
+    expect(alert.textContent).not.toContain("NFT Minting Failed");
+    expect(alert.textContent).toContain("0xconfirmed");
+    expect(transactionRecords()).toMatchObject([{ phase: "failed", transactionHash: "0xconfirmed", error: { message } }]);
+    expect(mocks.markVersionMinted).not.toHaveBeenCalled();
+    expect(mocks.onSuccess).not.toHaveBeenCalled();
+  });
+
+  it("waits for the endorsed version before finishing automatic preselection", async () => {
+    const endorsement = deferred<number>();
+    mocks.endorsedVersionIndex.mockReturnValue(endorsement.promise);
+    mocks.personGateway.listVersionEndorsements.mockResolvedValue({ versionIndices: [1, 2], endorsementCounts: [2, 1], tokenIds: [0, 0], totalVersions: 2, hasMore: false, nextOffset: 0 });
+    mocks.personGateway.listPersonVersionsPage.mockResolvedValue({ versions: [{ versionIndex: 1, addedBy: ownerAddress, timestamp: 1 }, { versionIndex: 2, addedBy: ownerAddress, timestamp: 2 }], totalVersions: 2, hasMore: false, nextOffset: 0 });
+    renderMintModal({ initialVersionIndex: undefined });
+    await waitFor(() => expect(mocks.personGateway.listVersionEndorsements).toHaveBeenCalled());
+    expect(mocks.getVersionDetails).not.toHaveBeenCalled();
+    await act(async () => { endorsement.resolve(2); });
+    await waitForMintableTarget();
+    expect(mocks.getVersionDetails).toHaveBeenCalledWith(personHash, 2);
   });
 
   it.each([

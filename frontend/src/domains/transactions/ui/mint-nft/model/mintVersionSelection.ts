@@ -18,8 +18,10 @@ export function reconcileMintVersionSelection(
   lookup: PersonVersionLookup,
   decidedForHash: string | null,
   endorsedVersionIndex: number,
+  endorsementReady = true,
 ): MintVersionSelectionUpdate | null {
   if (!lookup.personHash || lookup.status !== "ready") return null;
+  if (!endorsementReady) return null;
   if (decidedForHash === lookup.personHash) return null;
   const endorsed = lookup.versions.some(
     (version) => version.versionIndex === endorsedVersionIndex,

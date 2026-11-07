@@ -278,7 +278,9 @@ describe("Archive story writes", () => {
     f.archive.storyRecordRef.mockResolvedValue({
       blob: { pointer: POINTER, payloadHash: ethers.ZeroHash, payloadLength: 1n, segmentCount: 1n },
     });
-    await expect(f.submit()).rejects.toThrow(/reference|payload/i);
+    await expect(f.submit()).rejects.toMatchObject({
+      transactionHash: "0xappend", transactionConfirmed: true, verificationFailure: "mismatch", retryable: false,
+    });
   });
   it("seals the exact count/head and validates event and final state", async () => {
     const f = setup();
@@ -339,5 +341,50 @@ it("includes the exact title in the preview, transaction and returned record", a
     title,
     content,
     payloadHash: ethers.keccak256(payload),
+  });
+});
+
+
+describe("confirmed story readback failures", () => {
+  it.each(["storyRecordRef", "storyState"] as const)("keeps append confirmation when %s fails", async (method) => {
+    const f = setup();
+    const original = f.archive[method].getMockImplementation()!;
+    f.archive[method].mockImplementation(async (...args: any[]) => {
+      if (method === "storyRecordRef" || args[1]?.blockTag !== undefined) {
+        throw Object.assign(new Error("network unavailable"), { code: "NETWORK_ERROR" });
+      }
+      return (original as any)(...args);
+    });
+    await expect(f.submit()).rejects.toMatchObject({
+      type: "NETWORK_ERROR", transactionHash: "0xappend", transactionConfirmed: true,
+      verificationFailure: "read", retryable: false,
+    });
+    expect(f.archive.appendStoryRecord).toHaveBeenCalledOnce();
+  });
+
+  it.each(["read", "mismatch"] as const)("keeps seal confirmation for %s failure", async (failure) => {
+    const f = setup();
+    await f.submit();
+    const read = f.archive.storyState.getMockImplementation()!;
+    f.archive.storyState.mockImplementation(async (_tid?: string, overrides?: any) => {
+      if (overrides?.blockTag !== undefined) {
+        if (failure === "read") throw Object.assign(new Error("network unavailable"), { code: "NETWORK_ERROR" });
+        return { ...await read(), isSealed: false };
+      }
+      return read();
+    });
+    await expect(sealStoryService(f.signer as any, ADDRESS, "1", f.confirm)).rejects.toMatchObject({
+      transactionHash: "0xseal", transactionConfirmed: true, verificationFailure: failure, retryable: false,
+    });
+    expect(f.archive.sealStory).toHaveBeenCalledOnce();
+  });
+
+  it("keeps a failed receipt unconfirmed and preserves its submitted hash", async () => {
+    const f = setup();
+    f.archive.appendStoryRecord.mockResolvedValueOnce({hash: "0xfailed", wait: vi.fn(async () => ({status: 0, hash: "0xfailed", blockNumber: 12, logs: []}))});
+    const error = await f.submit().catch((error) => error);
+    expect(error.transactionHash).toBe("0xfailed");
+    expect(error.transactionConfirmed).not.toBe(true);
+    expect(error.verificationFailure).toBeUndefined();
   });
 });

@@ -16,6 +16,29 @@ const wrapper = ({ children }: { children: React.ReactNode }) => (
 );
 
 describe("captured transaction settlement", () => {
+  it("starts a fresh busy entry for an explicit retry of a failed submission", () => {
+    const oldError = { type: "NETWORK_ERROR", message: "Old failure", details: "Old failure" };
+    const { result, rerender } = renderHook(
+      ({ phase }: { phase: TransactionPhase }) => ({
+        entry: useTransactionCenterEntry({ kind: "mint", label: "Mint NFT", phase,
+          error: phase === "failed" ? oldError : null }),
+        centre: useTransactionCenter(),
+      }),
+      { wrapper, initialProps: { phase: "failed" as TransactionPhase } },
+    );
+    const oldId = result.current.centre!.records[0].id;
+    let settle!: (outcome: TransactionSettlement) => void;
+    act(() => { settle = result.current.entry.captureSettlement({ newEntry: true }); });
+    const nextId = result.current.centre!.records[0].id;
+    expect(nextId).not.toBe(oldId);
+    expect(result.current.centre!.records[0]).toMatchObject({ phase: "busy" });
+    expect(result.current.centre!.records[0].error).toBeUndefined();
+    rerender({ phase: "busy" });
+    act(() => settle({ phase: "done", transactionHash: "0xretry", error: null }));
+    expect(result.current.centre!.records.find((record) => record.id === oldId)?.phase).toBe("failed");
+    expect(result.current.centre!.records.find((record) => record.id === nextId)).toMatchObject({ phase: "done", transactionHash: "0xretry" });
+  });
+
   it("opens an entry synchronously before the submission's busy render", () => {
     const { result, rerender } = renderHook(
       ({ phase }: { phase: TransactionPhase }) => ({

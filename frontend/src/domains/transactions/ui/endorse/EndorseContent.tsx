@@ -2,7 +2,6 @@ import { Star } from "lucide-react";
 import { ModalSectionHeading, ResponsiveModalFrame } from "../../../../shared/ui";
 import { useEndorseModalController } from "./hooks/useEndorseModalController";
 import { assertPhaseHandled, type TransactionPhase } from "../shared/transactionPhase";
-import { EndorseBenefitsPanel } from "./sections/EndorseBenefitsPanel";
 import { EndorseFeePanel } from "./sections/EndorseFeePanel";
 import { EndorseFooter } from "./sections/EndorseFooter";
 import { EndorseStatusPanel } from "./sections/EndorseStatusPanel";
@@ -43,13 +42,6 @@ export default function EndorseModal(props: EndorseModalProps) {
             <div className="space-y-2.5">
               <ModalSectionHeading>{t("endorse.cost", "Cost")}</ModalSectionHeading>
               <EndorseFeePanel t={t} {...endorse.feePanel} />
-            </div>
-
-            <div className="space-y-2.5">
-              <ModalSectionHeading>
-                {t("endorse.benefits", "Benefits of Endorsing")}
-              </ModalSectionHeading>
-              <EndorseBenefitsPanel t={t} />
             </div>
           </div>
         </div>

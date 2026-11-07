@@ -34,11 +34,22 @@ const makeTypedError = (message: string, type: string, code?: string): Error => 
  * detection pipeline so story flows do not maintain a separate parser.
  */
 export function normalizeStoryTxError(error: any, contract: any): Error {
+  const retainConfirmation = (typed: Error) =>
+    Object.assign(typed, {
+      ...(typeof error?.transactionHash === "string" ? { transactionHash: error.transactionHash } : {}),
+      ...(error?.transactionConfirmed === true
+        ? {
+            transactionConfirmed: true,
+            verificationFailure: error.verificationFailure === "read" ? "read" : "mismatch",
+            retryable: false,
+          }
+        : {}),
+    });
   if (error?.code === ARCHIVE_VALIDATION_FAILED || error?.code === ARCHIVE_PREVIEW_REJECTED) {
     const typed = makeTypedError(error.message, "VALIDATION_ERROR", error.code);
     if (typeof error.reason === "string") (typed as any).reason = error.reason;
     if (error.i18n) (typed as any).i18n = error.i18n;
-    return typed;
+    return retainConfirmation(typed);
   }
   const normalized = normalizeErrorToError(error, defaultErrorTranslator as any, {
     contract,
@@ -54,5 +65,5 @@ export function normalizeStoryTxError(error: any, contract: any): Error {
   (typed as any).details = (normalized as any).details;
   (typed as any).retryable = (normalized as any).retryable;
   (typed as any).friendly = (normalized as any).friendly;
-  return typed;
+  return retainConfirmation(typed);
 }

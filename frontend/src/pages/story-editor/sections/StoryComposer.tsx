@@ -286,7 +286,7 @@ export function StoryComposer({ editor }: { editor: StoryEditorController }) {
       {form.error && (
         <p
           role="alert"
-          className="border-t border-red-200 bg-red-50 px-4 py-2.5 text-[12.5px] leading-relaxed text-red-700 sm:px-5 dark:border-red-900/50 dark:bg-red-900/20 dark:text-red-300"
+          className="whitespace-pre-wrap break-words border-t border-red-200 bg-red-50 px-4 py-2.5 text-[12.5px] leading-relaxed text-red-700 sm:px-5 dark:border-red-900/50 dark:bg-red-900/20 dark:text-red-300"
         >
           {form.error}
         </p>

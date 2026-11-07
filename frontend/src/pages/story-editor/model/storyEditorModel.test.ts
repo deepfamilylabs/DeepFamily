@@ -1,9 +1,13 @@
 import { describe, expect, it } from "vitest";
+import { createInstance } from "i18next";
+import zh from "../../../locales/zh-CN/index.json";
 import type { StoryRecord } from "../../../shared/model";
 import {
   convertRecordTypeToNumber,
   getByteLength,
   getValidTokenId,
+  mapStorySubmitError,
+  mapStorySealError,
   isRecordFormDirty,
   normalizeStoryRecords,
   resolveAttachmentUrl,
@@ -59,4 +63,18 @@ describe("storyEditorModel", () => {
     expect(resolveAttachmentUrl("ipfs://bafy")).toBe("https://ipfs.io/ipfs/bafy");
     expect(resolveAttachmentUrl("https://example.test/file")).toBe("https://example.test/file");
   });
+});
+
+
+it.each(["read", "mismatch"] as const)("explains confirmed %s failures and retains the public transaction hash", async (failure) => {
+  const i18n = createInstance();
+  await i18n.init({ lng: "zh-CN", resources: { "zh-CN": { translation: zh } } });
+  const error = { transactionConfirmed: true, transactionHash: "0xconfirmed", verificationFailure: failure, code: "NETWORK_ERROR" };
+  for (const map of [mapStorySubmitError, mapStorySealError]) {
+    const message = map(error, i18n.t as any);
+    expect(message).toContain("交易已确认");
+    expect(message).toContain(failure === "read" ? "刷新页面" : "数据核验");
+    expect(message).toContain("交易: 0xconfirmed");
+    expect(message).not.toContain("网络异常");
+  }
 });

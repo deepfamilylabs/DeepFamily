@@ -217,56 +217,38 @@ describe("AddVersion secret-state boundary", () => {
     {
       name: "an uncertain send",
       error: new Error("uncertain RPC timeout after broadcast"),
-      background: "foreground",
-      allowBackground: false,
+      lifecycle: "foreground",
     },
     {
       name: "a cancelled preview",
       error: Object.assign(new Error("preview cancelled"), {
         code: "ADD_VERSION_PREVIEW_REJECTED",
       }),
-      background: "foreground",
-      allowBackground: false,
+      lifecycle: "foreground",
     },
     {
       name: "a rejected wallet request",
       error: Object.assign(new Error("wallet rejected"), { code: "ACTION_REJECTED" }),
-      background: "foreground",
-      allowBackground: false,
+      lifecycle: "foreground",
     },
     {
       name: "an EIP-1193 wallet rejection",
       error: Object.assign(new Error("wallet rejected"), { code: 4001 }),
-      background: "foreground",
-      allowBackground: false,
+      lifecycle: "foreground",
     },
     {
       name: "an uncertain send followed by ordinary close and reopening",
       error: new Error("RPC timeout"),
-      background: "closed",
-      allowBackground: false,
+      lifecycle: "closed",
     },
     {
       name: "an uncertain send followed by unmounting",
       error: new Error("RPC timeout"),
-      background: "unmounted",
-      allowBackground: false,
-    },
-    {
-      name: "an uncertain send followed by explicit background continuation",
-      error: new Error("RPC timeout"),
-      background: "closed",
-      allowBackground: true,
-    },
-    {
-      name: "explicit background continuation followed by unmounting",
-      error: new Error("RPC timeout"),
-      background: "unmounted",
-      allowBackground: true,
+      lifecycle: "unmounted",
     },
   ])(
     "retries the exact ciphertext/public package after $name and caches no secret",
-    async ({ error, background, allowBackground }) => {
+    async ({ error, lifecycle }) => {
       let secretInput: string = secrets.rawPassphrase;
       const clearSecretInputs = vi.fn(() => {
         secretInput = "";
@@ -301,7 +283,6 @@ describe("AddVersion secret-state boundary", () => {
       const setSuccessResult = vi.fn();
       const setIsSubmitting = vi.fn();
       const submissionAttemptRef = { current: 0 };
-      const completionPolicyRef = { current: { allowBackground: false } };
       const resolveIdentityMaterial = vi.fn(async (current: unknown) =>
         current
           ? {
@@ -389,7 +370,7 @@ describe("AddVersion secret-state boundary", () => {
         .mockImplementationOnce(async (args: unknown) => {
           expect(secretInput).toBe("");
           expectNoSecretSentinels(args);
-          if (background !== "foreground") {
+          if (lifecycle !== "foreground") {
             return new Promise<typeof successfulResult>((resolve) => {
               resolveSecondReceipt = resolve;
             });
@@ -442,7 +423,6 @@ describe("AddVersion secret-state boundary", () => {
           setIsSubmitting,
           submissionPackageRef,
           submissionAttemptRef,
-          completionPolicyRef,
           onSubmissionDiscarded,
           settleTransaction: mocks.settleTransaction,
           captureSettlement: () => capturedSettlement,
@@ -478,7 +458,7 @@ describe("AddVersion secret-state boundary", () => {
         biography: "encrypted biography",
       };
       let nextSubmission: RetryableAddVersionSubmission | null = null;
-      if (background === "foreground") {
+      if (lifecycle === "foreground") {
         await act(async () => {
           await result.current(retryInput);
         });
@@ -490,12 +470,8 @@ describe("AddVersion secret-state boundary", () => {
         await vi.waitFor(() => expect(runAddVersionOrThrow).toHaveBeenCalledTimes(2));
         const successWrites = setSuccessResult.mock.calls.length;
         const submittingWrites = setIsSubmitting.mock.calls.length;
-        completionPolicyRef.current.allowBackground = allowBackground;
         submissionAttemptRef.current += 1;
-        // A reopened form owns a new policy object; the old task keeps only
-        // the explicit decision made for its original submission.
-        completionPolicyRef.current = { allowBackground: false };
-        if (background === "unmounted") unmount();
+        if (lifecycle === "unmounted") unmount();
         else nextSubmission = { ...submissionPackageRef.current!, draftKey: "a new version" };
         submissionPackageRef.current = nextSubmission;
         resolveSecondReceipt(successfulResult);
@@ -512,7 +488,7 @@ describe("AddVersion secret-state boundary", () => {
       expect(resolveIdentityMaterial).toHaveBeenCalledTimes(3);
       expect(generatePersonCommitmentProof).toHaveBeenCalledTimes(1);
       expect(mocks.cryptoWorkerCall).toHaveBeenCalledTimes(4);
-      const completesLocally = background === "foreground" || allowBackground;
+      const completesLocally = lifecycle === "foreground";
       expect(cacheValidatedPersonVersion).toHaveBeenCalledTimes(completesLocally ? 1 : 0);
       expect(toastSuccess).toHaveBeenCalledTimes(completesLocally ? 1 : 0);
       expect(invalidateByTx).toHaveBeenCalledTimes(completesLocally ? 1 : 0);
@@ -522,7 +498,7 @@ describe("AddVersion secret-state boundary", () => {
         phase: "done",
         transactionHash: "0xadd",
       });
-      expect(onSuccess).toHaveBeenCalledTimes(background === "foreground" ? 1 : 0);
+      expect(onSuccess).toHaveBeenCalledTimes(lifecycle === "foreground" ? 1 : 0);
       if (completesLocally) {
         expectNoSecretSentinels(cacheValidatedPersonVersion.mock.calls[0][0]);
       } else {

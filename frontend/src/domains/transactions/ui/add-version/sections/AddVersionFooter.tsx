@@ -20,7 +20,6 @@ interface AddVersionFooterProps {
   isParentVersionLookupPending: boolean;
   transactionPreview: AddVersionTransactionPreview | null;
   onTransactionPreviewDecision: (approved: boolean) => void;
-  onRunInBackground?: () => void;
   onClose: () => void;
   onBackToEdit: () => void;
   onContinueAdding: () => void;
@@ -37,7 +36,6 @@ export function AddVersionFooter({
   isParentVersionLookupPending,
   transactionPreview,
   onTransactionPreviewDecision,
-  onRunInBackground,
   onClose,
   onBackToEdit,
   onContinueAdding,
@@ -47,7 +45,6 @@ export function AddVersionFooter({
     <TransactionFooterBar
       phase={phase}
       slots={{
-        onRunInBackground,
         failed: { onClose, onBackToEdit },
         done: successResult ? (
         <>

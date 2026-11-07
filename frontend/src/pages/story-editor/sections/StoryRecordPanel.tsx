@@ -159,7 +159,7 @@ function SealCard({ editor }: { editor: StoryEditorController }) {
       {editor.seal.error && (
         <p
           role="alert"
-          className="rounded-lg border border-red-200 bg-red-50 px-2.5 py-2 text-[11.5px] leading-relaxed text-red-700 dark:border-red-900/50 dark:bg-red-900/20 dark:text-red-300"
+          className="whitespace-pre-wrap break-words rounded-lg border border-red-200 bg-red-50 px-2.5 py-2 text-[11.5px] leading-relaxed text-red-700 dark:border-red-900/50 dark:bg-red-900/20 dark:text-red-300"
         >
           {editor.seal.error}
         </p>

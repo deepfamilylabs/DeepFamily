@@ -118,7 +118,6 @@ export function useAddVersionModalController({
   const modalOpenRef = useRef(isOpen);
   modalOpenRef.current = isOpen;
   const submissionAttemptRef = useRef(0);
-  const completionPolicyRef = useRef({ allowBackground: false });
   const transactionPreviewDecisionRef = useRef<((approved: boolean) => void) | null>(null);
   const confirmTransactionPreview = useCallback((preview: AddVersionTransactionPreview) => {
     if (!modalOpenRef.current) return Promise.resolve(false);
@@ -264,6 +263,7 @@ export function useAddVersionModalController({
     label: t("addVersion.title", "Add Version"),
     phase,
     error: errorResult,
+    transactionHash: errorResult?.transactionHash,
   });
 
   const resetCommitmentProof = commitmentProof.reset;
@@ -271,7 +271,6 @@ export function useAddVersionModalController({
   const resetBusinessState = useCallback(
     (options?: { remountCalculators?: boolean }) => {
       submissionAttemptRef.current += 1;
-      completionPolicyRef.current = { allowBackground: false };
       reset();
       setPersonInfo(null);
       setFatherInfo(null);
@@ -324,13 +323,6 @@ export function useAddVersionModalController({
     resetBusinessState();
     requestFrameClose();
   }, [requestFrameClose, resetBusinessState]);
-
-  const handleRunInBackground = useCallback(() => {
-    // This permission belongs to the original attempt. Reset creates a fresh
-    // policy for the next form, while that attempt keeps this explicit choice.
-    completionPolicyRef.current.allowBackground = true;
-    handleClose();
-  }, [handleClose]);
 
   const handleContinueAdding = useCallback(() => {
     resetBusinessState({ remountCalculators: true });
@@ -520,7 +512,6 @@ export function useAddVersionModalController({
     setIsSubmitting,
     submissionPackageRef,
     submissionAttemptRef,
-    completionPolicyRef,
     onSubmissionDiscarded,
     settleTransaction,
     captureSettlement,
@@ -529,7 +520,6 @@ export function useAddVersionModalController({
 
   const onSubmit = useCallback(
     async (data: AddVersionFormInput) => {
-      completionPolicyRef.current = { allowBackground: false };
       // A retryable package has already passed this exact consent snapshot and
       // its secret inputs were deliberately erased before the wallet/RPC wait.
       // Retry validation belongs to the frozen package path in useAddVersionSubmit.
@@ -630,13 +620,12 @@ export function useAddVersionModalController({
           {
             id: "proof",
             label: t("transaction.stepProof", "Generate zero-knowledge proof"),
-            // Says what the label cannot: how long, and what it needs from you.
             detail:
               commitmentProof.proofStep === "verifying"
                 ? t("addVersion.verifyingProof", "Verifying proof...")
                 : t(
-                    "transaction.proofDuration",
-                    "This can take 30–60 seconds; keep this tab active.",
+                    "transaction.proofGenerationHint",
+                    "Keep this page open while the proof is generated.",
                   ),
           },
           { id: "encrypt", label: t("addVersion.stepEncrypt", "Encrypt the metadata envelope") },
@@ -659,8 +648,8 @@ export function useAddVersionModalController({
           },
         ],
         currentId: timelineStep,
-        failed: phase === "failed",
-        complete: phase === "done",
+        failed: phase === "failed" && !errorResult?.transactionConfirmed,
+        complete: phase === "done" || errorResult?.transactionConfirmed === true,
         // This step stops for the user; it must not look like work in progress.
         awaiting: phase === "review",
       }),
@@ -675,9 +664,6 @@ export function useAddVersionModalController({
       personInfo,
       allConsentsChecked,
       isParentVersionLookupPending,
-      // Closing always resets the modal. Only this explicit action permits
-      // local cache/notification work to continue for an already-sent transaction.
-      onRunInBackground: addVersionStatus === "confirming" ? handleRunInBackground : undefined,
       transactionPreview,
       onTransactionPreviewDecision: decideTransactionPreview,
       onClose: handleClose,

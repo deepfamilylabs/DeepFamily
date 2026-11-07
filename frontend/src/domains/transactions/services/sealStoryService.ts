@@ -6,6 +6,8 @@ import {
 } from "../../../shared/clients/contractFactory";
 import { parseReceiptEvents, waitForTransactionReceipt } from "../api/txGateway";
 import { normalizeStoryTxError } from "../../../shared/lib/errors";
+import { withTransactionHash } from "../api/exactTransactionReceipt";
+import { readConfirmedDetails, verifyConfirmedDetails } from "./confirmedTransactionError";
 
 import {
   archivePreviewRejectedError,
@@ -32,6 +34,7 @@ export async function sealStoryService(
 ): Promise<SealStoryResult> {
   const deepFamily = createDeepFamilyContract(contractAddress, signer);
   let errorContract = deepFamily;
+  let transactionHash: string | undefined;
   try {
     const archiveAddress = await deepFamily.archive();
     const contract = createArchiveContract(archiveAddress, signer);
@@ -66,6 +69,7 @@ export async function sealStoryService(
       });
     }
     const tx = await contract.sealStory(...args, { gasLimit: preview.gasLimit });
+    transactionHash = tx.hash;
     const receipt = await waitForTransactionReceipt(tx);
     const event = parseReceiptEvents(receipt, createArchiveInterface(), archiveAddress).find(
       (item) => item.name === "StorySealed",
@@ -84,31 +88,38 @@ export async function sealStoryService(
         key: "archive.errors.confirmationMismatch",
       });
     }
-    const finalState = await contract.storyState(tokenId, { blockTag: receipt.blockNumber });
-    if (
-      !finalState.isSealed ||
-      finalState.recordsHead !== state.recordsHead ||
-      BigInt(finalState.totalRecords) !== BigInt(state.totalRecords) ||
-      BigInt(finalState.totalPayloadLength) !== BigInt(state.totalPayloadLength) ||
-      BigInt(finalState.lastUpdateTime) !== BigInt(event.args.timestamp)
-    ) {
-      throw archiveValidationError("Stored story seal differs from the confirmed event", {
-        key: "archive.errors.confirmationMismatch",
-      });
-    }
-    const sealed = {
-      tokenId,
-      totalRecords: Number(state.totalRecords),
-      recordsHead: state.recordsHead,
-      sealer: author,
-    };
-    return {
-      ...sealed,
-      transactionHash: tx.hash,
-      blockNumber: receipt.blockNumber,
-      events: { StorySealed: sealed },
-    };
+    return await verifyConfirmedDetails(tx.hash, async () => {
+      const finalState = await readConfirmedDetails(tx.hash, () =>
+        contract.storyState(tokenId, { blockTag: receipt.blockNumber }),
+      );
+      if (
+        !finalState.isSealed ||
+        finalState.recordsHead !== state.recordsHead ||
+        BigInt(finalState.totalRecords) !== BigInt(state.totalRecords) ||
+        BigInt(finalState.totalPayloadLength) !== BigInt(state.totalPayloadLength) ||
+        BigInt(finalState.lastUpdateTime) !== BigInt(event.args.timestamp)
+      ) {
+        throw archiveValidationError("Stored story seal differs from the confirmed event", {
+          key: "archive.errors.confirmationMismatch",
+        });
+      }
+      const sealed = {
+        tokenId,
+        totalRecords: Number(state.totalRecords),
+        recordsHead: state.recordsHead,
+        sealer: author,
+      };
+      return {
+        ...sealed,
+        transactionHash: tx.hash,
+        blockNumber: receipt.blockNumber,
+        events: { StorySealed: sealed },
+      };
+    });
   } catch (error: any) {
-    throw normalizeStoryTxError(error, errorContract);
+    throw normalizeStoryTxError(
+      transactionHash ? withTransactionHash(error, transactionHash) : error,
+      errorContract,
+    );
   }
 }

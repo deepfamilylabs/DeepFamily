@@ -338,7 +338,10 @@ describe("useAddVersionFlow", () => {
     rerender();
     resolveService(serviceResult);
     await act(async () => {
-      await expect(pending).rejects.toMatchObject({ code: "ADD_VERSION_SCOPE_CHANGED" });
+      await expect(pending).rejects.toMatchObject({
+        code: "ADD_VERSION_SCOPE_CHANGED", transactionConfirmed: true,
+        transactionHash: serviceResult.transactionHash, verificationFailure: "read",
+      });
     });
 
     expect(result.current.status).not.toBe("success");

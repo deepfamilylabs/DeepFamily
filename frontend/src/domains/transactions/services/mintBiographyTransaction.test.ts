@@ -135,9 +135,9 @@ function setup(story = "  私密传记导入\r\n😀 e\u0301  ".repeat(100)) {
     blob.payloadHash,
   ];
   const confirm = vi.fn().mockResolvedValue(true);
-  const run = () =>
-    mintBiographyTransaction({ contract, signer: signer as any, args, personHash, confirm });
-  return { run, args, method, confirm, signer, archive, ref, receipt, payload };
+  const run = (overrides: Partial<Parameters<typeof mintBiographyTransaction>[0]> = {}) =>
+    mintBiographyTransaction({ contract, signer: signer as any, args, personHash, confirm, ...overrides });
+  return { run, args, method, confirm, signer, archive, ref, receipt, payload, contract };
 }
 describe("atomic mint biography transaction", () => {
   beforeEach(() => vi.clearAllMocks());
@@ -175,10 +175,19 @@ describe("atomic mint biography transaction", () => {
   it("rejects a stored reference or data runtime different from the confirmed payload", async () => {
     const f = setup();
     f.ref.author = main;
-    await expect(f.run()).rejects.toThrow(/reference/);
+    await expect(f.run()).rejects.toMatchObject({
+      message: expect.stringMatching(/reference/),
+      transactionHash: txHash,
+      transactionConfirmed: true,
+      verificationFailure: "mismatch",
+    });
     const g = setup();
     g.signer.provider.getCode.mockResolvedValue("0x00ff");
-    await expect(g.run()).rejects.toThrow();
+    await expect(g.run()).rejects.toMatchObject({
+      transactionHash: txHash,
+      transactionConfirmed: true,
+      verificationFailure: "mismatch",
+    });
   });
   it("allows an empty biography without creating a record or requesting its bytes", async () => {
     const f = setup("");
@@ -187,5 +196,140 @@ describe("atomic mint biography transaction", () => {
     expect(f.confirm).toHaveBeenCalledWith(
       expect.objectContaining({ payloadBytes: 0, segmentCount: 0 }),
     );
+  });
+
+  it("does not request the wallet after cancellation during the last network check", async () => {
+    const f = setup();
+    let resolveNetwork!: (value: { chainId: bigint }) => void;
+    let active = true;
+    let checkingFinalNetwork = false;
+    const finalNetwork = new Promise<{ chainId: bigint }>((resolve) => { resolveNetwork = resolve; });
+    f.confirm.mockImplementation(async () => {
+      f.signer.provider.getNetwork.mockImplementationOnce(() => {
+        checkingFinalNetwork = true;
+        return finalNetwork;
+      });
+      return true;
+    });
+    const assertActive = () => { if (!active) throw new Error("cancelled"); };
+    const pending = f.run({ assertActive });
+    await vi.waitFor(() => expect(checkingFinalNetwork).toBe(true));
+    // The last network RPC is still pending; the wallet has not been requested.
+    active = false;
+    resolveNetwork({ chainId: 31337n });
+    await expect(pending).rejects.toThrow("cancelled");
+    expect(f.method).not.toHaveBeenCalled();
+  });
+
+  it("uses the original fixed RPC for readback after the wallet changes network", async () => {
+    const f = setup();
+    const readbackProvider = {
+      getNetwork: vi.fn(async () => ({ chainId: 31337n })),
+      getCode: vi.fn(async () => `0x00${f.payload.slice(2)}`),
+    };
+    mocks.receipt.mockImplementationOnce(async () => {
+      f.signer.provider.getNetwork.mockRejectedValue(new Error("Wallet network changed"));
+      f.signer.provider.getCode.mockRejectedValue(new Error("Wallet network changed"));
+      return f.receipt;
+    });
+    await expect(f.run({ readbackProvider: readbackProvider as any })).resolves.toBe(f.receipt);
+    expect(mocks.archive).toHaveBeenCalledWith(archiveAddress, readbackProvider);
+    expect(readbackProvider.getCode).toHaveBeenCalledWith(pointer, 10);
+    expect(f.signer.provider.getCode).not.toHaveBeenCalled();
+  });
+
+  it("rejects a verification RPC on a different chain before sending", async () => {
+    const f = setup();
+    await expect(f.run({ readbackProvider: {
+      getNetwork: vi.fn(async () => ({ chainId: 1n })),
+    } as any })).rejects.toThrow(/different network/);
+    expect(f.method).not.toHaveBeenCalled();
+    expect(f.confirm).not.toHaveBeenCalled();
+  });
+
+  it.each(["state", "reference", "code"] as const)(
+    "classifies an unavailable %s read separately from a data mismatch",
+    async (read) => {
+      const f = setup();
+      const error = Object.assign(new Error("RPC unavailable"), { code: "NETWORK_ERROR" });
+      if (read === "state") f.archive.storyState.mockRejectedValueOnce(error);
+      else if (read === "reference") f.archive.storyRecordRef.mockRejectedValueOnce(error);
+      else f.signer.provider.getCode.mockRejectedValueOnce(error);
+      const onSubmitted = vi.fn();
+      const failure = await f.run({ onSubmitted }).catch((cause) => cause);
+      expect(failure).toMatchObject({
+        transactionHash: txHash,
+        transactionConfirmed: true,
+        verificationFailure: "read",
+      });
+      if (read === "code") {
+        expect(failure).toMatchObject({ code: "ARCHIVE_CODE_READ_FAILED", cause: error });
+      } else {
+        expect(failure).toBe(error);
+      }
+      expect(onSubmitted).toHaveBeenCalledWith(txHash);
+    },
+  );
+
+  it("classifies a returned commitment mismatch as validation failure", async () => {
+    const f = setup();
+    f.archive.storyState.mockResolvedValueOnce({
+      totalRecords: 1n,
+      totalPayloadLength: BigInt(ethers.getBytes(f.payload).length),
+      recordsHead: ethers.ZeroHash,
+    });
+    await expect(f.run()).rejects.toMatchObject({
+      message: expect.stringMatching(/commitment/),
+      transactionHash: txHash,
+      transactionConfirmed: true,
+      verificationFailure: "mismatch",
+    });
+  });
+
+  it("does not mark a mismatched mint receipt as a confirmed detail failure", async () => {
+    const f = setup();
+    f.receipt.logs.splice(0, 1);
+    const error = await f.run().catch((cause) => cause);
+    expect(error).toMatchObject({
+      transactionHash: txHash,
+      transactionConfirmed: false,
+    });
+    expect(error).not.toHaveProperty("verificationFailure");
+    expect(f.archive.storyState).not.toHaveBeenCalled();
+  });
+
+  it("verifies a successful fee replacement with its actual hash", async () => {
+    const f = setup();
+    const hash = ethers.id("repriced mint");
+    const receipt = { ...f.receipt, hash };
+    mocks.receipt.mockRejectedValueOnce({
+      code: "TRANSACTION_REPLACED",
+      reason: "repriced",
+      cancelled: false,
+      replacement: {
+        hash, chainId: 31337n, from: author, to: main, value: 0n,
+        data: f.contract.interface.encodeFunctionData("mintPersonVersionNFT", f.args),
+      },
+      receipt,
+    });
+    const onSubmitted = vi.fn();
+    await expect(f.run({ onSubmitted })).resolves.toBe(receipt);
+    expect(onSubmitted.mock.calls).toEqual([[txHash], [hash]]);
+    expect(f.archive.storyState).toHaveBeenCalledOnce();
+  });
+
+  it("does not accept a successful replacement with different mint calldata", async () => {
+    const f = setup();
+    const hash = ethers.id("different mint");
+    mocks.receipt.mockRejectedValueOnce({
+      code: "TRANSACTION_REPLACED", reason: "repriced", cancelled: false,
+      replacement: { hash, chainId: 31337n, from: author, to: main, value: 0n, data: "0x" },
+      receipt: { ...f.receipt, hash },
+    });
+    await expect(f.run()).rejects.toMatchObject({
+      code: "TRANSACTION_REPLACEMENT_MISMATCH",
+      transactionHash: txHash,
+    });
+    expect(f.archive.storyState).not.toHaveBeenCalled();
   });
 });

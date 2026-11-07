@@ -41,7 +41,14 @@ export function MintNftStatusPanel({
         },
         timeline,
         done: successResult ? <MintNFTSuccessResult t={t} successResult={successResult} /> : null,
-        failed: { title: t("mintNFT.mintFailed", "NFT Minting Failed"), error: errorResult },
+        failed: {
+          title: errorResult?.transactionConfirmed
+            ? errorResult.verificationFailure === "read"
+              ? t("mintNFT.detailsReadFailedTitle", "Transaction Confirmed; Details Unavailable")
+              : t("mintNFT.verificationMismatchTitle", "Transaction Confirmed; Data Verification Failed")
+            : t("mintNFT.mintFailed", "NFT Minting Failed"),
+          error: errorResult,
+        },
         blocked: (
           <div className="p-8 rounded-xl bg-surface border border-hairline text-center flex flex-col items-center justify-center">
             <div className="w-16 h-16 rounded-xl bg-danger/12 flex items-center justify-center mb-4 shadow-xs">

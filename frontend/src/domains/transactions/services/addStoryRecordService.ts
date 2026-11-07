@@ -13,6 +13,8 @@ import {
 } from "../../../shared/clients/contractFactory";
 import { parseReceiptEvents, waitForTransactionReceipt } from "../api/txGateway";
 import { normalizeStoryTxError } from "../../../shared/lib/errors";
+import { withTransactionHash } from "../api/exactTransactionReceipt";
+import { readConfirmedDetails, verifyConfirmedDetails } from "./confirmedTransactionError";
 import type { StoryRecord } from "../../../shared/model";
 import {
   archivePreviewRejectedError,
@@ -66,6 +68,7 @@ export async function addStoryRecordService(
 ): Promise<AddStoryRecordResult> {
   const deepFamily = createDeepFamilyContract(contractAddress, signer);
   let errorContract = deepFamily;
+  let transactionHash: string | undefined;
   try {
     // Freeze the exact DFS1 bytes before any RPC/wallet await.
     if (!Number.isInteger(recordType) || recordType < 1 || recordType > 255)
@@ -138,6 +141,7 @@ export async function addStoryRecordService(
       });
     }
     const tx = await contract.appendStoryRecord(...args, { gasLimit: preview.gasLimit });
+    transactionHash = tx.hash;
     const receipt = await waitForTransactionReceipt(tx);
     const event = parseReceiptEvents(receipt, createArchiveInterface(), archiveAddress).find(
       (item) => item.name === "StoryRecordAppended",
@@ -155,89 +159,96 @@ export async function addStoryRecordService(
         key: "archive.errors.confirmationMismatch",
       });
     }
-    const expectedBlob = {
-      payloadHash,
-      payloadLength: preview.payloadBytes,
-      segmentCount: preview.segmentCount,
-    };
-    assertBlobRefMatches(event.args.blob, expectedBlob);
-    const [ref, finalState] = await Promise.all([
-      contract.storyRecordRef(tokenId, recordIndex, { blockTag: receipt.blockNumber }),
-      contract.storyState(tokenId, { blockTag: receipt.blockNumber }),
-    ]);
-    assertBlobRefMatches(ref.blob, { ...expectedBlob, pointer: event.args.blob.pointer });
-    if (
-      ref.schemaId !== STORY_ENVELOPE_SCHEMA_ID ||
-      ref.author.toLowerCase() !== author.toLowerCase() ||
-      BigInt(ref.timestamp) !== BigInt(event.args.timestamp) ||
-      BigInt(finalState.totalRecords) < BigInt(recordIndex + 1) ||
-      BigInt(finalState.totalPayloadLength) <
-        BigInt(state.totalPayloadLength) + BigInt(preview.payloadBytes) ||
-      (BigInt(finalState.totalRecords) === BigInt(recordIndex + 1) &&
-        (finalState.recordsHead !== event.args.newHead ||
-          BigInt(finalState.totalPayloadLength) !==
-            BigInt(state.totalPayloadLength) + BigInt(preview.payloadBytes)))
-    ) {
-      throw archiveValidationError("Stored story reference differs from the confirmed event", {
-        key: "archive.errors.confirmationMismatch",
+    return await verifyConfirmedDetails(tx.hash, async () => {
+      const expectedBlob = {
+        payloadHash,
+        payloadLength: preview.payloadBytes,
+        segmentCount: preview.segmentCount,
+      };
+      assertBlobRefMatches(event.args.blob, expectedBlob);
+      const [ref, finalState] = await readConfirmedDetails(tx.hash, () =>
+        Promise.all([
+          contract.storyRecordRef(tokenId, recordIndex, { blockTag: receipt.blockNumber }),
+          contract.storyState(tokenId, { blockTag: receipt.blockNumber }),
+        ]),
+      );
+      assertBlobRefMatches(ref.blob, { ...expectedBlob, pointer: event.args.blob.pointer });
+      if (
+        ref.schemaId !== STORY_ENVELOPE_SCHEMA_ID ||
+        ref.author.toLowerCase() !== author.toLowerCase() ||
+        BigInt(ref.timestamp) !== BigInt(event.args.timestamp) ||
+        BigInt(finalState.totalRecords) < BigInt(recordIndex + 1) ||
+        BigInt(finalState.totalPayloadLength) <
+          BigInt(state.totalPayloadLength) + BigInt(preview.payloadBytes) ||
+        (BigInt(finalState.totalRecords) === BigInt(recordIndex + 1) &&
+          (finalState.recordsHead !== event.args.newHead ||
+            BigInt(finalState.totalPayloadLength) !==
+              BigInt(state.totalPayloadLength) + BigInt(preview.payloadBytes)))
+      ) {
+        throw archiveValidationError("Stored story reference differs from the confirmed event", {
+          key: "archive.errors.confirmationMismatch",
+        });
+      }
+      const computedRecordHash = computeStoryRecordHash({
+        chainId: network.chainId,
+        archive: archiveAddress,
+        tokenId,
+        index: recordIndex,
+        schemaId: STORY_ENVELOPE_SCHEMA_ID,
+        payloadHash,
+        payloadLength: preview.payloadBytes,
+        author,
+        timestamp: ref.timestamp,
       });
-    }
-    const computedRecordHash = computeStoryRecordHash({
-      chainId: network.chainId,
-      archive: archiveAddress,
-      tokenId,
-      index: recordIndex,
-      schemaId: STORY_ENVELOPE_SCHEMA_ID,
-      payloadHash,
-      payloadLength: preview.payloadBytes,
-      author,
-      timestamp: ref.timestamp,
-    });
-    if (
-      computedRecordHash !== event.args.recordHash ||
-      computeStoryHead({ previousHead: state.recordsHead, recordHash: computedRecordHash }) !==
-        event.args.newHead
-    ) {
-      throw archiveValidationError("Story event commitment differs from the frozen record", {
-        key: "archive.errors.confirmationMismatch",
-      });
-    }
-    const newRecord: StoryRecord = {
-      recordIndex,
-      payloadHash,
-      title,
-      content,
-      timestamp: Number(ref.timestamp),
-      author: author,
-      recordType,
-      attachmentURI,
-      schemaId: STORY_ENVELOPE_SCHEMA_ID,
-      rawPayload: payload,
-      payloadLength: preview.payloadBytes,
-      segmentCount: preview.segmentCount,
-      recordHash: event.args.recordHash,
-    };
-    return {
-      recordIndex,
-      payloadLength: preview.payloadBytes,
-      transactionHash: tx.hash,
-      blockNumber: receipt.blockNumber,
-      recordsHead: event.args.newHead,
-      newRecord,
-      events: {
-        StoryRecordAppended: {
-          tokenId,
-          recordIndex,
-          payloadLength: preview.payloadBytes,
-          payloadHash,
-          author: author,
-          title,
-          recordType,
-          attachmentURI,
+      if (
+        computedRecordHash !== event.args.recordHash ||
+        computeStoryHead({ previousHead: state.recordsHead, recordHash: computedRecordHash }) !==
+          event.args.newHead
+      ) {
+        throw archiveValidationError("Story event commitment differs from the frozen record", {
+          key: "archive.errors.confirmationMismatch",
+        });
+      }
+      const newRecord: StoryRecord = {
+        recordIndex,
+        payloadHash,
+        title,
+        content,
+        timestamp: Number(ref.timestamp),
+        author: author,
+        recordType,
+        attachmentURI,
+        schemaId: STORY_ENVELOPE_SCHEMA_ID,
+        rawPayload: payload,
+        payloadLength: preview.payloadBytes,
+        segmentCount: preview.segmentCount,
+        recordHash: event.args.recordHash,
+      };
+      return {
+        recordIndex,
+        payloadLength: preview.payloadBytes,
+        transactionHash: tx.hash,
+        blockNumber: receipt.blockNumber,
+        recordsHead: event.args.newHead,
+        newRecord,
+        events: {
+          StoryRecordAppended: {
+            tokenId,
+            recordIndex,
+            payloadLength: preview.payloadBytes,
+            payloadHash,
+            author: author,
+            title,
+            recordType,
+            attachmentURI,
+          },
         },
-      },
-    };
+      };
+    });
   } catch (error: any) {
-    throw normalizeStoryTxError(error, errorContract);
+    throw normalizeStoryTxError(
+      transactionHash ? withTransactionHash(error, transactionHash) : error,
+      errorContract,
+    );
   }
 }

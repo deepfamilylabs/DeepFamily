@@ -451,7 +451,14 @@ export function useStoryEditorController() {
             t("storyRecordEditor.success.recordAddedGeneric", "Story record added successfully"),
           );
         }
-      } catch (error) {
+      } catch (error: any) {
+        if (error?.transactionConfirmed === true && mounted.current && accessRef.current.scope === accessScope) {
+          if (validTokenId) {
+            scopedQueryClient.clear(storyKey(validTokenId));
+            scopedQueryClient.clear(`${storyKey(validTokenId)}:meta`);
+          }
+          storyQuery.refetch({ keepData: true });
+        }
         // Reported by the caller, at the composer. A toast here as well meant two
         // tellings of one failure, in two wordings, from two sides of the screen.
         throw error;
@@ -511,7 +518,14 @@ export function useStoryEditorController() {
             t("storyRecordEditor.success.storySealedGeneric", "Story sealed successfully"),
           );
         }
-      } catch (error) {
+      } catch (error: any) {
+        if (error?.transactionConfirmed === true && mounted.current && accessRef.current.scope === accessScope) {
+          if (validTokenId) {
+            scopedQueryClient.clear(storyKey(validTokenId));
+            scopedQueryClient.clear(`${storyKey(validTokenId)}:meta`);
+          }
+          storyQuery.refetch({ keepData: true });
+        }
         // Reported by the caller, on the seal card. See onAddRecord.
         throw error;
       }

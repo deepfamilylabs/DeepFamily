@@ -47,6 +47,7 @@ export interface MintNftFlowArgs {
   coreInfo: MintCoreInfo;
   storyTitle?: string;
   story?: string;
+  onTransactionSubmitted?: (transactionHash: string) => void;
 }
 
 export interface MintNFTSuccessResultView {
@@ -64,4 +65,7 @@ export interface MintNFTErrorResultView {
   message: string;
   details: string;
   retryable?: boolean;
+  transactionHash?: string;
+  transactionConfirmed?: boolean;
+  verificationFailure?: "read" | "mismatch";
 }

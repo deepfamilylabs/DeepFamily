@@ -12,7 +12,7 @@ const mocks = vi.hoisted(() => ({
     contractAddress: "0x0000000000000000000000000000000000000abc",
   },
   tx: { hash: "0xendorse" },
-  receipt: { transactionHash: "0xendorse", blockNumber: 20 },
+  receipt: { status: 1, transactionHash: "0xendorse", blockNumber: 20 },
   contract: {
     endorseVersion: vi.fn(),
   },
@@ -125,7 +125,7 @@ describe("useEndorseFlow", () => {
         versionIndex: 2,
         endorseVersion: expect.any(Function),
         deepTokenAddress: "0xtoken",
-              onStageChange: expect.any(Function),
+        onStageChange: expect.any(Function),
       }),
     );
     expect(result.current.status).toBe("success");
@@ -187,5 +187,55 @@ describe("useEndorseFlow", () => {
     expect(missingContract.result.current.status).toBe("error");
     expect(mocks.createDeepFamilyContract).not.toHaveBeenCalled();
     expect(mocks.executeEndorseFlow).not.toHaveBeenCalled();
+  });
+  it("does not send when a reset occurs after the last stage update but before sending", async () => {
+    let finishEstimate!: () => void;
+    const estimate = new Promise<void>((resolve) => {
+      finishEstimate = resolve;
+    });
+    mocks.executeEndorseFlow.mockImplementation(async (params) => {
+      params.onStageChange("submitting");
+      await estimate;
+      return params.endorseVersion(flowArgs.personHash, flowArgs.versionIndex);
+    });
+    const hook = renderHook(() => useEndorseFlow());
+    let pending!: Promise<any>;
+    act(() => {
+      pending = hook.result.current.runOrThrow(flowArgs);
+    });
+    const rejected = expect(pending).rejects.toMatchObject({ code: "ENDORSEMENT_CANCELLED" });
+    act(() => hook.result.current.reset());
+    await act(async () => {
+      finishEstimate();
+      await rejected;
+    });
+    expect(mocks.contract.endorseVersion).not.toHaveBeenCalled();
+  });
+
+  it("returns a confirmed result to the original caller after reset without updating the new form", async () => {
+    let finishReceipt!: (value: any) => void;
+    mocks.waitForTransactionReceipt.mockReturnValue(
+      new Promise((resolve) => {
+        finishReceipt = resolve;
+      }),
+    );
+    const confirmed = { alreadyEndorsed: false, transactionHash: "0xendorse" };
+    mocks.executeEndorseFlow.mockImplementation(async (params) => {
+      await params.endorseVersion(flowArgs.personHash, flowArgs.versionIndex);
+      return confirmed;
+    });
+    const hook = renderHook(() => useEndorseFlow());
+    let pending!: Promise<any>;
+    act(() => {
+      pending = hook.result.current.runOrThrow(flowArgs);
+    });
+    await vi.waitFor(() => expect(mocks.waitForTransactionReceipt).toHaveBeenCalledTimes(1));
+    act(() => hook.result.current.reset());
+    await act(async () => {
+      finishReceipt(mocks.receipt);
+      expect(await pending).toBe(confirmed);
+    });
+    expect(hook.result.current.status).toBe("idle");
+    expect(hook.result.current.result).toBeNull();
   });
 });

@@ -15,7 +15,6 @@ export interface EndorseFooterProps {
   hasValidTarget: boolean;
   isTargetValidOnChain: boolean;
   isPersonHashFormatValid: boolean;
-  onRunInBackground?: () => void;
   onClose: () => void;
   onBackToEdit: () => void;
   onContinueEndorsing: () => void;
@@ -34,7 +33,6 @@ export function EndorseFooter({
   hasValidTarget,
   isTargetValidOnChain,
   isPersonHashFormatValid,
-  onRunInBackground,
   onClose,
   onBackToEdit,
   onContinueEndorsing,
@@ -45,7 +43,6 @@ export function EndorseFooter({
     <TransactionFooterBar
       phase={phase}
       slots={{
-        onRunInBackground,
         failed: { onClose, onBackToEdit },
         // The phase is derived from this result, so it is always present here.
         done: successResult ? (

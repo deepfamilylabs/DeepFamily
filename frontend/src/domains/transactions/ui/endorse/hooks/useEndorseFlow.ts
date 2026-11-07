@@ -5,7 +5,7 @@ import { useConfig } from "../../../../config";
 import { createDeepFamilyContract } from "../../../../../shared/clients/contractFactory";
 import { getFriendlyError, type FriendlyError } from "../../../../../shared/lib/errors";
 import { useTxFlow, type TxFlowRunner } from "../../../hooks/useTxFlow";
-import { waitForTransactionReceipt } from "../../../api/txGateway";
+import { waitForExactTransactionReceipt } from "../../../api/exactTransactionReceipt";
 import { executeEndorseFlow } from "../../../services/endorseService";
 import type {
   EndorseFeeQuote,
@@ -28,12 +28,20 @@ export function useEndorseFlow() {
       }
 
       const contract = createDeepFamilyContract(contractAddress, signer);
+      const assertActive = () => {
+        if (!update.isCurrent()) {
+          throw Object.assign(new Error("Endorsement cancelled before wallet request"), {
+            code: "ENDORSEMENT_CANCELLED",
+          });
+        }
+      };
 
       const endorseVersion = async (
         personHash: string,
         versionIndex: number,
         overrides?: Record<string, unknown>,
       ) => {
+        assertActive();
         const tx =
           overrides && Object.keys(overrides).length > 0
             ? await contract.endorseVersion(personHash, versionIndex, overrides)
@@ -43,7 +51,19 @@ export function useEndorseFlow() {
         if (update.isCurrent()) {
           update("confirming", t("transaction.submitted", "Transaction submitted..."));
         }
-        return await waitForTransactionReceipt(tx);
+        const { receipt } = await waitForExactTransactionReceipt({
+          transaction: tx,
+          expected: {
+            from: address,
+            to: contractAddress,
+            data: contract.interface?.encodeFunctionData("endorseVersion", [
+              personHash,
+              versionIndex,
+            ]),
+            value: 0n,
+          },
+        });
+        return receipt;
       };
 
       return await executeEndorseFlow({
@@ -55,8 +75,12 @@ export function useEndorseFlow() {
         endorseVersion,
         deepTokenAddress: args.deepTokenAddress,
         quotedFee: args.quotedFee,
-        onFeeQuoteChange: args.onFeeQuoteChange,
+        assertActive,
+        onFeeQuoteChange: (quote) => {
+          if (update.isCurrent()) args.onFeeQuoteChange?.(quote);
+        },
         onStageChange: (stage) => {
+          assertActive();
           args.onStageChange?.(stage);
           // The service's own vocabulary, translated into the shared status
           // model plus the line the UI shows for it.
@@ -79,5 +103,6 @@ export function useEndorseFlow() {
 
   return useTxFlow<ExecuteEndorseFlowResult, [EndorseFlowArgs], FriendlyError>(runner, {
     normalizeError: (error) => getFriendlyError(error, t),
+    allowBackgroundCompletion: true,
   });
 }

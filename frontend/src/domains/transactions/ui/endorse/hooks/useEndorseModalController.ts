@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useWallet } from "../../../../wallet";
 import { useContractClient } from "../../../hooks/useContractClient";
-import { usePersonVersionOptions } from "../../../hooks/usePersonVersionOptions";
 import { useTreeMutations, useTreeNodeAccess } from "../../../../tree";
 import { useResponsiveModalMode } from "../../../../../shared/ui";
 import { useTransactionModalFrameState } from "../../shared/useTransactionModalFrameState";
@@ -26,10 +25,6 @@ interface UseEndorseModalControllerArgs {
   onMintNFT?: (personHash: string, versionIndex: number) => void;
   initialPersonHash?: string;
   initialVersionIndex?: number;
-}
-
-function isBytes32(value: string | undefined | null) {
-  return Boolean(value && /^0x[0-9a-fA-F]{64}$/.test(value.trim()));
 }
 
 function getTargetKey(personHash: string, versionIndex: number) {
@@ -75,14 +70,42 @@ export function useEndorseModalController({
   const didPatchCacheRef = useRef(false);
   const handledResultRef = useRef<ExecuteEndorseFlowResult | null>(null);
   const activeRunTargetRef = useRef<string | null>(null);
+  const activeRunScopeRef = useRef<{ address: typeof address; contract: typeof contract } | null>(
+    null,
+  );
+  const attemptRef = useRef(0);
+  const mountedRef = useRef(true);
+  const openRef = useRef(isOpen);
+  openRef.current = isOpen;
+  const cancelCurrentAttempt = useCallback(() => {
+    attemptRef.current += 1;
+    activeRunTargetRef.current = null;
+    activeRunScopeRef.current = null;
+    resetEndorseFlow();
+  }, [resetEndorseFlow]);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      attemptRef.current += 1;
+      activeRunTargetRef.current = null;
+    };
+  }, []);
 
+  const requestCancellation = useCallback(() => {
+    // Includes browser-back dismissal, which bypasses requestFrameClose.
+    cancelCurrentAttempt();
+    onClose();
+  }, [cancelCurrentAttempt, onClose]);
   const isDesktop = useResponsiveModalMode();
-  const { entered, requestClose: handleClose } = useTransactionModalFrameState({
+  const { entered, requestClose: requestFrameClose } = useTransactionModalFrameState({
     isOpen,
     isDesktop,
     modalId: "EndorseModal",
-    onClose,
+    onClose: requestCancellation,
   });
+
+  const handleClose = requestFrameClose;
 
   const feeQuote = useEndorseFeeQuote({ isOpen, address, contract });
   const targetStatus = useEndorseTargetStatus({
@@ -114,7 +137,7 @@ export function useEndorseModalController({
     isBusy: isSubmitting || isApproving,
   });
 
-  const { settle: settleTransaction } = useTransactionCenterEntry({
+  const { captureSettlement } = useTransactionCenterEntry({
     kind: "endorse",
     label: t("endorse.title", "Endorse Version"),
     phase,
@@ -131,9 +154,8 @@ export function useEndorseModalController({
     previousTargetRef.current = { hash: nextHash, index: nextIndex };
     didPatchCacheRef.current = false;
     handledResultRef.current = null;
-    activeRunTargetRef.current = null;
-    resetEndorseFlow();
-  }, [initialPersonHash, initialVersionIndex, isOpen, resetEndorseFlow, seedTarget]);
+    cancelCurrentAttempt();
+  }, [initialPersonHash, initialVersionIndex, isOpen, cancelCurrentAttempt, seedTarget]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -147,12 +169,16 @@ export function useEndorseModalController({
     setErrorResult(null);
     didPatchCacheRef.current = false;
     handledResultRef.current = null;
-    activeRunTargetRef.current = null;
-    resetEndorseFlow();
-  }, [isOpen, resetEndorseFlow, targetPersonHash, targetVersionIndex]);
+    cancelCurrentAttempt();
+  }, [isOpen, cancelCurrentAttempt, targetPersonHash, targetVersionIndex]);
 
   useEffect(() => {
     if (!isOpen || activeRunTargetRef.current !== currentTargetKey) return;
+    if (
+      activeRunScopeRef.current?.address !== address ||
+      activeRunScopeRef.current?.contract !== contract
+    )
+      return;
     if (endorseFlow.status !== "success" || !endorseFlow.result) return;
     const result = endorseFlow.result as ExecuteEndorseFlowResult;
     if (handledResultRef.current === result) return;
@@ -192,6 +218,7 @@ export function useEndorseModalController({
     onSuccess?.({ ...result.receipt, endorsementCount: nextEndorsementCount });
   }, [
     address,
+    contract,
     bumpEndorsementCount,
     endorseFlow.result,
     endorseFlow.status,
@@ -203,11 +230,15 @@ export function useEndorseModalController({
     targetPersonHash,
     targetStatus,
     targetVersionIndex,
-    settleTransaction,
   ]);
 
   useEffect(() => {
     if (!isOpen || activeRunTargetRef.current !== currentTargetKey) return;
+    if (
+      activeRunScopeRef.current?.address !== address ||
+      activeRunScopeRef.current?.contract !== contract
+    )
+      return;
     if (endorseFlow.status !== "error" || !endorseFlow.error) return;
     const friendly = endorseFlow.error;
     console.error("Endorse failed:", friendly);
@@ -217,7 +248,7 @@ export function useEndorseModalController({
       details: friendly.details,
       retryable: friendly.retryable,
     });
-  }, [currentTargetKey, endorseFlow.error, endorseFlow.status, isOpen]);
+  }, [address, contract, currentTargetKey, endorseFlow.error, endorseFlow.status, isOpen]);
 
   useEffect(() => {
     applyVersionDecision(reconcileEndorseVersionSelection(versionLookup, getDecidedVersionHash()));
@@ -228,18 +259,21 @@ export function useEndorseModalController({
     setSuccessResult(null);
     setErrorResult(null);
     targetStatus.reset();
-    resetEndorseFlow();
+    cancelCurrentAttempt();
     previousTargetRef.current = { hash: "", index: 0 };
     didPatchCacheRef.current = false;
     handledResultRef.current = null;
     activeRunTargetRef.current = null;
-  }, [resetEndorseFlow, targetStatus]);
+  }, [cancelCurrentAttempt, seedTarget, targetStatus]);
 
   const handleEndorse = useCallback(() => {
     if (!address) {
       activeRunTargetRef.current = null;
       setErrorResult(
-        toEndorseErrorResult("WALLET_NOT_CONNECTED", t("wallet.notConnected", "Please connect your wallet")),
+        toEndorseErrorResult(
+          "WALLET_NOT_CONNECTED",
+          t("wallet.notConnected", "Please connect your wallet"),
+        ),
       );
       return;
     }
@@ -270,8 +304,12 @@ export function useEndorseModalController({
     setErrorResult(null);
     handledResultRef.current = null;
     activeRunTargetRef.current = currentTargetKey;
-    // The outcome is reported through settle rather than the status effects
-    // below, so an endorsement outlives the modal that started it.
+    activeRunScopeRef.current = { address, contract };
+    const attempt = ++attemptRef.current;
+    const settleTransaction = captureSettlement({ newEntry: true });
+    const isCurrentAttempt = () =>
+      mountedRef.current && openRef.current && attemptRef.current === attempt;
+    // This callback belongs to the original record, even if another form opens.
     runEndorseFlowOrThrow({
       personHash: targetPersonHash,
       versionIndex: Number(targetVersionIndex),
@@ -279,15 +317,22 @@ export function useEndorseModalController({
       // Hold the submission to the fee actually on screen. A quote that never
       // loaded is not a promise to the user, so it constrains nothing.
       quotedFee: feeQuote.loaded ? feeQuote.deepTokenFeeRaw : undefined,
-      onFeeQuoteChange: feeQuote.applyFeeQuote,
+      onFeeQuoteChange: (quote) => {
+        if (isCurrentAttempt()) feeQuote.applyFeeQuote(quote);
+      },
     }).then(
       (result) => {
-        if (!result.alreadyEndorsed) {
-          settleTransaction({ phase: "done", transactionHash: result.transactionHash });
-        }
+        settleTransaction({
+          phase: "done",
+          transactionHash: result.alreadyEndorsed ? undefined : result.transactionHash,
+        });
       },
       (error) => {
-        settleTransaction({ phase: "failed", error: getFriendlyError(error, t) });
+        settleTransaction({
+          phase: "failed",
+          transactionHash: (error as any)?.transactionHash,
+          error: getFriendlyError(error, t),
+        });
       },
     );
   }, [
@@ -299,7 +344,8 @@ export function useEndorseModalController({
     t,
     targetPersonHash,
     targetVersionIndex,
-    settleTransaction,
+    captureSettlement,
+    contract,
   ]);
 
   return {
@@ -336,10 +382,7 @@ export function useEndorseModalController({
           {
             id: "approve",
             label: t("endorse.stepApprove", "Approve DEEP tokens"),
-            detail: t(
-              "endorse.approvingDesc",
-              "Please confirm the token approval in your wallet",
-            ),
+            detail: t("endorse.approvingDesc", "Please confirm the token approval in your wallet"),
           },
           { id: "submit", label: t("endorse.stepSubmit", "Submit the endorsement") },
           {
@@ -369,9 +412,6 @@ export function useEndorseModalController({
       hasEndorsed: targetStatus.hasEndorsed,
       hasValidTarget,
       isTargetValidOnChain: targetStatus.isTargetValidOnChain,
-      // Only once the transaction is away. Before that, closing cancels, so
-      // offering to "continue in background" would be a lie.
-      onRunInBackground: endorseFlow.status === "confirming" ? handleClose : undefined,
       isPersonHashFormatValid,
       onClose: handleClose,
       onBackToEdit: () => setErrorResult(null),

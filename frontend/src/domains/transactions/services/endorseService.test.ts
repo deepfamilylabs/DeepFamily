@@ -45,7 +45,10 @@ describe("endorseService executeEndorseFlow", () => {
       recentReward: vi.fn(async () => 10n),
       balanceOf: vi.fn(async () => 100n),
       allowance: vi.fn(async () => 0n),
-      approve: vi.fn(async () => ({ hash: "0xapprove", wait: vi.fn(async () => ({})) })),
+      approve: vi.fn(async () => ({
+        hash: "0xapprove",
+        wait: vi.fn(async () => ({ status: 1, hash: "0xapprove" })),
+      })),
       decimals: vi.fn(async () => 18),
       symbol: vi.fn(async () => "DEEP"),
     };

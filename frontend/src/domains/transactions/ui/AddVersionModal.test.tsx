@@ -779,6 +779,8 @@ describe("AddVersionModal", () => {
 
     await waitFor(() => expect(mocks.toastError).toHaveBeenCalledTimes(1));
     expect(mocks.readerContract.getVersionDetails).toHaveBeenCalledWith(personHash, 3);
+    expect(await screen.findByText("Transaction Confirmed; Data Verification Failed")).toBeTruthy();
+    expect(screen.getByRole("alert").textContent).toContain("Transaction: 0xadd");
     expect(mocks.cacheValidatedPersonVersion).not.toHaveBeenCalled();
     expect(mocks.invalidateByTx).not.toHaveBeenCalled();
     expect(mocks.onSuccess).not.toHaveBeenCalled();
@@ -1070,13 +1072,10 @@ describe("AddVersionModal", () => {
     ).toBe(true);
   });
 
-  it("settles background confirmation with its original cache revision without changing a reopened form", async () => {
+  it("settles an already-sent public receipt after route unmount without local completion", async () => {
     let confirm!: (result: ReturnType<typeof successfulFlowResult>) => void;
     mocks.addVersionRunOrThrow.mockImplementationOnce(
-      () =>
-        new Promise((resolve) => {
-          confirm = resolve;
-        }),
+      () => new Promise((resolve) => { confirm = resolve; }),
     );
     const view = render(modalWithTransactionCentre());
     await fillRequiredFields();
@@ -1087,23 +1086,20 @@ describe("AddVersionModal", () => {
     mocks.addVersionFlow.status = "confirming";
     view.rerender(modalWithTransactionCentre());
     const originalId = transactionRecords()[0].id;
-    fireEvent.click(screen.getByRole("button", { name: /Continue in background/i }));
-    view.rerender(modalWithTransactionCentre(false));
-    view.rerender(modalWithTransactionCentre());
-    mocks.captureMetadataCacheRevision.mockReturnValue(22);
-    await act(async () => {
-      confirm(successfulFlowResult());
-    });
-    await waitFor(() => expect(mocks.toastSuccess).toHaveBeenCalledOnce());
+    expect(screen.queryByRole("button", { name: /Continue in background/i })).toBeNull();
+    view.rerender(
+      <TransactionCenterProvider><TransactionRecords /></TransactionCenterProvider>,
+    );
+    await act(async () => { confirm(successfulFlowResult()); });
     expect(transactionRecords()).toMatchObject([
       { id: originalId, phase: "done", transactionHash: "0xadd" },
     ]);
-    expect(mocks.cacheValidatedPersonVersion).toHaveBeenCalledWith(expect.any(Object), 11);
-    expect(mocks.invalidateByTx).toHaveBeenCalledOnce();
+    expect(mocks.readerContract.getVersionDetails).not.toHaveBeenCalled();
+    expect(mocks.cacheValidatedPersonVersion).not.toHaveBeenCalled();
+    expect(mocks.invalidateByTx).not.toHaveBeenCalled();
+    expect(mocks.toastSuccess).not.toHaveBeenCalled();
     expect(mocks.toastError).not.toHaveBeenCalled();
     expect(mocks.onSuccess).not.toHaveBeenCalled();
-    expect(formSectionsHidden()).toBe(false);
-    expect(screen.queryByText("Transaction Successful")).toBeNull();
   });
 
   it("ordinary close resets and cancels local completion while recording an already-sent transaction", async () => {
@@ -1467,4 +1463,42 @@ describe("AddVersionModal", () => {
     expect(submitEvent.defaultPrevented).toBe(true);
     await waitFor(() => expect(mocks.addVersionRunOrThrow).toHaveBeenCalledTimes(1));
   });
+  it.each(["reader", "service"] as const)("keeps confirmed %s read failure distinct from transaction failure", async (boundary) => {
+    if (boundary === "reader") {
+      mocks.addVersionRunOrThrow.mockResolvedValueOnce(successfulFlowResult());
+      mocks.readerContract.getVersionDetails.mockRejectedValueOnce(new Error("Reader RPC unavailable"));
+    } else mocks.addVersionRunOrThrow.mockRejectedValueOnce(Object.assign(new Error("Archive RPC unavailable"), {
+      transactionHash: "0xadd", transactionConfirmed: true, verificationFailure: "read",
+    }));
+    render(modalWithTransactionCentre());
+    await fillRequiredFields();
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: /Add Version/i })));
+    await waitFor(() => expect(mocks.toastError).toHaveBeenCalledOnce());
+    expect(await screen.findByText("Transaction Confirmed; Details Unavailable")).toBeTruthy();
+    expect(screen.queryByText("Transaction Failed")).toBeNull();
+    expect(screen.getByRole("alert").textContent).toContain("Transaction: 0xadd");
+    expect(mocks.toastError).toHaveBeenCalledWith("The version transaction is confirmed. Refresh the page to load its details.");
+    expect(transactionRecords()).toMatchObject([{transactionHash: "0xadd", error: {retryable: false}}]);
+    expect(mocks.cacheValidatedPersonVersion).not.toHaveBeenCalled();
+    expect(mocks.onSuccess).not.toHaveBeenCalled();
+    expect(mocks.addVersionRunOrThrow).toHaveBeenCalledOnce();
+  });
+
+  it("settles a confirmed service read failure after close without local completion", async () => {
+    let reject!: (reason: any) => void;
+    mocks.addVersionRunOrThrow.mockReturnValueOnce(new Promise((_resolve, rejectRun) => { reject = rejectRun; }));
+    const view = render(modalWithTransactionCentre());
+    await fillRequiredFields();
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: /Add Version/i })));
+    await waitFor(() => expect(mocks.addVersionRunOrThrow).toHaveBeenCalledOnce());
+    view.rerender(modalWithTransactionCentre(false));
+    await act(async () => reject(Object.assign(new Error("Archive unavailable"), {
+      transactionHash: "0xadd", transactionConfirmed: true, verificationFailure: "read",
+    })));
+    await waitFor(() => expect(transactionRecords()).toMatchObject([{phase: "done", transactionHash: "0xadd"}]));
+    expect(mocks.toastError).not.toHaveBeenCalled();
+    expect(mocks.cacheValidatedPersonVersion).not.toHaveBeenCalled();
+    expect(mocks.onSuccess).not.toHaveBeenCalled();
+  });
+
 });
