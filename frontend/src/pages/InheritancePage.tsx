@@ -8,24 +8,21 @@ import {
   useShieldedPageIdentitySession,
   ShieldedAssetToolbar,
   PanelButton,
-  readShieldedAsset,
-  resolveShieldedAssetPool,
-  waitForShieldedTransaction,
+  loadShieldedAssetMetadata,
+  loadShieldedModules,
+  createShieldedAssetPool,
+  ShieldedConfigurationMismatchError,
+  ShieldedWalletChangedError,
   type ShieldedAsset,
   type ShieldedPageModules,
   type ShieldedPanelNavigation,
 } from "../domains/inheritance";
 import { useWallet, WalletConnectButton } from "../domains/wallet";
-import {
-  createDeepFamilyContract,
-  createShieldedPoolFactoryContract,
-  createLineageIndexContract,
-} from "../shared/clients/contractFactory";
-import { getReadonlyProvider } from "../shared/clients/providerRegistry";
 import { getShieldedPoolFactoryAddress } from "../shared/config/env";
 import { getAddress, ZeroAddress } from "ethers";
 import { SUPPORTED_NETWORKS } from "../shared/config/networks";
 import { EmptyState, PageHead } from "../shared/ui";
+import { getFriendlyErrorMessage, normalizeErrorToError, type NormalizedError } from "../shared/lib/errors";
 
 type PageError =
   | {
@@ -37,7 +34,7 @@ type PageError =
         | "shielded.transactionFailed";
       values?: { hash: string };
     }
-  | { message: string };
+  | { cause: NormalizedError };
 
 type ModulesState =
   | { status: "loading" }
@@ -50,9 +47,9 @@ function sameAddress(a: string, b: string): boolean {
 }
 
 function pageError(error: unknown): PageError {
-  return error instanceof Error
-    ? { message: error.message }
-    : { key: "shielded.unreachable" };
+  if (error instanceof ShieldedConfigurationMismatchError) return { key: "shielded.configurationMismatch" };
+  if (error instanceof ShieldedWalletChangedError) return { key: "shielded.walletChanged" };
+  return { cause: normalizeErrorToError(error) };
 }
 
 const INITIAL_NAVIGATION: ShieldedPanelNavigation = {
@@ -157,52 +154,16 @@ function InheritanceContent() {
     let cancelled = false;
     setState({ status: "loading" });
     const load = async () => {
-      const provider = getReadonlyProvider(config.rpcUrl, config.chainId);
-      const deepFamily = createDeepFamilyContract(config.contractAddress, provider);
-      const factory = createShieldedPoolFactoryContract(factoryAddress, provider);
-      const toBlock = await provider.getBlockNumber();
-      const [network, familyIndex, deepToken, asset] = await Promise.all([
-        provider.getNetwork(),
-        deepFamily.lineageIndex() as Promise<string>,
-        factory.DEEP_TOKEN() as Promise<string>,
-        readShieldedAsset(selectedAddress, provider, nativeSymbol, { blockTag: toBlock }),
-      ]);
-      if (
-        network.chainId !== BigInt(config.chainId) ||
-        !sameAddress(deepToken, config.tokenAddress)
-      ) {
-        if (!cancelled)
-          setState({ status: "unavailable", error: { key: "shielded.configurationMismatch" } });
-        return;
-      }
-      const resolved = await resolveShieldedAssetPool(factory, asset, provider, familyIndex, {
-        blockTag: toBlock,
+      const result = await loadShieldedModules({
+        rpcUrl: config.rpcUrl,
+        chainId: config.chainId,
+        contractAddress: config.contractAddress,
+        tokenAddress: config.tokenAddress,
+        factoryAddress,
+        assetAddress: selectedAddress,
+        nativeSymbol,
       });
-      if (!resolved) {
-        if (!cancelled) setState({ status: "missingPool", asset });
-        return;
-      }
-      const { pool, poolAddress, poolDeploymentBlock } = resolved;
-      if (!cancelled) {
-        setState({
-          status: "ready",
-          modules: {
-            chainId: network.chainId,
-            provider,
-            deepFamily,
-            lineageIndex: createLineageIndexContract(familyIndex, provider),
-            token: asset.token,
-            assetAddress: asset.address,
-            assetKind: asset.kind,
-            assetSymbol: asset.symbol,
-            factory,
-            pool,
-            poolAddress,
-            tokenDecimals: asset.decimals,
-            poolDeploymentBlock,
-          },
-        });
-      }
+      if (!cancelled) setState(result);
     };
     void load().catch((error: unknown) => {
       if (!cancelled) {
@@ -236,13 +197,12 @@ function InheritanceContent() {
     setAssetError(null);
     const importingContext = assetContext;
     try {
-      const provider = getReadonlyProvider(config.rpcUrl, config.chainId);
-      const asset = await readShieldedAsset(
-        getAddress(importAddress.trim()),
-        provider,
+      const asset = await loadShieldedAssetMetadata({
+        assetAddress: getAddress(importAddress.trim()),
+        rpcUrl: config.rpcUrl,
+        chainId: config.chainId,
         nativeSymbol,
-        { blockTag: await provider.getBlockNumber() },
-      );
+      });
       if (!mounted.current || currentAssetContext.current !== importingContext) return;
       setImportedAssets((assets) =>
         assets.some((item) => sameAddress(item.address, asset.address))
@@ -276,28 +236,15 @@ function InheritanceContent() {
     setCreatingPool(true);
     setAssetError(null);
     try {
-      const [network, signerAddress, fromBlock] = await Promise.all([
-        signer.provider?.getNetwork(),
-        signer.getAddress(),
-        signer.provider?.getBlockNumber(),
-      ]);
-      if (
-        !isCurrent() ||
-        network?.chainId !== BigInt(config.chainId) ||
-        !context.account ||
-        !sameAddress(signerAddress, context.account)
-      ) {
-        if (isCurrent()) setAssetError({ key: "shielded.walletChanged" });
-        return;
-      }
-      if (typeof fromBlock !== "number" || !Number.isSafeInteger(fromBlock) || fromBlock < 0)
-        throw new Error("Pool creation block is unavailable");
-      const factory = createShieldedPoolFactoryContract(factoryAddress, signer);
-      const tx = await factory.createPool(asset.address);
-      // ethers' contract response wrapper drops the signer's replacement scan anchor.
-      const { transactionHash, receipt } = await waitForShieldedTransaction(
-        tx.replaceableTransaction(fromBlock),
-      );
+      if (!context.account) throw new ShieldedWalletChangedError();
+      const { transactionHash, receipt } = await createShieldedAssetPool({
+        signer,
+        chainId: config.chainId,
+        account: context.account,
+        factoryAddress,
+        assetAddress: asset.address,
+        isCurrent,
+      });
       if (receipt.status !== 1) {
         if (isCurrent())
           setAssetError({ key: "shielded.transactionFailed", values: { hash: transactionHash } });
@@ -312,7 +259,9 @@ function InheritanceContent() {
     }
   };
   const errorMessage = (error: PageError) =>
-    "message" in error ? error.message : t(error.key, error.values);
+    "cause" in error
+      ? getFriendlyErrorMessage(error.cause, t, t("shielded.unreachable"), { preferDetailsForUnknown: true })
+      : t(error.key, error.values);
   const head = <PageHead title={t("shielded.title")} />;
   const readyModules =
     state.status === "ready" &&

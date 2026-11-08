@@ -1,3 +1,4 @@
+import { createChainContract } from "@deepfamily/chain-client";
 import { assertCanonicalSafeProfile } from "./safeGovernance.mjs";
 import {
   CONFLUX_SAFE_1_3_0_2_OF_3_PROFILE,
@@ -39,7 +40,7 @@ export const assertGovernanceMultisig = async ({ ethers, provider, address, labe
   let threshold;
   let owners;
   try {
-    const multisig = new ethers.Contract(address, MULTISIG_INSPECTION_ABI, provider);
+    const multisig = createChainContract(address, MULTISIG_INSPECTION_ABI, provider);
     [threshold, owners] = await Promise.all([multisig.getThreshold(), multisig.getOwners()]);
   } catch (error) {
     const detail = error.shortMessage || error.reason || error.message;

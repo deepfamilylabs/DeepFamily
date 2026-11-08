@@ -1,75 +1,68 @@
 import { ethers } from "ethers";
+import { createChainContract } from "@deepfamily/chain-client";
 import DeepFamily from "../../abi/DeepFamily.json";
 import DeepFamilyArchive from "../../abi/DeepFamilyArchive.json";
 import DeepFamilyReader from "../../abi/DeepFamilyReader.json";
 import DeepFamilyLineageIndex from "../../abi/DeepFamilyLineageIndex.json";
+import DeepFamilyToken from "../../abi/DeepFamilyToken.json";
 import ShieldedErc20Pool from "../../abi/ShieldedErc20Pool.json";
 import ShieldedNativePool from "../../abi/ShieldedNativePool.json";
 import ShieldedPoolFactory from "../../abi/ShieldedPoolFactory.json";
-
-export const DEEP_TOKEN_ABI = [
-  "function recentReward() view returns (uint256)",
-  "function balanceOf(address) view returns (uint256)",
-  "function decimals() view returns (uint8)",
-  "function allowance(address,address) view returns (uint256)",
-  "function approve(address,uint256) returns (bool)",
-  "function symbol() view returns (string)",
-] as const;
 
 export function createDeepFamilyContract(
   contractAddress: string,
   runner: ethers.ContractRunner,
 ): ethers.Contract {
-  return new ethers.Contract(contractAddress, DeepFamily.abi, runner);
+  return createChainContract(contractAddress, DeepFamily.abi, runner);
 }
 
 export function createDeepTokenContract(
   tokenAddress: string,
   runner: ethers.ContractRunner,
 ): ethers.Contract {
-  return new ethers.Contract(tokenAddress, DEEP_TOKEN_ABI, runner);
+  return createChainContract(tokenAddress, DeepFamilyToken.abi, runner);
 }
 
 export function createDeepFamilyReaderContract(
   readerAddress: string,
   runner: ethers.ContractRunner,
 ): ethers.Contract {
-  return new ethers.Contract(readerAddress, DeepFamilyReader.abi, runner);
+  return createChainContract(readerAddress, DeepFamilyReader.abi, runner);
 }
 
 export function createArchiveContract(
   archiveAddress: string,
   runner: ethers.ContractRunner,
 ): ethers.Contract {
-  return new ethers.Contract(archiveAddress, DeepFamilyArchive.abi, runner);
+  return createChainContract(archiveAddress, DeepFamilyArchive.abi, runner);
 }
 
 export function createLineageIndexContract(
   lineageIndexAddress: string,
   runner: ethers.ContractRunner,
 ): ethers.Contract {
-  return new ethers.Contract(lineageIndexAddress, DeepFamilyLineageIndex.abi, runner);
+  return createChainContract(lineageIndexAddress, DeepFamilyLineageIndex.abi, runner);
 }
 
 export function createShieldedErc20PoolContract(
   poolAddress: string,
   runner: ethers.ContractRunner,
 ): ethers.Contract {
-  return new ethers.Contract(poolAddress, ShieldedErc20Pool.abi, runner);
+  return createChainContract(poolAddress, ShieldedErc20Pool.abi, runner);
 }
 
 export function createShieldedNativePoolContract(
   poolAddress: string,
   runner: ethers.ContractRunner,
 ): ethers.Contract {
-  return new ethers.Contract(poolAddress, ShieldedNativePool.abi, runner);
+  return createChainContract(poolAddress, ShieldedNativePool.abi, runner);
 }
 
 export function createShieldedPoolFactoryContract(
   factoryAddress: string,
   runner: ethers.ContractRunner,
 ): ethers.Contract {
-  return new ethers.Contract(factoryAddress, ShieldedPoolFactory.abi, runner);
+  return createChainContract(factoryAddress, ShieldedPoolFactory.abi, runner);
 }
 
 export function createDeepFamilyInterface(): ethers.Interface {

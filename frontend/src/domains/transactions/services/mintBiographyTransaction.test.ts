@@ -11,6 +11,7 @@ import {
   createDeepFamilyInterface,
 } from "../../../shared/clients/contractFactory";
 import { mintBiographyTransaction } from "./mintBiographyTransaction";
+import { contractFeeReplacement } from "../test-helpers/contractReplacement";
 
 const mocks = vi.hoisted(() => ({ archive: vi.fn(), receipt: vi.fn() }));
 vi.mock("../../../shared/clients/contractFactory", async () => ({
@@ -18,10 +19,6 @@ vi.mock("../../../shared/clients/contractFactory", async () => ({
     "../../../shared/clients/contractFactory",
   )),
   createArchiveContract: mocks.archive,
-}));
-vi.mock("../api/txGateway", async () => ({
-  ...(await vi.importActual<typeof import("../api/txGateway")>("../api/txGateway")),
-  waitForTransactionReceipt: mocks.receipt,
 }));
 const author = "0x1111111111111111111111111111111111111111";
 const main = "0x2222222222222222222222222222222222222222";
@@ -79,7 +76,7 @@ function setup(story = "  私密传记导入\r\n😀 e\u0301  ".repeat(100)) {
     ],
   };
   mocks.receipt.mockResolvedValue(receipt);
-  const method = Object.assign(vi.fn().mockResolvedValue({ hash: txHash }), {
+  const method = Object.assign(vi.fn().mockResolvedValue({ replaceableTransaction() { return this; }, hash: txHash, nonce: 1, wait: mocks.receipt }), {
     estimateGas: vi.fn().mockResolvedValue(101n),
     staticCall: vi.fn().mockResolvedValue(undefined),
   });
@@ -100,7 +97,7 @@ function setup(story = "  私密传记导入\r\n😀 e\u0301  ".repeat(100)) {
   mocks.archive.mockReturnValue(archive);
   const signer = {
     getAddress: vi.fn().mockResolvedValue(author),
-    provider: {
+    provider: { getBlockNumber: async () => 12,
       getNetwork: vi.fn().mockResolvedValue({ chainId: 31337n }),
       getBlock: vi.fn().mockResolvedValue({ gasLimit: 30_000_000n }),
       getFeeData: vi.fn().mockResolvedValue({ gasPrice: 1n, maxFeePerGas: 2n }),
@@ -141,6 +138,16 @@ function setup(story = "  私密传记导入\r\n😀 e\u0301  ".repeat(100)) {
 }
 describe("atomic mint biography transaction", () => {
   beforeEach(() => vi.clearAllMocks());
+  it("discovers a fee replacement through the real ethers contract response", async () => {
+    const f = setup();
+    const tracked = contractFeeReplacement({eventInterface: f.contract.interface,
+      receipt: f.receipt, from: author, to: main,
+      data: f.contract.interface.encodeFunctionData("mintPersonVersionNFT", f.args)});
+    f.method.mockResolvedValue(tracked.transaction);
+    const receipt = await f.run();
+    expect(tracked.wasScanned()).toBe(true);
+    expect(receipt.hash).toBe(tracked.transactionHash);
+  }, 1500);
   it("previews the complete mint, freezes nested fields, verifies compressed readback and preserves all text", async () => {
     const f = setup();
     f.confirm.mockImplementation(async () => {
@@ -223,7 +230,7 @@ describe("atomic mint biography transaction", () => {
 
   it("uses the original fixed RPC for readback after the wallet changes network", async () => {
     const f = setup();
-    const readbackProvider = {
+    const readbackProvider = { getBlockNumber: async () => 12,
       getNetwork: vi.fn(async () => ({ chainId: 31337n })),
       getCode: vi.fn(async () => `0x00${f.payload.slice(2)}`),
     };
@@ -240,7 +247,7 @@ describe("atomic mint biography transaction", () => {
 
   it("rejects a verification RPC on a different chain before sending", async () => {
     const f = setup();
-    await expect(f.run({ readbackProvider: {
+    await expect(f.run({ readbackProvider: { getBlockNumber: async () => 12,
       getNetwork: vi.fn(async () => ({ chainId: 1n })),
     } as any })).rejects.toThrow(/different network/);
     expect(f.method).not.toHaveBeenCalled();
@@ -307,7 +314,7 @@ describe("atomic mint biography transaction", () => {
       reason: "repriced",
       cancelled: false,
       replacement: {
-        hash, chainId: 31337n, from: author, to: main, value: 0n,
+        hash, nonce: 1, chainId: 31337n, from: author, to: main, value: 0n,
         data: f.contract.interface.encodeFunctionData("mintPersonVersionNFT", f.args),
       },
       receipt,
@@ -323,7 +330,7 @@ describe("atomic mint biography transaction", () => {
     const hash = ethers.id("different mint");
     mocks.receipt.mockRejectedValueOnce({
       code: "TRANSACTION_REPLACED", reason: "repriced", cancelled: false,
-      replacement: { hash, chainId: 31337n, from: author, to: main, value: 0n, data: "0x" },
+      replacement: { hash, nonce: 1, chainId: 31337n, from: author, to: main, value: 0n, data: "0x" },
       receipt: { ...f.receipt, hash },
     });
     await expect(f.run()).rejects.toMatchObject({

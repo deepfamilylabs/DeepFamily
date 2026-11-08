@@ -1,3 +1,4 @@
+import { trackedTransactionHash } from "../../../model/txStatus";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -144,6 +145,7 @@ export function useAddVersionModalController({
   );
   const {
     status: addVersionStatus,
+    tracking: addVersionTracking,
     reset: resetAddVersionFlow,
     runOrThrow: runAddVersionOrThrow,
   } = useAddVersionFlow({ confirmTransactionPreview });
@@ -263,7 +265,7 @@ export function useAddVersionModalController({
     label: t("addVersion.title", "Add Version"),
     phase,
     error: errorResult,
-    transactionHash: errorResult?.transactionHash,
+    transactionHash: trackedTransactionHash(addVersionTracking) ?? errorResult?.transactionHash,
   });
 
   const resetCommitmentProof = commitmentProof.reset;

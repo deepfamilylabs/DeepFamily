@@ -6,7 +6,6 @@ export {
   resolveShieldedAssetPool,
 } from "./services/shieldedAssetRegistry";
 export type { ShieldedAsset } from "./services/shieldedAssetRegistry";
-export { waitForShieldedTransaction } from "./services/shieldedTransactionReceipt";
 export {
   ShieldedIdentitySessionProvider,
   useShieldedPageIdentitySession,
@@ -14,3 +13,5 @@ export {
 export { ShieldedAssetToolbar } from "./ui/ShieldedAssetToolbar";
 export { PanelButton } from "./ui/inheritanceControls";
 export type { ShieldedAssetToolbarProps } from "./ui/ShieldedAssetToolbar";
+
+export { loadShieldedModules, loadShieldedAssetMetadata, createShieldedAssetPool, ShieldedConfigurationMismatchError, ShieldedWalletChangedError } from "./services/shieldedPageService";

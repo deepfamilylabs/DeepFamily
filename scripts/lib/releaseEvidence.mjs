@@ -1,6 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
+import { normalizeChainError, runChainRead } from "@deepfamily/chain-client";
 
 import { summarizeProductionBuildInfo } from "./acceptanceSafety.mjs";
 
@@ -421,41 +422,69 @@ export const waitForFinalizedTransactions = async ({
 }) => {
   const entries = Object.entries(transactions).filter(([, entry]) => entry.hash && entry.receipt);
   if (entries.length === 0) throw new Error("No confirmed release transactions are available");
-  const lastCriticalBlock = Math.max(
-    ...entries.map(([, entry]) => Number(entry.receipt.blockNumber)),
+  const [, lastCriticalTransaction] = entries.reduce((latest, entry) =>
+    Number(entry[1].receipt.blockNumber) > Number(latest[1].receipt.blockNumber) ? entry : latest,
   );
+  const lastCriticalBlock = Number(lastCriticalTransaction.receipt.blockNumber);
   const deadline = Date.now() + timeoutMs;
   let finalizedBlock;
   while (Date.now() <= deadline) {
-    finalizedBlock = await provider.getBlock("finalized");
+    finalizedBlock = await runChainRead({
+      read: () => provider.getBlock("finalized"),
+      // This transaction determines the finalized height required by the whole batch.
+      transactionHash: lastCriticalTransaction.hash,
+      ...(Number(lastCriticalTransaction.receipt.status) === 1
+        ? { transactionConfirmed: true, verificationFailure: "read" }
+        : {}),
+    });
     if (finalizedBlock && Number(finalizedBlock.number) >= lastCriticalBlock) break;
     const remaining = deadline - Date.now();
     if (remaining > 0) await sleep(Math.min(pollIntervalMs, remaining));
   }
   if (!finalizedBlock || Number(finalizedBlock.number) < lastCriticalBlock) {
-    throw new Error(
+    throw normalizeChainError(Object.assign(new Error(
       `Finalized head did not cover release block ${lastCriticalBlock} within ${timeoutMs}ms`,
-    );
+    ), { code: "TIMEOUT" }), {
+      transactionHash: lastCriticalTransaction.hash, category: "verification", operation: "verify",
+      ...(Number(lastCriticalTransaction.receipt.status) === 1 ? { transactionConfirmed: true } : {}),
+    });
   }
 
   const revalidatedTransactions = [];
   for (const [label, expected] of entries) {
-    const receipt = await provider.getTransactionReceipt(expected.hash);
+    const receipt = await runChainRead({
+      read: () => provider.getTransactionReceipt(expected.hash),
+      transactionHash: expected.hash,
+      ...(Number(expected.receipt.status) === 1
+        ? { transactionConfirmed: true, verificationFailure: "read" }
+        : {}),
+    });
     if (!receipt || Number(receipt.status) !== 1) {
-      throw new Error(`${label} successful receipt disappeared before finality`);
+      throw normalizeChainError(new Error(`${label} successful receipt disappeared before finality`), {
+        transactionHash: expected.hash, category: "verification", operation: "verify",
+      });
     }
     if (
       Number(receipt.blockNumber) !== Number(expected.receipt.blockNumber) ||
       String(receipt.blockHash).toLowerCase() !== String(expected.receipt.blockHash).toLowerCase()
     ) {
-      throw new Error(`${label} receipt changed before finality`);
+      throw normalizeChainError(new Error(`${label} receipt changed before finality`), {
+        transactionHash: expected.hash, category: "verification", operation: "verify",
+      });
     }
-    const block = await provider.getBlock(receipt.blockNumber);
+    const block = await runChainRead({
+      read: () => provider.getBlock(receipt.blockNumber),
+      transactionHash: expected.hash, transactionConfirmed: true, verificationFailure: "read",
+    });
     if (!block || String(block.hash).toLowerCase() !== String(receipt.blockHash).toLowerCase()) {
-      throw new Error(`${label} is not in the canonical block recorded by its receipt`);
+      throw normalizeChainError(new Error(`${label} is not in the canonical block recorded by its receipt`), {
+        transactionHash: expected.hash, category: "verification", operation: "verify",
+      });
     }
     if (Number(finalizedBlock.number) < Number(receipt.blockNumber)) {
-      throw new Error(`${label} is above the finalized head`);
+      throw normalizeChainError(new Error(`${label} is above the finalized head`), {
+        transactionHash: expected.hash, category: "verification", operation: "verify",
+      });
     }
     revalidatedTransactions.push({
       label,

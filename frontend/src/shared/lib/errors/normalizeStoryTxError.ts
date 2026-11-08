@@ -1,8 +1,8 @@
 import {
-  ARCHIVE_PREVIEW_REJECTED,
-  ARCHIVE_VALIDATION_FAILED,
   defaultErrorTranslator,
   normalizeErrorToError,
+  type NormalizedError,
+  type NormalizeFriendlyErrorOptions,
 } from "./core";
 
 const STORY_ERROR_MESSAGES: Record<string, string> = {
@@ -21,49 +21,10 @@ const STORY_ERROR_MESSAGES: Record<string, string> = {
   StoryNotFound: "Story has no records",
 };
 
-const makeTypedError = (message: string, type: string, code?: string): Error => {
-  const err = new Error(message);
-  (err as any).type = type;
-  if (code) (err as any).code = code;
-  return err;
-};
-
-/**
- * Normalize a raw story transaction error into a typed Error with `type` and
- * optional `code` properties. Reuses the shared revert decoding / reason
- * detection pipeline so story flows do not maintain a separate parser.
- */
-export function normalizeStoryTxError(error: any, contract: any): Error {
-  const retainConfirmation = (typed: Error) =>
-    Object.assign(typed, {
-      ...(typeof error?.transactionHash === "string" ? { transactionHash: error.transactionHash } : {}),
-      ...(error?.transactionConfirmed === true
-        ? {
-            transactionConfirmed: true,
-            verificationFailure: error.verificationFailure === "read" ? "read" : "mismatch",
-            retryable: false,
-          }
-        : {}),
-    });
-  if (error?.code === ARCHIVE_VALIDATION_FAILED || error?.code === ARCHIVE_PREVIEW_REJECTED) {
-    const typed = makeTypedError(error.message, "VALIDATION_ERROR", error.code);
-    if (typeof error.reason === "string") (typed as any).reason = error.reason;
-    if (error.i18n) (typed as any).i18n = error.i18n;
-    return retainConfirmation(typed);
-  }
-  const normalized = normalizeErrorToError(error, defaultErrorTranslator as any, {
+/** Story-specific wording uses the same classification and normalization as every UI flow. */
+export function normalizeStoryTxError(error: unknown, contract: NormalizeFriendlyErrorOptions["contract"]): NormalizedError {
+  return normalizeErrorToError(error, defaultErrorTranslator as any, {
     contract,
-    fallbackMessage: error?.message || "An unknown error occurred",
     messageOverrides: STORY_ERROR_MESSAGES,
   });
-  const typed = makeTypedError(
-    normalized.message,
-    (normalized as any).type || "UNKNOWN_ERROR",
-    (normalized as any).code,
-  );
-  (typed as any).reason = (normalized as any).reason;
-  (typed as any).details = (normalized as any).details;
-  (typed as any).retryable = (normalized as any).retryable;
-  (typed as any).friendly = (normalized as any).friendly;
-  return retainConfirmation(typed);
 }

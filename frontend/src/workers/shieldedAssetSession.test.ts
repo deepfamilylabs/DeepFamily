@@ -101,8 +101,10 @@ vi.mock("../domains/inheritance/services/shieldedIdentityAuthorizationChain", ()
     return { ...result, stateRoot: result.state.root, witness: getShieldedIdentityAuthorizationWitness(result.state, alias) };
   },
 }));
-vi.mock("../domains/inheritance/services/privateLetterChain", () => ({
+vi.mock("../shared/clients/privateLetterClient", () => ({
   createPrivateLetterContract: () => ({ POOL_FACTORY: async () => mocks.factory, AUTHORIZATION_STATE: async () => mocks.verifier }),
+}));
+vi.mock("../domains/inheritance/services/privateLetterChain", () => ({
   readPrivateLetters: mocks.readLetters,
 }));
 vi.mock("../shared/zk/shieldedReceiveCode", () => ({

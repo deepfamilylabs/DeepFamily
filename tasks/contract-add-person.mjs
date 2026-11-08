@@ -100,7 +100,7 @@ const action = async (args, hre) => {
   });
 
   console.log(`Person version added: ${result.personHash}`);
-  console.log(`Transaction: ${result.tx.hash}`);
+  console.log(`Transaction: ${result.transactionHash}`);
   console.log(`Block: ${result.receipt?.blockNumber ?? "n/a"}`);
 };
 

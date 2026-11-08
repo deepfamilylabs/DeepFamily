@@ -1,3 +1,4 @@
+import { simulateChainCall } from "../scripts/lib/chainSimulation.mjs";
 /**
  * Usage (amount is a human-readable DEEP amount, not an 18-decimal base-unit integer):
  *   npx hardhat --config hardhat.config.mjs treasury-transfer --network confluxTestnet \
@@ -79,17 +80,15 @@ export const action = async (args, hre) => {
       );
     }
     assertSufficientBalance({ balance: currentBalance, rawAmount, symbol });
-    try {
-      await ethers.provider.call({
+    await simulateChainCall({
+      label: "treasury ERC20 transfer simulation reverted",
+      read: () => ethers.provider.call({
         to: tokenAddress,
         from: timelockAddress,
         data: payload,
         value,
-      });
-    } catch (error) {
-      const detail = error.shortMessage || error.reason || error.message;
-      throw new Error(`treasury ERC20 transfer simulation reverted: ${detail}`);
-    }
+      }),
+    });
 
     const proposerRole = await timelock.PROPOSER_ROLE();
     const result = await sendOrPrint({

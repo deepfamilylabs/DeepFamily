@@ -181,4 +181,28 @@ export default [
       ]),
     },
   },
+  {
+    files: ["src/pages/**/*.{ts,tsx}"],
+    ignores: ["src/**/*.test.{ts,tsx}"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          paths: [{
+            name: "ethers",
+            importNames: ["Contract", "BrowserProvider", "JsonRpcProvider", "ContractFactory"],
+            allowTypeImports: true,
+            message: "Create contract and RPC clients inside a domain service; pages compose domain operations.",
+          }],
+          patterns: [
+            ...noDomainInternal.map((group) => ({ group })),
+            {
+              group: ["**/clients/contractFactory", "**/clients/providerFactory", "**/clients/providerRegistry"],
+              message: "Pages must use domain services rather than construct contract or RPC clients.",
+            },
+          ],
+        },
+      ],
+    },
+  },
 ];

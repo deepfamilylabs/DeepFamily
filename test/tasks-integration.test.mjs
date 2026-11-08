@@ -5,6 +5,7 @@ import path from "node:path";
 import hre from "hardhat";
 import { ensureIntegratedSystem } from "../hardhat/integratedDeployment.mjs";
 import seedHelpers from "../lib/seedHelpers.js";
+import "../hardhat-test-setup.mjs";
 
 const { computePersonHash } = seedHelpers;
 
@@ -166,6 +167,35 @@ describe("Hardhat Tasks Integration", function () {
 
     const metadata = await deepFamilyReader.getStoryState(tokenId);
     expect(metadata.isSealed).to.equal(true);
+  });
+
+  it("passes the resolved Archive to mint through hre.run", async function () {
+    const originalMint = seedHelpers.mintPersonVersionNFT;
+    const minted = { transactionHash: "0xadapter-mint" };
+    let submitted;
+    seedHelpers.mintPersonVersionNFT = async (input) => {
+      submitted = input;
+      return minted;
+    };
+
+    try {
+      const result = await hre.run("mint-nft", {
+        ...personArgs,
+        person: personHash,
+        vindex: "1",
+        tokenuri: "ipfs://adapter-mint",
+        birthplace: "",
+      });
+
+      expect(result).to.equal(minted);
+      expect(submitted.archive).to.exist;
+      expect(await submitted.archive.getAddress()).to.equal(await submitted.deepFamily.archive());
+      expect(await submitted.signer.getAddress()).to.equal(signerAddress);
+      expect(submitted.personHash).to.equal(personHash);
+      expect(submitted.versionIndex).to.equal(1);
+    } finally {
+      seedHelpers.mintPersonVersionNFT = originalMint;
+    }
   });
 
   it("runs generate-disclosure-binding-proof in skip mode", async function () {

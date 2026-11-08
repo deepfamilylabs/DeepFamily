@@ -7,6 +7,7 @@ import {
 } from "../../../shared/clients/contractFactory";
 import { wrapIdentityCommitmentAsPersonHash } from "../../../shared/zk/zk";
 import { executeAddVersionFlow, type AddVersionPublicSignals } from "./addVersionService";
+import { contractFeeReplacement } from "../test-helpers/contractReplacement";
 
 const archiveMock = vi.hoisted(() => ({ metadataRef: vi.fn() }));
 
@@ -112,7 +113,7 @@ const receiptFor = (args: any[], hash = "0xtxhash") => {
 };
 const submitMethod = (receipt?: any) =>
   Object.assign(
-    vi.fn(async (...args: any[]) => ({
+    vi.fn(async (...args: any[]) => ({ replaceableTransaction() { return this; },
       hash: "0xtxhash",
       wait: vi.fn(async () => receipt ?? receiptFor(args)),
     })),
@@ -128,6 +129,34 @@ const preflightContract = (overrides: Record<string, unknown> = {}) => ({
 });
 
 describe("addVersionService fresh-v1 flow", () => {
+  it("discovers a fee replacement through the real ethers contract response", async () => {
+    const signals = rootSignals();
+    const envelope = metadataEnvelope();
+    const eventInterface = createDeepFamilyInterface();
+    const tracked = contractFeeReplacement({eventInterface,
+      receipt: receiptFor([proof, signals, 0, 0, envelope]), from: SUBMITTER, to: CONTRACT,
+      data: eventInterface.encodeFunctionData("addPersonVersion", [proof, signals, 0, 0, envelope])});
+    const submit = submitMethod();
+    submit.mockResolvedValueOnce(tracked.transaction as never);
+    const result = await executeAddVersionFlow({
+      submitContract: {
+        runner: {provider: {
+          getBlockNumber: async () => 12,
+          getNetwork: async () => ({chainId: 31337n}),
+          getBlock: async () => ({gasLimit: 30_000_000n}),
+          getFeeData: async () => ({gasPrice: 1n}),
+        }},
+        addPersonVersion: submit,
+      },
+      preflightContract: preflightContract(), contractAddress: CONTRACT, submitterAddress: SUBMITTER,
+      proof, publicSignals: signals, fatherVersionIndex: 0, motherVersionIndex: 0,
+      metadataEnvelope: envelope, expectedChainId: 31337n,
+    });
+    expect(tracked.wasScanned()).toBe(true);
+    expect(result.transactionHash).toBe(tracked.transactionHash);
+    expect(submit).toHaveBeenCalledOnce();
+  }, 1500);
+
   it("rejects a duplicate versionCommitment before proof submission", async () => {
     const signals = rootSignals();
     const preflight = preflightContract({ versionExists: vi.fn(async () => true) });
@@ -137,7 +166,7 @@ describe("addVersionService fresh-v1 flow", () => {
       executeAddVersionFlow({
         submitContract: {
           runner: {
-            provider: {
+            provider: { getBlockNumber: async () => 12,
               getNetwork: async () => ({ chainId: 31337n }),
               getBlock: async () => ({ gasLimit: 30000000n }),
               getFeeData: async () => ({ gasPrice: 1n }),
@@ -175,7 +204,7 @@ describe("addVersionService fresh-v1 flow", () => {
       executeAddVersionFlow({
         submitContract: {
           runner: {
-            provider: {
+            provider: { getBlockNumber: async () => 12,
               getNetwork: async () => ({ chainId: 31337n }),
               getBlock: async () => ({ gasLimit: 30000000n }),
               getFeeData: async () => ({ gasPrice: 1n }),
@@ -202,7 +231,7 @@ describe("addVersionService fresh-v1 flow", () => {
     const base = {
       submitContract: {
         runner: {
-          provider: {
+          provider: { getBlockNumber: async () => 12,
             getNetwork: async () => ({ chainId: 31337n }),
             getBlock: async () => ({ gasLimit: 30000000n }),
             getFeeData: async () => ({ gasPrice: 1n }),
@@ -242,7 +271,7 @@ describe("addVersionService fresh-v1 flow", () => {
       executeAddVersionFlow({
         submitContract: {
           runner: {
-            provider: {
+            provider: { getBlockNumber: async () => 12,
               getNetwork: async () => ({ chainId: 31337n }),
               getBlock: async () => ({ gasLimit: 30000000n }),
               getFeeData: async () => ({ gasPrice: 1n }),
@@ -266,7 +295,7 @@ describe("addVersionService fresh-v1 flow", () => {
       executeAddVersionFlow({
         submitContract: {
           runner: {
-            provider: {
+            provider: { getBlockNumber: async () => 12,
               getNetwork: async () => ({ chainId: 31337n }),
               getBlock: async () => ({ gasLimit: 30000000n }),
               getFeeData: async () => ({ gasPrice: 1n }),
@@ -327,7 +356,7 @@ describe("addVersionService fresh-v1 flow", () => {
     };
     const getTransactionReceipt = vi.fn(async () => receipt);
     const submit = submitMethod();
-    submit.mockResolvedValueOnce({
+    submit.mockResolvedValueOnce({ replaceableTransaction() { return this; },
       hash: transactionHash,
       wait: vi.fn(async () => {
         throw new Error("RPC timeout while waiting for receipt");
@@ -341,7 +370,7 @@ describe("addVersionService fresh-v1 flow", () => {
       executeAddVersionFlow({
         submitContract: {
           runner: {
-            provider: {
+            provider: { getBlockNumber: async () => 12,
               getNetwork: async () => ({ chainId: 31337n }),
               getBlock: async () => ({ gasLimit: 30000000n }),
               getFeeData: async () => ({ gasPrice: 1n }),
@@ -370,7 +399,7 @@ describe("addVersionService fresh-v1 flow", () => {
     const result = await executeAddVersionFlow({
       submitContract: {
         runner: {
-          provider: {
+          provider: { getBlockNumber: async () => 12,
             getNetwork: async () => ({ chainId: 31337n }),
             getBlock: async () => ({ gasLimit: 30000000n }),
             getFeeData: async () => ({ gasPrice: 1n }),
@@ -415,7 +444,7 @@ describe("addVersionService fresh-v1 flow", () => {
       executeAddVersionFlow({
         submitContract: {
           runner: {
-            provider: {
+            provider: { getBlockNumber: async () => 12,
               getNetwork: async () => ({ chainId: 31337n }),
               getBlock: async () => ({ gasLimit: 30000000n }),
               getFeeData: async () => ({ gasPrice: 1n }),
@@ -449,7 +478,7 @@ describe("addVersionService fresh-v1 flow", () => {
       executeAddVersionFlow({
         submitContract: {
           runner: {
-            provider: {
+            provider: { getBlockNumber: async () => 12,
               getNetwork: async () => ({ chainId: 31337n }),
               getBlock: async () => ({ gasLimit: 30000000n }),
               getFeeData: async () => ({ gasPrice: 1n }),
@@ -490,7 +519,7 @@ describe("addVersionService fresh-v1 flow", () => {
       executeAddVersionFlow({
         submitContract: {
           runner: {
-            provider: {
+            provider: { getBlockNumber: async () => 12,
               getNetwork: async () => ({ chainId: 31337n }),
               getBlock: async () => ({ gasLimit: 30000000n }),
               getFeeData: async () => ({ gasPrice: 1n }),
@@ -527,7 +556,7 @@ describe("addVersionService fresh-v1 flow", () => {
     const result = await executeAddVersionFlow({
       submitContract: {
         runner: {
-          provider: {
+          provider: { getBlockNumber: async () => 12,
             getNetwork: async () => ({ chainId: 31337n }),
             getBlock: async () => ({ gasLimit: 30000000n }),
             getFeeData: async () => ({ gasPrice: 1n }),
@@ -564,7 +593,7 @@ describe("addVersionService fresh-v1 flow", () => {
     });
     submit.mockImplementation(async (...args: any[]) => {
       order.push("send");
-      return {
+      return { replaceableTransaction() { return this; },
         hash: "0xtxhash",
         wait: vi.fn(async () => receiptFor(args, "0xtxhash")),
       };
@@ -588,7 +617,7 @@ describe("addVersionService fresh-v1 flow", () => {
     await executeAddVersionFlow({
       submitContract: {
         runner: {
-          provider: {
+          provider: { getBlockNumber: async () => 12,
             getNetwork: async () => ({ chainId: 31337n }),
             getBlock: async () => ({ gasLimit: 30000000n }),
             getFeeData: async () => ({ gasPrice: 1n }),
@@ -616,14 +645,14 @@ describe("addVersionService fresh-v1 flow", () => {
   it("records the hash but rejects a wallet response from a different chain", async () => {
     const wait = vi.fn(async () => ({ blockNumber: 55, logs: [] }));
     const submit = submitMethod();
-    submit.mockResolvedValueOnce({ hash: "0xwrongchain", chainId: 72n, wait } as any);
+    submit.mockResolvedValueOnce({ replaceableTransaction() { return this; }, hash: "0xwrongchain", chainId: 72n, wait } as any);
     const onTransactionSubmitted = vi.fn();
 
     await expect(
       executeAddVersionFlow({
         submitContract: {
           runner: {
-            provider: {
+            provider: { getBlockNumber: async () => 12,
               getNetwork: async () => ({ chainId: 31337n }),
               getBlock: async () => ({ gasLimit: 30000000n }),
               getFeeData: async () => ({ gasPrice: 1n }),
@@ -664,8 +693,9 @@ describe("addVersionService fresh-v1 flow", () => {
       0,
       envelope,
     ]);
-    const replacement = {
+    const replacement = { replaceableTransaction() { return this; },
       hash: replacementHash,
+      nonce: 1,
       to: CONTRACT,
       from: SUBMITTER,
       data: expectedData,
@@ -687,8 +717,9 @@ describe("addVersionService fresh-v1 flow", () => {
       receipt: replacementReceipt,
     });
     const submit = submitMethod();
-    submit.mockResolvedValueOnce({
+    submit.mockResolvedValueOnce({ replaceableTransaction() { return this; },
       hash: originalHash,
+      nonce: 1,
       chainId: 71n,
       wait: vi.fn(async () => {
         throw replacementError;
@@ -699,7 +730,7 @@ describe("addVersionService fresh-v1 flow", () => {
     const result = await executeAddVersionFlow({
       submitContract: {
         runner: {
-          provider: {
+          provider: { getBlockNumber: async () => 12,
             getNetwork: async () => ({ chainId: 31337n }),
             getBlock: async () => ({ gasLimit: 30000000n }),
             getFeeData: async () => ({ gasPrice: 1n }),
@@ -733,7 +764,7 @@ describe("addVersionService fresh-v1 flow", () => {
     const originalHash = `0x${"33".repeat(32)}`;
     const makeSubmit = (replacementError: Error) => {
       const submit = submitMethod();
-      submit.mockResolvedValueOnce({
+      submit.mockResolvedValueOnce({ replaceableTransaction() { return this; },
         hash: originalHash,
         chainId: 71n,
         wait: vi.fn(async () => {
@@ -772,7 +803,7 @@ describe("addVersionService fresh-v1 flow", () => {
         ...base,
         submitContract: {
           runner: {
-            provider: {
+            provider: { getBlockNumber: async () => 12,
               getNetwork: async () => ({ chainId: 31337n }),
               getBlock: async () => ({ gasLimit: 30000000n }),
               getFeeData: async () => ({ gasPrice: 1n }),
@@ -782,14 +813,14 @@ describe("addVersionService fresh-v1 flow", () => {
         },
       }),
     ).rejects.toMatchObject({
-      code: "TRANSACTION_REPLACED_CANCELLED",
+      code: "TRANSACTION_REPLACEMENT_CANCELLED",
       transactionReconciliationFinal: true,
     });
 
     const changed = Object.assign(new Error("replaced"), {
       code: "TRANSACTION_REPLACED",
       cancelled: false,
-      reason: "replaced",
+      reason: "repriced",
       replacement: {
         hash: `0x${"55".repeat(32)}`,
         to: CONTRACT,
@@ -804,7 +835,7 @@ describe("addVersionService fresh-v1 flow", () => {
         ...base,
         submitContract: {
           runner: {
-            provider: {
+            provider: { getBlockNumber: async () => 12,
               getNetwork: async () => ({ chainId: 31337n }),
               getBlock: async () => ({ gasLimit: 30000000n }),
               getFeeData: async () => ({ gasPrice: 1n }),
@@ -907,7 +938,7 @@ describe("addVersionService fresh-v1 flow", () => {
     const result = await executeAddVersionFlow({
       submitContract: {
         runner: {
-          provider: {
+          provider: { getBlockNumber: async () => 12,
             getNetwork: async () => ({ chainId: 31337n }),
             getBlock: async () => ({ gasLimit: 30000000n }),
             getFeeData: async () => ({ gasPrice: 1n }),
@@ -967,7 +998,7 @@ describe("Add Version confirmation readback", () => {
     const submit = submitMethod();
     const options = {
       submitContract: {
-        runner: {provider: {
+        runner: {provider: { getBlockNumber: async () => 12,
           getNetwork: async () => ({chainId: 31337n}),
           getBlock: async () => ({gasLimit: 30000000n}),
           getFeeData: async () => ({gasPrice: 1n}),

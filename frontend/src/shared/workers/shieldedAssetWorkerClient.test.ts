@@ -8,6 +8,7 @@ import {
   terminateShieldedAssetWorker,
 } from "./shieldedAssetWorkerClient";
 import { subscribePublicStateSyncProgress } from "./publicStateSyncProgress";
+import { getChainErrorDetails, normalizeChainError, serializeChainError } from "@deepfamily/chain-client";
 class FakeWorker {
   static instances: FakeWorker[] = [];
   requests: any[] = [];
@@ -64,6 +65,54 @@ describe("asset Worker secret lifetime", () => {
     vi.useRealTimers();
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
+  });
+  it("restores canonical public errors across the Worker boundary without copying diagnostics", async () => {
+    const promise = shieldedAssetWorkerCall("recover", { context });
+    const worker = FakeWorker.instances[0];
+    const raw = normalizeChainError(Object.assign(new Error("secret-network-diagnostic"), {
+      code: "NETWORK_ERROR", request: { privateKey: "secret-key" }, witness: "secret-witness",
+    }), { operation: "read" });
+    worker.emit("message", {
+      id: worker.clones[0].id, ok: false,
+      error: structuredClone(serializeChainError(raw, "Asset operation could not be completed.")),
+    });
+    const failure = await promise.catch((error) => error);
+    expect(failure.message).toBe("Asset operation could not be completed.");
+    expect(getChainErrorDetails(failure)).toEqual({ category: "network", operation: "read", code: "NETWORK_ERROR", retryable: true });
+    expect(failure).not.toHaveProperty("request");
+    expect(failure).not.toHaveProperty("witness");
+    expect(failure).not.toHaveProperty("cause");
+    expect(JSON.stringify(failure)).not.toContain("secret");
+    expect(worker.terminate).not.toHaveBeenCalled();
+  });
+  it.each([
+    { category: "private", operation: "read", code: "NETWORK_ERROR", retryable: true },
+    { category: "network", operation: "proving-secret", code: "NETWORK_ERROR", retryable: true },
+    { category: "network", operation: "read", code: { witness: "secret" }, retryable: true },
+    { category: "network", operation: "read", code: "privateCustomSecretCode", retryable: true },
+    { category: "network", operation: "read", code: "NETWORK_ERROR", retryable: "yes" },
+  ])("discards malformed public error metadata: %j", async (chainError) => {
+    const promise = shieldedAssetWorkerCall("cancelPreview", {});
+    const worker = FakeWorker.instances[0];
+    worker.emit("message", {
+      id: worker.clones[0].id, ok: false,
+      error: { message: "Safe operation failure", chainError, cause: { witness: "secret" } },
+    });
+    const failure = await promise.catch((error) => error);
+    expect(getChainErrorDetails(failure)).toMatchObject({ category: "unknown", code: "CHAIN_OPERATION_FAILED", retryable: false });
+    expect(failure).not.toHaveProperty("cause");
+    expect(failure).not.toHaveProperty("witness");
+    expect(JSON.stringify(failure)).not.toContain("secret");
+  });
+  it("rejects accessor metadata without executing foreign getters", async () => {
+    const promise = shieldedAssetWorkerCall("cancelPreview", {});
+    const worker = FakeWorker.instances[0];
+    const readCategory = vi.fn(() => { throw new Error("private getter"); });
+    const chainError = Object.defineProperty({}, "category", { get: readCategory });
+    worker.emit("message", { id: worker.clones[0].id, ok: false, error: { message: "Safe failure", chainError } });
+    const failure = await promise.catch((error) => error);
+    expect(readCategory).not.toHaveBeenCalled();
+    expect(getChainErrorDetails(failure)).toMatchObject({ category: "unknown", code: "CHAIN_OPERATION_FAILED" });
   });
   it("clears dispatch envelopes after cloning and retains the session until lock", async () => {
     const promise = shieldedAssetWorkerCall("unlockIdentity", {

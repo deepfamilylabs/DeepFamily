@@ -1,11 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Contract, Interface, id, keccak256, type Signer } from "ethers";
-import { PRIVATE_LETTER_ABI, PrivateLetterPreparationExpiredError, readPrivateLetters, submitPrivateLetter } from "./privateLetterChain";
+import { PRIVATE_LETTER_ABI } from "../../../shared/clients/privateLetterClient";
+import { PrivateLetterPreparationExpiredError, readPrivateLetters, submitPrivateLetter } from "./privateLetterChain";
 const mocks = vi.hoisted(() => ({ readBlob: vi.fn(), contract: vi.fn(), validateCheckpoint: vi.fn(), wait: vi.fn() }));
 vi.mock("@deepfamily/protocol-core", async original => ({ ...await original<typeof import("@deepfamily/protocol-core")>(), readArchiveBlob: mocks.readBlob }));
-vi.mock("ethers", async original => ({ ...await original<typeof import("ethers")>(), Contract: class { constructor() { return mocks.contract(); } } }));
+vi.mock("../../../shared/clients/privateLetterClient", async original => ({ ...await original<typeof import("../../../shared/clients/privateLetterClient")>(), createPrivateLetterContract: mocks.contract }));
 vi.mock("./shieldedIdentityAuthorizationChain", () => ({ createIdentityAuthorizationContract: () => ({ validateCheckpoint: mocks.validateCheckpoint }) }));
-vi.mock("./shieldedTransactionReceipt", () => ({ waitForShieldedTransaction: mocks.wait }));
+vi.mock("@deepfamily/chain-client", async original => ({
+  ...await original<typeof import("@deepfamily/chain-client")>(), executeChainTransaction: mocks.wait,
+}));
 beforeEach(() => { vi.clearAllMocks(); mocks.validateCheckpoint.mockReset().mockResolvedValue(0n); });
 function fixture() {
   const iface = new Interface(PRIVATE_LETTER_ABI);
@@ -20,6 +23,15 @@ function fixture() {
   return { provider, contract, record };
 }
 describe("authenticated private letter recovery", () => {
+  it("normalizes provider read failures without retrying or querying private messages", async () => {
+    const f = fixture();
+    f.provider.getBlock.mockRejectedValueOnce(Object.assign(new Error("RPC unavailable"), { code: "NETWORK_ERROR" }));
+    await expect(readPrivateLetters(f.contract as unknown as Contract)).rejects.toMatchObject({
+      chainError: { category: "network", operation: "read", code: "NETWORK_ERROR", retryable: true },
+    });
+    expect(f.provider.getBlock).toHaveBeenCalledOnce();
+    expect(f.provider.getLogs).not.toHaveBeenCalled();
+  });
   it("accepts only the configured archive events and matching records before fetching ciphertext", async () => {
     const f = fixture(); const letters = await readPrivateLetters(f.contract as unknown as Contract);
     expect(letters).toMatchObject([{ messageId: "7", recipientBinding: "9", transactionHash: "0xtransaction", ciphertext: Uint8Array.of(1, 2, 3) }]);
@@ -46,15 +58,19 @@ function submissionFixture() {
   const contract = {
     interface: iface, AUTHORIZATION_STATE: async () => address,
     letterRecord: vi.fn(async () => ({ registeredAt: 0n })),
-    registerLetter: vi.fn(async () => ({ hash: "0xtx" })),
+    registerLetter: vi.fn(async () => ({ hash: "0xtx", replaceableTransaction: vi.fn(() => ({ hash: "0xtx" })) })),
     queryFilter: vi.fn(async () => [{ transactionHash: "0xprior" }]),
     creationBlock: async () => 1, filters: { LetterRegistered: vi.fn() },
   };
-  const provider = { getNetwork: async () => ({ chainId: 31337n }), getBlock: vi.fn(async () => ({ timestamp: 1000 })) };
-  const signer = { provider } as unknown as Signer;
+  const provider = { getNetwork: async () => ({ chainId: 31337n }), getBlockNumber: vi.fn(async () => 20), getBlock: vi.fn(async () => ({ timestamp: 1000 })) };
+  const signer = { provider, getAddress: async () => address } as unknown as Signer;
   const registration = iface.encodeEventLog(iface.getEvent("LetterRegistered")!, [7, blob, 9, 1200, 1000]);
   mocks.contract.mockReturnValue(contract);
-  mocks.wait.mockResolvedValue({ transactionHash: "0xtx", receipt: { logs: [{ ...registration, address }] } });
+  mocks.wait.mockImplementation(async input => {
+    input.assertActive?.();
+    await input.send();
+    return { transactionHash: "0xtx", receipt: { status: 1, hash: "0xtx", logs: [{ ...registration, address }] } };
+  });
   return { input: { address, signer, chainId: "31337", letter }, contract, provider, iface, blob };
 }
 
@@ -107,8 +123,35 @@ describe("private letter retry and receipt confirmation", () => {
       [7, f.blob, 9, 1300, 1000],
     ]) {
       const event = f.iface.encodeEventLog(f.iface.getEvent("LetterRegistered")!, values);
-      mocks.wait.mockResolvedValue({ transactionHash: "0xtx", receipt: { logs: [{ ...event, address: f.input.address }] } });
+      mocks.wait.mockResolvedValue({ transactionHash: "0xtx", receipt: { status: 1, hash: "0xtx", logs: [{ ...event, address: f.input.address }] } });
       await expect(submitPrivateLetter(f.input)).rejects.toThrow("did not register");
     }
+  });
+});
+
+
+it("publishes broadcast callbacks and frozen expected call scope", async () => {
+  const f = submissionFixture();
+  const onBroadcast = vi.fn();
+  mocks.wait.mockImplementationOnce(async (input) => {
+    input.onSubmitted("0xtx");
+    return {transactionHash:"0xtx", receipt:{status:1, logs:[{
+      ...f.iface.encodeEventLog(f.iface.getEvent("LetterRegistered")!, [7, f.blob, 9, 1200, 1000]), address:f.input.address,
+    }]}};
+  });
+  await submitPrivateLetter({...f.input, onBroadcast});
+  expect(onBroadcast).toHaveBeenCalledWith("0xtx");
+  expect(mocks.wait).toHaveBeenCalledWith(expect.objectContaining({
+    expected: {chainId:31337n,from:f.input.address,to:f.input.address,
+      data:f.iface.encodeFunctionData("registerLetter",[f.input.letter.delivery,f.input.letter.ciphertext,f.input.letter.proof]),value:0n},
+    requireSuccess:false,
+  }));
+});
+
+it("retains confirmation context when a successful receipt lacks the authenticated event", async () => {
+  const f = submissionFixture();
+  mocks.wait.mockResolvedValueOnce({transactionHash:"0xtx",receipt:{status:1,hash:"0xtx",logs:[]}});
+  await expect(submitPrivateLetter(f.input)).rejects.toMatchObject({
+    transactionHash:"0xtx",transactionConfirmed:true,verificationFailure:"mismatch",
   });
 });

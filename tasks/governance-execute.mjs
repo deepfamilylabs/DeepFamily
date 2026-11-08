@@ -1,3 +1,4 @@
+import { executeChainTransaction } from "@deepfamily/chain-client";
 /**
  * Usage (after governance-schedule has been mined and the Timelock delay has elapsed):
  *   npx hardhat --config hardhat.config.mjs governance-execute --network confluxTestnet \
@@ -66,11 +67,12 @@ export const action = async (args, hre) => {
   let executed = false;
   if (openExecutor && signer) {
     console.log("  executor role is open (address(0)); executing directly");
-    const tx = await timelock
-      .connect(signer)
-      .execute(proxyAddress, value, calldata, predecessor, salt);
-    await tx.wait();
-    console.log(`  executed: tx ${tx.hash}`);
+    const { transactionHash } = await executeChainTransaction({
+      provider: ethers.provider,
+      send: () => timelock.connect(signer).execute(proxyAddress, value, calldata, predecessor, salt),
+      label: "timelock-execute",
+    });
+    console.log(`  executed: tx ${transactionHash}`);
     executed = true;
   } else {
     if (openExecutor) {

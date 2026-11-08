@@ -1,3 +1,4 @@
+import { getTransactionErrorContext } from "@deepfamily/chain-client";
 import { useCallback, useEffect, useRef, type MutableRefObject } from "react";
 import {
   getFriendlyError,
@@ -306,11 +307,10 @@ export function useMintNftSubmit({
           onSuccess?.(tokenId);
         }
       } catch (error) {
-        const knownHash = (error as any)?.transactionHash ?? transactionHash;
-        const transactionConfirmed = (error as any)?.transactionConfirmed === true;
-        const verificationFailure = transactionConfirmed
-          ? ((error as any)?.verificationFailure === "read" ? "read" : "mismatch")
-          : undefined;
+        const context = getTransactionErrorContext(error);
+        const knownHash = context.transactionHash ?? transactionHash;
+        const transactionConfirmed = context.transactionConfirmed === true;
+        const verificationFailure = transactionConfirmed ? context.verificationFailure ?? "mismatch" : undefined;
         if (!isCurrentAttempt() && transactionConfirmed && knownHash) {
           settle({ phase: "done", transactionHash: knownHash, error: null });
           return;

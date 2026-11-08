@@ -1,8 +1,13 @@
 import type { TFunction } from "i18next";
+import { ChainOperationError, getChainErrorDetails, type ChainErrorDetails, type ChainErrorOptions, type TransactionErrorContext } from "@deepfamily/chain-client";
 
 type SafeLogValue = string | number | boolean | null;
 
-export type FriendlyError = {
+export type FriendlyError = TransactionErrorContext & {
+  /** Public chain classification is independent of domain wording. */
+  category?: ChainErrorDetails["category"];
+  operation?: ChainErrorDetails["operation"];
+  chainError?: ChainErrorDetails;
   type: string;
   message: string;
   details: string;
@@ -10,6 +15,25 @@ export type FriendlyError = {
   code?: SafeLogValue;
   retryable?: boolean;
 };
+
+export type ChainFriendlyError = FriendlyError & {
+  category: ChainErrorDetails["category"];
+  operation: ChainErrorDetails["operation"];
+  chainError: ChainErrorDetails;
+};
+
+export interface NormalizedError extends Error, TransactionErrorContext {
+  category: ChainErrorDetails["category"];
+  operation: ChainErrorDetails["operation"];
+  chainError: ChainErrorDetails;
+  type: string;
+  details: string;
+  reason?: string;
+  code?: SafeLogValue;
+  retryable?: boolean;
+  i18n?: unknown;
+  friendly?: FriendlyError;
+}
 
 export type SafeLogError = {
   name?: string;
@@ -500,6 +524,8 @@ export const REASON_FRIENDLY_MAP: Record<string, string> = {
     "The transaction receipt does not match the frozen Add Version package.",
   TRANSACTION_REPLACED_CANCELLED:
     "The Add Version transaction was cancelled by a nonce replacement.",
+  TRANSACTION_REPLACEMENT_CANCELLED:
+    "The transaction was cancelled or replaced by another call. Check its result before submitting again.",
   TRANSACTION_REPLACEMENT_MISMATCH:
     "The replacement transaction differs from the frozen Add Version package and was rejected.",
   WALLET_REQUEST_PENDING:
@@ -533,7 +559,10 @@ const normalizeReason = (val?: string) => {
 };
 
 const getKnownReasonFromErrorCode = (error: any): string | undefined => {
-  const code = getPrimaryErrorCode(error);
+  const canonical = getChainErrorDetails(error);
+  const code = canonical.category === "wallet" || canonical.category === "cancelled"
+    ? canonical.code : getPrimaryErrorCode(error);
+  if (code === "CHAIN_WALLET_UNAVAILABLE") return "WALLET_NOT_CONNECTED";
   if (code === -32002) return "WALLET_REQUEST_PENDING";
   if (code === 4001 || code === "ACTION_REJECTED") return "USER_REJECTED";
   if (code === 4100) return "WALLET_UNAUTHORIZED";
@@ -679,6 +708,9 @@ const extractReasonFromMessages = (value: unknown): string | undefined => {
 export const resolveErrorReason = (error: any): string | undefined => {
   // ethers supplies reason="rejected" for denied wallet requests. The explicit
   // provider code is more precise than that generic reason or a cached decode.
+  const canonical = getChainErrorDetails(error);
+  if (canonical.category === "cancelled" && (canonical.code === "ACTION_REJECTED" || canonical.code === 4001 || canonical.code === "4001"))
+    return "USER_REJECTED";
   const code = getPrimaryErrorCode(error);
   if (code === "ACTION_REJECTED" || code === 4001) return "USER_REJECTED";
 
@@ -848,7 +880,13 @@ const translateArchiveError = (error: any, fallback: string, t: TFunction): stri
   return typeof translated === "string" && translated ? translated : fallback;
 };
 
-export const getFriendlyError = (error: any, t: TFunction): FriendlyError => {
+const resolveFriendlyPresentation = (error: any, t: TFunction): FriendlyError => {
+  const canonical = getChainErrorDetails(error);
+  if (canonical.code === "CHAIN_WALLET_SCOPE_CHANGED") {
+    const message = t("archive.errors.walletScopeChanged", "Wallet network or account changed; review the transaction again.");
+    return { type: "CHAIN_WALLET_SCOPE_CHANGED", reason: "CHAIN_WALLET_SCOPE_CHANGED",
+      code: canonical.code, message, details: message, retryable: false };
+  }
   // Capacity guidance is already a user-facing validation result. Words such
   // as "network" or "gas" must not replace it with a generic RPC error.
   if (error?.code === ARCHIVE_VALIDATION_FAILED || error?.code === ARCHIVE_PREVIEW_REJECTED) {
@@ -947,11 +985,14 @@ export const extractRevertReason = (
   return null;
 };
 
-export type NormalizeFriendlyErrorOptions = {
+export type NormalizeFriendlyErrorOptions = ChainErrorOptions & {
   contract?: { interface?: any } | null;
   fallbackMessage?: string;
   fallbackType?: string;
   messageOverrides?: Record<string, string>;
+  /** A domain may provide context-specific wording without replacing classification. */
+  message?: string;
+  preferDetailsForUnknown?: boolean;
 };
 
 export const defaultErrorTranslator = (_key: string, fallback?: string) => fallback ?? _key;
@@ -982,28 +1023,39 @@ export const normalizeFriendlyError = (
   error: any,
   t: TFunction,
   options: NormalizeFriendlyErrorOptions = {},
-): FriendlyError => {
+): ChainFriendlyError => {
   const enrichedError = attachDecodedReason(error, options.contract);
-  const friendly = getFriendlyError(enrichedError, t);
+  const friendly = resolveFriendlyPresentation(enrichedError, t);
+  const chainError = getChainErrorDetails(error, options);
   const reason = friendly.reason || friendly.type;
   const overriddenMessage = reason ? options.messageOverrides?.[reason] : undefined;
   const isUnknown = friendly.type === "UNKNOWN_ERROR";
+  const hasDiagnostic = !(error instanceof ChainOperationError) || error.messageAvailable;
   const message =
-    overriddenMessage ||
-    (isUnknown && options.fallbackMessage ? options.fallbackMessage : friendly.message);
-  const details =
-    overriddenMessage && friendly.details === friendly.message
-      ? overriddenMessage
-      : friendly.details;
+    options.message || overriddenMessage ||
+    (isUnknown && hasDiagnostic && options.preferDetailsForUnknown && friendly.details ? friendly.details :
+      isUnknown && options.fallbackMessage ? options.fallbackMessage : friendly.message);
+  const details = options.message || (!hasDiagnostic ? "" : overriddenMessage && friendly.details === friendly.message
+    ? overriddenMessage : friendly.details);
 
   return {
     ...friendly,
     type: isUnknown && options.fallbackType ? options.fallbackType : friendly.type,
     message,
     details,
-    retryable: friendly.retryable ?? isRetryableReason(reason),
+    retryable: chainError.retryable,
+    category: chainError.category,
+    operation: chainError.operation,
+    chainError,
+    ...(chainError.transactionHash ? { transactionHash: chainError.transactionHash } : {}),
+    ...(chainError.transactionConfirmed !== undefined ? { transactionConfirmed: chainError.transactionConfirmed } : {}),
+    ...(chainError.verificationFailure ? { verificationFailure: chainError.verificationFailure } : {}),
   };
 };
+
+/** All UI error entry points share classification and transaction context. */
+export const getFriendlyError = (error: unknown, t: TFunction): ChainFriendlyError =>
+  normalizeFriendlyError(error, t);
 
 export const getFriendlyErrorMessage = (
   error: any,
@@ -1013,30 +1065,31 @@ export const getFriendlyErrorMessage = (
     preferDetailsForUnknown?: boolean;
   } = {},
 ): string => {
-  const { preferDetailsForUnknown, ...normalizeOptions } = options;
-  const friendly = normalizeFriendlyError(error, t, {
-    ...normalizeOptions,
-    fallbackMessage,
-  });
-  if (preferDetailsForUnknown && friendly.type === "UNKNOWN_ERROR" && friendly.details) {
-    return friendly.details;
-  }
-  return friendly.message;
+  return normalizeFriendlyError(error, t, { ...options, fallbackMessage }).message;
 };
 
 export const normalizeErrorToError = (
-  error: any,
+  error: unknown,
   t: TFunction = defaultErrorTranslator as TFunction,
   options: NormalizeFriendlyErrorOptions = {},
-): Error => {
+): NormalizedError => {
   const friendly = normalizeFriendlyError(error, t, options);
-  const normalized = new Error(friendly.message);
-  (normalized as any).type = friendly.type;
-  (normalized as any).reason = friendly.reason;
-  (normalized as any).details = friendly.details;
-  (normalized as any).code = friendly.reason || friendly.type || friendly.code;
-  (normalized as any).retryable = friendly.retryable;
-  if (error?.i18n) (normalized as any).i18n = error.i18n;
-  (normalized as any).friendly = friendly;
-  return normalized;
+  const chainError = getChainErrorDetails(error, options);
+  const { transactionHash, transactionConfirmed, verificationFailure } = chainError;
+  const i18n = error && typeof error === "object" && "i18n" in error ? error.i18n : undefined;
+  return Object.assign(new Error(friendly.message), {
+    type: friendly.type,
+    reason: friendly.reason,
+    details: friendly.details,
+    code: friendly.reason || friendly.type || friendly.code,
+    retryable: chainError.transactionConfirmed ? false : friendly.retryable,
+    category: chainError.category,
+    operation: chainError.operation,
+    chainError,
+    ...(i18n ? { i18n } : {}),
+    friendly,
+    ...(transactionHash ? { transactionHash } : {}),
+    ...(transactionConfirmed !== undefined ? { transactionConfirmed } : {}),
+    ...(verificationFailure ? { verificationFailure } : {}),
+  });
 };

@@ -11,8 +11,7 @@ import {
 import { useWallet } from "../../../wallet";
 import { ModalShell } from "../../../../shared/ui/ModalShell";
 import { OVERLAY_Z_INDEX } from "../../../../shared/ui/overlayLayers";
-
-type EndorseReceiptLike = { logs?: any[] } | null;
+import type { EndorseReceiptLike } from "../EndorseModalProvider";
 
 export interface EndorseCompactModalProps {
   isOpen: boolean;

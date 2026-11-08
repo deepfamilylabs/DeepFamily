@@ -1,3 +1,4 @@
+import { instrumentChainContract } from "@deepfamily/chain-client";
 import { fileURLToPath } from "node:url";
 import fs from "node:fs/promises";
 import path from "node:path";
@@ -666,10 +667,10 @@ const assertProtocolTerminalState = async ({
   for (const [passed, message] of invariants) if (!passed) throw new Error(message);
   if (!sameAddress(await deepFamily.lineageIndex(), addresses.deepFamilyLineageIndex))
     throw new Error("DeepFamily lineage index binding mismatch");
-  const lineageIndex = await ethers.getContractAt(
+  const lineageIndex = instrumentChainContract(await ethers.getContractAt(
     "DeepFamilyLineageIndex",
     addresses.deepFamilyLineageIndex,
-  );
+  ));
   if (!sameAddress(await lineageIndex.DEEP_FAMILY(), addresses.deepFamily))
     throw new Error("Lineage index DeepFamily binding mismatch");
   await assertShieldedDeploymentBindings({
@@ -679,23 +680,23 @@ const assertProtocolTerminalState = async ({
         await Promise.all(
           RECEIVE_DEPLOYMENT_CONTRACTS.map(async ({ contractName, property }) => [
             property,
-            await ethers.getContractAt(contractName, addresses[property]),
+            instrumentChainContract(await ethers.getContractAt(contractName, addresses[property])),
           ]),
         ),
       ),
       lineageIndex,
-      shieldedErc20Pool: await ethers.getContractAt(
+      shieldedErc20Pool: instrumentChainContract(await ethers.getContractAt(
         "ShieldedErc20Pool",
         addresses.shieldedErc20Pool,
-      ),
-      shieldedNativePool: await ethers.getContractAt(
+      )),
+      shieldedNativePool: instrumentChainContract(await ethers.getContractAt(
         "ShieldedNativePool",
         addresses.shieldedNativePool,
-      ),
-      shieldedPoolFactory: await ethers.getContractAt(
+      )),
+      shieldedPoolFactory: instrumentChainContract(await ethers.getContractAt(
         "ShieldedPoolFactory",
         addresses.shieldedPoolFactory,
-      ),
+      )),
     },
     addresses,
   });
@@ -875,16 +876,16 @@ const revalidateCompletedRelease = async ({
   });
 
   const addresses = checkpoint.addresses;
-  const timelock = await ethers.getContractAt("GovernanceTimelock", addresses.timelock);
+  const timelock = instrumentChainContract(await ethers.getContractAt("GovernanceTimelock", addresses.timelock));
   const deployed = {
-    token: await ethers.getContractAt("DeepFamilyToken", addresses.token),
-    deepFamily: await ethers.getContractAt("DeepFamily", addresses.deepFamily),
-    archive: await ethers.getContractAt("DeepFamilyArchive", addresses.deepFamilyArchive),
-    deepFamilyReader: await ethers.getContractAt("DeepFamilyReader", addresses.deepFamilyReader),
-    groth16VerifierAdapter: await ethers.getContractAt(
+    token: instrumentChainContract(await ethers.getContractAt("DeepFamilyToken", addresses.token)),
+    deepFamily: instrumentChainContract(await ethers.getContractAt("DeepFamily", addresses.deepFamily)),
+    archive: instrumentChainContract(await ethers.getContractAt("DeepFamilyArchive", addresses.deepFamilyArchive)),
+    deepFamilyReader: instrumentChainContract(await ethers.getContractAt("DeepFamilyReader", addresses.deepFamilyReader)),
+    groth16VerifierAdapter: instrumentChainContract(await ethers.getContractAt(
       "Groth16VerifierAdapter",
       addresses.groth16VerifierAdapter,
-    ),
+    )),
   };
   await assertProtocolTerminalState({
     connection,
@@ -1406,7 +1407,7 @@ export const main = async (chainProfile) => {
         `Timelock deployed at ${timelockAddress}, expected ${plannedAddresses.timelock}`,
       );
     }
-    const timelock = TimelockFactory.attach(timelockAddress);
+    const timelock = instrumentChainContract(TimelockFactory.attach(timelockAddress));
     await assertTimelock({ connection, ethers, timelock, address: timelockAddress, config });
     await writeTimelockDeployment({ address: timelockAddress, config });
     checkpoint.addresses.timelock = timelockAddress;

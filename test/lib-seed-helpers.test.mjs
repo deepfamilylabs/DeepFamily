@@ -26,6 +26,7 @@ describe("SeedHelpers Library Tests", function () {
     const {
       deepFamily: deployedDeepFamily,
       deepFamilyReader,
+      archive,
       token: deployedToken,
     } = await hre.networkHelpers.loadFixture(deployIntegratedFixture);
 
@@ -37,7 +38,7 @@ describe("SeedHelpers Library Tests", function () {
 
     await setupStubVerifiers(hre.ethers, deployedDeepFamily);
 
-    return { deepFamily, reader: deepFamilyReader, token, signer, signerAddr };
+    return { deepFamily, reader: deepFamilyReader, archive, token, signer, signerAddr };
   }
 
   describe("computePersonHash", function () {
@@ -258,7 +259,7 @@ describe("SeedHelpers Library Tests", function () {
 
   describe("endorseVersion and mintPersonVersionNFT", function () {
     async function createEndorsedPersonFixture() {
-      const { deepFamily, token, signer, signerAddr } = await setupSeedFixture();
+      const { deepFamily, archive, token, signer, signerAddr } = await setupSeedFixture();
       const testPersonData = {
         fullName: `MintTestPerson_${Date.now()}`,
         passphrase: TEST_PASSPHRASE,
@@ -278,6 +279,7 @@ describe("SeedHelpers Library Tests", function () {
 
       return {
         deepFamily,
+        archive,
         token,
         signer,
         signerAddr,
@@ -307,7 +309,7 @@ describe("SeedHelpers Library Tests", function () {
     });
 
     it("should successfully mint NFT", async function () {
-      const { deepFamily, token, signer, signerAddr, testPersonHash, testPersonData } =
+      const { deepFamily, archive, token, signer, signerAddr, testPersonHash, testPersonData } =
         await createEndorsedPersonFixture();
       await endorseVersion({
         deepFamily,
@@ -330,6 +332,7 @@ describe("SeedHelpers Library Tests", function () {
 
       const result = await mintPersonVersionNFT({
         deepFamily,
+        archive,
         signer,
         personHash: testPersonHash,
         versionIndex: 1,
@@ -348,8 +351,34 @@ describe("SeedHelpers Library Tests", function () {
       console.log(`    NFT minted, TokenID: ${result.tokenId}`);
     });
 
+    it("retains a successful mint receipt when its NFT event cannot be verified", async function () {
+      const { deepFamily, archive, token, signer, testPersonHash, testPersonData } =
+        await createEndorsedPersonFixture();
+      await endorseVersion({
+        deepFamily, token, signer, personHash: testPersonHash, versionIndex: 1, autoApprove: true,
+      });
+      // Keep the real submitted call and receipt while simulating an unusable event decoder.
+      const withoutMintEvent = {
+        archive: (...args) => deepFamily.archive(...args),
+        personVersionsCount: (...args) => deepFamily.personVersionsCount(...args),
+        endorsedVersionIndex: (...args) => deepFamily.endorsedVersionIndex(...args),
+        connect: (runner) => deepFamily.connect(runner),
+        target: deepFamily.target,
+        interface: {parseLog: () => null},
+      };
+      await expect(mintPersonVersionNFT({
+        deepFamily: withoutMintEvent, archive, signer, personHash: testPersonHash,
+        versionIndex: 1, tokenURI: "", basicInfo: testPersonData, supplementInfo: {story: ""},
+      })).to.be.rejected.and.eventually.satisfy((error) => {
+        expect(error.transactionHash).to.match(/^0x[0-9a-f]{64}$/);
+        expect(error.transactionConfirmed).to.equal(true);
+        expect(error.verificationFailure).to.equal("mismatch");
+        return true;
+      });
+    });
+
     it("should not be able to mint NFT for non-endorsed version", async function () {
-      const { deepFamily, signer } = await setupSeedFixture();
+      const { deepFamily, archive, signer } = await setupSeedFixture();
       const newPersonData = {
         fullName: `NoEndorse_${Date.now()}`,
         passphrase: TEST_PASSPHRASE,
@@ -380,6 +409,7 @@ describe("SeedHelpers Library Tests", function () {
       await expect(
         mintPersonVersionNFT({
           deepFamily,
+          archive,
           signer,
           personHash: addResult.personHash,
           versionIndex: 1,
@@ -393,7 +423,7 @@ describe("SeedHelpers Library Tests", function () {
 
   describe("complete workflow", function () {
     it("should complete full workflow from adding to minting", async function () {
-      const { deepFamily, token, signer } = await setupSeedFixture();
+      const { deepFamily, archive, token, signer } = await setupSeedFixture();
       const personData = {
         fullName: `FullWorkflow_${Date.now()}`,
         passphrase: TEST_PASSPHRASE,
@@ -449,6 +479,7 @@ describe("SeedHelpers Library Tests", function () {
 
       const mintResult = await mintPersonVersionNFT({
         deepFamily,
+        archive,
         signer,
         personHash: addResult.personHash,
         versionIndex: 1,

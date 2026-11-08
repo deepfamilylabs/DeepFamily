@@ -121,7 +121,7 @@ describe("private letter composer", () => {
     await screen.findByText(tr("preparationExpired"));
     expect(mocks.worker).toHaveBeenCalledTimes(1);
     fireEvent.click(screen.getByRole("button", { name: tr("send") }));
-    await screen.findByText(`${tr("sent")}: 0xconfirmed`);
+    await screen.findByText(/shielded\.privateLetters\.sent.*0xconfirmed/);
     expect(mocks.worker).toHaveBeenCalledTimes(2);
     expect(mocks.worker.mock.calls.every(([method]) => method === "prepareLetter")).toBe(true);
   });
@@ -215,4 +215,33 @@ describe("private letter composer", () => {
     expect(screen.getByText(tr("emptyInbox"))).toBeTruthy();
     expect(initial.onBusyChange.mock.calls).toEqual([[true], [false]]);
   });
+});
+
+
+it("shows the public hash while waiting and retains it after an uncertain receipt failure", async () => {
+  let reject!: (reason: unknown) => void;
+  mocks.submit.mockImplementationOnce(async (input) => {
+    input.onBroadcast("0xpending");
+    return new Promise((_resolve, rejectSubmission) => { reject = rejectSubmission; });
+  });
+  render(<PrivateLettersPanel {...props()} />);
+  fillLetter();
+  fireEvent.click(screen.getByRole("button", {name: tr("send")}));
+  expect(await screen.findByText(/shielded.privateLetters.pending.*0xpending/)).toBeTruthy();
+  await act(async () => reject(Object.assign(new Error("RPC unavailable"), {transactionHash:"0xpending"})));
+  expect(screen.getByRole("alert").textContent).toBe(tr("confirmationPending"));
+  expect(screen.getByText(/shielded.privateLetters.confirmationPending.*0xpending/)).toBeTruthy();
+  expect((screen.getByLabelText(tr("body")) as HTMLTextAreaElement).value).toBe("Private letter text");
+});
+
+it("does not call a confirmed but unverified registration sent successfully", async () => {
+  mocks.submit.mockRejectedValueOnce(Object.assign(new Error("event mismatch"), {
+    transactionHash:"0xconfirmed", transactionConfirmed:true, verificationFailure:"mismatch",
+  }));
+  render(<PrivateLettersPanel {...props()} />);
+  fillLetter();
+  fireEvent.click(screen.getByRole("button", {name: tr("send")}));
+  expect((await screen.findByRole("alert")).textContent).toBe(tr("confirmedDetailsUnavailable"));
+  expect(screen.getByText(/shielded.privateLetters.confirmedDetailsUnavailable.*0xconfirmed/)).toBeTruthy();
+  expect(screen.queryByText(/shielded.privateLetters.sent/)).toBeNull();
 });

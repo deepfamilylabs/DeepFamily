@@ -3,6 +3,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { ethers } from "ethers";
+import { getChainErrorDetails } from "@deepfamily/chain-client";
 
 import {
   acquireReleaseLock,
@@ -90,7 +91,7 @@ const fixture = ({
       sends += 1;
       expect(checkpoint.transactions.deployModule.status).to.equal("planned");
       expect(request.nonce).to.equal(nonce);
-      return { hash: HASH, nonce };
+      return { hash: HASH, nonce, wait: async () => receipt };
     },
   };
   let saves = 0;
@@ -185,6 +186,138 @@ describe("eSpace Mainnet release checkpoint state", function () {
       actualCostWei: "200",
     });
   });
+
+  it("persists the submitted hash before waiting and resumes a timeout without broadcasting again", async function () {
+    const run = fixture();
+    const send = run.signer.sendTransaction;
+    run.signer.sendTransaction = async (request) => ({
+      ...await send(request),
+      wait: async (confirmations, timeoutMs) => {
+        expect(confirmations).to.equal(2);
+        expect(timeoutMs).to.equal(1_000);
+        expect(run.saves()).to.equal(2);
+        expect(run.checkpoint.transactions.deployModule).to.include({ status: "submitted", hash: HASH });
+        throw Object.assign(new Error("confirmation RPC timed out"), { code: "TIMEOUT" });
+      },
+    });
+
+    let failure;
+    try { await run.execute(); } catch (error) { failure = error; }
+    expect(getChainErrorDetails(failure)).to.include({
+      category: "network", operation: "confirm", transactionHash: HASH, retryable: false,
+    });
+    expect(run.sends()).to.equal(1);
+    expect((await run.execute()).hash).to.equal(HASH);
+    expect(run.sends()).to.equal(1);
+  });
+
+  it("does not adopt a replacement for a journalled CREATE deployment", async function () {
+    const run = fixture();
+    const send = run.signer.sendTransaction;
+    run.signer.sendTransaction = async (request) => ({
+      ...await send(request),
+      wait: async () => {
+        throw Object.assign(new Error("deployment repriced"), {
+          code: "TRANSACTION_REPLACED", reason: "repriced", cancelled: false,
+          replacement: { hash: `0x${"78".repeat(32)}` },
+          receipt: { ...run.receipt, hash: `0x${"78".repeat(32)}` },
+        });
+      },
+    });
+    let failure;
+    try { await run.execute(); } catch (error) { failure = error; }
+    expect(getChainErrorDetails(failure)).to.include({
+      code: "TRANSACTION_REPLACEMENT_CANCELLED", transactionHash: HASH, retryable: false,
+    });
+    expect(run.checkpoint.transactions.deployModule).to.include({ status: "submitted", hash: HASH });
+    expect(run.sends()).to.equal(1);
+  });
+
+  it("retains successful journal evidence when receipt revalidation cannot reach the RPC", async function () {
+    const run = fixture();
+    await run.execute();
+    run.provider.getTransactionReceipt = async () => {
+      throw Object.assign(new Error("receipt RPC unavailable"), { code: "NETWORK_ERROR" });
+    };
+    let failure;
+    try { await run.execute(); } catch (error) { failure = error; }
+    expect(getChainErrorDetails(failure)).to.include({
+      category: "verification", operation: "read", transactionHash: HASH,
+      transactionConfirmed: true, verificationFailure: "read", retryable: false,
+    });
+    expect(run.sends()).to.equal(1);
+    expect(run.checkpoint.transactions.deployModule).to.include({ status: "confirmed", hash: HASH });
+  });
+
+  for (const method of ["getTransaction", "getBlockNumber", "getCode", "getBlock"]) {
+    it(`retains successful confirmation when ${method} verification cannot reach the RPC`, async function () {
+      const run = fixture();
+      await run.execute();
+      run.provider[method] = async () => {
+        throw Object.assign(new Error("verification RPC unavailable"), { code: "NETWORK_ERROR" });
+      };
+      let failure;
+      try { await run.execute(); } catch (error) { failure = error; }
+      expect(getChainErrorDetails(failure)).to.include({
+        category: "verification", operation: "read", transactionHash: HASH,
+        transactionConfirmed: true, verificationFailure: "read", retryable: false,
+      });
+      expect(run.sends()).to.equal(1);
+    });
+  }
+
+  for (const previousReceipt of [false, true]) {
+    it(`retains a currently successful receipt when waiting for more confirmations fails (checkpoint ${previousReceipt})`, async function () {
+      const run = fixture();
+      if (previousReceipt) await run.execute();
+      run.provider.getBlockNumber = async () => 100;
+      run.provider.waitForTransaction = async () => {
+        throw Object.assign(new Error("confirmation RPC unavailable"), { code: "NETWORK_ERROR" });
+      };
+      let failure;
+      try { await run.execute(); } catch (error) { failure = error; }
+      expect(getChainErrorDetails(failure)).to.include({
+        category: "verification", operation: "confirm", code: "NETWORK_ERROR", transactionHash: HASH,
+        transactionConfirmed: true, verificationFailure: "read", retryable: false,
+      });
+      expect(run.sends()).to.equal(1);
+    });
+  }
+
+  it("does not reuse historical success when the current receipt disappeared before waiting", async function () {
+    const run = fixture();
+    await run.execute();
+    run.provider.getTransactionReceipt = async () => null;
+    run.provider.waitForTransaction = async () => {
+      throw Object.assign(new Error("confirmation RPC unavailable"), { code: "NETWORK_ERROR" });
+    };
+    let failure;
+    try { await run.execute(); } catch (error) { failure = error; }
+    expect(getChainErrorDetails(failure)).to.include({
+      category: "network", operation: "confirm", code: "NETWORK_ERROR", transactionHash: HASH, retryable: false,
+    });
+    expect(getChainErrorDetails(failure).transactionConfirmed).not.to.equal(true);
+    expect(run.sends()).to.equal(1);
+  });
+
+  for (const mismatch of ["reorg", "deployment address", "runtime code", "canonical block"]) {
+    it(`retains the hash without asserting confirmation after a ${mismatch} mismatch`, async function () {
+      const run = fixture();
+      await run.execute();
+      if (mismatch === "reorg") run.receipt.blockHash = `0x${"78".repeat(32)}`;
+      if (mismatch === "deployment address") run.receipt.contractAddress = ADDRESS;
+      if (mismatch === "runtime code") run.provider.getCode = async () => "0x";
+      if (mismatch === "canonical block") run.provider.getBlock = async () => ({ hash: `0x${"78".repeat(32)}` });
+      let failure;
+      try { await run.execute(); } catch (error) { failure = error; }
+      expect(getChainErrorDetails(failure)).to.include({
+        category: "verification", operation: "verify", transactionHash: HASH, retryable: false,
+      });
+      expect(getChainErrorDetails(failure).transactionConfirmed).not.to.equal(true);
+      expect(getChainErrorDetails(failure)).not.to.have.property("verificationFailure");
+      expect(run.sends()).to.equal(1);
+    });
+  }
 
   it("never rebroadcasts a planned nonce that is pending or consumed", async function () {
     const run = fixture({ pendingNonce: 8, latestNonce: 8 });

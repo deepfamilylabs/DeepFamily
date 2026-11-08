@@ -1,3 +1,4 @@
+import type { ContractReceipt } from "../../../shared/clients/transactionTypes";
 import { hexlify, keccak256 } from "ethers";
 import { encodePublicStoryRecord } from "../../../shared/config/storyEncoding";
 import { createDeepFamilyInterface } from "../../../shared/clients/contractFactory";
@@ -94,7 +95,7 @@ export type MintPersonVersionNFTFn = (
   coreInfo: MintCoreInfo,
   storyPayload: string,
   expectedStoryPayloadHash: string,
-) => Promise<any>;
+) => Promise<ContractReceipt>;
 
 export type MintReceiptEvent = {
   personHash: string;
@@ -133,7 +134,7 @@ export type ExecuteMintFlowResult =
     }
   | {
       requiresEndorsement: false;
-      receipt: any;
+      receipt: ContractReceipt;
       transactionHash: string;
       blockNumber: number;
       tokenId: number;

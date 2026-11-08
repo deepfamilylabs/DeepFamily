@@ -14,7 +14,9 @@ export {
   type EndorseSuccessHandler,
   type EndorseTarget,
 } from "./ui/EndorseModalProvider";
-export { NodeDetailProvider, useNodeDetail, type TrustedEndorserAccess } from "./ui";
+export { NodeDetailProvider, useNodeDetail } from "./ui";
+export type { TrustedEndorserAccess } from "./model/trustedEndorserTypes";
+export { useTrustedEndorserAccess } from "./queries/useTrustedEndorserAccess";
 export {
   default as PersonHashCalculator,
   type HashForm,

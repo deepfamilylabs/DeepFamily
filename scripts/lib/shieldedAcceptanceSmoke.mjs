@@ -156,6 +156,7 @@ export async function runShieldedAcceptanceSmoke({
   mother,
   personResult,
   recordTx,
+  recordReceipt,
   proofArtifacts,
 }) {
   root = path.resolve(root);
@@ -177,8 +178,8 @@ export async function runShieldedAcceptanceSmoke({
   const journal = new Map();
   let firstShieldBlock;
 
-  const record = async (label, tx) => {
-    const receipt = await recordTx(label, tx);
+  const record = async (label, send) => {
+    const receipt = await recordTx(label, send);
     assert.equal(receipt?.status, 1, `${label} did not succeed`);
     recorded.push(label);
     return receipt;
@@ -512,7 +513,7 @@ export async function runShieldedAcceptanceSmoke({
         : action === "unshield"
           ? [external.recipient, external.amount, data, generated.encoded]
           : [data, generated.encoded];
-    const receipt = await record(label, await pool[action](...args));
+    const receipt = await record(label, () => pool[action](...args));
     if (action === "shield") firstShieldBlock = receipt.blockNumber;
     const events = receipt.logs
       .filter((log) => getAddress(log.address) === getAddress(poolAddress))
@@ -612,7 +613,8 @@ export async function runShieldedAcceptanceSmoke({
         versionContent: { tag: "shielded-acceptance-root", biography: "Acceptance policy root" },
         proofArtifacts,
       });
-      await record("shielded-add-father-person", result.tx);
+      await recordReceipt("shielded-add-father-person", result.receipt);
+      recorded.push("shielded-add-father-person");
       assert.equal(result.identityCommitment, fatherMaterial.identityCommitment);
     }
     const [trustedExists, trustedLeafIndex] = await lineage.trustedLeafIndex(
@@ -695,7 +697,7 @@ export async function runShieldedAcceptanceSmoke({
     const poolTokenBefore = await token.balanceOf(poolAddress);
     const signerTokenBefore = await token.balanceOf(signerAddress);
     assert.ok(signerTokenBefore >= shieldedAmount, "Acceptance signer has insufficient DEEP");
-    await record("shielded-token-approve", await token.approve(poolAddress, shieldedAmount));
+    await record("shielded-token-approve", () => token.approve(poolAddress, shieldedAmount));
     const initial = await Promise.all([
       valueNote(donorKeys, shieldedAmount),
       valueNote(donorKeys, 0n),

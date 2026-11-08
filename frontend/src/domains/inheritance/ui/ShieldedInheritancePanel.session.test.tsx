@@ -2,7 +2,7 @@
 import { useState, type ReactNode } from "react";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { Signer } from "ethers";
+import { Interface, type Signer } from "ethers";
 import type { ShieldedPageModules } from "../model/shieldedPageTypes";
 import type { ShieldFlowInput, ShieldedPoolFlowResult } from "../services/shieldedPoolFlows";
 import type {
@@ -202,13 +202,16 @@ function tokenModules(initialAllowance = 0n, initialBalance = 1_000_000n * 10n *
   let allowance = initialAllowance;
   let balance = initialBalance;
   const token = {
+    getAddress: async () => address,
+    interface: new Interface(["function approve(address,uint256) returns (bool)"]),
     allowance: vi.fn(async () => allowance),
     balanceOf: vi.fn(async (_account: string) => balance),
     approve: vi.fn(async (_spender: string, value: bigint) => ({
       hash: "0xapproval",
+      replaceableTransaction() { return this; },
       wait: vi.fn(async () => {
         allowance = value;
-        return { status: 1 };
+        return { status: 1, hash: "0xapproval" };
       }),
     })),
     connect: vi.fn(),
@@ -753,11 +756,14 @@ describe("Shielded budget flow with a real identity session", () => {
         code: "TRANSACTION_REPLACED",
         reason: "repriced",
         cancelled: false,
-        replacement: { hash: repricedHash },
-        receipt: { status: 1 },
+        replacement: {
+          hash: repricedHash, chainId: 31337n, from: address, to: address, value: 0n, nonce: 0,
+          data: fixture.token.interface.encodeFunctionData("approve", [address, 1_250_000_000_000_000_000n]),
+        },
+        receipt: { status: 1, hash: repricedHash },
       });
     });
-    fixture.token.approve.mockImplementationOnce(async () => ({ hash: "0xapproval", wait }));
+    fixture.token.approve.mockImplementationOnce(async () => ({ hash: "0xapproval", wait, replaceableTransaction() { return this; } }));
     renderPanel({ selectedModules: fixture.modules });
     await restoreIndependentKey();
     fireEvent.click(navButton("shield"));

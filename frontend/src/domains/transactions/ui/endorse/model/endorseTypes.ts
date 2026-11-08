@@ -1,3 +1,4 @@
+import type { TransactionErrorContext } from "@deepfamily/chain-client";
 import type { FriendlyError } from "../../../../../shared/lib/errors";
 import type {
   EndorseFeeQuote,
@@ -32,7 +33,7 @@ export interface EndorseSuccessResultView {
   events: { PersonVersionEndorsed: any };
 }
 
-export interface EndorseErrorResultView {
+export interface EndorseErrorResultView extends TransactionErrorContext {
   type: string;
   message: string;
   details: string;

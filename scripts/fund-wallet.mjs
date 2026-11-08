@@ -1,4 +1,5 @@
 import "dotenv/config";
+import { executeChainTransaction, getChainErrorDetails } from "@deepfamily/chain-client";
 
 import hre from "hardhat";
 
@@ -46,15 +47,14 @@ async function main() {
 
   console.log(`Funding ${targetAddress} (${source}) with ${ethers.formatEther(amount)} ETH...`);
 
-  const tx = await deployer.sendTransaction({
-    to: targetAddress,
-    value: amount,
+  const { transactionHash } = await executeChainTransaction({
+    provider: deployer.provider,
+    send: () => deployer.sendTransaction({ to: targetAddress, value: amount }),
+    label: "fund-wallet",
   });
 
-  await tx.wait();
-
   console.log(`Successfully sent ${ethers.formatEther(amount)} ETH to ${targetAddress}`);
-  console.log(`Transaction hash: ${tx.hash}`);
+  console.log(`Transaction hash: ${transactionHash}`);
 
   // Check balance
   const balance = await ethers.provider.getBalance(targetAddress);
@@ -62,6 +62,6 @@ async function main() {
 }
 
 main().catch((error) => {
-  console.error(error);
+  console.error(error instanceof Error ? error.message : "Wallet funding failed", getChainErrorDetails(error));
   process.exit(1);
 });

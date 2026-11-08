@@ -1,4 +1,5 @@
 import { ethers } from "ethers";
+import { normalizeChainError, runChainRead, validateArchiveGas } from "@deepfamily/chain-client";
 import { ARCHIVE_MAX_SEGMENT_PAYLOAD_LENGTH } from "@deepfamily/protocol-core";
 import { ARCHIVE_PREVIEW_REJECTED, ARCHIVE_VALIDATION_FAILED } from "../../../shared/lib/errors";
 
@@ -14,18 +15,18 @@ export interface ArchiveErrorI18n {
 }
 
 export const archiveValidationError = (message: string, i18n: ArchiveErrorI18n, reason?: string) =>
-  Object.assign(new Error(message), {
+  normalizeChainError(Object.assign(new Error(message), {
     code: ARCHIVE_VALIDATION_FAILED,
     i18n,
     ...(reason ? { reason } : {}),
-  });
+  }), { category: "validation" });
 
 /** The writer closed the fee preview. Nothing was sent, so callers report nothing. */
 export const archivePreviewRejectedError = (message: string) =>
-  Object.assign(new Error(message), {
+  normalizeChainError(Object.assign(new Error(message), {
     code: ARCHIVE_PREVIEW_REJECTED,
     i18n: { key: "archive.errors.previewRejected" } satisfies ArchiveErrorI18n,
-  });
+  }), { category: "cancelled", operation: "submit" });
 
 export interface ArchiveTransactionPreview {
   canonicalPayload: string;
@@ -40,23 +41,10 @@ export interface ArchiveTransactionPreview {
   nativeSymbol: string;
 }
 
-// The eSpace eth block gas limit already represents the eSpace allowance.
-// A null cap means the network's current block limit is the limiting profile rule.
-export const ARCHIVE_CHAIN_PROFILES: Record<
-  string,
-  { maxTransactionGas: bigint | null; calldataGasPerByte: bigint; nativeSymbol: string }
-> = {
-  "1": { maxTransactionGas: 16_777_216n, calldataGasPerByte: 0n, nativeSymbol: "ETH" },
-  "11155111": { maxTransactionGas: 16_777_216n, calldataGasPerByte: 0n, nativeSymbol: "ETH" },
-  "1030": { maxTransactionGas: null, calldataGasPerByte: 100n, nativeSymbol: "CFX" },
-  "71": { maxTransactionGas: null, calldataGasPerByte: 100n, nativeSymbol: "CFX" },
-  "31337": { maxTransactionGas: null, calldataGasPerByte: 0n, nativeSymbol: "ETH" },
-};
-
 export async function estimateArchiveTransaction(input: {
-  contractMethod: any;
+  contractMethod: { estimateGas?: (...args: unknown[]) => Promise<bigint>; staticCall?: (...args: unknown[]) => Promise<unknown> };
   args: readonly unknown[];
-  provider: any;
+  provider: Pick<ethers.Provider, "getNetwork" | "getBlock" | "getFeeData">;
   calldata: string;
   payload: string;
   kind: "Story" | "Metadata" | "Seal" | "Mint";
@@ -75,14 +63,14 @@ export async function estimateArchiveTransaction(input: {
   try {
     if (typeof input.contractMethod.estimateGas !== "function")
       throw archiveValidationError("RPC gas estimation is unavailable", estimationFailed);
-    estimatedGas = BigInt(await input.contractMethod.estimateGas(...input.args));
+    estimatedGas = BigInt(await runChainRead({ read: () => input.contractMethod.estimateGas!(...input.args), operation: "estimate" }));
     if (estimatedGas <= 0n)
       throw archiveValidationError("RPC returned an invalid gas estimate", estimationFailed);
   } catch (error) {
     // A successful simulation does not authorize sending an unestimated transaction.
     if (typeof input.contractMethod.staticCall === "function") {
       try {
-        await input.contractMethod.staticCall(...input.args);
+        await runChainRead({ read: () => input.contractMethod.staticCall!(...input.args), operation: "estimate" });
       } catch (simulationError) {
         throw simulationError;
       }
@@ -97,30 +85,24 @@ export async function estimateArchiveTransaction(input: {
     input.provider.getBlock("latest"),
     input.provider.getFeeData(),
   ]);
-  const profile = ARCHIVE_CHAIN_PROFILES[String(network.chainId)];
-  if (!profile)
-    throw archiveValidationError("Archive transaction limits are not configured for this network", {
-      key: "archive.errors.networkNotConfigured",
-    });
-  if (!block || BigInt(block.gasLimit) <= 0n)
-    throw archiveValidationError("Current block gas limit is unavailable", {
-      key: "archive.errors.blockGasLimitUnavailable",
-    });
-  const gasLimit = (estimatedGas * 120n + 99n) / 100n;
-  if (
-    gasLimit > BigInt(block.gasLimit) ||
-    (profile.maxTransactionGas !== null && gasLimit > profile.maxTransactionGas)
-  ) {
-    throw archiveValidationError(
-      `Buffered archive gas exceeds the network transaction limit. ${guidance}`,
-      { key: "archive.errors.gasLimitExceeded", guidanceKey },
-    );
-  }
-  if (gasLimit < BigInt(ethers.getBytes(input.calldata).length) * profile.calldataGasPerByte) {
-    throw archiveValidationError("RPC gas estimate is below the network calldata gas floor", {
-      key: "archive.errors.gasBelowCalldataFloor",
+  let validated: ReturnType<typeof validateArchiveGas>;
+  try {
+    validated = validateArchiveGas({ estimatedGas, chainId: network.chainId,
+      blockGasLimit: block?.gasLimit, calldata: input.calldata });
+  } catch (error) {
+    const code = error instanceof Error && "code" in error ? error.code : undefined;
+    const keys: Record<string, string> = {
+      ARCHIVE_NETWORK_NOT_CONFIGURED: "archive.errors.networkNotConfigured",
+      ARCHIVE_BLOCK_GAS_UNAVAILABLE: "archive.errors.blockGasLimitUnavailable",
+      ARCHIVE_GAS_LIMIT_EXCEEDED: "archive.errors.gasLimitExceeded",
+      ARCHIVE_GAS_BELOW_CALLDATA_FLOOR: "archive.errors.gasBelowCalldataFloor",
+    };
+    throw archiveValidationError(error instanceof Error ? error.message : "Archive gas validation failed", {
+      key: typeof code === "string" ? keys[code] ?? estimationFailed.key : estimationFailed.key,
+      guidanceKey,
     });
   }
+  const { gasLimit, nativeSymbol } = validated;
   const gasPrice = fees.gasPrice ?? fees.maxFeePerGas;
   const maximumGasPrice = fees.maxFeePerGas ?? fees.gasPrice;
   if (
@@ -144,7 +126,7 @@ export async function estimateArchiveTransaction(input: {
     gasLimit,
     estimatedFee: estimatedGas * BigInt(gasPrice),
     maximumFee: gasLimit * BigInt(maximumGasPrice),
-    nativeSymbol: profile.nativeSymbol,
+    nativeSymbol,
   });
 }
 

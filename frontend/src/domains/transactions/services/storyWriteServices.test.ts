@@ -9,6 +9,7 @@ import {
 import { addStoryRecordService } from "./addStoryRecordService";
 import { sealStoryService } from "./sealStoryService";
 import { createArchiveInterface } from "../../../shared/clients/contractFactory";
+import { contractFeeReplacement } from "../test-helpers/contractReplacement";
 const mocks = vi.hoisted(() => ({ main: vi.fn(), archive: vi.fn() }));
 vi.mock("../../../shared/clients/contractFactory", async () => ({
   ...(await vi.importActual<typeof import("../../../shared/clients/contractFactory")>(
@@ -63,8 +64,9 @@ function setup() {
         lastUpdateTime: 100n,
         isSealed: false,
       };
-      return {
+      return { replaceableTransaction() { return this; },
         hash: "0xappend",
+        nonce: 1,
         wait: vi.fn(async () => ({
           status: 1,
           hash: "0xappend",
@@ -89,8 +91,9 @@ function setup() {
   const seal = Object.assign(
     vi.fn(async (tokenId: string) => {
       state = { ...state, isSealed: true, lastUpdateTime: 101n };
-      return {
+      return { replaceableTransaction() { return this; },
         hash: "0xseal",
+        nonce: 1,
         wait: vi.fn(async () => ({
           status: 1,
           hash: "0xseal",
@@ -119,7 +122,7 @@ function setup() {
   };
   const signer = {
     getAddress: vi.fn(async () => AUTHOR),
-    provider: {
+    provider: { getBlockNumber: async () => 12,
       getNetwork: vi.fn(async () => ({ chainId: 31337n })),
       getBlock: vi.fn(async () => ({ gasLimit: 30000000n })),
       getFeeData: vi.fn(async () => ({ gasPrice: 1n, maxFeePerGas: 2n })),
@@ -129,7 +132,7 @@ function setup() {
   mocks.archive.mockReturnValue(archive);
   const confirm = vi.fn(async () => true);
   const submit = (content = "  原文\n🙂  ", title = "") =>
-    addStoryRecordService(signer as any, ADDRESS, "1", 0, title, content, "", 2, "", confirm);
+    addStoryRecordService({signer: signer as any, contractAddress: ADDRESS, tokenId: "1", recordIndex: 0, title, content, expectedPayloadHash: "", recordType: 2, attachmentURI: "", confirmTransactionPreview: confirm});
   return { archive, signer, confirm, submit };
 }
 describe("Archive story writes", () => {
@@ -193,24 +196,14 @@ describe("Archive story writes", () => {
 
     // Read through the wallet, the page's index 0 disagrees with the wallet's 5.
     await expect(
-      addStoryRecordService(f.signer as any, ADDRESS, "1", 0, "", "A story", "", 2, "", f.confirm),
+      addStoryRecordService({signer: f.signer as any, contractAddress: ADDRESS, tokenId: "1", recordIndex: 0, title: "", content: "A story", expectedPayloadHash: "", recordType: 2, attachmentURI: "", confirmTransactionPreview: f.confirm}),
     ).rejects.toThrow(/Story changed/);
     expect(f.archive.appendStoryRecord).not.toHaveBeenCalled();
 
     // Read through the page's provider, the same index is the chain's end.
-    const result = await addStoryRecordService(
-      f.signer as any,
-      ADDRESS,
-      "1",
-      0,
-      "",
-      "A story",
-      "",
-      2,
-      "",
-      f.confirm,
-      readProvider,
-    );
+    const result = await addStoryRecordService({signer: f.signer as any, contractAddress: ADDRESS, tokenId: "1", recordIndex: 0,
+      title: "", content: "A story", expectedPayloadHash: "", recordType: 2, attachmentURI: "",
+      confirmTransactionPreview: f.confirm, readProvider});
     expect(pageArchive.storyState).toHaveBeenCalledWith("1");
     expect(f.archive.appendStoryRecord).toHaveBeenCalledTimes(1);
     expect(result.recordIndex).toBe(0);
@@ -285,7 +278,7 @@ describe("Archive story writes", () => {
   it("seals the exact count/head and validates event and final state", async () => {
     const f = setup();
     const added = await f.submit();
-    const sealed = await sealStoryService(f.signer as any, ADDRESS, "1", f.confirm);
+    const sealed = await sealStoryService({signer: f.signer as any, contractAddress: ADDRESS, tokenId: "1", confirmTransactionPreview: f.confirm});
     expect(f.archive.sealStory).toHaveBeenCalledWith("1", 1n, added.recordsHead, {
       gasLimit: 1200n,
     });
@@ -297,7 +290,7 @@ describe("Archive story writes", () => {
     await f.submit();
     f.confirm.mockClear();
     f.archive.sealStory.estimateGas.mockRejectedValue(new Error("RPC unavailable"));
-    await expect(sealStoryService(f.signer as any, ADDRESS, "1", f.confirm)).rejects.toThrow(
+    await expect(sealStoryService({signer: f.signer as any, contractAddress: ADDRESS, tokenId: "1", confirmTransactionPreview: f.confirm})).rejects.toThrow(
       /estimat/i,
     );
     expect(f.archive.sealStory).not.toHaveBeenCalled();
@@ -307,7 +300,7 @@ describe("Archive story writes", () => {
     const f = setup();
     await f.submit();
     f.confirm.mockResolvedValue(false);
-    await expect(sealStoryService(f.signer as any, ADDRESS, "1", f.confirm)).rejects.toMatchObject({
+    await expect(sealStoryService({signer: f.signer as any, contractAddress: ADDRESS, tokenId: "1", confirmTransactionPreview: f.confirm})).rejects.toMatchObject({
       code: "ARCHIVE_PREVIEW_REJECTED",
       message: expect.stringMatching(/cancel/i),
     });
@@ -320,7 +313,7 @@ describe("Archive story writes", () => {
       f.signer.getAddress.mockResolvedValue(POINTER);
       return true;
     });
-    await expect(sealStoryService(f.signer as any, ADDRESS, "1", f.confirm)).rejects.toThrow(
+    await expect(sealStoryService({signer: f.signer as any, contractAddress: ADDRESS, tokenId: "1", confirmTransactionPreview: f.confirm})).rejects.toThrow(
       /account changed/i,
     );
     expect(f.archive.sealStory).not.toHaveBeenCalled();
@@ -373,7 +366,7 @@ describe("confirmed story readback failures", () => {
       }
       return read();
     });
-    await expect(sealStoryService(f.signer as any, ADDRESS, "1", f.confirm)).rejects.toMatchObject({
+    await expect(sealStoryService({signer: f.signer as any, contractAddress: ADDRESS, tokenId: "1", confirmTransactionPreview: f.confirm})).rejects.toMatchObject({
       transactionHash: "0xseal", transactionConfirmed: true, verificationFailure: failure, retryable: false,
     });
     expect(f.archive.sealStory).toHaveBeenCalledOnce();
@@ -381,10 +374,147 @@ describe("confirmed story readback failures", () => {
 
   it("keeps a failed receipt unconfirmed and preserves its submitted hash", async () => {
     const f = setup();
-    f.archive.appendStoryRecord.mockResolvedValueOnce({hash: "0xfailed", wait: vi.fn(async () => ({status: 0, hash: "0xfailed", blockNumber: 12, logs: []}))});
+    f.archive.appendStoryRecord.mockResolvedValueOnce({ replaceableTransaction() { return this; },hash: "0xfailed", nonce: 1, wait: vi.fn(async () => ({status: 0, hash: "0xfailed", blockNumber: 12, logs: []}))});
     const error = await f.submit().catch((error) => error);
     expect(error.transactionHash).toBe("0xfailed");
     expect(error.transactionConfirmed).not.toBe(true);
     expect(error.verificationFailure).toBeUndefined();
   });
+});
+
+
+it.each(["append", "seal"] as const)("follows a fee-only replacement for %s and verifies its final hash", async (kind) => {
+  const f = setup();
+  if (kind === "seal") await f.submit();
+  const method = kind === "append" ? f.archive.appendStoryRecord : f.archive.sealStory;
+  const original = method.getMockImplementation()!;
+  const hash = `0x${"ab".repeat(32)}`;
+  method.mockImplementation(async (...args: any[]) => {
+    const tx = await (original as any)(...args);
+    const receipt = { ...await tx.wait(), hash };
+    return { replaceableTransaction() { return this; }, ...tx, wait: vi.fn(async () => { throw {
+      code: "TRANSACTION_REPLACED", reason: "repriced", cancelled: false,
+      replacement: {hash, nonce: 1, chainId: 31337n, from: AUTHOR, to: ADDRESS, value: 0n,
+        data: iface.encodeFunctionData(kind === "append" ? "appendStoryRecord" : "sealStory", args.slice(0, kind === "append" ? 6 : 3))},
+      receipt,
+    }; }) };
+  });
+  const onSubmitted = vi.fn();
+  const onConfirmed = vi.fn();
+  const common = {signer: f.signer as any, contractAddress: ADDRESS, tokenId: "1", confirmTransactionPreview: f.confirm, onSubmitted, onConfirmed};
+  const result = kind === "append"
+    ? await addStoryRecordService({...common, recordIndex: 0, title: "", content: "Exact frozen record", expectedPayloadHash: ""})
+    : await sealStoryService(common);
+  expect(result.transactionHash).toBe(hash);
+  expect(result.receipt.hash).toBe(hash);
+  expect(onSubmitted.mock.calls.map(([value]) => value)).toEqual([kind === "append" ? "0xappend" : "0xseal", hash]);
+  expect(onConfirmed).toHaveBeenCalledWith(hash, expect.objectContaining({status: 1, hash}));
+});
+
+it.each(["append", "seal"] as const)("discovers a fee replacement through the real ethers %s contract response", async (kind) => {
+  const f = setup();
+  if (kind === "seal") await f.submit();
+  const method = kind === "append" ? f.archive.appendStoryRecord : f.archive.sealStory;
+  const original = method.getMockImplementation()!;
+  let tracked!: ReturnType<typeof contractFeeReplacement>;
+  method.mockImplementation(async (...args: any[]) => {
+    const tx = await (original as any)(...args);
+    tracked = contractFeeReplacement({
+      eventInterface: iface, receipt: await tx.wait(), from: AUTHOR, to: ADDRESS,
+      data: iface.encodeFunctionData(kind === "append" ? "appendStoryRecord" : "sealStory", args.slice(0, kind === "append" ? 6 : 3)),
+    });
+    return tracked.transaction as never;
+  });
+  const common = {signer: f.signer as any, contractAddress: ADDRESS, tokenId: "1", confirmTransactionPreview: f.confirm};
+  const result = kind === "append"
+    ? await addStoryRecordService({...common, recordIndex: 0, title: "", content: "Exact frozen record", expectedPayloadHash: ""})
+    : await sealStoryService(common);
+  expect(tracked.wasScanned()).toBe(true);
+  expect(result.transactionHash).toBe(tracked.transactionHash);
+  expect(result.receipt.hash).toBe(tracked.transactionHash);
+}, 1500);
+
+
+it.each(["append", "seal"] as const)("rejects a changed %s replacement without accepting or resending it", async (kind) => {
+  const f = setup();
+  if (kind === "seal") await f.submit();
+  const method = kind === "append" ? f.archive.appendStoryRecord : f.archive.sealStory;
+  const original = method.getMockImplementation()!;
+  method.mockClear();
+  method.mockImplementation(async (...args: any[]) => {
+    const tx = await (original as any)(...args);
+    return { replaceableTransaction() { return this; }, ...tx, wait: vi.fn(async () => { throw {
+      code: "TRANSACTION_REPLACED", reason: "repriced", cancelled: false,
+      replacement: {hash: "0xchanged", nonce: 1, chainId: 31337n, from: AUTHOR, to: ADDRESS, value: 0n, data: "0x"},
+      receipt: {...await tx.wait(), hash: "0xchanged"},
+    }; }) };
+  });
+  const onConfirmed = vi.fn();
+  const common = {signer: f.signer as any, contractAddress: ADDRESS, tokenId: "1", confirmTransactionPreview: f.confirm, onConfirmed};
+  const pending = kind === "append"
+    ? addStoryRecordService({...common, recordIndex: 0, title: "", content: "Exact frozen record", expectedPayloadHash: ""})
+    : sealStoryService(common);
+  const error = await pending.catch((error) => error);
+  expect(error.transactionConfirmed).not.toBe(true);
+  expect(error.transactionHash).toBe(kind === "append" ? "0xappend" : "0xseal");
+  expect(onConfirmed).not.toHaveBeenCalled();
+  expect(method).toHaveBeenCalledOnce();
+});
+
+it.each(["append", "seal"] as const)("rejects wallet cancellation of %s without accepting or resending it", async (kind) => {
+  const f = setup();
+  if (kind === "seal") await f.submit();
+  const method = kind === "append" ? f.archive.appendStoryRecord : f.archive.sealStory;
+  const original = method.getMockImplementation()!;
+  method.mockClear();
+  method.mockImplementation(async (...args: any[]) => {
+    const tx = await (original as any)(...args);
+    return { replaceableTransaction() { return this; }, ...tx, wait: vi.fn(async () => { throw {
+      code: "TRANSACTION_REPLACED", reason: "cancelled", cancelled: true,
+      replacement: { hash: "0xcancel", nonce: 1, chainId: 31337n, from: AUTHOR,
+        to: AUTHOR, value: 0n, data: "0x" },
+      receipt: {status: 1, hash: "0xcancel", blockNumber: 12, logs: []},
+    }; }) };
+  });
+  const onConfirmed = vi.fn();
+  const common = {signer: f.signer as any, contractAddress: ADDRESS, tokenId: "1",
+    confirmTransactionPreview: f.confirm, onConfirmed};
+  const pending = kind === "append"
+    ? addStoryRecordService({...common, recordIndex: 0, title: "", content: "Exact frozen record", expectedPayloadHash: ""})
+    : sealStoryService(common);
+  await expect(pending).rejects.toMatchObject({
+    code: "TRANSACTION_REPLACEMENT_CANCELLED",
+    transactionHash: kind === "append" ? "0xappend" : "0xseal",
+  });
+  expect(onConfirmed).not.toHaveBeenCalled();
+  expect(method).toHaveBeenCalledOnce();
+});
+
+it.each(["append", "seal"] as const)("rejects a different nonce in an otherwise exact %s replacement", async (kind) => {
+  const f = setup();
+  if (kind === "seal") await f.submit();
+  const method = kind === "append" ? f.archive.appendStoryRecord : f.archive.sealStory;
+  const original = method.getMockImplementation()!;
+  method.mockClear();
+  method.mockImplementation(async (...args: any[]) => {
+    const tx = await (original as any)(...args);
+    return { replaceableTransaction() { return this; }, ...tx, wait: vi.fn(async () => { throw {
+      code: "TRANSACTION_REPLACED", reason: "repriced", cancelled: false,
+      replacement: {hash: "0xnonce", nonce: 2, chainId: 31337n, from: AUTHOR, to: ADDRESS, value: 0n,
+        data: iface.encodeFunctionData(kind === "append" ? "appendStoryRecord" : "sealStory", args.slice(0, kind === "append" ? 6 : 3))},
+      receipt: {...await tx.wait(), hash: "0xnonce"},
+    }; }) };
+  });
+  const onConfirmed = vi.fn();
+  const common = {signer: f.signer as any, contractAddress: ADDRESS, tokenId: "1",
+    confirmTransactionPreview: f.confirm, onConfirmed};
+  const pending = kind === "append"
+    ? addStoryRecordService({...common, recordIndex: 0, title: "", content: "Exact frozen record", expectedPayloadHash: ""})
+    : sealStoryService(common);
+  await expect(pending).rejects.toMatchObject({
+    code: "TRANSACTION_REPLACEMENT_MISMATCH",
+    transactionHash: kind === "append" ? "0xappend" : "0xseal",
+  });
+  expect(onConfirmed).not.toHaveBeenCalled();
+  expect(method).toHaveBeenCalledOnce();
 });

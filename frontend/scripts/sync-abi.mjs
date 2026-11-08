@@ -74,6 +74,7 @@ export async function main() {
     "DeepFamily",
     "DeepFamilyArchive",
     "DeepFamilyReader",
+    "DeepFamilyToken",
     "DeepFamilyLineageIndex",
     "ShieldedErc20Pool",
     "ShieldedNativePool",

@@ -1,5 +1,5 @@
+import type { TransactionErrorContext } from "@deepfamily/chain-client";
 import type { TFunction } from "i18next";
-import type { FriendlyError } from "../../../../../shared/lib/errors";
 import type { PersonData, ProofEnvelope } from "../../../../../shared/zk/zk";
 import type {
   AddVersionPublicSignals,
@@ -67,21 +67,6 @@ export interface AddVersionFlowArgs {
   metadataEnvelope: Uint8Array;
 }
 
-export type AddVersionFlowStep = "idle" | "validating" | "confirming" | "success" | "error";
-
-export type AddVersionFlowState =
-  | { step: "idle"; result?: undefined; error?: undefined }
-  | { step: "validating"; result?: undefined; error?: undefined }
-  | { step: "confirming"; result?: undefined; error?: undefined }
-  | { step: "success"; result: AddVersionResult; error?: undefined }
-  | { step: "error"; result?: undefined; error: FriendlyError };
-
-export type AddVersionFlowAction =
-  | { type: "reset" }
-  | { type: "stage"; step: Extract<AddVersionFlowStep, "validating" | "confirming"> }
-  | { type: "success"; result: AddVersionResult }
-  | { type: "error"; error: FriendlyError };
-
 export interface AddVersionSuccessResultView {
   hash: string;
   index: number;
@@ -91,12 +76,9 @@ export interface AddVersionSuccessResultView {
   events: AddVersionResult["events"];
 }
 
-export interface AddVersionErrorResultView {
+export interface AddVersionErrorResultView extends TransactionErrorContext {
   type: string;
   message: string;
   details: string;
   retryable?: boolean;
-  transactionHash?: string;
-  transactionConfirmed?: boolean;
-  verificationFailure?: "read" | "mismatch";
 }

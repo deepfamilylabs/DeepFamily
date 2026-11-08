@@ -1,3 +1,5 @@
+import { simulateChainCall } from "./lib/chainSimulation.mjs";
+import { runChainRead } from "@deepfamily/chain-client";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { formatEther } from "ethers";
@@ -154,15 +156,14 @@ const assertConfiguredSafeAddress = (configuredAddress, predictedAddress) => {
 };
 
 const simulateFactoryCreation = async ({ ethers, provider, expectedDeployer, preparedSafe }) => {
-  let result;
-  try {
-    result = await provider.call({
+  const result = await simulateChainCall({
+    label: "Canonical Safe factory simulation failed",
+    formatError: publicSafeCreatorError,
+    read: () => provider.call({
       from: expectedDeployer,
       ...preparedSafe.deploymentTransaction,
-    });
-  } catch (error) {
-    throw new Error(`Canonical Safe factory simulation failed: ${publicSafeCreatorError(error)}`);
-  }
+    }),
+  });
   const factoryInterface = createCanonicalSafeProxyFactoryInterface(MAINNET_CHAIN_ID);
   let simulatedAddress;
   try {
@@ -355,10 +356,16 @@ const assertCompletedCheckpointShape = (checkpoint) => {
 
 const inspectDeploymentEvidence = async ({ provider, checkpoint, intent }) => {
   const entry = checkpoint.transactions[TRANSACTION_LABEL];
-  const [transaction, receipt] = await Promise.all([
-    provider.getTransaction(entry.hash),
-    provider.getTransactionReceipt(entry.hash),
-  ]);
+  const [transaction, receipt] = await runChainRead({
+    read: () => Promise.all([
+      provider.getTransaction(entry.hash),
+      provider.getTransactionReceipt(entry.hash),
+    ]),
+    transactionHash: entry.hash,
+    ...(Number(entry.receipt?.status) === 1
+      ? { transactionConfirmed: true, verificationFailure: "read" }
+      : {}),
+  });
   return assertCanonicalSafeDeploymentReceipt({
     receipt,
     transaction,

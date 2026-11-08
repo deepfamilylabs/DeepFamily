@@ -4,6 +4,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { ethers } from "ethers";
+import { executeChainTransaction, waitForTransactionHashReceipt, runChainRead, readConfirmedDetails, normalizeChainError, getChainErrorDetails } from "@deepfamily/chain-client";
 
 import {
   GAS_CHARGING_CONFLUX_THREE_QUARTER,
@@ -258,38 +259,72 @@ const assertTransactionMatchesPlan = ({ transaction, planned, signerAddress, lab
   }
 };
 
+const checkpointReadContext = (entry) => ({
+  transactionHash: entry.hash,
+  ...(Number(entry.receipt?.status) === 1
+    ? { transactionConfirmed: true, verificationFailure: "read" }
+    : {}),
+});
+
 const canonicalReceipt = async ({ provider, entry, confirmations, timeoutMs, label }) => {
-  let receipt = await provider.getTransactionReceipt(entry.hash);
+  let receipt = await runChainRead({
+    read: () => provider.getTransactionReceipt(entry.hash), ...checkpointReadContext(entry), label,
+  });
   if (!receipt) {
-    receipt = await provider.waitForTransaction(entry.hash, confirmations, timeoutMs);
+    ({ receipt } = await waitForTransactionHashReceipt({
+      provider, transactionHash: entry.hash, confirmations, timeoutMs, requireSuccess: false, label,
+    }));
   } else if (confirmations > 1) {
-    const latest = await provider.getBlockNumber();
+    const latest = await runChainRead({
+      read: () => provider.getBlockNumber(), transactionHash: entry.hash, label,
+      ...(Number(receipt.status) === 1 ? { transactionConfirmed: true, verificationFailure: "read" } : {}),
+    });
     const observed = latest - Number(receipt.blockNumber) + 1;
     if (observed < confirmations) {
-      receipt = await provider.waitForTransaction(entry.hash, confirmations, timeoutMs);
+      try {
+        ({ receipt } = await waitForTransactionHashReceipt({
+          provider, transactionHash: entry.hash, confirmations, timeoutMs, requireSuccess: false, label,
+        }));
+      } catch (error) {
+        if (Number(receipt.status) === 1 && getChainErrorDetails(error).category === "network") {
+          throw normalizeChainError(error, { transactionConfirmed: true, verificationFailure: "read" });
+        }
+        throw error;
+      }
     }
   }
   if (!receipt) throw new Error(`${label} transaction was not confirmed before the timeout`);
-  if (Number(receipt.status) !== 1) throw new Error(`${label} transaction reverted`);
+  if (Number(receipt.status) !== 1) throw normalizeChainError(
+    Object.assign(new Error(`${label} transaction reverted`), { code: "CALL_EXCEPTION", receipt }),
+    { operation: "confirm", transactionHash: entry.hash, label },
+  );
   if (entry.receipt) {
     if (
       Number(entry.receipt.blockNumber) !== Number(receipt.blockNumber) ||
       String(entry.receipt.blockHash).toLowerCase() !== String(receipt.blockHash).toLowerCase()
     ) {
-      throw new Error(`${label} confirmed receipt changed; refusing to continue after a reorg`);
+      throw normalizeChainError(new Error(`${label} confirmed receipt changed; refusing to continue after a reorg`), {
+        transactionHash: entry.hash, category: "verification", operation: "verify",
+      });
     }
   }
   if (entry.kind === "deployment") {
     if (!receipt.contractAddress || !sameAddress(receipt.contractAddress, entry.predictedAddress)) {
-      throw new Error(`${label} deployed at an address different from its checkpoint prediction`);
+      throw normalizeChainError(new Error(`${label} deployed at an address different from its checkpoint prediction`), {
+        transactionHash: entry.hash, category: "verification", operation: "verify",
+      });
     }
-    if ((await provider.getCode(receipt.contractAddress)) === "0x") {
-      throw new Error(`${label} has no runtime code at ${receipt.contractAddress}`);
+    if ((await readConfirmedDetails(entry.hash, () => provider.getCode(receipt.contractAddress))) === "0x") {
+      throw normalizeChainError(new Error(`${label} has no runtime code at ${receipt.contractAddress}`), {
+        transactionHash: entry.hash, category: "verification", operation: "verify",
+      });
     }
   }
-  const block = await provider.getBlock(receipt.blockNumber);
+  const block = await readConfirmedDetails(entry.hash, () => provider.getBlock(receipt.blockNumber));
   if (!block || String(block.hash).toLowerCase() !== String(receipt.blockHash).toLowerCase()) {
-    throw new Error(`${label} receipt is not in the canonical block at its recorded height`);
+    throw normalizeChainError(new Error(`${label} receipt is not in the canonical block at its recorded height`), {
+      transactionHash: entry.hash, category: "verification", operation: "verify",
+    });
   }
   return receipt;
 };
@@ -564,7 +599,7 @@ export const createCheckpointedTransactionExecutor = ({
         gasLimit = BigInt(transactionRequest.gasLimit);
       } else {
         const { gasLimit: _populatedGasLimit, ...requestToEstimate } = populatedBySigner;
-        const estimatedGas = BigInt(await signer.estimateGas(requestToEstimate));
+        const estimatedGas = BigInt(await runChainRead({ read: () => signer.estimateGas(requestToEstimate), operation: "estimate", label }));
         gasLimit = (estimatedGas * 130n + 99n) / 100n;
       }
       let feeFields;
@@ -664,7 +699,7 @@ export const createCheckpointedTransactionExecutor = ({
       });
       const recoveredHash = recoveryTransactions[label];
       if (recoveredHash) {
-        const recoveredTransaction = await provider.getTransaction(recoveredHash);
+        const recoveredTransaction = await runChainRead({ read: () => provider.getTransaction(recoveredHash), transactionHash: recoveredHash, label });
         assertTransactionMatchesPlan({
           transaction: recoveredTransaction,
           planned: entry,
@@ -700,14 +735,22 @@ export const createCheckpointedTransactionExecutor = ({
           budgetEnvironmentName,
           nativeSymbol,
         });
-        const response = await signer.sendTransaction(hydrateRequest(entry.request));
-        if (Number(response.nonce) !== entry.request.nonce) {
-          throw new Error(`${label} was broadcast with an unexpected nonce`);
-        }
-        entry.hash = response.hash;
-        entry.status = "submitted";
-        entry.submittedAt = nowIso();
-        await saveCheckpoint();
+        await executeChainTransaction({
+          provider,
+          send: () => signer.sendTransaction(hydrateRequest(entry.request)),
+          replacementPolicy: "reject",
+          confirmations: transactionConfirmations,
+          timeoutMs: transactionTimeoutMs,
+          label,
+          onTransactionSubmitted: async (response) => {
+            if (Number(response.nonce) !== entry.request.nonce)
+              throw new Error(`${label} was broadcast with an unexpected nonce`);
+            entry.hash = response.hash;
+            entry.status = "submitted";
+            entry.submittedAt = nowIso();
+            await saveCheckpoint();
+          },
+        });
       }
     }
 
@@ -718,7 +761,9 @@ export const createCheckpointedTransactionExecutor = ({
     ) {
       throw new Error(`${label} checkpoint has unsupported status ${entry.status}`);
     }
-    const transaction = await provider.getTransaction(entry.hash);
+    const transaction = await runChainRead({
+      read: () => provider.getTransaction(entry.hash), ...checkpointReadContext(entry), label,
+    });
     assertCheckpointReservations({
       checkpoint,
       maxCostWei: releaseCostCap,
@@ -775,7 +820,9 @@ export const revalidateCheckpointTransactions = async ({
   const canonicalCosts = new Map();
   for (const [label, entry] of Object.entries(checkpoint.transactions ?? {})) {
     if (!entry.hash) continue;
-    const transaction = await provider.getTransaction(entry.hash);
+    const transaction = await runChainRead({
+      read: () => provider.getTransaction(entry.hash), ...checkpointReadContext(entry), label,
+    });
     assertTransactionMatchesPlan({
       transaction,
       planned: entry,

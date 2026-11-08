@@ -1,4 +1,5 @@
 import { resolveGovernedTarget } from "./timelockUpgrade.mjs";
+import { simulateChainCall } from "../../scripts/lib/chainSimulation.mjs";
 
 const FORBIDDEN_GOVERNANCE_SIGNATURES = [
   "upgradeToAndCall(address,bytes)",
@@ -160,15 +161,13 @@ export const simulateGovernanceCall = async ({
   timelockAddress,
   calldata,
 }) => {
-  try {
-    await ethers.provider.call({
+  await simulateChainCall({
+    label: "governance call simulation reverted",
+    read: () => ethers.provider.call({
       to: targetAddress,
       from: timelockAddress,
       data: calldata,
       value: 0n,
-    });
-  } catch (error) {
-    const detail = error.shortMessage || error.reason || error.message;
-    throw new Error(`governance call simulation reverted: ${detail}`);
-  }
+    }),
+  });
 };

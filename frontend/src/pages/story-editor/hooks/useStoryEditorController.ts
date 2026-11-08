@@ -1,3 +1,4 @@
+import { getTransactionErrorContext } from "@deepfamily/chain-client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
@@ -452,7 +453,7 @@ export function useStoryEditorController() {
           );
         }
       } catch (error: any) {
-        if (error?.transactionConfirmed === true && mounted.current && accessRef.current.scope === accessScope) {
+        if (getTransactionErrorContext(error).transactionConfirmed === true && mounted.current && accessRef.current.scope === accessScope) {
           if (validTokenId) {
             scopedQueryClient.clear(storyKey(validTokenId));
             scopedQueryClient.clear(`${storyKey(validTokenId)}:meta`);
@@ -519,7 +520,7 @@ export function useStoryEditorController() {
           );
         }
       } catch (error: any) {
-        if (error?.transactionConfirmed === true && mounted.current && accessRef.current.scope === accessScope) {
+        if (getTransactionErrorContext(error).transactionConfirmed === true && mounted.current && accessRef.current.scope === accessScope) {
           if (validTokenId) {
             scopedQueryClient.clear(storyKey(validTokenId));
             scopedQueryClient.clear(`${storyKey(validTokenId)}:meta`);

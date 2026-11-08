@@ -115,6 +115,7 @@ describe("Historical seed signer", function () {
 
     const minted = await seedHelpers.mintPersonVersionNFT({
       deepFamily,
+      archive,
       signer,
       personHash: added.personHash,
       versionIndex: 1,

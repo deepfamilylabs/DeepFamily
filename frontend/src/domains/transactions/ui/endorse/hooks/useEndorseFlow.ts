@@ -1,11 +1,11 @@
-import { useCallback } from "react";
+import { useCallback, useMemo, useRef } from "react";
 import { useTranslation } from "react-i18next";
-import { useWallet } from "../../../../wallet";
+import { getWalletConnectionGeneration, useWallet } from "../../../../wallet";
 import { useConfig } from "../../../../config";
 import { createDeepFamilyContract } from "../../../../../shared/clients/contractFactory";
 import { getFriendlyError, type FriendlyError } from "../../../../../shared/lib/errors";
 import { useTxFlow, type TxFlowRunner } from "../../../hooks/useTxFlow";
-import { waitForExactTransactionReceipt } from "../../../api/exactTransactionReceipt";
+import { assertChainWalletScope, executeChainTransaction } from "@deepfamily/chain-client";
 import { executeEndorseFlow } from "../../../services/endorseService";
 import type {
   EndorseFeeQuote,
@@ -18,8 +18,11 @@ export type { EndorseFeeQuote, EndorseFlowArgs, ExecuteEndorseFlowResult, Endors
 
 export function useEndorseFlow() {
   const { signer, address } = useWallet();
-  const { contractAddress } = useConfig();
+  const { contractAddress, chainId } = useConfig();
   const { t } = useTranslation();
+  const scope = useMemo(() => ({ signer, address, contractAddress, chainId }), [signer, address, contractAddress, chainId]);
+  const latestScope = useRef(scope);
+  latestScope.current = scope;
 
   const runner: TxFlowRunner<ExecuteEndorseFlowResult, [EndorseFlowArgs]> = useCallback(
     async (update, args) => {
@@ -28,32 +31,42 @@ export function useEndorseFlow() {
       }
 
       const contract = createDeepFamilyContract(contractAddress, signer);
+      const generation = getWalletConnectionGeneration();
       const assertActive = () => {
         if (!update.isCurrent()) {
           throw Object.assign(new Error("Endorsement cancelled before wallet request"), {
             code: "ENDORSEMENT_CANCELLED",
           });
         }
+        if (latestScope.current !== scope || generation !== getWalletConnectionGeneration()) {
+          throw Object.assign(new Error("The wallet, account or network changed before endorsement submission"), {
+            code: "CHAIN_WALLET_SCOPE_CHANGED",
+            reason: "CHAIN_WALLET_SCOPE_CHANGED",
+          });
+        }
       };
+      const assertWalletScope = () => assertChainWalletScope({ signer, chainId, account: address, assertActive });
+      await assertWalletScope();
 
       const endorseVersion = async (
         personHash: string,
         versionIndex: number,
         overrides?: Record<string, unknown>,
       ) => {
-        assertActive();
-        const tx =
-          overrides && Object.keys(overrides).length > 0
-            ? await contract.endorseVersion(personHash, versionIndex, overrides)
-            : await contract.endorseVersion(personHash, versionIndex);
-        // Past the point of no return: the transaction is away, so this run
-        // carries on to the receipt whether or not anyone is still watching.
-        if (update.isCurrent()) {
-          update("confirming", t("transaction.submitted", "Transaction submitted..."));
-        }
-        const { receipt } = await waitForExactTransactionReceipt({
-          transaction: tx,
+        const { receipt } = await executeChainTransaction({
+          provider: signer.provider,
+          assertActive,
+          beforeSend: assertWalletScope,
+          send: () => overrides && Object.keys(overrides).length > 0
+            ? contract.endorseVersion(personHash, versionIndex, overrides)
+            : contract.endorseVersion(personHash, versionIndex),
+          onSubmitted: (hash) => {
+            update.submitted(hash);
+            if (update.isCurrent()) update("confirming", t("transaction.submitted", "Transaction submitted..."));
+          },
+          onConfirmed: update.confirmed,
           expected: {
+            chainId,
             from: address,
             to: contractAddress,
             data: contract.interface?.encodeFunctionData("endorseVersion", [
@@ -69,6 +82,7 @@ export function useEndorseFlow() {
       return await executeEndorseFlow({
         contract,
         signer,
+        chainId,
         address,
         personHash: args.personHash,
         versionIndex: args.versionIndex,
@@ -76,6 +90,8 @@ export function useEndorseFlow() {
         deepTokenAddress: args.deepTokenAddress,
         quotedFee: args.quotedFee,
         assertActive,
+        onSubmitted: update.submitted,
+        onApprovalConfirmed: update.confirmed,
         onFeeQuoteChange: (quote) => {
           if (update.isCurrent()) args.onFeeQuoteChange?.(quote);
         },
@@ -98,7 +114,7 @@ export function useEndorseFlow() {
         },
       });
     },
-    [address, contractAddress, signer, t],
+    [address, chainId, contractAddress, scope, signer, t],
   );
 
   return useTxFlow<ExecuteEndorseFlowResult, [EndorseFlowArgs], FriendlyError>(runner, {

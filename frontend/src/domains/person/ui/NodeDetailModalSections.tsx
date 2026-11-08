@@ -29,16 +29,7 @@ import {
 
 type NodeDetailT = TFunction;
 
-export interface TrustedEndorserAccess {
-  connectedAddress?: string | null;
-  loadTrustedEndorsers: (personHash: string, versionIndex: number) => Promise<string[]>;
-  addTrustedEndorser: (personHash: string, versionIndex: number, account: string) => Promise<void>;
-  removeTrustedEndorser: (
-    personHash: string,
-    versionIndex: number,
-    account: string,
-  ) => Promise<void>;
-}
+import type { TrustedEndorserAccess } from "../model/trustedEndorserTypes";
 
 function SmartHash({ text }: { text?: string | null }) {
   if (!text || text === ethers.ZeroHash) return <span>-</span>;

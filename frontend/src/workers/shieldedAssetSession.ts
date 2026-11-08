@@ -103,7 +103,8 @@ import {
 } from "../domains/inheritance/services/shieldedAssetRegistry";
 import { createIdentityAuthorizationContract, loadShieldedIdentityAuthorizationWitnessForMode } from "../domains/inheritance/services/shieldedIdentityAuthorizationChain";
 
-import { createPrivateLetterContract, readPrivateLetters } from "../domains/inheritance/services/privateLetterChain";
+import { createPrivateLetterContract } from "../shared/clients/privateLetterClient";
+import { readPrivateLetters } from "../domains/inheritance/services/privateLetterChain";
 import { proveShieldedReceivePresentation } from "../shared/zk/shieldedReceivePresentation";
 import {
   ShieldedProofConfigurationError,

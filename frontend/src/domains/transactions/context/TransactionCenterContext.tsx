@@ -8,7 +8,7 @@ export type TransactionKind = "addVersion" | "endorse" | "mint" | "shielded";
 export type ShieldedSubmissionContext = {
   chainId: string;
   poolAddress: string;
-  kind: "action" | "approval";
+  kind: "action" | "approval" | "authorization";
   nonce?: number;
   signerAddress?: string;
   fromBlock?: number;

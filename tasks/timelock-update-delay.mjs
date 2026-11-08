@@ -1,3 +1,4 @@
+import { simulateChainCall } from "../scripts/lib/chainSimulation.mjs";
 /**
  * Usage (new delay is expressed in seconds):
  *   npx hardhat --config hardhat.config.mjs timelock-update-delay --network confluxTestnet \
@@ -172,17 +173,15 @@ export const action = async (args, hre) => {
       );
     }
 
-    try {
-      await ethers.provider.call({
+    await simulateChainCall({
+      label: "timelock self-call simulation reverted",
+      read: () => ethers.provider.call({
         to: timelockAddress,
         from: timelockAddress,
         data: payload,
         value,
-      });
-    } catch (error) {
-      const detail = error.shortMessage || error.reason || error.message;
-      throw new Error(`timelock self-call simulation reverted: ${detail}`);
-    }
+      }),
+    });
 
     const proposerRole = await timelock.PROPOSER_ROLE();
     const result = await sendOrPrint({

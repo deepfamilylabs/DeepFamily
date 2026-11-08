@@ -1,3 +1,5 @@
+import { simulateChainCall } from "../scripts/lib/chainSimulation.mjs";
+import { instrumentChainContract } from "@deepfamily/chain-client";
 /**
  * Usage (repeat the same arguments with --phase execute after the delay):
  *   npx hardhat --config hardhat.config.mjs timelock-migrate-owner \
@@ -131,10 +133,10 @@ export const resolveOwnerMigrationOperation = async ({ hre, connection, ethers, 
   const tokenAddress = ethers.getAddress(
     await readDeploymentAddress(connection, "DeepFamilyToken"),
   );
-  const deepFamily = await ethers.getContractAt(deepFamilyContractName, deepFamilyAddress);
-  const token = await ethers.getContractAt(tokenContractName, tokenAddress);
-  const oldTimelock = await ethers.getContractAt(oldContractName, oldTimelockAddress);
-  const newTimelock = await ethers.getContractAt(newContractName, newTimelockAddress);
+  const deepFamily = instrumentChainContract(await ethers.getContractAt(deepFamilyContractName, deepFamilyAddress));
+  const token = instrumentChainContract(await ethers.getContractAt(tokenContractName, tokenAddress));
+  const oldTimelock = instrumentChainContract(await ethers.getContractAt(oldContractName, oldTimelockAddress));
+  const newTimelock = instrumentChainContract(await ethers.getContractAt(newContractName, newTimelockAddress));
 
   const deepFamilyImplementation = await assertProxy(ethers, deepFamilyAddress);
   await assertImplementationMatchesArtifact({
@@ -418,17 +420,15 @@ export const action = async (args, hre) => {
       "DeepFamily ownership transfer",
       "DEEP treasury sweep",
     ].entries()) {
-      try {
-        await ethers.provider.call({
+      await simulateChainCall({
+        label: `${label} simulation failed`,
+        read: () => ethers.provider.call({
           to: targets[index],
           from: oldTimelockAddress,
           data: payloads[index],
           value: values[index],
-        });
-      } catch (error) {
-        const detail = error.shortMessage || error.reason || error.message;
-        throw new Error(`${label} simulation failed: ${detail}`);
-      }
+        }),
+      });
     }
 
     const proposerRole = await oldTimelock.PROPOSER_ROLE();

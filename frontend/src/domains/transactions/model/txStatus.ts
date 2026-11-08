@@ -16,15 +16,20 @@ export type TxFlowStatus =
   | "success"
   | "error";
 
-export type TxFlowState<TResult = unknown, TError = TxFlowError> = {
-  status: TxFlowStatus;
-  /** Human-readable description of the current step, suitable for UI display. */
-  stepMessage: string | null;
-  error: TError | null;
-  txHash: string | null;
-  receipt: unknown | null;
-  result: TResult | null;
-};
+export type TxFlowProgressStatus = Exclude<TxFlowStatus, "idle" | "success" | "error">;
+
+export type TransactionTracking =
+  | { state: "none" }
+  | { state: "submitted"; transactionHash: string }
+  | { state: "confirmed"; transactionHash: string; receipt?: import("@deepfamily/chain-client").TransactionReceiptLike };
+
+type TxFlowCommon = { stepMessage: string | null; tracking: TransactionTracking };
+
+export type TxFlowState<TResult = unknown, TError = TxFlowError> = TxFlowCommon & (
+  | { status: "idle" | TxFlowProgressStatus; error: null; result: null }
+  | { status: "success"; error: null; result: TResult }
+  | { status: "error"; error: TError; result: null }
+);
 
 export type TxFlowActions<TArgs extends unknown[] = unknown[], TResult = unknown> = {
   /** Reset the flow to idle state. */
@@ -45,3 +50,7 @@ export type TxFlowError = {
   /** Decoded revert reason, if available. */
   reason?: string;
 };
+
+export function trackedTransactionHash(tracking: TransactionTracking | undefined): string | undefined {
+  return tracking && tracking.state !== "none" ? tracking.transactionHash : undefined;
+}

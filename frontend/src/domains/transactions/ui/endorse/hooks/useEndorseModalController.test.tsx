@@ -28,7 +28,7 @@ const mocks = vi.hoisted(() => ({
   gateway: { listVersionEndorsements: vi.fn(), listPersonVersionsPage: vi.fn() },
   tree: { bumpEndorsementCount: vi.fn(), invalidateByTx: vi.fn(), getOwnerOf: vi.fn() },
 }));
-vi.mock("../../../../wallet", () => ({ useWallet: () => mocks.wallet }));
+vi.mock("../../../../wallet", () => ({ useWallet: () => mocks.wallet, getWalletConnectionGeneration: () => 0 }));
 vi.mock("../../../../config", () => ({ useConfig: () => mocks.config }));
 vi.mock("../../../../person", () => ({ usePersonGateway: () => mocks.gateway }));
 vi.mock("../../../../tree", () => ({
@@ -56,7 +56,7 @@ function defer<T>() {
 function fixture(proxy = oldProxy, tokenAddress = oldToken) {
   const receipt = { status: 1, hash: `0x${"fe".repeat(32)}`, blockNumber: 20, logs: [] };
   const send = Object.assign(
-    vi.fn(async () => ({ hash: receipt.hash, wait: vi.fn(async () => receipt) })),
+    vi.fn(async () => ({ replaceableTransaction() { return this; }, hash: receipt.hash, wait: vi.fn(async () => receipt) })),
     { estimateGas: vi.fn(async () => 100n) },
   );
   const contract = {
@@ -71,7 +71,7 @@ function fixture(proxy = oldProxy, tokenAddress = oldToken) {
     recentReward: vi.fn(async () => 1n),
     balanceOf: vi.fn(async () => 100n),
     allowance: vi.fn(async () => 100n),
-    approve: vi.fn(async () => ({ hash: "0xapprove", wait: vi.fn(async () => ({ status: 1 })) })),
+    approve: vi.fn(async () => ({ replaceableTransaction() { return this; }, hash: "0xapprove", wait: vi.fn(async () => ({ status: 1, hash: "0xapprove" })) })),
     decimals: vi.fn(async () => 18),
     symbol: vi.fn(async () => "DEEP"),
   };
@@ -99,7 +99,7 @@ describe("endorsement cancellation and public receipt settlement", () => {
     mocks.config.contractAddress = oldProxy;
     mocks.config.readerAddress = "0x0000000000000000000000000000000000000def";
     mocks.wallet.address = walletAddress;
-    mocks.wallet.signer = { id: "old signer" };
+    mocks.wallet.signer = { id: "old signer", getAddress: async () => walletAddress, provider: { getBlockNumber: vi.fn(async () => 19), getNetwork: async () => ({ chainId: 31337n }) } };
     mocks.contracts.clear();
     mocks.tokens.clear();
     vi.clearAllMocks();
@@ -174,7 +174,7 @@ describe("endorsement cancellation and public receipt settlement", () => {
     const f = fixture();
     const gate = defer<any>();
     const waitForReceipt = vi.fn(() => gate.promise);
-    f.send.mockResolvedValue({ hash: f.receipt.hash, wait: waitForReceipt });
+    f.send.mockResolvedValue({ replaceableTransaction() { return this; }, hash: f.receipt.hash, wait: waitForReceipt });
     let latest!: ReturnType<typeof controller>;
     function Modal() {
       latest = controller();
@@ -210,7 +210,7 @@ describe("endorsement cancellation and public receipt settlement", () => {
     const f = fixture();
     const gate = defer<any>();
     const waitForReceipt = vi.fn(() => gate.promise);
-    f.send.mockResolvedValue({ hash: f.receipt.hash, wait: waitForReceipt });
+    f.send.mockResolvedValue({ replaceableTransaction() { return this; }, hash: f.receipt.hash, wait: waitForReceipt });
     const h = renderHook(controller, { wrapper });
     await vi.waitFor(() => expect(h.result.current.footer.isTargetValidOnChain).toBe(true));
     act(() => h.result.current.footer.onEndorse());
@@ -237,7 +237,7 @@ describe("endorsement cancellation and public receipt settlement", () => {
     const oldReceipt = defer<any>();
     const nextEstimate = defer<bigint>();
     const waitForReceipt = vi.fn(() => oldReceipt.promise);
-    f.send.mockResolvedValue({ hash: f.receipt.hash, wait: waitForReceipt });
+    f.send.mockResolvedValue({ replaceableTransaction() { return this; }, hash: f.receipt.hash, wait: waitForReceipt });
     const h = renderHook(controller, { wrapper });
     await vi.waitFor(() => expect(h.result.current.footer.isTargetValidOnChain).toBe(true));
     act(() => h.result.current.footer.onEndorse());

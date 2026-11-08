@@ -77,7 +77,9 @@ export function useMintNftFlow(options: UseMintNftFlowOptions = {}) {
           // Past the point of no return: the transaction is away, so an
           // abandoned run must carry on to the receipt and the readback rather
           // than abort here and leave a mint nobody verified.
+          onConfirmed: update.confirmed,
           onSubmitted: (transactionHash) => {
+            update.submitted(transactionHash);
             args.onTransactionSubmitted?.(transactionHash);
             if (update.isCurrent()) {
               update("confirming", t("mintNFT.waitingConfirmation", "Waiting for confirmation..."));

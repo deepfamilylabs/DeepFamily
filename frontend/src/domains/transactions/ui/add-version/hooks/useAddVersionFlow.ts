@@ -8,7 +8,7 @@ import { isDevMode } from "../../../../../shared/config/env";
 import { getFriendlyError, type FriendlyError } from "../../../../../shared/lib/errors";
 import { useTxFlow, type TxFlowRunner } from "../../../hooks/useTxFlow";
 import { executeAddVersionFlow } from "../../../services/addVersionService";
-import { withConfirmedTransaction } from "../../../services/confirmedTransactionError";
+import { getTransactionErrorContext, withConfirmedTransaction } from "@deepfamily/chain-client";
 import type { AddVersionFlowArgs, AddVersionResult } from "../model/addVersionTypes";
 import type { AddVersionTransactionPreview } from "../model/addVersionTypes";
 import {
@@ -126,7 +126,9 @@ export function useAddVersionFlow(options: UseAddVersionFlowOptions = {}) {
             // account RPC is pending, immediately before the send boundary.
             assertActiveRequest();
           },
+          onTransactionConfirmed: update.confirmed,
           onTransactionSubmitted: (transactionHash) => {
+            update.submitted(transactionHash);
             // Recorded even for an abandoned run: the transaction is already on
             // its way, and only this hash lets the next attempt reconcile it
             // instead of sending a second one.
@@ -163,7 +165,7 @@ export function useAddVersionFlow(options: UseAddVersionFlowOptions = {}) {
         // A settled outcome, however bad, leaves nothing to reconcile.
         if (
           (error as any)?.transactionReconciliationFinal === true ||
-          (error as any)?.transactionConfirmed === true ||
+          getTransactionErrorContext(error).transactionConfirmed === true ||
           (error as any)?.code === ADD_VERSION_SCOPE_CHANGED
         ) {
           submittedTransactionsRef.current.delete(args);

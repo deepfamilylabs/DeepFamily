@@ -1,3 +1,4 @@
+import { instrumentChainContract } from "@deepfamily/chain-client";
 import { assertGovernanceMultisigWithProfile } from "../../scripts/lib/governanceSafety.mjs";
 import { DEFAULT_TIMELOCK_ARTIFACT, parseArtifactName } from "./timelockArtifacts.mjs";
 import { readExactTimelockRoleState } from "./timelockMultisigMigration.mjs";
@@ -130,7 +131,7 @@ export const resolveTreasury = async ({ hre, connection, ethers, args }) => {
     implementation: tokenAddress,
     spec: { needsLibraries: false },
   });
-  const token = await ethers.getContractAt(tokenContractName, tokenAddress);
+  const token = instrumentChainContract(await ethers.getContractAt(tokenContractName, tokenAddress));
   const [configuredToken, configuredMain, tokenOwner, decimals, symbol] = await Promise.all([
     deepFamily.DEEP_FAMILY_TOKEN_CONTRACT(),
     token.deepFamilyContract(),

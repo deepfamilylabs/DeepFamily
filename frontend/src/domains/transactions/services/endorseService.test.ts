@@ -16,6 +16,11 @@ vi.mock("../../../shared/clients/contractFactory", async () => {
   };
 });
 
+const scopeSigner = (account: string) => ({
+  getAddress: async () => account,
+  provider: { getBlockNumber: async () => 12, getNetwork: async () => ({ chainId: 31337n }) },
+}) as any;
+
 describe("endorseService executeEndorseFlow", () => {
   beforeEach(() => {
     createDeepTokenContractMock.mockReset();
@@ -29,7 +34,8 @@ describe("endorseService executeEndorseFlow", () => {
 
     const result = await executeEndorseFlow({
       contract,
-      signer: {} as any,
+      signer: scopeSigner("0x00000000000000000000000000000000000000aa"),
+      chainId: 31337,
       address: "0x00000000000000000000000000000000000000aa",
       personHash: "0x00000000000000000000000000000000000000000000000000000000000000bb",
       versionIndex: 3,
@@ -45,7 +51,7 @@ describe("endorseService executeEndorseFlow", () => {
       recentReward: vi.fn(async () => 10n),
       balanceOf: vi.fn(async () => 100n),
       allowance: vi.fn(async () => 0n),
-      approve: vi.fn(async () => ({
+      approve: vi.fn(async () => ({ replaceableTransaction() { return this; },
         hash: "0xapprove",
         wait: vi.fn(async () => ({ status: 1, hash: "0xapprove" })),
       })),
@@ -65,7 +71,7 @@ describe("endorseService executeEndorseFlow", () => {
       getAddress: vi.fn(async () => contractAddress),
       endorseVersion: endorseMethod,
       runner: {
-        provider: {
+        provider: { getBlockNumber: async () => 12,
           getNetwork: vi.fn(async () => ({ chainId: 31337n })),
         },
       },
@@ -99,14 +105,17 @@ describe("endorseService executeEndorseFlow", () => {
         },
       ],
     }));
+    const onApprovalConfirmed = vi.fn();
 
     const result = await executeEndorseFlow({
       contract,
-      signer: {} as any,
+      signer: scopeSigner("0x00000000000000000000000000000000000000bb"),
+      chainId: 31337,
       address: "0x00000000000000000000000000000000000000bb",
       personHash: "0x00000000000000000000000000000000000000000000000000000000000000aa",
       versionIndex: 2,
       endorseVersion,
+      onApprovalConfirmed,
     });
 
     expect(result.alreadyEndorsed).toBe(false);
@@ -120,6 +129,7 @@ describe("endorseService executeEndorseFlow", () => {
       { gasLimit: 120n },
     );
     expect(result.approvalTxHash).toBe("0xapprove");
+    expect(onApprovalConfirmed).toHaveBeenCalledWith("0xapprove", {status: 1, hash: "0xapprove"});
     expect(result.event?.endorsementFee).toBe("10");
     expect(result.event?.recipient).toBe("0x00000000000000000000000000000000000000cc");
     expect(result.transactionHash).toBe("0xtxhash");
@@ -148,7 +158,8 @@ describe("endorseService executeEndorseFlow", () => {
 
     const result = await executeEndorseFlow({
       contract,
-      signer: {} as any,
+      signer: scopeSigner("0x00000000000000000000000000000000000000bb"),
+      chainId: 31337,
       address: "0x00000000000000000000000000000000000000bb",
       personHash: "0x00000000000000000000000000000000000000000000000000000000000000aa",
       versionIndex: 2,
@@ -196,7 +207,8 @@ describe("endorseService executeEndorseFlow", () => {
     await expect(
       executeEndorseFlow({
         contract,
-        signer: {} as any,
+        signer: scopeSigner("0x00000000000000000000000000000000000000bb"),
+        chainId: 31337,
         address: "0x00000000000000000000000000000000000000bb",
         personHash: "0x00000000000000000000000000000000000000000000000000000000000000aa",
         versionIndex: 2,
@@ -233,7 +245,8 @@ describe("endorseService executeEndorseFlow", () => {
     await expect(
       executeEndorseFlow({
         contract,
-        signer: {} as any,
+        signer: scopeSigner("0x00000000000000000000000000000000000000bb"),
+        chainId: 31337,
         address: "0x00000000000000000000000000000000000000bb",
         personHash: "0x00000000000000000000000000000000000000000000000000000000000000aa",
         versionIndex: 2,

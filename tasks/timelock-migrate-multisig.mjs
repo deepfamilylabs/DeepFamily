@@ -1,3 +1,4 @@
+import { simulateChainCall } from "../scripts/lib/chainSimulation.mjs";
 /**
  * Usage:
  *   npx hardhat --config hardhat.config.mjs timelock-migrate-multisig \
@@ -130,17 +131,15 @@ export const action = async (args, hre) => {
     }
 
     for (const payload of operation.payloads) {
-      try {
-        await ethers.provider.call({
+      await simulateChainCall({
+        label: "timelock role-migration self-call simulation reverted",
+        read: () => ethers.provider.call({
           to: timelockAddress,
           from: timelockAddress,
           data: payload,
           value: 0n,
-        });
-      } catch (error) {
-        const detail = error.shortMessage || error.reason || error.message;
-        throw new Error(`timelock role-migration self-call simulation reverted: ${detail}`);
-      }
+        }),
+      });
     }
 
     const result = await sendOrPrint({

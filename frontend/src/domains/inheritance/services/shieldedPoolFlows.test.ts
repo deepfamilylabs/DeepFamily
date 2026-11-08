@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import type { Contract, Signer } from "ethers";
+import { Interface, type Contract, type Signer } from "ethers";
+import ShieldedPool from "../../../abi/ShieldedErc20Pool.json";
 import type { Groth16Proof } from "../../../shared/zk/zk";
 import {
   assertShieldedDepositBalance,
@@ -67,8 +68,9 @@ function fixture(capacity = 2) {
     methodNames.map((name) => {
       const method = Object.assign(
         vi.fn(async () => ({
-          hash: `0x${name}`,
-          wait: async () => receipt,
+          hash: `0x${name}`, nonce: 9,
+          replaceableTransaction() { return this; },
+          wait: async () => ({ ...receipt, hash: `0x${name}` }),
         })),
         { estimateGas },
       );
@@ -91,6 +93,7 @@ function fixture(capacity = 2) {
     getAddress: vi.fn(async () => WALLET_ADDRESS),
   } as unknown as Signer;
   const pool = {
+    interface: new Interface(ShieldedPool.abi),
     getAddress: vi.fn(async () => POOL_ADDRESS),
     connect: vi.fn(() => methods),
     LINEAGE_INDEX: lineageIndex,
@@ -247,22 +250,30 @@ describe("shielded pool asset-worker proof submission", () => {
     expect(f.proofLifetime).not.toHaveBeenCalled();
     expect(f.lineageRoot).not.toHaveBeenCalled();
     expect(f.provider.getBlock).not.toHaveBeenCalled();
-    expect(f.provider.getBlockNumber).not.toHaveBeenCalled();
+    expect(f.provider.getBlockNumber).toHaveBeenCalledTimes(4);
   });
 
   it.each([1, 0])("returns a repriced transaction's hash and receipt status %i", async (status) => {
     const f = fixture();
-    const receipt = { status };
+    const receipt = { status, hash: "0xrepriced" };
     const replacement = Object.assign(new Error("Transaction repriced"), {
       code: "TRANSACTION_REPLACED",
       reason: "repriced",
       cancelled: false,
-      replacement: { hash: "0xrepriced" },
+      replacement: {
+        hash: "0xrepriced", nonce: 9, chainId: 71n, from: WALLET_ADDRESS, to: POOL_ADDRESS, value: 0n,
+        data: "0x",
+      },
       receipt,
     });
     f.methods.shield.mockResolvedValueOnce({
-      hash: "0xshield",
-      wait: vi.fn().mockRejectedValue(replacement),
+      hash: "0xshield", nonce: 9,
+      replaceableTransaction() { return this; },
+      wait: vi.fn(async () => {
+        const call = f.methods.shield.mock.calls[0];
+        replacement.replacement.data = f.common.pool.interface.encodeFunctionData("shield", call.slice(0, -1));
+        throw replacement;
+      }),
     });
     const onBroadcast = vi.fn();
 
@@ -286,13 +297,14 @@ describe("shielded pool asset-worker proof submission", () => {
       });
       f.methods.shield.mockResolvedValueOnce({
         hash: "0xshield",
+        replaceableTransaction() { return this; },
         wait: vi.fn().mockRejectedValue(replacement),
       });
       const onBroadcast = vi.fn();
 
-      await expect(submitShield({ ...f.common, amount: 100n, onBroadcast })).rejects.toBe(
-        replacement,
-      );
+      await expect(submitShield({ ...f.common, amount: 100n, onBroadcast })).rejects.toMatchObject({
+        code: "TRANSACTION_REPLACEMENT_CANCELLED", transactionHash: "0xshield",
+      });
 
       expect(onBroadcast).toHaveBeenCalledExactlyOnceWith("0xshield");
       expect(f.methods.shield).toHaveBeenCalledOnce();
@@ -302,7 +314,7 @@ describe("shielded pool asset-worker proof submission", () => {
   it("holds the wallet request guard only until the wallet returns, before broadcasting or waiting for a receipt", async () => {
     const f = fixture();
     const order: string[] = [];
-    let releaseWallet!: (transaction: { hash: string; wait: typeof wait }) => void;
+    let releaseWallet!: (transaction: { hash: string; wait: typeof wait; replaceableTransaction: (fromBlock: number) => unknown }) => void;
     let releaseReceipt!: (receipt: { status: number }) => void;
     const wait = vi.fn(() => {
       order.push("receipt");
@@ -335,7 +347,7 @@ describe("shielded pool asset-worker proof submission", () => {
     await vi.waitFor(() => expect(f.methods.shield).toHaveBeenCalledOnce());
     expect(order).toEqual(["begin", "anchor", "wallet"]);
     expect(endWalletRequest).not.toHaveBeenCalled();
-    releaseWallet({ hash: "0xshield", wait });
+    releaseWallet({ hash: "0xshield", wait, replaceableTransaction() { return this; } });
     await vi.waitFor(() => expect(wait).toHaveBeenCalledOnce());
     expect(order).toEqual([
       "begin",
@@ -348,7 +360,7 @@ describe("shielded pool asset-worker proof submission", () => {
     ]);
     expect(onWalletRequest).toHaveBeenCalledOnce();
     expect(endWalletRequest).toHaveBeenCalledOnce();
-    releaseReceipt({ status: 1 });
+    releaseReceipt({ status: 1, hash: "0xshield" } as {status: number});
     await pending;
     expect(endWalletRequest).toHaveBeenCalledOnce();
   });
@@ -554,7 +566,7 @@ describe("shielded pool asset-worker proof submission", () => {
     const f = fixture();
     await submitPrivateTransfer({ ...f.common, data: actionData(4) });
     expect(f.provider.getTransactionCount).not.toHaveBeenCalled();
-    expect(f.provider.getBlockNumber).not.toHaveBeenCalled();
+    expect(f.provider.getBlockNumber).toHaveBeenCalledOnce();
     expect(
       f.methods.privateTransfer.mock.calls[0][f.methods.privateTransfer.mock.calls[0].length - 1],
     ).not.toHaveProperty("nonce");

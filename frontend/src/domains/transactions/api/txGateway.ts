@@ -1,25 +1,23 @@
+import type { ContractReceipt, ContractReceiptLog } from "../../../shared/clients/transactionTypes";
 import { ethers } from "ethers";
+import { runChainRead } from "@deepfamily/chain-client";
 import {
   extractRevertReason,
   formatErrorSummaryForDev,
   sanitizeErrorForLogging,
 } from "../../../shared/lib/errors";
 
-type ContractMethod<TArgs extends readonly unknown[]> = ((...args: TArgs) => Promise<any>) & {
+type ContractMethod<TArgs extends readonly unknown[]> = ((...args: TArgs) => Promise<unknown>) & {
   estimateGas?: (...args: TArgs) => Promise<bigint>;
-  staticCall?: (...args: TArgs) => Promise<any>;
+  staticCall?: (...args: TArgs) => Promise<unknown>;
 };
 
-export type ParsedReceiptEvent = {
-  name: string;
-  args: any;
-  log: any;
-};
+export type ParsedReceiptEvent = { name: string; args: ethers.Result; log: ContractReceiptLog };
 
 type EstimateGasOptions<TArgs extends readonly unknown[]> = {
   contractMethod: ContractMethod<TArgs>;
   args: TArgs;
-  decodeContract?: { interface?: any } | null;
+  decodeContract?: { interface?: ethers.Interface } | null;
   fallbackGas: bigint;
   gasBumpPercent?: number;
   isDev?: boolean;
@@ -53,7 +51,7 @@ export async function estimateGasWithFallbackDetails<TArgs extends readonly unkn
 }: EstimateGasOptions<TArgs>): Promise<GasEstimateDetails> {
   try {
     if (typeof contractMethod.estimateGas === "function") {
-      const estimatedGas = await contractMethod.estimateGas(...args);
+      const estimatedGas = await runChainRead({ read: () => contractMethod.estimateGas!(...args), operation: "estimate" });
       return {
         estimatedGas,
         gasLimit: (estimatedGas * BigInt(gasBumpPercent)) / 100n,
@@ -77,7 +75,7 @@ export async function estimateGasWithFallbackDetails<TArgs extends readonly unkn
 
     if (typeof contractMethod.staticCall === "function") {
       try {
-        await contractMethod.staticCall(...args);
+        await runChainRead({ read: () => contractMethod.staticCall!(...args), operation: "estimate" });
         return { estimatedGas: null, gasLimit: fallbackGas, estimated: false };
       } catch (staticError: any) {
         if (isDev) {
@@ -120,22 +118,8 @@ export async function estimateGasWithFallback<TArgs extends readonly unknown[]>(
   return details.gasLimit;
 }
 
-export async function sendTransactionAndWait<TTx extends { wait: () => Promise<any> }>(
-  send: () => Promise<TTx>,
-): Promise<{ tx: TTx; receipt: any }> {
-  const tx = await send();
-  const receipt = await waitForTransactionReceipt(tx);
-  return { tx, receipt };
-}
-
-export async function waitForTransactionReceipt<TTx extends { wait: () => Promise<any> }>(
-  tx: TTx,
-): Promise<any> {
-  return await tx.wait();
-}
-
 export function parseReceiptEvents(
-  receipt: { logs?: any[] } | null | undefined,
+  receipt: ContractReceipt | null | undefined,
   eventInterface: ethers.Interface,
   contractAddress?: string | null,
 ): ParsedReceiptEvent[] {
@@ -157,7 +141,8 @@ export function parseReceiptEvents(
       continue;
     }
     try {
-      const result = eventInterface.parseLog(log);
+      if (typeof log.data !== "string" || !log.topics) continue;
+      const result = eventInterface.parseLog({ data: log.data, topics: log.topics });
       if (result) {
         parsed.push({ name: result.name, args: result.args, log });
       }

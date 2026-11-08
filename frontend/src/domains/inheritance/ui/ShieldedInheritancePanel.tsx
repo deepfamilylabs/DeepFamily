@@ -1,5 +1,6 @@
 import {
   useEffect,
+  useCallback,
   useId,
   useLayoutEffect,
   useMemo,
@@ -20,7 +21,6 @@ import {
   getAddress,
   parseUnits,
   toUtf8Bytes,
-  type ContractTransactionResponse,
   type Provider,
   type Signer,
 } from "ethers";
@@ -34,8 +34,8 @@ import { useTransactionCenter } from "../../transactions";
 import type { ShieldedPageModules } from "../model/shieldedPageTypes";
 import { getShieldedPoolFactoryDeploymentBlock, getPrivateLetterArchiveAddress, getPrivateLetterArchiveDeploymentBlock } from "../../../shared/config/env";
 import {
-  getFriendlyErrorMessage,
-  REASON_FRIENDLY_MAP,
+  normalizeFriendlyError,
+  type ChainFriendlyError,
   resolveErrorReason,
 } from "../../../shared/lib/errors";
 import {
@@ -68,10 +68,9 @@ import {
 } from "../services/shieldedPoolFlows";
 import {
   readShieldedSubmissionOutcome,
-  type ShieldedSubmissionTracking,
 } from "../services/shieldedSubmissionTracking";
-import { createIdentityAuthorizationContract } from "../services/shieldedIdentityAuthorizationChain";
-import { waitForShieldedTransaction } from "../services/shieldedTransactionReceipt";
+import { submitShieldedApproval, submitShieldedAuthorization } from "../services/shieldedWalletSubmission";
+import { useShieldedSubmissionCoordinator, type ShieldedTrackedSubmission } from "./useShieldedSubmissionCoordinator";
 import {
   assertShieldedDepositBalance,
   ShieldedDepositBalanceError,
@@ -218,17 +217,13 @@ export function ShieldedInheritancePanel({
   const walletRef = useRef({ signer, account });
   walletRef.current = { signer, account };
   const previousGasWallet = useRef({ signer, account });
-  const receiptTracking = useRef<
-    | (ShieldedSubmissionTracking & {
-        id: string;
-        label: string;
-        kind: "action" | "approval";
-      })
-    | null
-  >(null);
+  const receiptTracking = useRef<ShieldedTrackedSubmission | null>(null);
   const [busy, setBusy] = useState(false),
     [stage, setStage] = useState(""),
-    [error, setError] = useState("");
+    [error, setErrorState] = useState<ChainFriendlyError | null>(null);
+  const setError = useCallback((message: string, cause?: unknown) => {
+    setErrorState(message ? normalizeFriendlyError(cause ?? new Error(message), t, { message }) : null);
+  }, [t]);
   const acceptPublicSyncProgress = useRef(false);
   const [publicSyncProgress, setPublicSyncProgress] = useState<Partial<Record<PublicStateSyncProgress["domain"], PublicStateSyncProgress>>>({});
   const [publicSyncPaused, setPublicSyncPaused] = useState(false);
@@ -402,6 +397,31 @@ export function ShieldedInheritancePanel({
   ]);
   const previousContext = useRef({ contextKey, protocolContextKey, ownerContextKey });
   contextRef.current = contextKey;
+  const submissionCoordinator = useShieldedSubmissionCoordinator({
+    chainId: modules.chainId,
+    poolAddress: modules.poolAddress,
+    tracking: receiptTracking,
+    isCurrent: () => mounted.current && contextRef.current === contextKey,
+    onPending: (tracking) => {
+      setTransactionHash(tracking.hash ?? "");
+      setTransactionLabel(tracking.label);
+      setTransactionPending(true);
+      setTransactionResult(null);
+    },
+    onSettled: (tracking, status) => {
+      setAllowanceRevision((revision) => revision + 1);
+      setTransactionHash(tracking.hash ?? "");
+      setTransactionPending(false);
+      setTransactionResult(status === 1 ? "done" : "failed");
+      setTransactionLabel(tracking.label);
+      if (tracking.kind === "authorization" && status === 1) {
+        setOwnCode("");
+        receiveCodeScope.current = "";
+      }
+    },
+    onRejected: () => setTransactionPending(false),
+  });
+
   const draftKey = JSON.stringify([
     contextKey,
     session.identity?.handle,
@@ -878,7 +898,7 @@ export function ShieldedInheritancePanel({
         const successful = outcome.status === "confirmed" && outcome.receiptStatus === 1;
         // A consumed approval nonce does not establish which transaction mined.
         // Read back the allowance without reporting an unobserved receipt as failed.
-        const unknownApproval = tracked.kind === "approval" && outcome.status === "replaced";
+        const unknownApproval = tracked.kind !== "action" && outcome.status === "replaced";
         latestTxCenter.current?.upsert({
           id: tracked.id,
           kind: "shielded",
@@ -910,6 +930,7 @@ export function ShieldedInheritancePanel({
         // A recovered deposit may have consumed its approval, including when
         // a replacement's exact receipt cannot be identified. Re-read current state.
         setAllowanceRevision((revision) => revision + 1);
+        if (successful && tracked.kind === "authorization") { setOwnCode(""); receiveCodeScope.current = ""; }
         // A public result must not clear a newer secret session's selection.
         if (
           generation === getShieldedAssetWorkerGeneration() &&
@@ -973,24 +994,20 @@ export function ShieldedInheritancePanel({
       await task(current);
     } catch (cause) {
       if (current()) {
-        const reason = resolveErrorReason(cause);
+        if (resolveErrorReason(cause) === "ERC20InsufficientAllowance") {
+          // The allowance may also change outside this page while a proof is prepared.
+          setAllowanceRevision((revision) => revision + 1);
+        }
         if (cause instanceof ShieldedDepositBalanceError) {
           setError(t("shielded.depositBalanceInsufficient", {
             balance: formatUnits(cause.balance, modules.tokenDecimals ?? 0),
             amount: formatUnits(cause.amount, modules.tokenDecimals ?? 0),
             symbol: modules.assetSymbol,
-          }));
-        } else if (reason === "ERC20InsufficientAllowance") {
-          // The allowance may also change outside this page while a proof is prepared.
-          setAllowanceRevision((revision) => revision + 1);
-          setError(getFriendlyErrorMessage(cause, t, tr("failed")));
-        } else if (
-          (reason && Object.prototype.hasOwnProperty.call(REASON_FRIENDLY_MAP, reason)) ||
-          (cause && typeof cause === "object" && "code" in cause && cause.code === "CALL_EXCEPTION")
-        ) {
-          setError(getFriendlyErrorMessage(cause, t, tr("failed")));
+          }), cause);
         } else {
-          setError(cause instanceof Error ? cause.message : tr("failed"));
+          setErrorState(normalizeFriendlyError(cause, t, {
+            fallbackMessage: tr("failed"), preferDetailsForUnknown: true,
+          }));
         }
       }
     } finally {
@@ -1554,15 +1571,30 @@ export function ShieldedInheritancePanel({
         (await chosen.getAddress()).toLowerCase() !== account.toLowerCase() || walletRef.current.signer !== chosen)
         throw new Error(t("shielded.walletChanged"));
       if (!current()) return;
-      const contract = createIdentityAuthorizationContract(result.address, chosen);
-      const endWalletRequest = latestSession.current.beginWalletRequest();
-      let transaction: ContractTransactionResponse;
+      const tracking = submissionCoordinator.capture({
+        id: `shielded:authorization:${modules.chainId}:${Date.now()}`,
+        label: t("shielded.privateLetters.revoking"), kind: "authorization",
+      }, chosen.provider!);
       try {
-        transaction = await contract.incrementCounter(...result.args, { chainId: modules.chainId });
-      } finally { endWalletRequest(); }
-      const confirmed = await waitForShieldedTransaction(transaction);
-      if (confirmed.receipt.status !== 1) throw new Error(t("shielded.transactionFailed", { hash: confirmed.transactionHash }));
-      if (current()) { setOwnCode(""); receiveCodeScope.current = ""; }
+        const confirmed = await submitShieldedAuthorization({
+          signer: chosen, chainId: modules.chainId, account,
+          address: result.address, args: result.args,
+          assertCurrent: () => {
+            if (!current() || walletRef.current.signer !== chosen)
+              throw new Error(t("shielded.walletChanged"));
+          },
+          onSubmitting: tracking.onSubmitting,
+          onBroadcast: tracking.onBroadcast,
+          onWalletRequest: () => latestSession.current.beginWalletRequest(),
+        });
+        tracking.onReceipt(confirmed.transactionHash, confirmed.receipt.status);
+        if (confirmed.receipt.status !== 1)
+          throw new Error(t("shielded.transactionFailed", { hash: confirmed.transactionHash }));
+        if (current()) { setOwnCode(""); receiveCodeScope.current = ""; }
+      } catch (error) {
+        tracking.onError(error);
+        throw error;
+      }
     }, t("shielded.privateLetters.revoking"), "wallet");
   }
   const receiveCodeReady = !!session.identity && (codeSlot === "identity" || independentKeyReady);
@@ -1644,95 +1676,6 @@ export function ShieldedInheritancePanel({
       }
     }, t(action === "fund" ? "shielded.stages.fundReceiveCredential" : "shielded.stages.receiveCode"));
   }
-  function trackBroadcast(provider: Provider, hash: string, id: string, label: string) {
-    const center = latestTxCenter.current;
-    center?.upsert({
-      id,
-      kind: "shielded",
-      label,
-      phase: "busy",
-      transactionHash: hash,
-      ...(receiptTracking.current?.id === id || center.records.some((record) => record.id === id)
-        ? {}
-        : {
-            shieldedSubmission: {
-              chainId: String(modules.chainId),
-              poolAddress: modules.poolAddress,
-              kind: "action" as const,
-            },
-          }),
-    });
-    if (!mounted.current || contextRef.current !== contextKey) return;
-    if (receiptTracking.current && receiptTracking.current.id !== id) return;
-    receiptTracking.current = {
-      kind: "action",
-      ...(receiptTracking.current?.id === id ? receiptTracking.current : {}),
-      provider,
-      hash,
-      chainId: modules.chainId,
-      id,
-      label,
-    };
-    if (mounted.current) {
-      setTransactionHash(hash);
-      setTransactionLabel(label);
-      setTransactionPending(true);
-      setTransactionResult(null);
-    }
-  }
-  function clearFailedWalletRequest(cause: unknown, id: string) {
-    const tracked = receiptTracking.current;
-    if (tracked?.id !== id || tracked.hash) return;
-    const error = cause && typeof cause === "object" ? cause : undefined;
-    const code = error && "code" in error ? error.code : undefined;
-    const info = error && "info" in error ? error.info : undefined;
-    // ethers can send successfully, then fail while fetching the transaction.
-    // Preserve tracking whenever the error carries evidence of a broadcast.
-    if (
-      (error && "receipt" in error && error.receipt) ||
-      (info && typeof info === "object" && "sendTransactionHash" in info && info.sendTransactionHash)
-    )
-      return;
-    const estimationFailed =
-      code === "CALL_EXCEPTION" && error && "action" in error && error.action === "estimateGas";
-    // An explicit rejection, insufficient funds, or failed estimation cannot
-    // produce a transaction. Transport errors still need public reconciliation.
-    if (
-      code !== "ACTION_REJECTED" &&
-      code !== 4001 &&
-      code !== "INSUFFICIENT_FUNDS" &&
-      !estimationFailed
-    )
-      return;
-    txCenter?.upsert({ id, kind: "shielded", label: tracked.label, phase: "failed" });
-    receiptTracking.current = null;
-    if (mounted.current) setTransactionPending(false);
-  }
-  function recordReceipt(
-    hash: string,
-    status: number | null,
-    transaction?: { id: string; label: string },
-  ) {
-    const tracked = receiptTracking.current;
-    const record = transaction ?? (tracked?.hash === hash ? tracked : undefined);
-    if (!record || status === null) return;
-    txCenter?.upsert({
-      id: record.id,
-      kind: "shielded",
-      label: record.label,
-      phase: status === 1 ? "done" : "failed",
-      transactionHash: hash,
-    });
-    // ERC-20 deposits consume allowance. Never reuse the pre-deposit snapshot
-    // for the next amount, even if the original secret session has been locked.
-    if (mounted.current) setAllowanceRevision((revision) => revision + 1);
-    if (mounted.current && tracked?.id === record.id) {
-      receiptTracking.current = null;
-      setTransactionPending(false);
-      setTransactionResult(status === 1 ? "done" : "failed");
-      setTransactionLabel(record.label);
-    }
-  }
   function clearTransactionFeedback(dismissed = false) {
     setTransactionHash("");
     setTransactionResult(null);
@@ -1750,76 +1693,37 @@ export function ShieldedInheritancePanel({
         value = parseUnits(amount, modules.tokenDecimals ?? 0);
       if (value <= 0n || value >= 1n << 128n) throw new Error(tr("amountInvalid"));
       clearSecretInputs();
-      if (
-        (await chosen.provider?.getNetwork())?.chainId !== modules.chainId ||
-        (await chosen.getAddress()).toLowerCase() !== account.toLowerCase() ||
-        walletRef.current.signer !== chosen
-      )
-        throw new Error(t("shielded.walletChanged"));
-      await assertShieldedDepositBalance(modules.token, account, value);
-      if (!current()) return;
-      const [nonce, fromBlock] = await Promise.all([
-        chosen.provider!.getTransactionCount(account, "pending"),
-        chosen.provider!.getBlockNumber(),
-      ]);
-      if (!current()) return;
-      if (generation !== getShieldedAssetWorkerGeneration())
-        throw new Error(t("shielded.unlockRequired"));
-      const txId = `shielded:approval:${modules.chainId}:${account}:${nonce}:${Date.now()}`;
-      const label = `${modules.assetSymbol} · ${tr("approve")}`;
-      receiptTracking.current = {
-        provider: chosen.provider!,
-        chainId: modules.chainId,
-        nonce,
-        fromBlock,
-        signerAddress: account,
-        id: txId,
-        label,
-        kind: "approval",
-      };
-      txCenter?.upsert({
-        id: txId,
-        kind: "shielded",
-        label,
-        phase: "busy",
-        shieldedSubmission: {
-          chainId: String(modules.chainId),
-          poolAddress: modules.poolAddress,
-          kind: "approval",
-          nonce,
-          fromBlock,
-          signerAddress: account,
-        },
-      });
-      setTransactionHash("");
-      setTransactionLabel(label);
-      setTransactionPending(true);
-      setTransactionResult(null);
-      const endWalletRequest = latestSession.current.beginWalletRequest();
-      let tx: ContractTransactionResponse;
+      const tracking = submissionCoordinator.capture({
+        id: `shielded:approval:${modules.chainId}:${account}:${Date.now()}`,
+        label: `${modules.assetSymbol} · ${tr("approve")}`, kind: "approval",
+      }, chosen.provider!);
       try {
-        tx = await (modules.token.connect(chosen) as typeof modules.token).approve(
-          modules.poolAddress,
-          value,
-          { nonce, chainId: modules.chainId },
-        );
-      } catch (cause) {
-        clearFailedWalletRequest(cause, txId);
-        throw cause;
-      } finally {
-        endWalletRequest();
+        const confirmed = await submitShieldedApproval({
+          signer: chosen, chainId: modules.chainId, account,
+          token: modules.token, spender: modules.poolAddress, amount: value,
+          assertCurrent: () => {
+            if (!current() || walletRef.current.signer !== chosen || walletRef.current.account !== account)
+              throw new Error(t("shielded.walletChanged"));
+            if (generation !== getShieldedAssetWorkerGeneration())
+              throw new Error(t("shielded.unlockRequired"));
+          },
+          onSubmitting: tracking.onSubmitting,
+          onBroadcast: (hash) => {
+            tracking.onBroadcast(hash);
+            if (current()) {
+              setStage(t("shielded.stages.confirming"));
+              setProgress({ kind: "approval", stage: "confirming" });
+            }
+          },
+          onWalletRequest: () => latestSession.current.beginWalletRequest(),
+        });
+        tracking.onReceipt(confirmed.transactionHash, confirmed.receipt.status);
+        if (confirmed.receipt.status !== 1)
+          throw new Error(t("shielded.transactionFailed", { hash: confirmed.transactionHash }));
+      } catch (error) {
+        tracking.onError(error);
+        throw error;
       }
-      trackBroadcast(chosen.provider!, tx.hash, txId, label);
-      if (current()) {
-        setStage(t("shielded.stages.confirming"));
-        setProgress({ kind: "approval", stage: "confirming" });
-      }
-      const { transactionHash, receipt } = await waitForShieldedTransaction(tx, (hash) => {
-        trackBroadcast(chosen.provider!, hash, txId, label);
-      });
-      recordReceipt(transactionHash, receipt.status, { id: txId, label });
-      if (receipt.status !== 1)
-        throw new Error(t("shielded.transactionFailed", { hash: transactionHash }));
     }, t("shielded.stages.submitting"), "wallet");
   }
   /**
@@ -1931,6 +1835,10 @@ export function ShieldedInheritancePanel({
           assertCurrent();
           const txId = `shielded:${modules.chainId}:${Date.now()}:${planned.handle}`,
             label = `${modules.assetSymbol} · ${t(`shielded.actions.${result.action}`, { symbol: modules.assetSymbol })}`;
+          const tracking = submissionCoordinator.capture({
+            id: txId, label, kind: "action", pool: modules.pool,
+            outputCommitments: result.data.outputCommitments.map((value) => getBigInt(value).toString()),
+          }, chosen.provider!);
           const common = {
             pool: modules.pool,
             signer: chosen,
@@ -1945,49 +1853,15 @@ export function ShieldedInheritancePanel({
               }
             },
             onBroadcast: (hash: string) => {
-              trackBroadcast(chosen.provider!, hash, txId, label);
+              tracking.onBroadcast(hash);
             },
             onWalletRequest: () => {
               assertCurrent();
               return latestSession.current.beginWalletRequest();
             },
-            onSubmitting: (metadata: {
-              nonce: number;
-              fromBlock: number;
-              signerAddress: string;
-            }) => {
+            onSubmitting: (metadata: import("../services/shieldedWalletSubmission").ShieldedSubmissionAnchor) => {
               assertCurrent();
-              receiptTracking.current = {
-                provider: chosen.provider!,
-                chainId: modules.chainId,
-                id: txId,
-                label,
-                kind: "action",
-                ...metadata,
-                pool: modules.pool,
-                outputCommitments: result.data.outputCommitments.map((value) =>
-                  getBigInt(value).toString(),
-                ),
-              };
-              txCenter?.upsert({
-                id: txId,
-                kind: "shielded",
-                label,
-                phase: "busy",
-                shieldedSubmission: {
-                  chainId: String(modules.chainId),
-                  poolAddress: modules.poolAddress,
-                  kind: "action",
-                  ...metadata,
-                  outputCommitments: receiptTracking.current.outputCommitments,
-                },
-              });
-              if (mounted.current) {
-                setTransactionHash("");
-                setTransactionLabel(label);
-                setTransactionPending(true);
-                setTransactionResult(null);
-              }
+              tracking.onSubmitting(metadata);
             },
           };
           let submitted;
@@ -2013,11 +1887,11 @@ export function ShieldedInheritancePanel({
                           recipient: result.recipient!,
                         });
           } catch (cause) {
-            clearFailedWalletRequest(cause, txId);
+            tracking.onError(cause);
             throw cause;
           }
           sent = true;
-          recordReceipt(submitted.transactionHash, submitted.receipt.status, { id: txId, label });
+          tracking.onReceipt(submitted.transactionHash, submitted.receipt.status);
           if (current()) {
             setTransactionHash(submitted.transactionHash);
             setTransactionLabel(label);
@@ -2112,7 +1986,7 @@ export function ShieldedInheritancePanel({
     ) : null;
   const errorNotice = error ? (
     <p role="alert" className="break-words text-sm text-danger">
-      {error}
+      {error.message}
     </p>
   ) : null;
   // A confirmed spend plan shows its own progress inside the step being sent.
@@ -2256,7 +2130,7 @@ export function ShieldedInheritancePanel({
         </p>
       ) : receiveCodeReady ? (
         <>
-          {error ? <p className="break-words text-xs text-danger">{error}</p> : null}
+          {error ? <p className="break-words text-xs text-danger">{error.message}</p> : null}
           <PanelButton
             size="compact"
             disabled={submissionPending}

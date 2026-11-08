@@ -2,6 +2,7 @@ import { ethers } from "ethers";
 import { makeNodeId } from "../../../shared/model";
 import { unionParentKey } from "../model/treeStore";
 import { nftKey, tvKey, vdKey } from "../../../shared/cache/queryKeys";
+import type { ContractReceipt } from "../../../shared/clients/transactionTypes";
 
 export interface PersonVersionAddedEvent {
   personHash: string;
@@ -30,7 +31,7 @@ export interface ParsedTreeTxEvents {
 }
 
 export interface TreeTxInvalidationInput {
-  receipt?: { logs?: any[] } | null;
+  receipt?: ContractReceipt | null;
   events?: {
     PersonVersionAdded?: PersonVersionAddedEvent | null;
     PersonVersionEndorsed?: PersonVersionEndorsedEvent | null;
@@ -105,7 +106,7 @@ export function getInvalidateKeysAfterPersonVersionAdded(ev: PersonVersionAddedE
 }
 
 export function parseTreeTxEvents(
-  receipt: { logs?: any[] } | null | undefined,
+  receipt: ContractReceipt | null | undefined,
   eventInterface: ethers.Interface,
   contractAddress?: string | null,
 ): ParsedTreeTxEvents {
@@ -114,13 +115,14 @@ export function parseTreeTxEvents(
   const normalizedContractAddress = contractAddress?.toLowerCase();
 
   for (const log of logs) {
-    const logAddr = String((log as any)?.address || "").toLowerCase();
+    const logAddr = String(log?.address || "").toLowerCase();
     if (normalizedContractAddress && logAddr && logAddr !== normalizedContractAddress) {
       continue;
     }
 
     try {
-      const event = eventInterface.parseLog(log);
+      if (!log.topics || typeof log.data !== "string") continue;
+      const event = eventInterface.parseLog({ topics: log.topics, data: log.data });
       if (!event) continue;
       switch (event.name) {
         case "PersonVersionAdded":

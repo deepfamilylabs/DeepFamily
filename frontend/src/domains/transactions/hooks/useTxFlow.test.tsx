@@ -175,4 +175,58 @@ describe("useTxFlow", () => {
     expect(result.current.status).toBe("idle");
     expect(result.current.error).toBeNull();
   });
+
+  it("tracks the submitted hash and confirmed receipt through the business result", async () => {
+    const receipt = { hash: "0xtracked", status: 1, blockNumber: 7 };
+    const confirmation = createDeferred<typeof receipt>();
+    const { result } = renderHook(() => useTxFlow(async (update) => {
+      update("confirming");
+      update.submitted(receipt.hash);
+      await confirmation.promise;
+      update.confirmed(receipt.hash, receipt);
+      return "verified";
+    }));
+    let pending!: Promise<string>;
+    act(() => { pending = result.current.runOrThrow(); });
+    expect(result.current.tracking).toEqual({ state: "submitted", transactionHash: receipt.hash });
+    await act(async () => { confirmation.resolve(receipt); await pending; });
+    expect(result.current.tracking).toEqual({ state: "confirmed", transactionHash: receipt.hash, receipt });
+    expect(result.current.status).toBe("success");
+  });
+
+  it("retains chain confirmation and its receipt when later detail verification fails", async () => {
+    const receipt = { hash: "0xconfirmed", status: 1, blockNumber: 8 };
+    const error = Object.assign(new Error("Details unavailable"), {
+      transactionHash: receipt.hash, transactionConfirmed: true, verificationFailure: "read",
+    });
+    const { result } = renderHook(() => useTxFlow(async (update) => {
+      update.confirmed(receipt.hash, receipt);
+      throw error;
+    }));
+    await act(async () => { await expect(result.current.runOrThrow()).rejects.toBe(error); });
+    expect(result.current.status).toBe("error");
+    expect(result.current.tracking).toEqual({ state: "confirmed", transactionHash: receipt.hash, receipt });
+  });
+
+  it("ignores retired public tracking callbacks without restoring a cancelled UI", async () => {
+    const done = createDeferred<string>();
+    let report!: Parameters<TxFlowRunner<string, []>>[0];
+    const { result } = renderHook(() => useTxFlow(async (update) => {
+      report = update;
+      update.submitted("0xold");
+      return done.promise;
+    }, { allowBackgroundCompletion: true }));
+    let pending!: Promise<string>;
+    act(() => { pending = result.current.runOrThrow(); });
+    act(() => result.current.reset());
+    await act(async () => {
+      report.submitted("0xreplacement");
+      report.confirmed("0xreplacement", { hash: "0xreplacement", status: 1 });
+      done.resolve("confirmed");
+      await pending;
+    });
+    expect(result.current.tracking).toEqual({ state: "none" });
+    expect(result.current.status).toBe("idle");
+  });
+
 });

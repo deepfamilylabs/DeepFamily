@@ -103,6 +103,7 @@ vi.mock("../domains/tree", () => ({
 }));
 
 vi.mock("../domains/person", () => ({
+  useTrustedEndorserAccess: () => undefined,
   EndorseModalProvider: ({ children }: any) => <div data-testid="endorse-provider">{children}</div>,
   NodeDetailProvider: ({ children, onRequestMetadataUnlock }: any) => (
     <div data-testid="node-detail-provider">

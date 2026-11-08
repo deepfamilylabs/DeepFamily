@@ -10,7 +10,7 @@ import {
 import { useWallet } from "../../wallet";
 import { useTxFlow, type TxFlowRunner } from "./useTxFlow";
 
-import type { ArchiveTransactionPreview } from "../services/archiveTransaction";
+import { archivePreviewRejectedError, type ArchiveTransactionPreview } from "../services/archiveTransaction";
 
 export type AddStoryRecordFlowArgs = {
   tokenId: string;
@@ -36,20 +36,13 @@ export function useAddStoryRecordFlow() {
 
       update("submitting", t("story.addingRecord", "Adding story record..."));
 
-      return await addStoryRecordService(
-        signer as any,
-        contractAddress,
-        args.tokenId,
-        args.recordIndex,
-        args.title,
-        args.content,
-        args.expectedPayloadHash,
-        args.recordType,
-        args.attachmentURI,
-        args.confirmTransactionPreview,
-        // The same endpoint the editor's snapshot was read from; see readProvider.
-        rpcUrl ? getReadonlyProvider(rpcUrl, chainId) : undefined,
-      );
+      return await addStoryRecordService({
+        ...args, signer, contractAddress,
+        readProvider: rpcUrl ? getReadonlyProvider(rpcUrl, chainId) : undefined,
+        assertActive: () => { if (!update.isCurrent()) throw archivePreviewRejectedError("Story submission cancelled before wallet request"); },
+        onSubmitted: update.submitted,
+        onConfirmed: update.confirmed,
+      });
     },
     [signer, contractAddress, rpcUrl, chainId, t],
   );

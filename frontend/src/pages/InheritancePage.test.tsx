@@ -226,11 +226,12 @@ function chooseAsset(name: string) {
 }
 
 function poolCreationTransaction(wait: () => Promise<{ status: number }>) {
-  return {
-    hash: "0x1234",
-    wait,
-    replaceableTransaction: vi.fn(() => ({ hash: "0x1234", wait })),
+  const hash = `0x${"12".repeat(32)}`;
+  const response = {
+    hash,
+    wait: async () => ({ ...await wait(), hash }),
   };
+  return { ...response, replaceableTransaction: vi.fn(() => response) };
 }
 
 /** Use ethers' actual Contract wrapper and wait implementation; only RPC responses are fake. */
@@ -249,7 +250,7 @@ function replacedPoolCreation(outcome: "repriced" | "failed" | "cancelled") {
       if (hash !== replacementHash) return null;
       if (outcome === "repriced")
         mocks.poolAddress = "0x0000000000000000000000000000000000000020";
-      return { status: outcome === "failed" ? 0 : 1, blockNumber: 2 };
+      return { status: outcome === "failed" ? 0 : 1, blockNumber: 2, hash: replacementHash };
     },
     getBlock: vi.fn(async (number: number) => ({
       length: number === 2 ? 1 : 0,
@@ -750,7 +751,7 @@ describe("InheritancePage private pool entry", () => {
     render(<InheritancePage />);
     fireEvent.click(await screen.findByRole("button", { name: "shielded.assets.create" }));
     await waitFor(() =>
-      expect(screen.getByRole("alert").textContent).toContain("transaction was replaced"),
+      expect(screen.getByRole("alert").textContent).toBe("errors.contractError.TRANSACTION_REPLACEMENT_CANCELLED"),
     );
     expect(screen.queryByTestId("shielded-panel")).toBeNull();
     expect(mocks.resolveShieldedAssetPool).toHaveBeenCalledOnce();
@@ -763,7 +764,7 @@ describe("InheritancePage private pool entry", () => {
     render(<InheritancePage />);
     fireEvent.click(await screen.findByRole("button", { name: "shielded.assets.create" }));
     await waitFor(() =>
-      expect(screen.getByRole("alert").textContent).toContain("User rejected pool creation"),
+      expect(screen.getByRole("alert").textContent).toBe("errors.contractError.USER_REJECTED"),
     );
     expect(screen.queryByTestId("shielded-panel")).toBeNull();
     expect(mocks.resolveShieldedAssetPool).toHaveBeenCalledOnce();

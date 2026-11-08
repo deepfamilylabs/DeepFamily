@@ -13,9 +13,20 @@ const SAFE_INPUT_FILES = Object.freeze([
   "hardhat.config.mjs",
   "package.json",
   "package-lock.json",
+  "packages/chain-client/package.json",
+  "packages/chain-client/index.js",
+  "packages/chain-client/errors.js",
+  "packages/chain-client/internal.js",
+  "packages/chain-client/contracts.js",
+  "packages/chain-client/execution.js",
+  "packages/chain-client/receipts.js",
+  "packages/chain-client/gas.js",
+  "packages/chain-client/wallet.js",
+  "packages/chain-client/transport.js",
   "scripts/evm-command.mjs",
   "scripts/evm-mainnet-safe.mjs",
   "scripts/lib/chainProfiles.mjs",
+  "scripts/lib/chainSimulation.mjs",
   "scripts/lib/mainnetCommandWrapper.mjs",
   "scripts/lib/mainnetSafeEvidence.mjs",
   "scripts/lib/mainnetSafeIntent.mjs",
@@ -67,18 +78,19 @@ describe("multi-chain Mainnet Safe creator evidence", function () {
     );
   });
 
-  it("changes the aggregate and only the changed file digest when a critical input changes", async function () {
-    const before = await hashMainnetSafeInputs(ethers, temporaryDirectory);
-    const changedPath = "scripts/lib/safeGovernance.mjs";
-    await fs.writeFile(path.join(temporaryDirectory, changedPath), "fixture:changed\n");
-    const after = await hashMainnetSafeInputs(ethers, temporaryDirectory);
+  for (const changedPath of ["scripts/lib/safeGovernance.mjs", "packages/chain-client/execution.js"]) {
+    it(`changes the aggregate and only the changed file digest when ${changedPath} changes`, async function () {
+      const before = await hashMainnetSafeInputs(ethers, temporaryDirectory);
+      await fs.writeFile(path.join(temporaryDirectory, changedPath), "fixture:changed\n");
+      const after = await hashMainnetSafeInputs(ethers, temporaryDirectory);
 
-    expect(after.digest).not.to.equal(before.digest);
-    expect(after.files[changedPath]).not.to.equal(before.files[changedPath]);
-    for (const relativePath of SAFE_INPUT_FILES.filter((entry) => entry !== changedPath)) {
-      expect(after.files[relativePath], relativePath).to.equal(before.files[relativePath]);
-    }
-  });
+      expect(after.digest).not.to.equal(before.digest);
+      expect(after.files[changedPath]).not.to.equal(before.files[changedPath]);
+      for (const relativePath of SAFE_INPUT_FILES.filter((entry) => entry !== changedPath)) {
+        expect(after.files[relativePath], relativePath).to.equal(before.files[relativePath]);
+      }
+    });
+  }
 
   it("redacts configured secrets and long calldata before truncating public errors", function () {
     const privateKey = `0x${"ab".repeat(32)}`;

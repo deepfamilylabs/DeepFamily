@@ -1,4 +1,5 @@
 import { ethers } from "ethers";
+import { getTransactionErrorContext } from "@deepfamily/chain-client";
 import { encodePublicStoryRecord } from "../../../shared/config/storyEncoding";
 import { getFriendlyErrorMessage } from "../../../shared/lib/errors";
 import type { NodeData, StoryRecord, StoryMetadata } from "../../../shared/model";
@@ -142,11 +143,12 @@ export function isStaleStoryError(error: any): boolean {
 }
 
 function confirmedStoryError(
-  error: any,
+  error: unknown,
   t: (key: string, fallback: string) => string,
 ): string | undefined {
-  if (error?.transactionConfirmed !== true) return undefined;
-  const message = error.verificationFailure === "read"
+  const context = getTransactionErrorContext(error);
+  if (!context.transactionConfirmed) return undefined;
+  const message = context.verificationFailure === "read"
     ? t(
         "storyRecordEditor.confirmedReadFailed",
         "The transaction is confirmed. Refresh the page to load its details.",
@@ -157,13 +159,13 @@ function confirmedStoryError(
       );
   return [
     message,
-    error.transactionHash
-      ? `${t("transaction.rowTransaction", "Transaction")}: ${error.transactionHash}` : "",
+    context.transactionHash
+      ? `${t("transaction.rowTransaction", "Transaction")}: ${context.transactionHash}` : "",
   ].filter(Boolean).join("\n");
 }
 
 export function mapStorySubmitError(
-  error: any,
+  error: unknown,
   t: (key: string, fallback: string) => string,
 ): string {
   return confirmedStoryError(error, t) ?? getFriendlyErrorMessage(
@@ -175,7 +177,7 @@ export function mapStorySubmitError(
 }
 
 export function mapStorySealError(
-  error: any,
+  error: unknown,
   t: (key: string, fallback: string) => string,
 ): string {
   return confirmedStoryError(error, t) ?? getFriendlyErrorMessage(

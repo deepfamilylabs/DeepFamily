@@ -18,7 +18,9 @@ import {
 } from "ethers";
 import type { Groth16Proof } from "../../../shared/zk/zk";
 import { createLineageIndexContract } from "../../../shared/clients/contractFactory";
-import { waitForShieldedTransaction } from "./shieldedTransactionReceipt";
+import { executeChainTransaction, runChainRead } from "@deepfamily/chain-client";
+import { readPublicSubmissionAnchor, type ShieldedSubmissionAnchor } from "./shieldedWalletSubmission";
+export type { ShieldedSubmissionAnchor } from "./shieldedWalletSubmission";
 import { assertShieldedDepositBalance } from "./shieldedDepositBalance";
 
 /** Submissions contain only public action data and a proof produced by the asset Worker. */
@@ -49,11 +51,7 @@ export type ShieldedGasReview = {
   maximumGasFee: bigint;
 };
 
-export type ShieldedSubmissionAnchor = {
-  nonce: number;
-  fromBlock: number;
-  signerAddress: string;
-};
+
 
 type BaseFlowInput = {
   pool: Contract;
@@ -292,9 +290,10 @@ async function submitAction(
       : action === "unshield"
         ? [publicRecipient, publicAmount, data, proof]
         : [data, proof];
+  const calldata = pool.interface.encodeFunctionData(action, args);
   onStage?.("checkingGas");
   const valueOverrides = transactionValue > 0n ? { value: transactionValue } : {};
-  const gasEstimate = await method.estimateGas(...args, valueOverrides);
+  const gasEstimate = await runChainRead({ operation: "estimate", read: () => method.estimateGas(...args, valueOverrides) });
   const { review: gasReview, feeOverrides } = await assertTransactionGas(
     signer,
     signerAddress,
@@ -306,18 +305,7 @@ async function submitAction(
   await assertSignerNetwork(signer, expectedChainId);
   let submission: ShieldedSubmissionAnchor | undefined;
   if (input.onSubmitting) {
-    const [nonce, fromBlock] = await Promise.all([
-      provider.getTransactionCount(signerAddress, "pending"),
-      provider.getBlockNumber(),
-    ]);
-    if (
-      !Number.isSafeInteger(nonce) ||
-      nonce < 0 ||
-      !Number.isSafeInteger(fromBlock) ||
-      fromBlock < 0
-    )
-      throw new Error("Transaction submission anchor is invalid");
-    submission = { nonce, fromBlock, signerAddress };
+    submission = await readPublicSubmissionAnchor(provider, signerAddress);
   }
   if (action === "claim" || (action === "fund" && data.fundMode === 0n)) {
     await assertTimeBoundActionCurrent(pool, provider, data);
@@ -328,26 +316,36 @@ async function submitAction(
     if (!block || activeReceipts.some((item) => BigInt(block.timestamp) >= item.deadline))
       throw new Error("The receive authorization expired before submission. Prepare and confirm a fresh preview.");
   }
-  // This synchronous boundary lets the caller recheck lock/context state after
-  // every preparatory RPC read, before recording an unknown broadcast attempt.
-  onStage?.("submitting");
-  const endWalletRequest = input.onWalletRequest?.();
-  let tx: ContractTransactionResponse;
-  try {
-    if (submission) input.onSubmitting?.(submission);
-    tx = await method(...args, {
-      ...valueOverrides,
-      chainId: expectedChainId,
-      gasLimit,
-      ...feeOverrides,
+  const fromBlock = submission?.fromBlock ?? await provider.getBlockNumber();
+  if (!Number.isSafeInteger(fromBlock) || fromBlock < 0)
+    throw new Error("Transaction submission block is unavailable");
+  const { transactionHash, receipt } = await executeChainTransaction<TransactionReceipt, ContractTransactionResponse>({
+    fromBlock,
+    // The callback rechecks lock/context state after every preparatory RPC read.
+    assertActive: () => onStage?.("submitting"),
+    send: async () => {
+      const endWalletRequest = input.onWalletRequest?.();
+      try {
+        if (submission) input.onSubmitting?.(submission);
+        return await method(...args, {
+          ...valueOverrides,
+          chainId: expectedChainId,
+          gasLimit,
+          ...feeOverrides,
+          ...(submission ? { nonce: submission.nonce } : {}),
+        });
+      } finally {
+        endWalletRequest?.();
+      }
+    },
+    expected: {
+      chainId: expectedChainId, from: signerAddress, to: poolAddress,
+      data: calldata, value: transactionValue,
       ...(submission ? { nonce: submission.nonce } : {}),
-    });
-  } finally {
-    endWalletRequest?.();
-  }
-  input.onBroadcast?.(tx.hash);
-  onStage?.("confirming");
-  const { transactionHash, receipt } = await waitForShieldedTransaction(tx, input.onBroadcast);
+    },
+    onSubmitted: (hash) => { input.onBroadcast?.(hash); onStage?.("confirming"); },
+    requireSuccess: false,
+  });
   return { transactionHash, receipt, gasEstimate, gasLimit };
 }
 

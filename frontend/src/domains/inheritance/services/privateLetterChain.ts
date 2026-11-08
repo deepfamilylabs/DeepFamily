@@ -1,20 +1,9 @@
 import { readArchiveBlob } from "@deepfamily/protocol-core";
-import { Contract, id, isError, keccak256, type ContractRunner, type Signer } from "ethers";
+import { type Contract, id, isError, keccak256, type Signer, type ContractTransactionResponse, type TransactionReceipt } from "ethers";
+import { executeChainTransaction, runChainRead, normalizeChainError, withConfirmedTransaction } from "@deepfamily/chain-client";
+import { createPrivateLetterContract } from "../../../shared/clients/privateLetterClient";
 import { getEventScanConfig } from "../../../shared/config/env";
 import { createIdentityAuthorizationContract } from "./shieldedIdentityAuthorizationChain";
-import { waitForShieldedTransaction } from "./shieldedTransactionReceipt";
-
-const BLOB = "tuple(bytes32 payloadHash,address pointer,uint64 payloadLength,uint32 segmentCount)";
-const DELIVERY = "tuple(uint128 messageId,uint256 checkpointId,uint64 asOf,uint64 deadline,uint256 recipientBinding)";
-export const PRIVATE_LETTER_ABI = [
-  "function AUTHORIZATION_STATE() view returns (address)", "function POOL_FACTORY() view returns (address)",
-  "function DEEP_FAMILY() view returns (address)", "function creationBlock() view returns (uint256)",
-  `function letterRecord(uint128) view returns (tuple(${BLOB} blob,uint256 recipientBinding,uint64 registeredAt,uint64 deadline))`,
-  `function registerLetter(${DELIVERY} delivery,bytes ciphertext,bytes proof)`,
-  `event LetterRegistered(uint128 indexed messageId,${BLOB} blob,uint256 recipientBinding,uint64 deadline,uint64 registeredAt)`,
-] as const;
-
-export const createPrivateLetterContract = (address: string, runner: ContractRunner) => new Contract(address, PRIVATE_LETTER_ABI, runner);
 
 export type ProvenPrivateLetter = {
   delivery: { messageId: string; checkpointId: string; asOf: string; deadline: string; recipientBinding: string };
@@ -32,11 +21,24 @@ export class PrivateLetterPreparationExpiredError extends Error {
   constructor() {
     super("The receive authorization or its checkpoint expired before letter submission");
     this.name = "PrivateLetterPreparationExpiredError";
+    normalizeChainError(this, { category: "validation", operation: "submit" });
+  }
+}
+
+export class PrivateLetterTransactionFailedError extends Error {
+  constructor(readonly transactionHash: string) {
+    super("The private letter transaction reverted");
+    this.name = "PrivateLetterTransactionFailedError";
+    normalizeChainError(this, { category: "reverted", operation: "confirm" });
   }
 }
 
 /** Only events from the configured authenticated archive become inbox candidates. */
-export async function readPrivateLetters(contract: Contract): Promise<PrivateLetterChainRecord[]> {
+export function readPrivateLetters(contract: Contract): Promise<PrivateLetterChainRecord[]> {
+  return runChainRead({ read: () => readPrivateLetterHistory(contract) });
+}
+
+async function readPrivateLetterHistory(contract: Contract): Promise<PrivateLetterChainRecord[]> {
   const provider = contract.runner?.provider;
   if (!provider) throw new Error("Private letter archive has no provider");
   const toBlock = await provider.getBlockNumber();
@@ -71,12 +73,14 @@ export async function readPrivateLetters(contract: Contract): Promise<PrivateLet
 }
 
 /** Wallet submission has no plaintext, credential, identity, recipient key or witness. */
-export async function submitPrivateLetter(input: { address: string; signer: Signer; chainId: string; letter: ProvenPrivateLetter; onWalletRequest?: () => () => void; isCurrent?: () => boolean }) {
+export async function submitPrivateLetter(input: { address: string; signer: Signer; chainId: string; letter: ProvenPrivateLetter; onWalletRequest?: () => () => void; onBroadcast?: (hash: string) => void; isCurrent?: () => boolean }) {
   const provider = input.signer.provider;
-  if (!provider || (await provider.getNetwork()).chainId !== BigInt(input.chainId)) throw new Error("Transaction wallet is connected to the wrong network");
+  if (!provider || (await provider.getNetwork()).chainId !== BigInt(input.chainId))
+    throw normalizeChainError(new Error("Transaction wallet is connected to the wrong network"), { category: "wallet", operation: "submit" });
+  const submitterAddress = await input.signer.getAddress();
   const contract = createPrivateLetterContract(input.address, input.signer);
   const { delivery, ciphertext, proof } = input.letter;
-  const existing = await contract.letterRecord(delivery.messageId);
+  const existing = await runChainRead({ read: () => contract.letterRecord(delivery.messageId) });
   if (BigInt(existing.registeredAt) !== 0n) {
     if (BigInt(existing.recipientBinding) !== BigInt(delivery.recipientBinding) ||
       String(existing.blob.payloadHash).toLowerCase() !== keccak256(ciphertext).toLowerCase() ||
@@ -90,7 +94,7 @@ export async function submitPrivateLetter(input: { address: string; signer: Sign
   if (BigInt(block.timestamp) >= BigInt(delivery.deadline)) throw new PrivateLetterPreparationExpiredError();
   const authorization = createIdentityAuthorizationContract(await contract.AUTHORIZATION_STATE(), provider);
   try {
-    await authorization.validateCheckpoint(delivery.checkpointId, delivery.asOf);
+    await runChainRead({ read: () => authorization.validateCheckpoint(delivery.checkpointId, delivery.asOf) });
   } catch (error) {
     // Only this irreversible expiry permits discarding an uncertain prior attempt.
     // RPC failures retain the original message number so a retry can reconcile it.
@@ -98,14 +102,33 @@ export async function submitPrivateLetter(input: { address: string; signer: Sign
       throw new PrivateLetterPreparationExpiredError();
     throw error;
   }
-  if (input.isCurrent && !input.isCurrent()) throw new Error("The transaction wallet changed before letter submission");
-  const finishWalletRequest = input.onWalletRequest?.();
-  let transaction;
-  try {
-    transaction = await contract.registerLetter(delivery, ciphertext, proof, { chainId: BigInt(input.chainId) });
-  } finally { finishWalletRequest?.(); }
-  const confirmed = await waitForShieldedTransaction(transaction);
+  const fromBlock = await provider.getBlockNumber();
+  if (!Number.isSafeInteger(fromBlock) || fromBlock < 0)
+    throw normalizeChainError(new Error("Letter submission block is unavailable"), { category: "validation", operation: "submit" });
+  const confirmed = await executeChainTransaction<TransactionReceipt, ContractTransactionResponse>({
+    fromBlock,
+    assertActive: () => {
+      if (input.isCurrent && !input.isCurrent())
+        throw normalizeChainError(new Error("The transaction wallet changed before letter submission"), { category: "cancelled", operation: "submit" });
+    },
+    send: async () => {
+      const finishWalletRequest = input.onWalletRequest?.();
+      try {
+        return await contract.registerLetter(delivery, ciphertext, proof, { chainId: BigInt(input.chainId) });
+      } finally { finishWalletRequest?.(); }
+    },
+    expected: {
+      chainId: BigInt(input.chainId),
+      from: submitterAddress,
+      to: input.address,
+      data: contract.interface.encodeFunctionData("registerLetter", [delivery, ciphertext, proof]),
+      value: 0n,
+    },
+    onSubmitted: input.onBroadcast,
+    requireSuccess: false,
+  });
   const receipt = confirmed.receipt;
+  if (receipt.status !== 1) throw new PrivateLetterTransactionFailedError(confirmed.transactionHash);
   const registered = receipt.logs.some((log) => {
     if (log.address.toLowerCase() !== input.address.toLowerCase()) return false;
     try {
@@ -116,6 +139,10 @@ export async function submitPrivateLetter(input: { address: string; signer: Sign
         String(event.args.blob.payloadHash).toLowerCase() === keccak256(ciphertext).toLowerCase();
     } catch { return false; }
   });
-  if (!registered) throw new Error("Letter transaction did not register the expected authenticated message");
+  if (!registered) throw withConfirmedTransaction(
+    new Error("Letter transaction did not register the expected authenticated message"),
+    confirmed.transactionHash,
+    "mismatch",
+  );
   return { transactionHash: confirmed.transactionHash };
 }

@@ -16,8 +16,9 @@ import {
   NodeDetailHashRows,
   NodeDetailNftSection,
   NodeDetailTrustedEndorsersSection,
-  type TrustedEndorserAccess,
 } from "./NodeDetailModalSections";
+
+import type { TrustedEndorserAccess } from "../model/trustedEndorserTypes";
 
 interface NodeDetailModalProps {
   open: boolean;

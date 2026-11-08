@@ -1,3 +1,4 @@
+import type { ContractReceipt } from "../../../shared/clients/transactionTypes";
 import { encodePublicStoryRecord } from "../../../shared/config/storyEncoding";
 import { ethers, type JsonRpcSigner } from "ethers";
 import {
@@ -11,10 +12,10 @@ import {
   createArchiveContract,
   createArchiveInterface,
 } from "../../../shared/clients/contractFactory";
-import { parseReceiptEvents, waitForTransactionReceipt } from "../api/txGateway";
+import { parseReceiptEvents } from "../api/txGateway";
 import { normalizeStoryTxError } from "../../../shared/lib/errors";
-import { withTransactionHash } from "../api/exactTransactionReceipt";
-import { readConfirmedDetails, verifyConfirmedDetails } from "./confirmedTransactionError";
+import { executeChainTransaction, withTransactionHash } from "@deepfamily/chain-client";
+import { readConfirmedDetails, verifyConfirmedDetails } from "@deepfamily/chain-client";
 import type { StoryRecord } from "../../../shared/model";
 import {
   archivePreviewRejectedError,
@@ -29,6 +30,7 @@ export interface AddStoryRecordResult {
   payloadLength: number;
   transactionHash: string;
   blockNumber: number;
+  receipt: ContractReceipt;
   recordsHead: string;
   newRecord: StoryRecord;
   events: {
@@ -45,27 +47,28 @@ export interface AddStoryRecordResult {
   };
 }
 
-export async function addStoryRecordService(
-  signer: JsonRpcSigner,
-  contractAddress: string,
-  tokenId: string,
-  recordIndex: number,
-  title: string,
-  content: string,
-  expectedPayloadHash: string,
-  recordType = 1,
-  attachmentURI = "",
-  confirmTransactionPreview?: (preview: ArchiveTransactionPreview) => boolean | Promise<boolean>,
-  /**
-   * The provider the page read the story through. The record index the caller
-   * passes came from it, so the pre-write state it is checked against must come
-   * from it too; the wallet's provider is a different endpoint, with its own
-   * caching, and comparing a count from one against a count from the other
-   * refused writes the chain would have taken. Signing still goes through the
-   * wallet.
-   */
-  readProvider?: ethers.Provider,
-): Promise<AddStoryRecordResult> {
+export interface AddStoryRecordCommand {
+  signer: JsonRpcSigner;
+  contractAddress: string;
+  tokenId: string;
+  recordIndex: number;
+  title: string;
+  content: string;
+  expectedPayloadHash: string;
+  recordType?: number;
+  attachmentURI?: string;
+  confirmTransactionPreview?: (preview: ArchiveTransactionPreview) => boolean | Promise<boolean>;
+  readProvider?: ethers.Provider;
+  assertActive?: () => void;
+  onSubmitted?: (transactionHash: string) => void;
+  onConfirmed?: (transactionHash: string, receipt: ContractReceipt) => void;
+}
+
+export async function addStoryRecordService({
+  signer, contractAddress, tokenId, recordIndex, title, content, expectedPayloadHash,
+  recordType = 1, attachmentURI = "", confirmTransactionPreview, readProvider,
+  assertActive, onSubmitted, onConfirmed,
+}: AddStoryRecordCommand): Promise<AddStoryRecordResult> {
   const deepFamily = createDeepFamilyContract(contractAddress, signer);
   let errorContract = deepFamily;
   let transactionHash: string | undefined;
@@ -128,9 +131,10 @@ export async function addStoryRecordService(
     if (!confirmTransactionPreview || !(await confirmTransactionPreview(preview))) {
       throw archivePreviewRejectedError("Story submission cancelled before wallet request");
     }
-    const [currentNetwork, currentAuthor] = await Promise.all([
+    const [currentNetwork, currentAuthor, fromBlock] = await Promise.all([
       signer.provider.getNetwork(),
       signer.getAddress(),
+      signer.provider.getBlockNumber(),
     ]);
     if (
       currentNetwork.chainId !== network.chainId ||
@@ -140,9 +144,16 @@ export async function addStoryRecordService(
         key: "archive.errors.walletScopeChanged",
       });
     }
-    const tx = await contract.appendStoryRecord(...args, { gasLimit: preview.gasLimit });
-    transactionHash = tx.hash;
-    const receipt = await waitForTransactionReceipt(tx);
+    const tracked = await executeChainTransaction<ContractReceipt>({
+      fromBlock,
+      assertActive,
+      send: () => contract.appendStoryRecord(...args, { gasLimit: preview.gasLimit }),
+      expected: { chainId: network.chainId, from: author, to: archiveAddress,
+        data: contract.interface.encodeFunctionData("appendStoryRecord", args), value: 0n },
+      onSubmitted: (hash) => { transactionHash = hash; onSubmitted?.(hash); },
+    });
+    const { receipt } = tracked;
+    transactionHash = tracked.transactionHash;
     const event = parseReceiptEvents(receipt, createArchiveInterface(), archiveAddress).find(
       (item) => item.name === "StoryRecordAppended",
     );
@@ -153,20 +164,21 @@ export async function addStoryRecordService(
       Number(event.args.index) !== recordIndex ||
       event.args.schemaId !== STORY_ENVELOPE_SCHEMA_ID ||
       String(event.args.author).toLowerCase() !== author.toLowerCase() ||
-      String(receipt.hash ?? receipt.transactionHash).toLowerCase() !== tx.hash.toLowerCase()
+      String(receipt.hash ?? receipt.transactionHash).toLowerCase() !== tracked.transactionHash.toLowerCase()
     ) {
       throw archiveValidationError("Story receipt does not match the frozen record", {
         key: "archive.errors.confirmationMismatch",
       });
     }
-    return await verifyConfirmedDetails(tx.hash, async () => {
+    onConfirmed?.(tracked.transactionHash, receipt);
+    return await verifyConfirmedDetails(tracked.transactionHash, async () => {
       const expectedBlob = {
         payloadHash,
         payloadLength: preview.payloadBytes,
         segmentCount: preview.segmentCount,
       };
       assertBlobRefMatches(event.args.blob, expectedBlob);
-      const [ref, finalState] = await readConfirmedDetails(tx.hash, () =>
+      const [ref, finalState] = await readConfirmedDetails(tracked.transactionHash, () =>
         Promise.all([
           contract.storyRecordRef(tokenId, recordIndex, { blockTag: receipt.blockNumber }),
           contract.storyState(tokenId, { blockTag: receipt.blockNumber }),
@@ -227,8 +239,9 @@ export async function addStoryRecordService(
       return {
         recordIndex,
         payloadLength: preview.payloadBytes,
-        transactionHash: tx.hash,
-        blockNumber: receipt.blockNumber,
+        transactionHash: tracked.transactionHash,
+        blockNumber: Number(receipt.blockNumber),
+        receipt,
         recordsHead: event.args.newHead,
         newRecord,
         events: {

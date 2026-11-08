@@ -1,4 +1,5 @@
 import fs from "node:fs/promises";
+import { executeChainTransaction, instrumentChainContract, readConfirmedDetails, normalizeChainError } from "@deepfamily/chain-client";
 import path from "node:path";
 import {
   INTEGRATED_DEPLOYMENT_RECORDS,
@@ -221,7 +222,7 @@ const assertGovernanceOwnerInvariants = async ({
       implementation: address,
       spec: { needsLibraries: false },
     });
-    timelock = await ethers.getContractAt("GovernanceTimelock", address);
+    timelock = instrumentChainContract(await ethers.getContractAt("GovernanceTimelock", address));
     minDelay = await timelock.getMinDelay();
     if (minDelay <= 0n) {
       throw new Error(
@@ -614,21 +615,25 @@ export const deployIntegratedSystem = async (
   const executeTransaction = async (label, transactionRequest, kind = "call") => {
     let receipt;
     if (transactionExecutor) {
-      receipt = await transactionExecutor({
-        label,
-        kind,
-        transactionRequest,
-        signer: deployer,
-        transactionConfirmations,
-        transactionTimeoutMs,
-      });
+      try {
+        receipt = await transactionExecutor({
+          label, kind, transactionRequest, signer: deployer,
+          transactionConfirmations, transactionTimeoutMs,
+        });
+      } catch (error) {
+        // An injected executor owns its submit/confirm boundary; preserve that stage.
+        throw normalizeChainError(error);
+      }
     } else {
-      const transaction = await deployer.sendTransaction(transactionRequest);
-      if (!transaction?.hash) throw new Error(`${label} transaction hash is unavailable`);
-      await onTransactionSubmitted?.(label, transaction, { kind });
-      // ethers v6 removes its transaction/block listeners when this native timeout fires. A
-      // Promise.race wrapper would return control but leave the underlying wait running.
-      receipt = await transaction.wait(transactionConfirmations, transactionTimeoutMs);
+      ({ receipt } = await executeChainTransaction({
+        provider: deployer.provider,
+        send: () => deployer.sendTransaction(transactionRequest),
+        replacementPolicy: kind === "deployment" ? "reject" : "fee-only",
+        confirmations: transactionConfirmations,
+        timeoutMs: transactionTimeoutMs,
+        onTransactionSubmitted: (transaction) => onTransactionSubmitted?.(label, transaction, { kind }),
+        label,
+      }));
     }
     if (!receipt) throw new Error(`${label} transaction was not confirmed`);
     if (Number(receipt.status) !== 1) throw new Error(`${label} transaction reverted`);
@@ -643,10 +648,10 @@ export const deployIntegratedSystem = async (
       throw new Error(`${label} receipt does not contain a deployment address`);
     }
     const address = ethers.getAddress(receipt.contractAddress);
-    if ((await ethers.provider.getCode(address)) === "0x") {
+    if ((await readConfirmedDetails(receipt.hash, () => ethers.provider.getCode(address))) === "0x") {
       throw new Error(`${label} has no runtime code at ${address}`);
     }
-    return factory.attach(address);
+    return instrumentChainContract(factory.attach(address));
   };
 
   // Validate the GovernanceTimelock up front so a misconfigured live deployment fails before any
@@ -756,7 +761,7 @@ export const deployIntegratedSystem = async (
       [tokenAddress, deployerAddress],
       deployContract,
     );
-  const deepFamily = await ethers.getContractAt("DeepFamily", deepFamilyAddress, deployer);
+  const deepFamily = instrumentChainContract(await ethers.getContractAt("DeepFamily", deepFamilyAddress, deployer));
 
   const bound = await token.deepFamilyContract().catch(() => ethers.ZeroAddress);
   if (bound === ethers.ZeroAddress) {
@@ -917,11 +922,11 @@ export const deployIntegratedSystem = async (
   receive.privateLetterArchive = await deployContract("privateLetterArchive",
     await ethers.getContractFactory("PrivateLetterArchive", deployer),
     receiveDeploymentConstructorArgs("privateLetterArchive", receiveAddresses));
-  const shieldedErc20Pool = await ethers.getContractAt(
+  const shieldedErc20Pool = instrumentChainContract(await ethers.getContractAt(
     "ShieldedErc20Pool",
     await shieldedPoolFactory.poolFor(tokenAddress),
     deployer,
-  );
+  ));
   const shielded = {
     ...receive,
     shieldedVerifiers,
@@ -1166,11 +1171,11 @@ export const ensureIntegratedSystem = async (
         shieldedVerifiers: {},
       };
       for (const record of records) {
-        const contract = await ethers.getContractAt(
+        const contract = instrumentChainContract(await ethers.getContractAt(
           record.contractName,
           record.deployment.address,
           signer,
-        );
+        ));
         const parts = record.property.split(".");
         const target = parts.length === 1 ? deployed : deployed[parts[0]];
         target[parts.at(-1)] = contract;

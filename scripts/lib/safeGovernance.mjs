@@ -1,3 +1,4 @@
+import { createChainContract, runChainRead } from "@deepfamily/chain-client";
 import Safe from "@safe-global/protocol-kit";
 import {
   getCompatibilityFallbackHandlerDeployments,
@@ -707,7 +708,7 @@ export const inspectCanonicalSafeInfrastructure = async ({ provider, chainId }) 
     };
   }
 
-  const proxyFactory = new ethers.Contract(
+  const proxyFactory = createChainContract(
     metadata.proxyFactory.address,
     metadata.proxyFactory.abi,
     ethersProvider,
@@ -938,9 +939,11 @@ export const assertCanonicalSafeOperationalAcceptance = async ({
     transactionHash,
   );
   const ethersProvider = asEthersProvider(provider);
-  await assertProviderChain(ethersProvider, normalizedChainId);
+  await runChainRead({ read: () => assertProviderChain(ethersProvider, normalizedChainId), transactionHash: normalizedTransactionHash });
 
-  const transaction = await ethersProvider.getTransaction(normalizedTransactionHash);
+  const transaction = await runChainRead({
+    read: () => ethersProvider.getTransaction(normalizedTransactionHash), transactionHash: normalizedTransactionHash,
+  });
   if (!transaction) {
     throw new Error("Safe operational acceptance transaction is unavailable from the RPC");
   }
@@ -1027,7 +1030,9 @@ export const assertCanonicalSafeOperationalAcceptance = async ({
     throw new Error("Safe operational acceptance refund and payment gas fields must all be zero");
   }
 
-  const receipt = await ethersProvider.getTransactionReceipt(normalizedTransactionHash);
+  const receipt = await runChainRead({
+    read: () => ethersProvider.getTransactionReceipt(normalizedTransactionHash), transactionHash: normalizedTransactionHash,
+  });
   if (!receipt || Number(receipt.status) !== 1 || !Array.isArray(receipt.logs)) {
     throw new Error("Safe operational acceptance receipt is missing or reverted");
   }
@@ -1174,7 +1179,7 @@ export const assertCanonicalSafeProfile = async ({
   }
 
   const proxyCode = await ethersProvider.getCode(normalizedSafeAddress);
-  const proxyFactory = new ethers.Contract(
+  const proxyFactory = createChainContract(
     metadata.proxyFactory.address,
     metadata.proxyFactory.abi,
     ethersProvider,
@@ -1185,7 +1190,7 @@ export const assertCanonicalSafeProfile = async ({
     canonicalRuntimeCode: canonicalProxyRuntimeCode,
   });
 
-  const safeContract = new ethers.Contract(
+  const safeContract = createChainContract(
     normalizedSafeAddress,
     [...metadata.singleton.abi, "function masterCopy() view returns (address)"],
     ethersProvider,

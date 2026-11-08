@@ -3,6 +3,7 @@ import type {
   ShieldedAssetSessionState,
 } from "./shieldedAssetWorkerTypes";
 import { isPublicStateSyncProgress, publishPublicStateSyncProgress, type PublicStateSyncProgress } from "./publicStateSyncProgress";
+import { restoreChainError } from "@deepfamily/chain-client";
 
 type Pending = {
   resolve: (value: unknown) => void;
@@ -106,7 +107,7 @@ function ensureWorker(): Worker {
     progressWatermarks.clear();
     clearTimeout(entry.timer);
     if (message.ok) entry.resolve(message.result);
-    else entry.reject(new Error(message.error?.message ?? "Asset operation failed"));
+    else entry.reject(restoreChainError(message.error));
   });
   instance.addEventListener("error", () => {
     if (worker === instance) terminateShieldedAssetWorker();

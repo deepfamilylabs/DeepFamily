@@ -8,6 +8,7 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import { ethers } from "ethers";
+import { createChainContract } from "@deepfamily/chain-client";
 import seedHelpers from "../../lib/seedHelpers.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -157,7 +158,7 @@ async function updateLocalConfig() {
       process.exit(1);
     }
 
-    const deepFamily = new ethers.Contract(contractAddress, deepFamilyDeployment.abi, provider);
+    const deepFamily = createChainContract(contractAddress, deepFamilyDeployment.abi, provider);
 
     const [localChain, poolCode, nativeCode, factoryCode] = await Promise.all([
       provider.getNetwork(),
@@ -171,10 +172,10 @@ async function updateLocalConfig() {
     ) {
       throw new Error("Local shielded deployment is missing or belongs to another chain");
     }
-    const pool = new ethers.Contract(poolAddress, poolDeployment.abi, provider);
-    const nativePool = new ethers.Contract(nativePoolAddress, nativeDeployment.abi, provider);
-    const letters = new ethers.Contract(lettersAddress, lettersDeployment.abi, provider);
-    const factory = new ethers.Contract(factoryAddress, factoryDeployment.abi, provider);
+    const pool = createChainContract(poolAddress, poolDeployment.abi, provider);
+    const nativePool = createChainContract(nativePoolAddress, nativeDeployment.abi, provider);
+    const letters = createChainContract(lettersAddress, lettersDeployment.abi, provider);
+    const factory = createChainContract(factoryAddress, factoryDeployment.abi, provider);
     const [
       familyToken,
       familyLineage,

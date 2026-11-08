@@ -79,20 +79,12 @@ describe("story transaction flows", () => {
       ).resolves.toBe(serviceResult);
     });
 
-    expect(mocks.addStoryRecordService).toHaveBeenCalledWith(
-      mocks.wallet.signer,
-      mocks.config.contractAddress,
-      "7",
-      2,
-      "",
-      "hello",
-      "0xexpected",
-      1,
-      "ipfs://record",
-      undefined,
-      // no rpcUrl in this config, so no readonly provider to read the story through
-      undefined,
-    );
+    expect(mocks.addStoryRecordService).toHaveBeenCalledWith(expect.objectContaining({
+      signer: mocks.wallet.signer, contractAddress: mocks.config.contractAddress,
+      tokenId: "7", recordIndex: 2, title: "", content: "hello", expectedPayloadHash: "0xexpected",
+      recordType: 1, attachmentURI: "ipfs://record", readProvider: undefined,
+      onSubmitted: expect.any(Function), onConfirmed: expect.any(Function), assertActive: expect.any(Function),
+    }));
     expect(result.current.status).toBe("success");
     expect(result.current.result).toBe(serviceResult);
   });
@@ -113,12 +105,10 @@ describe("story transaction flows", () => {
       await expect(result.current.runOrThrow({ tokenId: "9" })).resolves.toBe(serviceResult);
     });
 
-    expect(mocks.sealStoryService).toHaveBeenCalledWith(
-      mocks.wallet.signer,
-      mocks.config.contractAddress,
-      "9",
-      undefined,
-    );
+    expect(mocks.sealStoryService).toHaveBeenCalledWith(expect.objectContaining({
+      signer: mocks.wallet.signer, contractAddress: mocks.config.contractAddress, tokenId: "9",
+      onSubmitted: expect.any(Function), onConfirmed: expect.any(Function), assertActive: expect.any(Function),
+    }));
     expect(result.current.status).toBe("success");
     expect(result.current.result).toBe(serviceResult);
   });

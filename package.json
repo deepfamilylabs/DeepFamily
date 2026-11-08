@@ -7,14 +7,16 @@
   "type": "module",
   "workspaces": [
     "frontend",
-    "packages/protocol-core"
+    "packages/protocol-core",
+    "packages/chain-client"
   ],
   "scripts": {
     "build": "hardhat --config hardhat.config.mjs --build-profile production compile",
     "pages:build": "npm ci --workspace deepfamily-frontend --include-workspace-root=false --no-audit --no-fund && npm run build --workspace deepfamily-frontend",
-    "pretest": "npm run test:protocol",
+    "pretest": "npm run test:protocol && npm run test:chain-client",
     "test": "cross-env REQUIRE_REAL_RECEIVE_PROOFS=1 hardhat --config hardhat.config.mjs test mocha",
     "test:protocol": "node scripts/generate-unicode-normalization-data.mjs --check && node scripts/generate-precis-data.mjs --check && npm test --workspace @deepfamily/protocol-core",
+    "test:chain-client": "node scripts/check-chain-client-boundaries.mjs && npm test --workspace @deepfamily/chain-client",
     "test:circuits": "node --test circuits/test/shielded_*.test.mjs",
     "deploy:net": "hardhat --config hardhat.config.mjs --build-profile production run scripts/deploy-integrated.mjs --network $npm_config_net",
     "deploy:timelock": "hardhat --config hardhat.config.mjs --build-profile production run scripts/deploy-timelock.mjs --network $npm_config_net",
@@ -144,7 +146,8 @@
     "big-integer": "^1.6.52",
     "dotenv": "^16.0.0",
     "poseidon-lite": "^0.3.0",
-    "poseidon-solidity": "^0.0.5"
+    "poseidon-solidity": "^0.0.5",
+    "@deepfamily/chain-client": "0.1.0"
   },
   "engines": {
     "node": ">=22.18.0"

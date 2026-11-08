@@ -1,3 +1,5 @@
+import { createChainContract } from "@deepfamily/chain-client";
+import IdentityAuthorizationState from "../../abi/IdentityAuthorizationState.json";
 import {
   createShieldedIdentityAuthorizationTree,
   bigintFrom,
@@ -7,7 +9,7 @@ import {
   type ShieldedIdentityAuthorizationWitness,
 } from "@deepfamily/protocol-core";
 import {
-  Contract,
+  type Contract,
   getAddress,
   type BigNumberish,
   type ContractRunner,
@@ -21,18 +23,7 @@ import {
   type ShieldedStateReadMode,
 } from "../config/shieldedStateReadMode";
 
-export const IDENTITY_AUTHORIZATION_ABI = [
-  "function creationBlock() view returns (uint256)",
-  "function currentCheckpointId() view returns (uint256)",
-  "function currentRoot() view returns (uint256)",
-  "function getCheckpoint(uint256) view returns (tuple(uint256 root,uint64 createdAt,uint64 retiredAt))",
-  "function validateCheckpoint(uint256,uint64) view returns (uint256)",
-  "function getCounterProof(uint256 aliasR) view returns (tuple(uint64 authorizationCounter,uint256 stateRoot,uint256 depth,uint256[64] siblings,uint256 oldKey,uint64 oldValue,bool isOld0,bool absent))",
-  "function getStateSnapshotHeader() view returns (tuple(uint256 formatVersion,uint64 rootNodeId,uint64 nodeCount,uint256 root,uint256 checkpointId))",
-  "function getNodePage(uint256 startId,uint256 limit) view returns (tuple(uint256 hash,uint256 key,uint64 counter,uint64 left,uint64 right)[])",
-  "function incrementCounter(uint256 authorizationNullifier,uint256 aliasR,uint64 oldCounter,uint64 newCounter,bytes proof)",
-  "event CounterIncremented(uint256 indexed checkpointId,uint256 indexed aliasR,uint64 oldCounter,uint64 newCounter,uint256 oldRoot,uint256 newRoot,uint256 authorizationNullifier)",
-] as const;
+export const IDENTITY_AUTHORIZATION_ABI = IdentityAuthorizationState.abi;
 
 type AuthorizationTree = ReturnType<typeof createShieldedIdentityAuthorizationTree>;
 type VerifiedReplay = {
@@ -53,7 +44,7 @@ export type ShieldedIdentityAuthorizationScope = {
 };
 
 export function createIdentityAuthorizationContract(address: string, runner: ContractRunner) {
-  return new Contract(address, IDENTITY_AUTHORIZATION_ABI, runner);
+  return createChainContract(address, IDENTITY_AUTHORIZATION_ABI, runner);
 }
 
 /** Read one chain-native path at a fixed block; RPC observers can see the queried alias. */

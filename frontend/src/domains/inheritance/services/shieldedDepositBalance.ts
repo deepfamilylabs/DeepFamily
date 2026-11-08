@@ -1,3 +1,4 @@
+import { normalizeChainError } from "@deepfamily/chain-client";
 import { getBigInt, type BigNumberish, type Contract } from "ethers";
 
 /** Public-wallet funds and pool allowance are separate prerequisites for a deposit. */
@@ -10,6 +11,7 @@ export class ShieldedDepositBalanceError extends Error {
     this.name = "ShieldedDepositBalanceError";
     this.balance = balance;
     this.amount = amount;
+    normalizeChainError(this, { category: "validation", operation: "submit" });
   }
 }
 

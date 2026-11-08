@@ -1,3 +1,4 @@
+import { trackedTransactionHash } from "../../../model/txStatus";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -85,6 +86,7 @@ export function useMintNftModalController({
   }, []);
   const {
     status: mintNftStatus,
+    tracking: mintNftTracking,
     reset: resetMintNftFlow,
     runOrThrow: runMintNftOrThrow,
   } = useMintNftFlow({ confirmTransactionPreview });
@@ -224,7 +226,7 @@ export function useMintNftModalController({
     kind: "mint",
     label: t("mintNFT.title", "Mint NFT"),
     phase,
-    transactionHash: successResult?.transactionHash ?? errorResult?.transactionHash,
+    transactionHash: trackedTransactionHash(mintNftTracking) ?? successResult?.transactionHash ?? errorResult?.transactionHash,
     error: errorResult,
   });
 

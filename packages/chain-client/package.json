@@ -1,0 +1,29 @@
+{
+  "name": "@deepfamily/chain-client",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "import": "./index.js",
+      "default": "./index.js"
+    }
+  },
+  "main": "./index.js",
+  "types": "./index.d.ts",
+  "files": [
+    "*.js",
+    "*.d.ts"
+  ],
+  "scripts": {
+    "test": "node --test test/*.test.js"
+  },
+  "dependencies": {
+    "ethers": "6.17.0"
+  },
+  "engines": {
+    "node": ">=22.18.0"
+  }
+}

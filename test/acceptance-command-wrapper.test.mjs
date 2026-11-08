@@ -2,6 +2,9 @@ import { expect } from "chai";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import vm from "node:vm";
+import ts from "typescript";
+import { getChainErrorDetails, waitForTransactionHashReceipt } from "@deepfamily/chain-client";
 
 import { ESPACE_CHAIN_PROFILE, ETHEREUM_CHAIN_PROFILE } from "../scripts/lib/chainProfiles.mjs";
 import {
@@ -23,6 +26,29 @@ const CHECK_RESULT = Object.freeze({
   protocolManifestSha256: "d".repeat(64),
   receiveManifestSha256: "e".repeat(64),
 });
+
+async function acceptanceReceiptRecorder({ confirmations = 3, waitForTransaction }) {
+  const source = await fs.readFile("scripts/evm-acceptance.mjs", "utf8");
+  const parsed = ts.createSourceFile("evm-acceptance.mjs", source, ts.ScriptTarget.Latest, true);
+  let initializer;
+  const visit = (node) => {
+    if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.name.text === "recordReceipt")
+      initializer = node.initializer;
+    ts.forEachChild(node, visit);
+  };
+  visit(parsed);
+  expect(initializer, "the real acceptance receipt recorder").to.exist;
+  const report = { transactions: {} };
+  let saves = 0;
+  const record = vm.runInNewContext(`(${initializer.getText(parsed)})`, {
+    assertCondition: (value, message) => { if (!value) throw new Error(message); },
+    config: { confirmations }, TX_TIMEOUT_MS: 7500,
+    provider: { waitForTransaction }, waitForTransactionHashReceipt,
+    publicReceipt: (receipt) => receipt, report,
+    saveReport: async () => { saves++; },
+  });
+  return { record, report, saves: () => saves };
+}
 
 const runFixture = async ({
   chainProfile,
@@ -436,6 +462,82 @@ describe("acceptance command wrapper", function () {
     const rpcConnect = source.indexOf("await hre.network.create()");
     expect(wrapperCheck).to.be.greaterThan(-1);
     expect(rpcConnect).to.be.greaterThan(wrapperCheck);
+  });
+
+  it("passes the deployed Archive into the acceptance NFT mint", async function () {
+    // Execute only the real call expression: running the acceptance engine itself sends transactions.
+    const source = await fs.readFile("scripts/evm-acceptance.mjs", "utf8");
+    const parsed = ts.createSourceFile("evm-acceptance.mjs", source, ts.ScriptTarget.Latest, true);
+    const mintCalls = [];
+    const visit = (node) => {
+      if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) &&
+          node.expression.text === "mintPersonVersionNFT") mintCalls.push(node);
+      ts.forEachChild(node, visit);
+    };
+    visit(parsed);
+    expect(mintCalls).to.have.lengthOf(1);
+    const archive = Object.freeze({ address: "deployed archive" });
+    const deepFamily = Object.freeze({ address: "deployed family" });
+    const runDeployer = Object.freeze({ address: "run deployer" });
+    const input = vm.runInNewContext(mintCalls[0].getText(parsed), {
+      mintPersonVersionNFT: (args) => args,
+      archive, deepFamily, runDeployer,
+      personHash: "test person hash", person: { fullName: "Acceptance test" },
+      config: { runId: "test" }, CHAIN_PROFILE: { displayName: "Test chain" },
+      disclosureProofArtifactPaths: {},
+    });
+    expect(input.archive).to.equal(archive);
+    expect(input.deepFamily).to.equal(deepFamily);
+    expect(input.signer).to.equal(runDeployer);
+  });
+
+  it("waits for configured confirmations before recording a helper's receipt", async function () {
+    const receipt = { hash: `0x${"ab".repeat(32)}`, status: 1, blockNumber: 10 };
+    let release;
+    const wait = new Promise((resolve) => { release = resolve; });
+    const calls = [];
+    const fixture = await acceptanceReceiptRecorder({
+      waitForTransaction: (...args) => { calls.push(args); return wait; },
+    });
+    const pending = fixture.record("helper-mint", receipt);
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(calls).to.deep.equal([[receipt.hash, 3, 7500]]);
+    expect(fixture.saves()).to.equal(0);
+    expect(fixture.report.transactions).not.to.have.property("helper-mint");
+    release(receipt);
+    await pending;
+    expect(fixture.report.transactions["helper-mint"]).to.equal(receipt);
+    expect(fixture.saves()).to.equal(1);
+  });
+
+  it("does not record or resend a helper transaction when confirmation waiting times out", async function () {
+    const receipt = { hash: `0x${"bc".repeat(32)}`, status: 1, blockNumber: 10 };
+    const timeout = Object.assign(new Error("confirmation timeout"), { code: "TIMEOUT" });
+    let waits = 0;
+    const fixture = await acceptanceReceiptRecorder({
+      waitForTransaction: async () => { waits++; throw timeout; },
+    });
+    let failure;
+    try { await fixture.record("helper-mint", receipt); } catch (error) { failure = error; }
+    expect(failure).to.equal(timeout);
+    expect(getChainErrorDetails(failure)).to.include({ transactionHash: receipt.hash, retryable: false });
+    expect(waits).to.equal(1);
+    expect(fixture.saves()).to.equal(0);
+    expect(fixture.report.transactions).to.deep.equal({});
+  });
+
+  for (const [name, confirmations, options] of [
+    ["a one-confirmation receipt", 1, undefined],
+    ["an executor receipt that already satisfies the policy", 3, { confirmationsSatisfied: true }],
+  ]) it(`does not wait again for ${name}`, async function () {
+    let waits = 0;
+    const fixture = await acceptanceReceiptRecorder({
+      confirmations, waitForTransaction: async () => { waits++; throw new Error("unexpected extra wait"); },
+    });
+    const receipt = { hash: `0x${"cd".repeat(32)}`, status: 1, blockNumber: 10 };
+    await fixture.record("helper-mint", receipt, options);
+    expect(waits).to.equal(0);
+    expect(fixture.saves()).to.equal(1);
   });
 
   it("self-validates and publishes release evidence before reporting a passed rehearsal", async function () {

@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { Signer } from "ethers";
+import { normalizeFriendlyError, type ChainFriendlyError } from "../../../shared/lib/errors";
 import type { ShieldedAssetWorkerCallMap, ShieldedWorkerContext } from "../../../shared/workers/shieldedAssetWorkerTypes";
 import { shieldedAssetWorkerCall, subscribeShieldedAssetWorkerLock } from "../../../shared/workers/shieldedAssetWorkerClient";
 import { getWalletConnectionGeneration, subscribeWalletConnectionChange } from "../../wallet";
-import { PrivateLetterPreparationExpiredError, submitPrivateLetter, type ProvenPrivateLetter } from "../services/privateLetterChain";
+import { PrivateLetterPreparationExpiredError, PrivateLetterTransactionFailedError, submitPrivateLetter, type ProvenPrivateLetter } from "../services/privateLetterChain";
 import { FIELD_TEXTAREA, FieldBlock, PanelButton } from "./inheritanceControls";
 
 export type PrivateLetterView = "write" | "inbox";
@@ -22,8 +23,13 @@ export function PrivateLettersPanel(props: {
   const [code, setCode] = useState("");
   const [body, setBody] = useState("");
   const [working, setWorking] = useState(false);
-  const [error, setError] = useState("");
-  const [sent, setSent] = useState("");
+  const [error, setErrorState] = useState<ChainFriendlyError | null>(null);
+  const setError = useCallback((message: string, cause?: unknown) => {
+    setErrorState(message ? normalizeFriendlyError(cause ?? new Error(message), t, { message }) : null);
+  }, [t]);
+  const [submission, setSubmission] = useState<{
+    transactionHash: string; state: "pending" | "confirmed" | "unknown" | "verificationFailed" | "failed";
+  } | null>(null);
   const [inbox, setInbox] = useState<ShieldedAssetWorkerCallMap["recoverLetters"]["result"] | null>(null);
   const prepared = useRef<ProvenPrivateLetter | null>(null);
   const epoch = useRef(0);
@@ -57,7 +63,7 @@ export function PrivateLettersPanel(props: {
   }, []);
   useEffect(() => subscribeShieldedAssetWorkerLock(() => {
     const wasWorking = activeOperation.current !== null;
-    epoch.current++; activeOperation.current = null; setCode(""); setBody(""); setInbox(null); setError(""); setSent(""); prepared.current = null; setWorking(false);
+    epoch.current++; activeOperation.current = null; setCode(""); setBody(""); setInbox(null); setError(""); setSubmission(null); prepared.current = null; setWorking(false);
     if (wasWorking) busyChange.current?.(false);
   }), []);
   useEffect(() => subscribeWalletConnectionChange(invalidateSending), [invalidateSending]);
@@ -75,7 +81,7 @@ export function PrivateLettersPanel(props: {
     // The read strategy changes neither the recipient nor the unlocked keys.
     // Keep their displayed content until the new read finishes.
     if (previousContentScope.current !== contentScope) {
-      setCode(""); setBody(""); setInbox(null); setError(""); setSent("");
+      setCode(""); setBody(""); setInbox(null); setError(""); setSubmission(null);
     }
     previousContentScope.current = contentScope;
     prepared.current = null;
@@ -96,15 +102,34 @@ export function PrivateLettersPanel(props: {
       }, { timeoutMs: 1_200_000 });
       if (!current()) return;
       prepared.current = letter;
-      const result = await submitPrivateLetter({ address: props.context.lettersAddress, signer: props.signer, chainId: props.context.chainId, letter, onWalletRequest: props.beginWalletRequest, isCurrent: current });
+      const result = await submitPrivateLetter({
+        address: props.context.lettersAddress, signer: props.signer, chainId: props.context.chainId,
+        letter, onWalletRequest: props.beginWalletRequest, isCurrent: current,
+        onBroadcast: (transactionHash) => {
+          if (current()) setSubmission({ transactionHash, state: "pending" });
+        },
+      });
       if (!current()) return;
-      setSent(result.transactionHash); setBody(""); setCode(""); prepared.current = null;
+      setSubmission({ transactionHash: result.transactionHash, state: "confirmed" }); setBody(""); setCode(""); prepared.current = null;
     } catch (cause) {
       if (current()) {
         if (cause instanceof PrivateLetterPreparationExpiredError) {
           prepared.current = null;
-          setError(tr("preparationExpired"));
-        } else setError(tr("sendFailed"));
+          setError(tr("preparationExpired"), cause);
+        } else if (cause instanceof PrivateLetterTransactionFailedError) {
+          setSubmission({ transactionHash: cause.transactionHash, state: "failed" });
+          setError(t("transaction.failed"), cause);
+          prepared.current = null;
+        } else {
+          const publicError = normalizeFriendlyError(cause, t);
+          if (publicError.transactionHash) {
+            setSubmission({
+              transactionHash: publicError.transactionHash,
+              state: publicError.transactionConfirmed ? "verificationFailed" : "unknown",
+            });
+            setError(tr(publicError.transactionConfirmed ? "confirmedDetailsUnavailable" : "confirmationPending"), cause);
+          } else setError(tr("sendFailed"), cause);
+        }
       }
     }
     finally { if (mounted.current && version === epoch.current) { activeOperation.current = null; setWorking(false); busyChange.current?.(false); } }
@@ -117,7 +142,7 @@ export function PrivateLettersPanel(props: {
     try {
       const result = await shieldedAssetWorkerCall("recoverLetters", { context: props.context }, { timeoutMs: 1_200_000 });
       if (mounted.current && version === epoch.current) setInbox(result);
-    } catch { if (mounted.current && version === epoch.current) setError(tr("recoverFailed")); }
+    } catch (cause) { if (mounted.current && version === epoch.current) setError(tr("recoverFailed"), cause); }
     finally { if (mounted.current && version === epoch.current) { activeOperation.current = null; setWorking(false); busyChange.current?.(false); } }
   }
   // Entering the inbox reads once for this key/context. Busy state changes and
@@ -140,8 +165,8 @@ export function PrivateLettersPanel(props: {
     {props.context.lettersAddress && !props.recoveryReady ? <p className="text-sm text-ink-muted">{tr("recoveryKeysRequired")}</p> : null}
     {props.mode === "write" ? <div className="space-y-4">
       <p className="text-sm text-ink-muted">{tr("writeHint")}</p>
-      <FieldBlock label={tr("recipientCode")}><textarea aria-label={tr("recipientCode")} className={FIELD_TEXTAREA} rows={3} disabled={busy} value={code} onChange={event => { setCode(event.target.value); prepared.current = null; setSent(""); }} /></FieldBlock>
-      <FieldBlock label={tr("body")}><textarea aria-label={tr("body")} className={FIELD_TEXTAREA} rows={6} disabled={busy} value={body} onChange={event => { setBody(event.target.value); prepared.current = null; setSent(""); }} /></FieldBlock>
+      <FieldBlock label={tr("recipientCode")}><textarea aria-label={tr("recipientCode")} className={FIELD_TEXTAREA} rows={3} disabled={busy} value={code} onChange={event => { setCode(event.target.value); prepared.current = null; setSubmission(null); }} /></FieldBlock>
+      <FieldBlock label={tr("body")}><textarea aria-label={tr("body")} className={FIELD_TEXTAREA} rows={6} disabled={busy} value={body} onChange={event => { setBody(event.target.value); prepared.current = null; setSubmission(null); }} /></FieldBlock>
       <PanelButton disabled={busy || !props.context.lettersAddress || !props.signer || !code.trim() || !body.trim()} onClick={() => void send()}>{working ? tr("working") : tr("send")}</PanelButton>
     </div> : null}
     {props.mode === "inbox" && inbox ? <div className="space-y-3">
@@ -153,7 +178,10 @@ export function PrivateLettersPanel(props: {
       </article>)}
     </div> : null}
     {working ? <p role="status" className="text-sm text-ink-muted">{tr("working")}</p> : null}
-    {error ? <p role="alert" className="text-sm text-danger">{error}</p> : null}
-    {sent ? <p role="status" className="break-all text-sm text-ink-muted">{tr("sent")}: {sent}</p> : null}
+    {error ? <p role="alert" className="text-sm text-danger">{error.message}</p> : null}
+    {submission ? <p role="status" className="break-all text-sm text-ink-muted">
+      {submission.state === "failed" ? t("transaction.failed") : tr(submission.state === "confirmed" ? "sent" : submission.state === "pending" ? "pending" : submission.state === "verificationFailed" ? "confirmedDetailsUnavailable" : "confirmationPending")}
+      {" · "}{t("shielded.walletKeys.transactionHash")}: {submission.transactionHash}
+    </p> : null}
   </div>;
 }

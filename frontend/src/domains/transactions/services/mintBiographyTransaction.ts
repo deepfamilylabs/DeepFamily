@@ -1,3 +1,4 @@
+import type { ContractReceipt } from "../../../shared/clients/transactionTypes";
 import { ethers, type JsonRpcSigner, type Provider } from "ethers";
 import {
   computeStoryHead,
@@ -11,7 +12,7 @@ import {
   createDeepFamilyInterface,
 } from "../../../shared/clients/contractFactory";
 import { parseReceiptEvents } from "../api/txGateway";
-import { waitForExactTransactionReceipt, withTransactionHash } from "../api/exactTransactionReceipt";
+import { executeChainTransaction, withTransactionHash } from "@deepfamily/chain-client";
 import {
   archivePreviewRejectedError,
   archiveValidationError,
@@ -30,6 +31,7 @@ export async function mintBiographyTransaction(input: {
   assertActive?: () => void;
   readbackProvider?: Provider;
   onSubmitted?: (transactionHash: string) => void;
+  onConfirmed?: (transactionHash: string, receipt: ContractReceipt) => void;
 }) {
   const { contract, signer } = input;
   const readbackProvider = input.readbackProvider ?? signer.provider;
@@ -64,9 +66,10 @@ export async function mintBiographyTransaction(input: {
   if (!(await input.confirm(preview)))
     throw archivePreviewRejectedError("Mint cancelled before wallet request");
   input.assertActive?.();
-  const [currentAuthor, currentNetwork] = await Promise.all([
+  const [currentAuthor, currentNetwork, fromBlock] = await Promise.all([
     signer.getAddress(),
     signer.provider.getNetwork(),
+    signer.provider.getBlockNumber(),
   ]);
   input.assertActive?.();
   if (
@@ -76,9 +79,10 @@ export async function mintBiographyTransaction(input: {
     throw archiveValidationError("Wallet network or account changed; preview the mint again", {
       key: "archive.errors.walletScopeChanged",
     });
-  const tx = await contract.mintPersonVersionNFT(...args, { gasLimit: preview.gasLimit });
-  const { receipt, transactionHash } = await waitForExactTransactionReceipt({
-    transaction: tx,
+  const { receipt, transactionHash } = await executeChainTransaction<ContractReceipt>({
+    fromBlock,
+    assertActive: input.assertActive,
+    send: () => contract.mintPersonVersionNFT(...args, { gasLimit: preview.gasLimit }),
     expected: { chainId: network.chainId, from: author, to: contractAddress, data: calldata, value: 0n },
     onSubmitted: input.onSubmitted,
   });
@@ -110,6 +114,7 @@ export async function mintBiographyTransaction(input: {
         key: "archive.errors.confirmationMismatch",
       });
     transactionConfirmed = true;
+    input.onConfirmed?.(transactionHash, receipt);
     const archive = createArchiveContract(archiveAddress, readbackProvider);
     const blockTag = receipt.blockNumber;
     const state = await readDetails(() => archive.storyState(mint.tokenId, { blockTag }));

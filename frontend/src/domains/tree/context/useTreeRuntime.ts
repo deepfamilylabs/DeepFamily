@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { useConfig } from "../../config";
 import { makeNodeId, type NodeId } from "../../../shared/model";
 import {
@@ -49,10 +49,9 @@ export function useTreeRuntime() {
     () => getScopedQueryClient({ rpcUrl, contractAddress, chainId }),
     [rpcUrl, contractAddress, chainId],
   );
-  const queryCacheRef = useRef(scopedQueryCache);
-  useEffect(() => {
-    queryCacheRef.current = scopedQueryCache;
-  }, [scopedQueryCache]);
+  // Bind every runtime to its own cache. Old async work must keep the old scope,
+  // while a new contract must never capture the previous render's cache.
+  const queryCacheRef = useMemo(() => ({ current: scopedQueryCache }), [scopedQueryCache]);
 
   const storyRevalidateRef = useRef(new Set<string>());
   const eventInterfaceRef = useRef(createDeepFamilyInterface());
@@ -60,11 +59,11 @@ export function useTreeRuntime() {
     () =>
       contract
         ? {
-            ...createTreeReadGateway(contract, queryCacheRef.current),
-            ...createPersonReadGateway(contract, queryCacheRef.current),
+            ...createTreeReadGateway(contract, scopedQueryCache),
+            ...createPersonReadGateway(contract, scopedQueryCache),
           }
         : null,
-    [contract],
+    [contract, scopedQueryCache],
   );
 
   const storageNS = useMemo(

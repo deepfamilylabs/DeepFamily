@@ -1,3 +1,4 @@
+import { executeChainTransaction } from "@deepfamily/chain-client";
 import {
   readStoryRecord,
   STORY_BIOGRAPHY_SCHEMA_ID,
@@ -450,9 +451,12 @@ async function seedSingleLanguage(dataFile, deepFamily, deepFamilyReader, archiv
   const allowance = await token.allowance(signer.address, deepFamilyAddr);
   if (allowance === 0n) {
     console.log("  >No allowance found, sending approve transaction...");
-    const approveTx = await token.approve(deepFamilyAddr, ethers.MaxUint256);
-    console.log(`  ⧗ Approve tx sent: ${approveTx.hash}`);
-    await approveTx.wait();
+    await executeChainTransaction({
+      provider: signer.provider,
+      send: () => token.approve(deepFamilyAddr, ethers.MaxUint256),
+      onSubmitted: (hash) => console.log(`  ⧗ Approve tx sent: ${hash}`),
+      label: "seed-token-approve",
+    });
     console.log("Token approved\n");
   } else {
     console.log(`Token already approved (allowance: ${allowance.toString()})\n`);
@@ -563,7 +567,7 @@ async function seedSingleLanguage(dataFile, deepFamily, deepFamilyReader, archiv
     const addElapsed = Date.now() - addStart;
     const proofMs = addResult?.timing?.proofGeneration ?? null;
     const txMs = addResult?.timing?.transaction ?? null;
-    const txHash = addResult?.tx?.hash || addResult?.receipt?.hash;
+    const txHash = addResult.transactionHash;
     const txBlock = addResult?.receipt?.blockNumber;
     if (proofMs !== null) {
       console.log(`  [ok]ZK proof generated in ${proofMs}ms`);
@@ -675,7 +679,7 @@ async function seedSingleLanguage(dataFile, deepFamily, deepFamilyReader, archiv
         let endorsementFee = null;
         try {
           const endorseStart = Date.now();
-          const { tx, receipt, fee } = await endorseVersion({
+          const { transactionHash, fee } = await endorseVersion({
             deepFamily,
             token,
             signer,
@@ -685,12 +689,9 @@ async function seedSingleLanguage(dataFile, deepFamily, deepFamilyReader, archiv
           });
           endorsementFee = fee;
           const endorseElapsed = Date.now() - endorseStart;
-          const endorseTxHash = tx?.hash || receipt?.hash;
           const feeStr =
             endorsementFee !== null ? `, fee: ${ethers.formatUnits(endorsementFee, 18)} DEEP` : "";
-          console.log(
-            `  [ok]Endorsed (tx: ${endorseTxHash || "unknown"}, ${endorseElapsed}ms${feeStr})`,
-          );
+          console.log(`  [ok]Endorsed (tx: ${transactionHash}, ${endorseElapsed}ms${feeStr})`);
         } catch (endorseErr) {
           const reason = decodeEthersError(endorseErr, deepFamily);
           if (reason === "AlreadyEndorsed") {
@@ -718,6 +719,7 @@ async function seedSingleLanguage(dataFile, deepFamily, deepFamilyReader, archiv
 
         const mintResult = await mintPersonVersionNFT({
           deepFamily,
+          archive,
           signer,
           personHash: person.hash,
           versionIndex: person.version,
@@ -728,7 +730,7 @@ async function seedSingleLanguage(dataFile, deepFamily, deepFamilyReader, archiv
 
         tokenId = Number(mintResult.tokenId);
         const mintElapsed = Date.now() - mintStart;
-        const mintTxHash = mintResult?.tx?.hash || mintResult?.receipt?.hash;
+        const mintTxHash = mintResult?.transactionHash || mintResult?.receipt?.hash;
         console.log(
           `  [ok]NFT minted, tokenId: ${tokenId}, tx: ${mintTxHash || "unknown"} (${mintElapsed}ms)`,
         );

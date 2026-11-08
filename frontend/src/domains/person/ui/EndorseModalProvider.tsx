@@ -1,5 +1,6 @@
 import React, { createContext, useCallback, useContext, useMemo, useState } from "react";
 import EndorseCompactModal from "./EndorseCompactModal";
+import type { ContractReceipt } from "../../../shared/clients/transactionTypes";
 
 export type EndorseTarget = {
   personHash: string;
@@ -8,7 +9,7 @@ export type EndorseTarget = {
   endorsementCount?: number;
 };
 
-export type EndorseReceiptLike = { logs?: any[] } | null;
+export type EndorseReceiptLike = ContractReceipt | null;
 
 export type EndorseSuccessHandler = (
   target: EndorseTarget,

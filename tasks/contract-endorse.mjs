@@ -1,3 +1,4 @@
+import { executeChainTransaction } from "@deepfamily/chain-client";
 import { task } from "hardhat/config";
 import { ArgumentType } from "hardhat/types/arguments";
 import { ensureIntegratedSystem } from "../hardhat/integratedDeployment.mjs";
@@ -39,8 +40,11 @@ const action = async (args, hre) => {
       if (String(args.autoapprove).toLowerCase() === "true") {
         const multiplier = BigInt(Number(args.approvebuffer) || 1);
         const approveAmount = fee * multiplier;
-        const approveTx = await token.approve(deepFamilyAddr, approveAmount);
-        await approveTx.wait();
+        await executeChainTransaction({
+          provider: ethers.provider,
+          send: () => token.approve(deepFamilyAddr, approveAmount),
+          label: "endorsement-approve",
+        });
       } else {
         throw new Error(
           `Insufficient allowance (${allowance}) < fee (${fee}). Re-run with --autoapprove true or manually approve.`,
@@ -50,14 +54,15 @@ const action = async (args, hre) => {
   }
 
   // Call endorseVersion
-  const tx = await deepFamily.endorseVersion(args.person, versionIndex);
-  const receipt = await tx.wait();
+  const { receipt, transactionHash } = await executeChainTransaction({
+    provider: ethers.provider,
+    send: () => deepFamily.endorseVersion(args.person, versionIndex),
+    label: "endorse-version",
+  });
 
   // Decode PersonVersionEndorsed event
   try {
-    const iface = new ethers.Interface([
-      "event PersonVersionEndorsed(bytes32 indexed personHash, address indexed endorser, uint256 versionIndex, address recipient, uint256 recipientShare, address protocolRecipient, uint256 protocolShare, uint256 endorsementFee, uint256 timestamp)",
-    ]);
+    const iface = deepFamily.interface;
     for (const log of receipt.logs || []) {
       if ((log.address || "").toLowerCase() !== deepAddr) continue;
       try {
@@ -70,6 +75,7 @@ const action = async (args, hre) => {
       }
     }
   } catch (e) {}
+  return { receipt, transactionHash };
 };
 
 export default task(

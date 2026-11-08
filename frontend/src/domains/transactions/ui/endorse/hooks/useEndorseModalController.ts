@@ -1,3 +1,5 @@
+import { getTransactionErrorContext } from "@deepfamily/chain-client";
+import { trackedTransactionHash } from "../../../model/txStatus";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useWallet } from "../../../../wallet";
@@ -141,7 +143,7 @@ export function useEndorseModalController({
     kind: "endorse",
     label: t("endorse.title", "Endorse Version"),
     phase,
-    transactionHash: successResult?.transactionHash,
+    transactionHash: trackedTransactionHash(endorseFlow.tracking) ?? successResult?.transactionHash,
     error: errorResult,
   });
 
@@ -330,7 +332,7 @@ export function useEndorseModalController({
       (error) => {
         settleTransaction({
           phase: "failed",
-          transactionHash: (error as any)?.transactionHash,
+          transactionHash: getTransactionErrorContext(error).transactionHash,
           error: getFriendlyError(error, t),
         });
       },

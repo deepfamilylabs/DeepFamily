@@ -230,7 +230,7 @@ describe("mintService executeMintFlow", () => {
       endorsedVersionIndex: vi.fn(async () => 2),
       getAddress: vi.fn(async () => contractAddress),
       runner: {
-        provider: {
+        provider: { getBlockNumber: async () => 12,
           getNetwork: vi.fn(async () => ({ chainId: 31337n })),
         },
       },

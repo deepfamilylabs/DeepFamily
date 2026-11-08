@@ -16,6 +16,8 @@ export {
   sanitizeErrorForLogging,
   summarizeErrorForDev,
   type FriendlyError,
+  type ChainFriendlyError,
+  type NormalizedError,
   type NormalizeFriendlyErrorOptions,
   type SafeLogError,
 } from "./core";

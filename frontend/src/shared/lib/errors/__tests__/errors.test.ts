@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ethers } from "ethers";
+import { getChainErrorDetails, normalizeChainError, restoreChainError, serializeChainError, withConfirmedTransaction } from "@deepfamily/chain-client";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -59,6 +60,42 @@ const collectLocalContractErrors = () => {
 };
 
 describe("errors", () => {
+  it("keeps one canonical contract across the UI conversion entry points", () => {
+    const raw = normalizeChainError(Object.assign(new Error("RPC unavailable"), {
+      code: "NETWORK_ERROR",
+      request: { data: "private calldata" },
+      witness: { secret: "private witness" },
+    }), { operation: "estimate" });
+    const expected = { category: "network", operation: "estimate", code: "NETWORK_ERROR", retryable: true };
+    const friendly = getFriendlyError(raw, passthroughT as any);
+    const normalized = normalizeErrorToError(raw, passthroughT as any);
+    for (const converted of [friendly, normalizeFriendlyError(raw, passthroughT as any), normalized]) {
+      expect(converted.chainError).toEqual(expected);
+      expect(converted).toMatchObject({ category: "network", operation: "estimate", retryable: true });
+      expect(converted).not.toHaveProperty("request");
+      expect(converted).not.toHaveProperty("witness");
+    }
+    expect(getChainErrorDetails(normalized)).toEqual(expected);
+    expect(getFriendlyErrorMessage(raw, passthroughT as any, "Operation failed")).toBe(friendly.message);
+  });
+
+  it("uses translated fallbacks when a foreign rejection has no diagnostic", () => {
+    const error = normalizeChainError(null, { operation: "read" });
+    expect(getFriendlyErrorMessage(error, passthroughT as any, "Modules unavailable", { preferDetailsForUnknown: true })).toBe("Modules unavailable");
+  });
+
+  it("lets domains select wording while retaining a confirmed transaction's classification", () => {
+    const transactionHash = `0x${"34".repeat(32)}`;
+    const raw = withConfirmedTransaction(Object.assign(new Error("RPC unavailable"), { code: "NETWORK_ERROR" }), transactionHash, "read");
+    const friendly = normalizeFriendlyError(raw, passthroughT as any, { message: "Refresh the confirmed result." });
+    expect(friendly).toMatchObject({
+      message: "Refresh the confirmed result.",
+      category: "verification", operation: "read", transactionHash, transactionConfirmed: true,
+      verificationFailure: "read", retryable: false,
+    });
+    expect(friendly.chainError).toEqual(getChainErrorDetails(raw));
+  });
+
   it("resolves DuplicateVersion from nested Hardhat revert data", () => {
     const error = {
       code: "CALL_EXCEPTION",
@@ -367,6 +404,44 @@ describe("errors", () => {
   });
 
   it.each([
+    [4100, "WALLET_UNAUTHORIZED"],
+    [4200, "WALLET_METHOD_UNSUPPORTED"],
+    [4900, "WALLET_DISCONNECTED"],
+    [4901, "WALLET_CHAIN_DISCONNECTED"],
+    [4902, "WALLET_CHAIN_NOT_ADDED"],
+  ])("keeps nested wallet code %s consistent with its UI presentation", (code, reason) => {
+    const error = normalizeChainError(Object.assign(new Error("could not coalesce error"), {
+      code: "UNKNOWN_ERROR", info: { error: { code } },
+    }), { operation: "submit" });
+    expect(normalizeFriendlyError(error, passthroughT as any)).toMatchObject({
+      type: reason, reason, category: "wallet", operation: "submit",
+      chainError: { category: "wallet", code },
+    });
+  });
+
+  it("translates a wallet scope change without replacing its canonical classification", () => {
+    const error = normalizeChainError(Object.assign(new Error("Wallet scope changed"), {
+      code: "CHAIN_WALLET_SCOPE_CHANGED",
+    }), { category: "wallet", operation: "submit" });
+    const t = (key: string, fallback?: string) => key === "archive.errors.walletScopeChanged"
+      ? "钱包网络或账户已变化，请重新确认交易。" : fallback ?? key;
+    expect(normalizeFriendlyError(error, t as any)).toMatchObject({
+      message: "钱包网络或账户已变化，请重新确认交易。",
+      type: "CHAIN_WALLET_SCOPE_CHANGED", category: "wallet", operation: "submit", retryable: false,
+    });
+  });
+
+  it("retains replacement cancellation wording after the safe Worker error round trip", () => {
+    const error = restoreChainError(serializeChainError(Object.assign(new Error("replaced"), {
+      code: "TRANSACTION_REPLACEMENT_CANCELLED",
+    }), "Transaction tracking stopped"));
+    expect(normalizeFriendlyError(error, passthroughT as any)).toMatchObject({
+      type: "TRANSACTION_REPLACEMENT_CANCELLED", category: "cancelled",
+      message: "The transaction was cancelled or replaced by another call. Check its result before submitting again.",
+    });
+  });
+
+  it.each([
     ["ethers", { code: "ACTION_REJECTED", info: { error: { code: 4001 } } }],
     ["provider", { code: 4001 }],
     ["nested provider", { info: { error: { code: 4001 } } }],
@@ -398,6 +473,8 @@ describe("errors", () => {
       reason: "USER_REJECTED",
       message: "交易已取消。",
       details: "交易已取消。",
+      category: "cancelled",
+      retryable: false,
     });
     expect(getFriendlyErrorMessage(error, localizedT as any, "提交失败")).toBe("交易已取消。");
   });
@@ -440,6 +517,19 @@ describe("errors", () => {
 });
 
 describe("Archive validation guidance", () => {
+  it("retains public confirmation context without copying wallet or proof diagnostics", () => {
+    const hash = `0x${"12".repeat(32)}`;
+    const raw = withConfirmedTransaction(Object.assign(new Error("network unavailable"), {
+      code: "NETWORK_ERROR", witness: { secret: "private witness" }, request: { data: "private calldata" },
+    }), hash, "read");
+    const normalized = normalizeErrorToError(raw, passthroughT as any);
+    expect(normalized).toMatchObject({
+      transactionHash: hash, transactionConfirmed: true, verificationFailure: "read", retryable: false,
+    });
+    expect(normalized).not.toHaveProperty("witness");
+    expect(normalized).not.toHaveProperty("request");
+  });
+
   it("preserves capacity guidance across service, flow and UI normalization", () => {
     const message =
       "Buffered archive gas exceeds the network transaction limit. Split the text into another logical story record.";

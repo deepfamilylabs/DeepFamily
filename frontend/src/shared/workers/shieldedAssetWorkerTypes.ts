@@ -2,6 +2,13 @@ import type { ShieldedStateReadMode } from "../config/shieldedStateReadMode";
 import type { IdentityFields } from "@deepfamily/protocol-core";
 import type { Groth16Proof } from "../zk/zk";
 import type { ShieldedPoolActionData } from "../zk/shieldedActionTypes";
+import type { SerializedChainError } from "@deepfamily/chain-client";
+
+export type ShieldedAssetWorkerFailure = {
+  id: number;
+  ok: false;
+  error: SerializedChainError;
+};
 
 /** Only public identifiers and display summaries cross the asset-session boundary. */
 export type ShieldedPublicIdentity = {

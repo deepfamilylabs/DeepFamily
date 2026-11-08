@@ -10,7 +10,9 @@ const action = async (args, hre) => {
   const { ethers } = connection;
   const signer = (await ethers.getSigners())[0];
   const signerAddr = await signer.getAddress();
-  const { deepFamily } = await ensureIntegratedSystem(connection, { artifacts: hre.artifacts });
+  const { deepFamily, archive } = await ensureIntegratedSystem(connection, {
+    artifacts: hre.artifacts,
+  });
 
   const versionIndex = Number(args.vindex);
   if (!Number.isInteger(versionIndex) || versionIndex <= 0) {
@@ -74,6 +76,7 @@ const action = async (args, hre) => {
 
   const result = await mintPersonVersionNFT({
     deepFamily,
+    archive,
     signer,
     personHash: args.person,
     versionIndex,
@@ -83,7 +86,7 @@ const action = async (args, hre) => {
   });
 
   console.log(`NFT minted for person ${args.person}`);
-  console.log(`Transaction: ${result.tx.hash}`);
+  console.log(`Transaction: ${result.transactionHash}`);
   console.log(`Block: ${result.receipt?.blockNumber ?? "n/a"}`);
 };
 

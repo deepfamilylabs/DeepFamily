@@ -2,7 +2,7 @@
 import { StrictMode } from "react";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { getAddress, type Signer } from "ethers";
+import { getAddress, Interface, type Signer } from "ethers";
 import type { ShieldedPageModules } from "../model/shieldedPageTypes";
 import { ShieldedInheritancePanel, type ShieldedPanelNavigation } from "./ShieldedInheritancePanel";
 import type { PublicStateSyncProgress } from "../../../shared/workers/publicStateSyncProgress";
@@ -139,8 +139,12 @@ vi.mock("../services/shieldedPoolFlows", () => ({
   submitPrivateTransfer: mocks.submit,
   submitUnshield: mocks.submit,
 }));
-vi.mock("../services/shieldedIdentityAuthorizationChain", () => ({
-  createIdentityAuthorizationContract: () => ({ incrementCounter: mocks.incrementCounter }),
+vi.mock("../../../shared/clients/shieldedIdentityAuthorizationChain", () => ({
+  createIdentityAuthorizationContract: (target: string) => ({
+    incrementCounter: mocks.incrementCounter,
+    getAddress: async () => target,
+    interface: new Interface(["function incrementCounter(uint256,uint256,uint64,uint64,bytes)", "event CounterIncremented(uint256 indexed checkpointId,uint256 indexed aliasR,uint64 oldCounter,uint64 newCounter,uint256 oldRoot,uint256 newRoot,uint256 authorizationNullifier)"]),
+  }),
 }));
 vi.mock("../services/privateLetterChain", async original => ({
   ...await original<typeof import("../services/privateLetterChain")>(),
@@ -178,6 +182,12 @@ vi.mock("../../person", async () => {
   };
 });
 const address = "0x00000000000000000000000000000000000000aa";
+const approvalInterface = new Interface(["function approve(address,uint256)"]);
+const connectedApproval = (approve: ReturnType<typeof vi.fn>) => ({
+  approve,
+  getAddress: async () => address,
+  interface: approvalInterface,
+});
 const credentials = { handle: "credentials:1" };
 const identity = {
   handle: "identity:1",
@@ -564,7 +574,7 @@ describe("Worker-backed shielded wallet", () => {
     });
     mocks.update.mockImplementation(publishSession);
     mocks.receipt.mockReset().mockResolvedValue(null);
-    mocks.incrementCounter.mockReset().mockResolvedValue({ hash: "0xrevocation", wait: async () => ({ status: 1 }) });
+    mocks.incrementCounter.mockReset().mockResolvedValue({ hash: "0xrevocation", replaceableTransaction() { return this; }, wait: async () => ({ hash: "0xrevocation", status: 1 }) });
     (signer.signMessage as any).mockResolvedValue("signature");
     (signer.getAddress as any).mockResolvedValue(address);
     (signer.provider!.getTransactionCount as any).mockResolvedValue(7);
@@ -720,7 +730,7 @@ describe("Worker-backed shielded wallet", () => {
     fireEvent.change(screen.getByLabelText("shielded.privateLetters.recipientCode"), { target: { value: "valid-receive-code" } });
     fireEvent.change(screen.getByLabelText("shielded.privateLetters.body"), { target: { value: "Letter without a deposit" } });
     fireEvent.click(screen.getByRole("button", { name: "shielded.privateLetters.send" }));
-    await screen.findByText("shielded.privateLetters.sent: 0xletter");
+    await screen.findByText(/shielded\.privateLetters\.sent.*0xletter/);
     expect(mocks.call).toHaveBeenCalledWith("prepareLetter", {
       context: expect.objectContaining({ chainId: "31337", assetKind, lettersAddress: mocks.lettersAddress }),
       code: "valid-receive-code", body: "Letter without a deposit",
@@ -1290,19 +1300,19 @@ describe("Worker-backed shielded wallet", () => {
   it("submits batch revocation in the signing wallet request scope and regenerates current material", async () => {
     const defaultCall = mocks.call.getMockImplementation();
     let codeNumber = 0;
-    const args = ["1", "2", "0", "1", "0xproof"];
+    const args = ["1", "2", "0", "1", "0x1234"];
     mocks.call.mockImplementation(async (method, params) => method === "receiveCode" ? { code: `code-${++codeNumber}` }
       : method === "authorizeIdentityCounter" ? { address, args } : defaultCall?.(method, params));
     mocks.incrementCounter.mockImplementation(async () => {
       expect(mocks.walletRequestPending).toBe(true);
-      return { hash: "0xrevocation", wait: async () => ({ status: 1 }) };
+      return { hash: "0xrevocation", replaceableTransaction() { return this; }, wait: async () => ({ hash: "0xrevocation", status: 1 }) };
     });
     await renderUnlockedPanel();
     openReceiveCode("identity");
     await waitFor(() => expect((screen.getByLabelText("shielded.receiveCodeLabel") as HTMLTextAreaElement).value).toBe("code-1"));
     await waitUntilIdle();
     fireEvent.click(screen.getByRole("button", { name: "shielded.privateLetters.revokeAll" }));
-    await waitFor(() => expect(mocks.incrementCounter).toHaveBeenCalledWith(...args, { chainId: 31337n }));
+    await waitFor(() => expect(mocks.incrementCounter).toHaveBeenCalledWith(...args, { nonce: 7, chainId: 31337n }));
     await waitFor(() => expect((screen.getByLabelText("shielded.receiveCodeLabel") as HTMLTextAreaElement).value).toBe("code-2"));
     expect(mocks.walletRequestPending).toBe(false);
     expect(mocks.submit).not.toHaveBeenCalled();
@@ -4162,7 +4172,7 @@ describe("Worker-backed shielded wallet", () => {
     mocks.center = { records: [], upsert };
     mocks.call.mockImplementation(async (method: string) =>
       method === "recover" ? emptyWallet : method === "prove"
-        ? { action: "shield", amount: "1", data: {}, proof: {} }
+        ? { action: "shield", amount: "1", data: { outputCommitments: [] }, proof: {} }
         : {
             handle: "action:1",
             action: "shield",
@@ -4403,6 +4413,10 @@ describe("Worker-backed shielded wallet", () => {
       reason: "rejected",
       info: { error: { code: 4001 }, payload: { method: "eth_sendTransaction" } },
     }, "USER_REJECTED"],
+    [{ code: "UNKNOWN_ERROR", info: { error: { code: 4001 } } }, "USER_REJECTED"],
+    [{ error: { code: 4001 } }, "USER_REJECTED"],
+    [{ cause: { code: 4001 } }, "USER_REJECTED"],
+    [{ code: -32002 }, "WALLET_REQUEST_PENDING"],
   ] as const)("releases the pending guard for a definite unsubmitted failure: %j", async (failure, expectedReason) => {
     mocks.identity = identity;
     mocks.call.mockImplementation(async (method: string) =>
@@ -4442,14 +4456,19 @@ describe("Worker-backed shielded wallet", () => {
       reason: "rejected",
       info: { error: { code: 4001 }, payload: { method: "eth_sendTransaction" } },
     }, "USER_REJECTED"],
+    [{ code: "UNKNOWN_ERROR", info: { error: { code: 4001 } } }, "USER_REJECTED"],
+    [{ error: { code: 4001 } }, "USER_REJECTED"],
+    [{ cause: { code: 4001 } }, "USER_REJECTED"],
+    [{ code: -32002 }, "WALLET_REQUEST_PENDING"],
   ] as const)("allows an ERC20 approval to retry after a pre-broadcast failure: %j", async (failure, expectedReason) => {
     mocks.identity = identity;
     let approved = false;
     const approve = vi.fn(async () => ({
       hash: "0xapproval",
+      replaceableTransaction() { return this; },
       wait: async () => {
         approved = true;
-        return { status: 1 };
+        return { hash: "0xapproval", status: 1 };
       },
     })).mockRejectedValueOnce(Object.assign(new Error("approval failed before broadcast"), failure));
     const records: Array<{ id: string; phase: string }> = [];
@@ -4467,7 +4486,7 @@ describe("Worker-backed shielded wallet", () => {
       token: {
         allowance: vi.fn(async () => approved ? 1000000000000000000n : 0n),
         balanceOf: vi.fn(async () => 1_000_000n * 10n ** 18n),
-        connect: vi.fn(() => ({ approve })),
+        connect: vi.fn(() => connectedApproval(approve)),
       },
       pool: { runner: { provider: signer.provider } },
     } as unknown as ShieldedPageModules;
@@ -4502,7 +4521,7 @@ describe("Worker-backed shielded wallet", () => {
       token: {
         allowance: vi.fn(async () => 0n),
         balanceOf: vi.fn(async () => 1_000_000n * 10n ** 18n),
-        connect: vi.fn(() => ({ approve })),
+        connect: vi.fn(() => connectedApproval(approve)),
       },
       pool: { runner: { provider } },
     } as unknown as ShieldedPageModules;
@@ -4540,14 +4559,15 @@ describe("Worker-backed shielded wallet", () => {
       : Promise.resolve(0n));
     const approve = vi.fn(async () => ({
       hash: "0xapproval",
+      replaceableTransaction() { return this; },
       wait: async () => {
         approved = true;
-        return { status: 1 };
+        return { hash: "0xapproval", status: 1 };
       },
     }));
     const selectedModules = {
       ...modules, assetKind: "erc20",
-      token: { allowance, balanceOf: vi.fn(async () => 1_000_000n * 10n ** 18n), connect: vi.fn(() => ({ approve })) },
+      token: { allowance, balanceOf: vi.fn(async () => 1_000_000n * 10n ** 18n), connect: vi.fn(() => connectedApproval(approve)) },
       pool: { runner: { provider: signer.provider } },
     } as unknown as ShieldedPageModules;
     const rendered = await renderPanel(signer, selectedModules);
@@ -4827,7 +4847,7 @@ describe("Worker-backed shielded wallet", () => {
     const token = {
       allowance: vi.fn(async () => value),
       balanceOf: vi.fn(async () => value),
-      connect: vi.fn(() => ({ approve })),
+      connect: vi.fn(() => connectedApproval(approve)),
     };
     const selectedModules = {
       ...modules, assetKind: "erc20", assetSymbol: "DEEP", token,
@@ -4860,15 +4880,16 @@ describe("Worker-backed shielded wallet", () => {
     const hash = `0x${"73".repeat(32)}`;
     const approve = vi.fn(async () => ({
       hash,
+      replaceableTransaction() { return this; },
       wait: vi.fn(async () => {
         approved = true;
-        return { status: 1 };
+        return { hash, status: 1 };
       }),
     }));
     const token = {
       allowance: vi.fn(async () => approved ? 10000n * 10n ** 18n : 0n),
       balanceOf: vi.fn(async () => balance),
-      connect: vi.fn(() => ({ approve })),
+      connect: vi.fn(() => connectedApproval(approve)),
     };
     const selectedModules = {
       ...modules, assetKind: "erc20", assetSymbol: "DEEP", token,
@@ -4896,7 +4917,7 @@ describe("Worker-backed shielded wallet", () => {
     const token = {
       allowance: vi.fn(async () => kind === "approval" ? 0n : 10000n * 10n ** 18n),
       balanceOf,
-      connect: vi.fn(() => ({ approve })),
+      connect: vi.fn(() => connectedApproval(approve)),
     };
     const selectedModules = {
       ...modules, assetKind: "erc20", token,
@@ -4967,11 +4988,11 @@ describe("Worker-backed shielded wallet", () => {
     mocks.identity = identity;
     let finishApproval!: (receipt: unknown) => void;
     const wait = vi.fn(() => new Promise((resolve) => { finishApproval = resolve; }));
-    const approve = vi.fn(async () => ({ hash: "0xapproval", wait }));
+    const approve = vi.fn(async () => ({ hash: "0xapproval", wait, replaceableTransaction() { return this; } }));
     const allowance = vi.fn(async () => 0n);
     const selectedModules = {
       ...modules, assetKind: "erc20",
-      token: { allowance, balanceOf: vi.fn(async () => 1_000_000n * 10n ** 18n), connect: vi.fn(() => ({ approve })) },
+      token: { allowance, balanceOf: vi.fn(async () => 1_000_000n * 10n ** 18n), connect: vi.fn(() => connectedApproval(approve)) },
       pool: { runner: { provider: signer.provider } },
     } as unknown as ShieldedPageModules;
     await renderPanel(signer, selectedModules);
@@ -4983,7 +5004,7 @@ describe("Worker-backed shielded wallet", () => {
     lockWorkspace();
     const allowanceReads = allowance.mock.calls.length;
     allowance.mockResolvedValue(1000000000000000000n);
-    await act(async () => finishApproval({ status: 1 }));
+    await act(async () => finishApproval({ hash: "0xapproval", status: 1 }));
     await waitFor(() => expect(allowance.mock.calls.length).toBeGreaterThan(allowanceReads));
     fireEvent.change(screen.getByLabelText("identity passphrase"), { target: { value: "secret" } });
     fireEvent.change(screen.getByLabelText("identity passphrase"), { target: { value: "child-passphrase" } });

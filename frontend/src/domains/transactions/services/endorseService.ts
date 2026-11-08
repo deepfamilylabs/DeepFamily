@@ -1,9 +1,11 @@
+import type { ContractReceipt } from "../../../shared/clients/transactionTypes";
 import { ethers } from "ethers";
+import { assertChainWalletScope } from "@deepfamily/chain-client";
 import {
   createDeepFamilyInterface,
   createDeepTokenContract,
 } from "../../../shared/clients/contractFactory";
-import { ensureAllowance } from "../api/erc20Gateway";
+import { ensureAllowance, type AllowanceTransactionResponse } from "../api/erc20Gateway";
 import { estimateGasWithFallback, parseReceiptEvents } from "../api/txGateway";
 
 export type EndorseServiceStage = "checking" | "approving" | "submitting";
@@ -32,11 +34,12 @@ export type EndorseVersionFn = (
   personHash: string,
   versionIndex: number,
   overrides?: Record<string, unknown>,
-) => Promise<any>;
+) => Promise<ContractReceipt>;
 
 export type ExecuteEndorseFlowParams = {
   contract: ethers.Contract;
   signer: ethers.Signer;
+  chainId: number;
   address: string;
   personHash: string;
   versionIndex: number;
@@ -48,6 +51,8 @@ export type ExecuteEndorseFlowParams = {
   onStageChange?: (stage: EndorseServiceStage) => void;
   onFeeQuoteChange?: (quote: EndorseFeeQuote) => void;
   assertActive?: () => void;
+  onSubmitted?: (transactionHash: string) => void;
+  onApprovalConfirmed?: (transactionHash: string, receipt: ContractReceipt) => void;
 };
 
 export type ExecuteEndorseFlowResult =
@@ -56,7 +61,7 @@ export type ExecuteEndorseFlowResult =
     }
   | {
       alreadyEndorsed: false;
-      receipt: any;
+      receipt: ContractReceipt;
       transactionHash: string;
       blockNumber: number;
       approvalTxHash?: string;
@@ -75,7 +80,7 @@ type TokenAllowanceContract = {
   approve: (
     spender: string,
     amount: bigint,
-  ) => Promise<{ wait: () => Promise<any>; hash?: string }>;
+  ) => Promise<AllowanceTransactionResponse>;
   recentReward: () => Promise<bigint>;
   balanceOf: (owner: string) => Promise<bigint>;
   decimals: () => Promise<bigint | number>;
@@ -92,6 +97,7 @@ function attachErrorCode(error: unknown, code: string): Error {
 export async function executeEndorseFlow({
   contract,
   signer,
+  chainId,
   address,
   personHash,
   versionIndex,
@@ -102,7 +108,11 @@ export async function executeEndorseFlow({
   onStageChange,
   onFeeQuoteChange,
   assertActive,
+  onSubmitted,
+  onApprovalConfirmed,
 }: ExecuteEndorseFlowParams): Promise<ExecuteEndorseFlowResult> {
+  const assertWalletScope = () => assertChainWalletScope({ signer, chainId, account: address, assertActive });
+  await assertWalletScope();
   const endorsedIdx = await contract.endorsedVersionIndex(personHash, address);
   assertActive?.();
   if (Number(endorsedIdx) === Number(versionIndex)) {
@@ -164,12 +174,17 @@ export async function executeEndorseFlow({
   let approvalTxHash: string | undefined;
   if (fee > 0n) {
     onStageChange?.("approving");
+    if (!signer.provider) throw new Error("The signer is missing its transaction provider");
     const approval = await ensureAllowance({
       tokenContract,
+      provider: signer.provider,
       owner: address,
       spender,
       required: fee,
       assertActive,
+      beforeSend: assertWalletScope,
+      onSubmitted,
+      onConfirmed: onApprovalConfirmed,
     });
     approvalTxHash = approval.approvalTxHash;
   }
@@ -183,7 +198,7 @@ export async function executeEndorseFlow({
     label: "endorseVersion",
   });
 
-  assertActive?.();
+  await assertWalletScope();
   const receipt = await endorseVersion(
     personHash,
     versionIndex,

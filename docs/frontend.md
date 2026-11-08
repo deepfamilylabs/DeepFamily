@@ -58,6 +58,8 @@ Use the directory tree for ownership boundaries, and these files as first-read e
 - Runtime config: `frontend/src/shared/config/env.ts`, `frontend/src/shared/config/networks.ts`, `frontend/src/domains/tree/config/familyTreeConfig.ts`
 - Wallet connection and local transaction boundary: `frontend/src/domains/wallet/context/WalletContext.tsx`, `frontend/src/domains/wallet/services/walletProvider.ts`
 - Domain gateways: `frontend/src/domains/tree/api/treeReadGateway.ts`, `frontend/src/shared/clients/personReadGateway.ts`, `frontend/src/domains/transactions/api/txGateway.ts`, `frontend/src/domains/transactions/api/invalidationCoordinator.ts`
+- Shared browser/Node contract mechanics: `packages/chain-client/` (contract boundaries, reads, transaction execution, exact receipts, canonical errors and Archive gas limits). Business event and content verification stay in domain services.
+- Recommended-source management: `frontend/src/domains/person/services/trustedEndorserService.ts` and `frontend/src/domains/person/queries/useTrustedEndorserAccess.ts`.
 - Tree runtime: `frontend/src/domains/tree/context/TreeViewContext.tsx`, `frontend/src/domains/tree/context/useTreeGraphState.ts`, `frontend/src/domains/tree/services/treeTraversalOrchestrator.ts`
 - Worker/ZK/metadata boundaries: `frontend/src/workers/crypto.worker.ts`,
   `frontend/src/workers/zk.worker.ts`, `frontend/src/workers/shieldedAsset.worker.ts`,
@@ -105,6 +107,43 @@ candidates belong in `lib/proofDescriptors.js`; browser artifact URLs belong in
 
 `frontend:source-rules` keeps frontend source inside its owning layers, keeps `scripts/check-root.mjs`
 from printing a passphrase, and keeps Argon2id behind `@deepfamily/protocol-core`.
+
+Contract mechanics live in the browser/Node-neutral `@deepfamily/chain-client` workspace,
+separately from protocol algorithms. `index.js` only exports the following modules:
+
+- `contracts.js`: ethers contract construction/instrumentation; view calls, simulations and
+  gas estimates attach canonical errors while preserving the original contract APIs.
+- `execution.js`: `runChainRead` executes one read or estimate; `executeChainTransaction`
+  executes the supplied send callback once and tracks its receipt. It captures a block anchor
+  before sending, awaits `beforeSend`, checks the current lifecycle, and restores
+  `replaceableTransaction(fromBlock)` for ethers contract responses.
+- `receipts.js`: receipt hash/status checks, confirmation and timeout policies, and fee-only
+  replacement matching across chain/from/to/calldata/value/nonce. Deployment and journalled
+  recovery can explicitly reject replacement following.
+- `errors.js`: one safe error contract for category, operation, code, manual retry eligibility
+  and public transaction context. Original errors retain domain/ethers decoding fields;
+  the public details exclude calldata, credentials, proofs and arbitrary diagnostic causes.
+- `transport.js`: validated public error DTOs for Worker messages. Callers provide sanitized
+  wording; raw errors, causes, RPC payloads and proof inputs never enter the DTO.
+- `wallet.js`: actual network/account checks, using raw `eth_chainId` when available to avoid
+  stale cached network information. Endorsement checks its configured scope before reads,
+  approval and endorsement submission.
+- `gas.js`: supported Archive network profiles and pure gas limit validation.
+
+No shared operation retries automatically. Frontend lifecycle cancellation, private-pool
+output/nonce reconciliation, CLI wording, and production release checkpoints remain
+caller-owned policies using the same execution boundary. Durable callers journal submission
+through `onTransactionSubmitted` before waiting and resume with `waitForTransactionHashReceipt`.
+A caller that needs to reconcile a reverted receipt explicitly sets `requireSuccess: false`.
+
+Pages compose domain operations and cannot import contract/provider factories or construct
+ethers clients; ESLint enforces this boundary. `shieldedPageService` owns pool discovery and
+creation, and `trustedEndorserService` owns recommended-source reads and writes.
+`shieldedWalletSubmission` owns approval and counter wallet calls;
+`useShieldedSubmissionCoordinator` records only their public submission identity. The wallet
+and Worker each retain their own provider lifecycle. A wallet pending-request refusal releases
+the new local submission only when no hash or receipt is known; broadcast or uncertain
+submissions continue through reconciliation rather than opening a second send.
 
 ### React page and transaction UI structure
 
@@ -161,7 +200,19 @@ type TransactionState<TResult> =
 
 UI should derive rendering from `state.step`, `state.result`, and `state.error`, not from scattered local flags.
 
+The concrete `useTxFlow` model uses a discriminated `status` union and a separate `tracking`
+union (`none`, `submitted`, `confirmed`). Runners publish actual hashes through
+`update.submitted()` and successful receipts through `update.confirmed()`. UI workflow errors
+can coexist with a confirmed transaction when a later read fails; the public transaction
+context must survive normalization without copying secrets or arbitrary wallet diagnostics.
+
 `FriendlyError` means the app's normalized user-facing error shape, such as the result of `getFriendlyError` or a transaction-domain type with the same fields. Do not invent a new incompatible error object for each flow.
+
+`normalizeFriendlyError` is the single presentation conversion. `getFriendlyError`, story
+wording and normalized Error objects delegate to it. Its `ChainFriendlyError` result always
+includes the canonical chain category, operation and public context, while domain mappings
+select the appropriate translated message. A confirmed transaction or known submitted hash
+must never become retryable merely because a later read or UI update failed.
 
 Avoid long-lived nullable transaction state shapes such as `status + error | null + result | null` for complex flows. If multiple transaction UIs need a shared state model, make the shared model a discriminated union instead of adapting UI code around nullable fields.
 
@@ -641,6 +692,7 @@ transitive import. If a worker breaks after a refactor, check the new import gra
 
 - Contract ABIs live in `frontend/src/abi/` and are copied from Hardhat build output by `frontend/scripts/sync-abi.mjs`. The script runs automatically in `npm run dev` and `npm run build`. It keeps only each contract's ABI and identity: bytecode carries a metadata hash that depends on which sources were compiled together, so it stays in the root `artifacts/`.
 - Providers and contract instances are constructed in `frontend/src/shared/clients/`.
+- Tree gateways capture the contract and scoped cache together during the same render. Their cache handle is stable within a scope and replaced on scope changes, so late old-network work cannot write into the new-network cache.
 - RPC URL plus the DeepFamilyReader module entry address come from `VITE_*` env vars; main and token addresses are derived on startup.
 - If the frontend breaks after a Solidity interface change, re-run dev/build or `node frontend/scripts/sync-abi.mjs` directly.
 

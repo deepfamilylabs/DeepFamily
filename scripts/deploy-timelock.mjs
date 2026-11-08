@@ -1,4 +1,5 @@
 import hre from "hardhat";
+import { executeChainTransaction, getChainErrorDetails } from "@deepfamily/chain-client";
 import { resolveTimelockDeploymentConfig } from "./lib/timelockDeployment.mjs";
 
 // Deploy a TimelockController (via the GovernanceTimelock artifact) to own the UUPS proxy.
@@ -30,9 +31,16 @@ const main = async () => {
   });
 
   const Timelock = await ethers.getContractFactory("GovernanceTimelock", deployer);
-  const timelock = await Timelock.deploy(minDelay, governanceMultisig);
-  await timelock.waitForDeployment();
-  const address = await timelock.getAddress();
+  const request = await Timelock.getDeployTransaction(minDelay, governanceMultisig);
+  const { receipt } = await executeChainTransaction({
+    provider: deployer.provider,
+    send: () => deployer.sendTransaction(request),
+    replacementPolicy: "reject",
+    label: "deploy-governance-timelock",
+  });
+  if (!receipt.contractAddress || !ethers.isAddress(receipt.contractAddress))
+    throw new Error("GovernanceTimelock receipt does not contain a deployment address");
+  const address = ethers.getAddress(receipt.contractAddress);
 
   console.log("GovernanceTimelock deployed:");
   console.log(`  address:   ${address}`);
@@ -52,6 +60,6 @@ const main = async () => {
 };
 
 main().catch((error) => {
-  console.error(error);
+  console.error(error instanceof Error ? error.message : "Timelock deployment failed", getChainErrorDetails(error));
   process.exit(1);
 });

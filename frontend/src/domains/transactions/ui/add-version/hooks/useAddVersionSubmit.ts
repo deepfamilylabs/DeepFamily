@@ -9,10 +9,6 @@ import {
 } from "@deepfamily/protocol-core";
 import type { PersonHashCalculatorHandle } from "../../../../person";
 import type { AddVersionProofStep } from "./usePersonCommitmentProof";
-import {
-  createDeepFamilyContract,
-  createDeepFamilyReaderContract,
-} from "../../../../../shared/clients/contractFactory";
 import { getReadonlyProvider } from "../../../../../shared/clients/providerRegistry";
 import {
   cryptoWorkerCall,
@@ -22,13 +18,13 @@ import {
   type ValidatedPersonVersionV1Result,
 } from "../../../../../shared/workers/cryptoWorkerClient";
 import { terminateZkWorkerIfIdle } from "../../../../../shared/workers/zkWorkerClient";
-import { readConfirmedDetails } from "../../../services/confirmedTransactionError";
+import { readConfirmedDetails, getTransactionErrorContext } from "@deepfamily/chain-client";
+import { assertNewPersonVersion, verifyConfirmedVersion } from "../../../services/addVersionVerification";
 import { getFriendlyError, sanitizeErrorForLogging } from "../../../../../shared/lib/errors";
 import type { ProofEnvelope } from "../../../../../shared/zk/zk";
 import {
   makeNodeId,
   mergeValidatedMetadataUnlock,
-  parseVersionDetailsResult,
   type NodeData,
 } from "../../../../../shared/model";
 import { addVersionSchema } from "../model/addVersionSchema";
@@ -218,7 +214,7 @@ function buildDraftKey(input: {
 
 function isDefinitelyNotRetryable(error: unknown): boolean {
   const value = error && typeof error === "object" ? (error as Record<string, any>) : {};
-  if (value.transactionReconciliationFinal === true || value.transactionConfirmed === true)
+  if (value.transactionReconciliationFinal === true || getTransactionErrorContext(error).transactionConfirmed === true)
     return true;
   const code = value.code ?? value.error?.code;
   const reason = String(value.reason ?? value.shortMessage ?? value.message ?? "");
@@ -235,85 +231,6 @@ function sameHex(left: string | undefined, right: string | undefined): boolean {
   return Boolean(left && right && left.toLowerCase() === right.toLowerCase());
 }
 
-function duplicateVersionError(): Error {
-  return Object.assign(new Error("DuplicateVersionCommitment"), {
-    reason: "DuplicateVersionCommitment",
-    __dfDecodedReason: "DuplicateVersionCommitment",
-  });
-}
-
-async function verifyConfirmedVersion(input: {
-  runner: ethers.ContractRunner;
-  contractAddress: string;
-  readerAddress: string;
-  result: AddVersionResult;
-  expectedPersonHash: string;
-  expectedFatherHash: string;
-  expectedMotherHash: string;
-  expectedFatherVersionIndex: number;
-  expectedMotherVersionIndex: number;
-  expectedSubmitter: string;
-  expectedVersionCommitment: bigint;
-  expectedMetadataPointer: string;
-  expectedPayloadHash: string;
-  expectedPayloadLength: number;
-}) {
-  const deepFamily = createDeepFamilyContract(input.contractAddress, input.runner);
-  const reader = createDeepFamilyReaderContract(input.readerAddress, input.runner);
-  const [configuredArchive, readerDeepFamily, readerArchive, rawDetails] = await readConfirmedDetails(
-    input.result.transactionHash,
-    () => Promise.all([
-      deepFamily.archive(),
-      reader.DEEP_FAMILY(),
-      reader.ARCHIVE(),
-      reader.getVersionDetails(input.result.hash, input.result.index),
-    ]),
-  );
-  if (
-    !sameHex(configuredArchive, readerArchive) ||
-    !sameHex(readerDeepFamily, input.contractAddress)
-  ) {
-    throw new Error("Reader and DeepFamily metadata archive binding mismatch after confirmation");
-  }
-  const details = parseVersionDetailsResult(rawDetails);
-  const version = details.version;
-  const metadata = details.metadata;
-  const sameUnsignedInteger = (
-    actual: string | number | undefined,
-    expected: string | number | bigint,
-  ): boolean => {
-    try {
-      return actual !== undefined && BigInt(actual) === BigInt(expected);
-    } catch {
-      return false;
-    }
-  };
-  const pointerIsValid =
-    typeof metadata.pointer === "string" &&
-    ethers.isAddress(metadata.pointer) &&
-    !sameHex(metadata.pointer, ethers.ZeroAddress);
-  const versionMatches =
-    sameHex(version.personHash, input.expectedPersonHash) &&
-    sameUnsignedInteger(version.versionIndex, input.result.index) &&
-    sameHex(version.fatherHash, input.expectedFatherHash) &&
-    sameHex(version.motherHash, input.expectedMotherHash) &&
-    sameUnsignedInteger(version.fatherVersionIndex, input.expectedFatherVersionIndex) &&
-    sameUnsignedInteger(version.motherVersionIndex, input.expectedMotherVersionIndex) &&
-    sameHex(version.addedBy, input.expectedSubmitter) &&
-    sameUnsignedInteger(version.versionCommitment, input.expectedVersionCommitment);
-  const metadataMatches =
-    pointerIsValid &&
-    sameHex(metadata.pointer, input.expectedMetadataPointer) &&
-    sameHex(metadata.payloadHash, input.expectedPayloadHash) &&
-    metadata.payloadLength === input.expectedPayloadLength &&
-    metadata.segmentCount === Math.ceil(input.expectedPayloadLength / 16_384);
-  if (!versionMatches || !metadataMatches) {
-    throw new Error(
-      "Confirmed Reader version or Archive reference does not match the prepared submission",
-    );
-  }
-  return details;
-}
 
 export function useAddVersionSubmit({
   t,
@@ -629,10 +546,8 @@ export function useAddVersionSubmit({
 
         // This public commitment preflight happens before compression, Groth16,
         // or file encryption so random re-encryption cannot waste proof work.
-        const deepFamily = createDeepFamilyContract(scope.contractAddress, signer);
-        if (await deepFamily.versionExists(personIdentity.personHash, versionHash)) {
-          throw duplicateVersionError();
-        }
+        await assertNewPersonVersion({ contractAddress: scope.contractAddress, runner: signer,
+          personHash: personIdentity.personHash, versionHash });
         assertCurrentAttempt();
 
         const context: MetadataContextInput = {
@@ -764,12 +679,10 @@ export function useAddVersionSubmit({
         zkWorkerReleased = terminateZkWorkerIfIdle();
         await submitPrepared(submission);
       } catch (error) {
-        const transactionHash = (error as any)?.transactionHash ?? confirmedTransactionHash;
-        const transactionConfirmed =
-          confirmedTransactionHash !== null || (error as any)?.transactionConfirmed === true;
-        const verificationFailure = transactionConfirmed
-          ? ((error as any)?.verificationFailure === "read" ? "read" : "mismatch")
-          : undefined;
+        const context = getTransactionErrorContext(error);
+        const transactionHash = context.transactionHash ?? confirmedTransactionHash ?? undefined;
+        const transactionConfirmed = confirmedTransactionHash !== null || context.transactionConfirmed === true;
+        const verificationFailure = transactionConfirmed ? context.verificationFailure ?? "mismatch" : undefined;
         if (!isCurrentAttempt() && transactionConfirmed && transactionHash) {
           settle({ phase: "done", transactionHash, error: null });
           return;

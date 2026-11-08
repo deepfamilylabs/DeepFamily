@@ -1,33 +1,18 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { TxFlowState, TxFlowActions, TxFlowStatus } from "../model/txStatus";
+import {
+  getTransactionErrorContext,
+  type TransactionErrorContext,
+  type TransactionReceiptLike,
+} from "@deepfamily/chain-client";
+import type {
+  TxFlowState, TxFlowActions, TxFlowProgressStatus, TransactionTracking,
+} from "../model/txStatus";
 
-/**
- * Generic transaction flow hook.
- *
- * Provides unified state management for any chain write operation. The caller
- * supplies a `runner` function that receives status-update callbacks and
- * performs the actual transaction work. UI components consume the returned
- * `TxFlowState` to render progress, errors, and results.
- *
- * Usage:
- * ```ts
- * const flow = useTxFlow(async (update) => {
- *   update("validating", "Checking prerequisites...");
- *   // ... validate
- *   update("submitting", "Sending transaction...");
- *   const receipt = await sendTx();
- *   return { receipt };
- * });
- * ```
- */
-/**
- * Reports progress, and throws if the run has been superseded — by a newer run,
- * a reset, or an unmount. `isCurrent` asks the same question without throwing,
- * for the places that must decline rather than abort: a decision nobody is
- * waiting on any more has to resolve as a refusal.
- */
-export type TxFlowUpdate = ((status: TxFlowStatus, stepMessage?: string) => void) & {
+/** Progress is cancellable; public receipt tracking may finish after the UI is retired. */
+export type TxFlowUpdate = ((status: TxFlowProgressStatus, stepMessage?: string) => void) & {
   isCurrent: () => boolean;
+  submitted: (transactionHash: string) => void;
+  confirmed: (transactionHash: string, receipt?: TransactionReceiptLike) => void;
 };
 
 export type TxFlowRunner<TResult, TArgs extends unknown[]> = (
@@ -39,137 +24,99 @@ const SUPERSEDED = "Transaction flow was superseded by a newer request";
 
 export type UseTxFlowOptions<TError = unknown> = {
   normalizeError?: (error: unknown) => TError;
-  /** Return a confirmed result to its caller after reset/unmount, without updating UI state.
-   * The runner must guard every pre-send boundary with update.isCurrent(). */
+  /** Deliver the original result after reset/unmount, without updating the retired UI. */
   allowBackgroundCompletion?: boolean;
 };
 
-export type UseTxFlowReturn<TResult, TArgs extends unknown[], TError = unknown> = TxFlowState<
-  TResult,
-  TError
-> &
-  TxFlowActions<TArgs, TResult>;
+export type UseTxFlowReturn<TResult, TArgs extends unknown[], TError = unknown> =
+  TxFlowState<TResult, TError> & TxFlowActions<TArgs, TResult>;
 
+function initialState<TResult, TError>(): TxFlowState<TResult, TError> {
+  return { status: "idle", stepMessage: null, tracking: { state: "none" }, error: null, result: null };
+}
+
+function trackingAfterError(
+  previous: TransactionTracking,
+  context: TransactionErrorContext,
+): TransactionTracking {
+  if (!context.transactionHash) return previous;
+  const previousConfirmation = previous.state === "confirmed" &&
+    previous.transactionHash === context.transactionHash ? previous : undefined;
+  // A later read failure cannot undo the successful receipt already observed.
+  if (context.transactionConfirmed || previousConfirmation) {
+    return { state: "confirmed", transactionHash: context.transactionHash,
+      ...(previousConfirmation?.receipt ? { receipt: previousConfirmation.receipt } : {}) };
+  }
+  return { state: "submitted", transactionHash: context.transactionHash };
+}
+
+/** One typed state owns progress, chain confirmation and the business result. */
 export function useTxFlow<TResult = unknown, TArgs extends unknown[] = [], TError = unknown>(
   runner: TxFlowRunner<TResult, TArgs>,
   options: UseTxFlowOptions<TError> = {},
 ): UseTxFlowReturn<TResult, TArgs, TError> {
-  const [status, setStatus] = useState<TxFlowStatus>("idle");
-  const [stepMessage, setStepMessage] = useState<string | null>(null);
-  const [error, setError] = useState<TError | null>(null);
-  const [txHash, setTxHash] = useState<string | null>(null);
-  const [receipt, setReceipt] = useState<unknown | null>(null);
-  const [result, setResult] = useState<TResult | null>(null);
-
+  const [state, setState] = useState<TxFlowState<TResult, TError>>(initialState);
   const runIdRef = useRef(0);
+  useEffect(() => () => { runIdRef.current += 1; }, []);
+  const { normalizeError, allowBackgroundCompletion = false } = options;
 
-  // Unmount supersedes UI updates. A runner that explicitly supports background
-  // completion can still return its confirmed result to the original caller.
-  useEffect(
-    () => () => {
-      runIdRef.current += 1;
-    },
-    [],
-  );
-  const normalizeError = options.normalizeError;
-  const allowBackgroundCompletion = options.allowBackgroundCompletion === true;
-  const toFlowError = useCallback(
-    (err: unknown): TError => (normalizeError ? normalizeError(err) : (err as TError)),
-    [normalizeError],
-  );
-
-  const update = useCallback((nextStatus: TxFlowStatus, message?: string) => {
-    setStatus(nextStatus);
-    if (message !== undefined) setStepMessage(message);
-  }, []);
-
-  /**
-   * A run that has been superseded — by a newer run, a reset, or an unmount —
-   * stops at its next step boundary. Silently ignoring the progress report
-   * would let an abandoned flow carry on to the wallet.
-   */
-  const guardedUpdate = useCallback(
-    (runId: number): TxFlowUpdate => {
-      const report = (nextStatus: TxFlowStatus, message?: string) => {
-        if (runIdRef.current !== runId) throw new Error(SUPERSEDED);
-        update(nextStatus, message);
-      };
-      report.isCurrent = () => runIdRef.current === runId;
-      return report;
-    },
-    [update],
-  );
-
-  const resetState = useCallback(() => {
-    setStatus("idle");
-    setStepMessage(null);
-    setError(null);
-    setTxHash(null);
-    setReceipt(null);
-    setResult(null);
+  const guardedUpdate = useCallback((runId: number): TxFlowUpdate => {
+    const isCurrent = () => runIdRef.current === runId;
+    const report = (status: TxFlowProgressStatus, stepMessage?: string) => {
+      if (!isCurrent()) throw new Error(SUPERSEDED);
+      setState((previous) => isCurrent() ? {
+        status, stepMessage: stepMessage ?? previous.stepMessage,
+        tracking: previous.tracking, error: null, result: null,
+      } : previous);
+    };
+    report.isCurrent = isCurrent;
+    const track = (tracking: TransactionTracking) => {
+      if (!isCurrent()) return;
+      setState((previous) => isCurrent() ? { ...previous, tracking } : previous);
+    };
+    report.submitted = (transactionHash: string) => track({ state: "submitted", transactionHash });
+    report.confirmed = (transactionHash: string, receipt?: TransactionReceiptLike) =>
+      track({ state: "confirmed", transactionHash, ...(receipt ? { receipt } : {}) });
+    return report;
   }, []);
 
   const reset = useCallback(() => {
     runIdRef.current += 1;
-    resetState();
-  }, [resetState]);
+    setState(initialState());
+  }, []);
 
-  const run = useCallback(
-    async (...args: TArgs) => {
-      const thisRunId = ++runIdRef.current;
-      resetState();
-
-      try {
-        setStatus("validating");
-        const flowResult = await runner(guardedUpdate(thisRunId), ...args);
-
-        if (runIdRef.current !== thisRunId) return;
-
-        setResult(flowResult);
-        setStatus("success");
-        setStepMessage(null);
-      } catch (err: any) {
-        if (runIdRef.current !== thisRunId) return;
-
-        setError(toFlowError(err));
-        setStatus("error");
-        setStepMessage(null);
+  const execute = useCallback(async (throwErrors: boolean, ...args: TArgs): Promise<TResult | undefined> => {
+    const runId = ++runIdRef.current;
+    const isCurrent = () => runIdRef.current === runId;
+    setState({ status: "validating", stepMessage: null, tracking: { state: "none" }, error: null, result: null });
+    try {
+      const result = await runner(guardedUpdate(runId), ...args);
+      if (!isCurrent()) {
+        if (throwErrors && allowBackgroundCompletion) return result;
+        if (throwErrors) throw new Error(SUPERSEDED);
+        return;
       }
-    },
-    [runner, resetState, toFlowError, guardedUpdate],
-  );
-
-  const runOrThrow = useCallback(
-    async (...args: TArgs): Promise<TResult> => {
-      const thisRunId = ++runIdRef.current;
-      resetState();
-
-      try {
-        setStatus("validating");
-        const flowResult = await runner(guardedUpdate(thisRunId), ...args);
-
-        if (runIdRef.current !== thisRunId) {
-          if (allowBackgroundCompletion) return flowResult;
-          throw new Error(SUPERSEDED);
-        }
-
-        setResult(flowResult);
-        setStatus("success");
-        setStepMessage(null);
-        return flowResult;
-      } catch (err: any) {
-        if (runIdRef.current !== thisRunId) {
-          throw err;
-        }
-
-        setError(toFlowError(err));
-        setStatus("error");
-        setStepMessage(null);
-        throw err;
+      setState((previous) => isCurrent() ? {
+        status: "success", stepMessage: null, tracking: previous.tracking, error: null, result,
+      } : previous);
+      return result;
+    } catch (error) {
+      if (isCurrent()) {
+        const context = getTransactionErrorContext(error);
+        const normalized = normalizeError ? normalizeError(error) : error as TError;
+        setState((previous) => isCurrent() ? {
+          status: "error", stepMessage: null, error: normalized, result: null,
+          tracking: trackingAfterError(previous.tracking, context),
+        } : previous);
       }
-    },
-    [allowBackgroundCompletion, runner, resetState, toFlowError, guardedUpdate],
-  );
+      if (throwErrors) throw error;
+    }
+  }, [allowBackgroundCompletion, guardedUpdate, normalizeError, runner]);
 
-  return { status, stepMessage, error, txHash, receipt, result, reset, run, runOrThrow };
+  const runOrThrow = useCallback(async (...args: TArgs): Promise<TResult> =>
+    await execute(true, ...args) as TResult, [execute]);
+  const run = useCallback(async (...args: TArgs): Promise<void> => {
+    await execute(false, ...args);
+  }, [execute]);
+  return { ...state, reset, run, runOrThrow };
 }

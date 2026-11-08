@@ -1,3 +1,4 @@
+import { executeChainTransaction, instrumentChainContract } from "@deepfamily/chain-client";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
@@ -224,11 +225,11 @@ export const resolveTarget = async (
     throw new Error(`Unknown --target "${targetArg}" (expected: main)`);
   }
   const proxyAddress = await readDeploymentAddress(connection, spec.contract);
-  const proxy = await ethers.getContractAt(spec.contract, proxyAddress);
+  const proxy = instrumentChainContract(await ethers.getContractAt(spec.contract, proxyAddress));
   const timelockAddress = await proxy.owner();
   // The owner is expected to be a TimelockController. Lifecycle tasks pass the exact retained
   // artifact for historical deployments; ordinary governance tasks use the current default.
-  const timelock = await ethers.getContractAt(timelockContractName, timelockAddress);
+  const timelock = instrumentChainContract(await ethers.getContractAt(timelockContractName, timelockAddress));
   return { spec, proxyAddress, proxy, timelockAddress, timelock };
 };
 
@@ -260,9 +261,16 @@ export const deployImplementation = async (connection, ethers, signer, spec, con
     };
   }
   const factory = await ethers.getContractFactory(contractName, factoryOpts);
-  const impl = await factory.deploy();
-  await impl.waitForDeployment();
-  return impl.getAddress();
+  const request = await factory.getDeployTransaction();
+  const { receipt } = await executeChainTransaction({
+    provider: signer.provider,
+    send: () => signer.sendTransaction(request),
+    replacementPolicy: "reject",
+    label: `deploy-${contractName}`,
+  });
+  if (!receipt.contractAddress || !ethers.isAddress(receipt.contractAddress))
+    throw new Error(`${contractName} receipt does not contain a deployment address`);
+  return ethers.getAddress(receipt.contractAddress);
 };
 
 // Encode the proxy's upgrade call. The proxy ABI of the target contract carries upgradeToAndCall.
@@ -292,10 +300,13 @@ export const sendOrPrint = async ({
   const signerAddress = await signer.getAddress();
   const hasRole = await timelock.hasRole(role, signerAddress);
   if (hasRole) {
-    const tx = await timelock.connect(signer)[method](...callArgs);
-    await tx.wait();
-    console.log(`  sent ${method} from ${signerAddress}: tx ${tx.hash}`);
-    return { sent: true, txHash: tx.hash, calldata };
+    const { transactionHash } = await executeChainTransaction({
+      provider: signer.provider,
+      send: () => timelock.connect(signer)[method](...callArgs),
+      label: `timelock-${method}`,
+    });
+    console.log(`  sent ${method} from ${signerAddress}: tx ${transactionHash}`);
+    return { sent: true, txHash: transactionHash, calldata };
   }
   console.log(`  signer ${signerAddress} lacks the required role; submit this from the multisig:`);
   console.log(`    to:        ${timelockAddress}`);

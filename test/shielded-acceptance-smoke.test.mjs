@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import path from "node:path";
 
 import hre from "hardhat";
+import { executeChainTransaction } from "@deepfamily/chain-client";
 
 import { deployIntegratedFixture } from "./fixtures/integrated.mjs";
 import { addPersonVersion } from "../lib/seedHelpers.js";
@@ -54,7 +55,8 @@ describe("integrated shielded acceptance smoke", function () {
       wasm: path.resolve("frontend/public/zk/identity/person_commitment.wasm"),
       zkey: path.resolve("frontend/public/zk/identity/person_commitment_final.zkey"),
     };
-    const recordTx = async (_label, tx) => tx.wait();
+    const recordTx = async (label, send) => (await executeChainTransaction({ provider: connection.ethers.provider, send, label })).receipt;
+    const recordReceipt = async (_label, receipt) => receipt;
     const personResult = await addPersonVersion({
       deepFamily: deployed.deepFamily,
       signer,
@@ -76,6 +78,7 @@ describe("integrated shielded acceptance smoke", function () {
       mother,
       personResult,
       recordTx,
+      recordReceipt,
       proofArtifacts,
     });
     assert.equal(result.status, "passed");

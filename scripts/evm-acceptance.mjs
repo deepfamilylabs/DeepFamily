@@ -1,3 +1,4 @@
+import { createChainContract, executeChainTransaction, getChainErrorDetails, instrumentChainContract, runChainRead, waitForTransactionHashReceipt } from "@deepfamily/chain-client";
 import { fileURLToPath } from "node:url";
 import {
   appendDfsStoryRecord,
@@ -444,7 +445,7 @@ const inspectCanonicalSafeInfrastructure = async ({ provider, chainId }) => {
       matched: true,
     };
   }
-  const proxyFactory = new Contract(
+  const proxyFactory = createChainContract(
     metadata.proxyFactory.address,
     metadata.proxyFactory.abi,
     provider,
@@ -852,7 +853,7 @@ const refundWallet = async ({ ethers, provider, wallet, recipient, confirmations
   const feePerGas = feeData.maxFeePerGas ?? feeData.gasPrice;
   if (!feePerGas || feePerGas <= 0n)
     throw new Error("RPC did not return a usable gas price for refund");
-  const estimatedGas = await wallet.estimateGas({ to: recipient, value: 0n });
+  const estimatedGas = await runChainRead({ read: () => wallet.estimateGas({ to: recipient, value: 0n }), operation: "estimate" });
   const gasLimit = (estimatedGas * 125n + 99n) / 100n;
   const reserve = gasLimit * feePerGas;
   if (balanceBefore <= reserve) {
@@ -868,13 +869,13 @@ const refundWallet = async ({ ethers, provider, wallet, recipient, confirmations
           maxPriorityFeePerGas: feeData.maxPriorityFeePerGas ?? 0n,
         }
       : { gasPrice: feeData.gasPrice };
-  const tx = await wallet.sendTransaction({
-    to: recipient,
-    value: amount,
-    gasLimit,
-    ...feeOverrides,
+  const { receipt } = await executeChainTransaction({
+    provider,
+    send: () => wallet.sendTransaction({ to: recipient, value: amount, gasLimit, ...feeOverrides }),
+    confirmations,
+    timeoutMs: TX_TIMEOUT_MS,
+    label: "refund-run-deployer",
   });
-  const receipt = await tx.wait(confirmations, TX_TIMEOUT_MS);
   assertCondition(receipt, "Run-deployer refund transaction was not confirmed");
   assertCondition(Number(receipt.status) === 1, "Run-deployer refund transaction reverted");
   return {
@@ -918,6 +919,7 @@ const runRecovery = async ({ ethers, provider, config, funder, runDeployer, base
   } catch (error) {
     report.status = "failed";
     report.error = safeErrorMessage(error, [config.privateKey, runDeployer.privateKey]);
+    report.chainError = getChainErrorDetails(error);
     throw error;
   } finally {
     report.finishedAt = nowIso();
@@ -1309,21 +1311,40 @@ export const main = async (chainProfile) => {
     await saveReport();
     console.log(`[${CHAIN_PROFILE.id}-acceptance] PASS ${name}`);
   };
-  const recordTx = async (label, tx) => {
-    const receipt = await tx.wait(config.confirmations, TX_TIMEOUT_MS);
+  const recordReceipt = async (label, receipt, { confirmationsSatisfied = false } = {}) => {
     assertCondition(receipt, `${label} transaction was not confirmed`);
     assertCondition(Number(receipt.status) === 1, `${label} transaction reverted`);
+    // Helpers use their own receipt policy; apply the acceptance policy before publishing.
+    if (!confirmationsSatisfied && config.confirmations > 1) {
+      ({ receipt } = await waitForTransactionHashReceipt({
+        provider,
+        transactionHash: receipt.hash,
+        confirmations: config.confirmations,
+        timeoutMs: TX_TIMEOUT_MS,
+      }));
+    }
     report.transactions[label] = publicReceipt(receipt);
     await saveReport();
     return receipt;
   };
+  const recordTx = async (label, send, { replacementPolicy = "fee-only" } = {}) => {
+    const { receipt } = await executeChainTransaction({
+      provider, send, replacementPolicy,
+      confirmations: config.confirmations,
+      timeoutMs: TX_TIMEOUT_MS,
+      label,
+    });
+    return recordReceipt(label, receipt, { confirmationsSatisfied: true });
+  };
   const deploy = async (contractName, signer, args = [], factoryOptions = {}) => {
     const factory = await ethers.getContractFactory(contractName, { signer, ...factoryOptions });
-    const contract = await factory.deploy(...args);
-    const transaction = contract.deploymentTransaction();
-    assertCondition(transaction, `${contractName} deployment transaction is unavailable`);
-    await recordTx(`deploy-${contractName}`, transaction);
-    const address = await contract.getAddress();
+    const request = await factory.getDeployTransaction(...args);
+    const receipt = await recordTx(`deploy-${contractName}`, () => signer.sendTransaction(request), {
+      replacementPolicy: "reject",
+    });
+    assertCondition(ethers.isAddress(receipt.contractAddress), `${contractName} deployment address is unavailable`);
+    const address = ethers.getAddress(receipt.contractAddress);
+    const contract = instrumentChainContract(factory.attach(address));
     assertCondition(
       (await provider.getCode(address)) !== "0x",
       `${contractName} has no deployed code`,
@@ -1430,12 +1451,11 @@ export const main = async (chainProfile) => {
     });
 
     currentStep = "funding";
-    const fundingTx = await funder.sendTransaction({
-      to: runDeployer.address,
-      value: config.maximumCostWei,
+    await recordTx("fund-run-deployer", async () => {
+      const transaction = await funder.sendTransaction({ to: runDeployer.address, value: config.maximumCostWei });
+      funded = true;
+      return transaction;
     });
-    funded = true;
-    await recordTx("fund-run-deployer", fundingTx);
     assertCondition(
       (await provider.getBalance(runDeployer.address)) <= config.maximumCostWei,
       "Run deployer received more than the configured hard budget",
@@ -1470,8 +1490,7 @@ export const main = async (chainProfile) => {
       (await provider.getCode(preparedSafe.safeAddress)) === "0x",
       `Predicted governance Safe ${preparedSafe.safeAddress} is already deployed`,
     );
-    const safeDeploymentTx = await runDeployer.sendTransaction(preparedSafe.deploymentTransaction);
-    await recordTx("deploy-canonical-governance-safe", safeDeploymentTx);
+    await recordTx("deploy-canonical-governance-safe", () => runDeployer.sendTransaction(preparedSafe.deploymentTransaction));
     const safeAddress = preparedSafe.safeAddress;
     const initialSafeProfile = await assertCanonicalSafeProfile({
       provider,
@@ -1619,12 +1638,9 @@ export const main = async (chainProfile) => {
       safeContext = primarySafeContext,
     ) => {
       const signed = await signedExecution(target, value, data, wallets, safeContext);
-      const tx = await runDeployer.sendTransaction({
-        to: safeContext.safeAddress,
-        value: 0n,
-        data: signed.encodedTransaction,
-      });
-      const receipt = await recordTx(label, tx);
+      const receipt = await recordTx(label, () => runDeployer.sendTransaction({
+        to: safeContext.safeAddress, value: 0n, data: signed.encodedTransaction,
+      }));
       const execution = assertSafeExecutionSuccess({
         receipt,
         safeAddress: safeContext.safeAddress,
@@ -2371,7 +2387,7 @@ export const main = async (chainProfile) => {
       addResult.metadata.parents.father && addResult.metadata.parents.mother,
       "Complete parent commitments missing",
     );
-    await recordTx("zk-add-person", addResult.tx);
+    await recordReceipt("zk-add-person", addResult.receipt);
     const personHash = addResult.personHash;
     assertCondition(
       (await deepFamily.personVersionsCount(personHash)) === 1n,
@@ -2425,12 +2441,12 @@ export const main = async (chainProfile) => {
 
     await recordTx(
       "endorsement-approve",
-      await token.connect(runDeployer).approve(addresses.deepFamily, reward),
+      () => token.connect(runDeployer).approve(addresses.deepFamily, reward),
     );
     const treasuryBefore = await token.balanceOf(timelockAddress);
     await recordTx(
       "endorse-person-version",
-      await deepFamily.connect(runDeployer).endorseVersion(personHash, 1),
+      () => deepFamily.connect(runDeployer).endorseVersion(personHash, 1),
     );
     const protocolShare = (reward * activeProtocolFee) / 10_000n;
     const treasuryAfter = await token.balanceOf(timelockAddress);
@@ -2451,6 +2467,7 @@ export const main = async (chainProfile) => {
     const mintResult = await withTimeout(
       mintPersonVersionNFT({
         deepFamily,
+        archive,
         signer: runDeployer,
         personHash,
         versionIndex: 1,
@@ -2477,7 +2494,7 @@ export const main = async (chainProfile) => {
       disclosureProofArtifacts,
       "Disclosure binding proof artifact",
     );
-    await recordTx("zk-mint-person-nft", mintResult.tx);
+    await recordReceipt("zk-mint-person-nft", mintResult.receipt);
     const tokenId = await deepFamily.versionToTokenId(personHash, 1);
     assertCondition(tokenId > 0n, "NFT token ID was not assigned");
     assertCondition(
@@ -2496,7 +2513,7 @@ export const main = async (chainProfile) => {
       attachmentURI: "",
     });
     const storyHash = storyResult.recordRef.blob.payloadHash;
-    await recordTx("story-add-record", storyResult.tx);
+    await recordReceipt("story-add-record", storyResult.receipt);
     assertCondition(
       storyResult.record.decoded.title === storyTitle &&
         storyResult.record.decoded.content === storyContent,
@@ -2519,7 +2536,7 @@ export const main = async (chainProfile) => {
       const gas = await estimateArchiveCall({ method, args, provider });
       const receipt = await recordTx(
         `archive-boundary-${payloadLength}`,
-        await method(...args, { gasLimit: gas.gasLimit }),
+        () => method(...args, { gasLimit: gas.gasLimit }),
       );
       const ref = await archive.storyRecordRef(tokenId, before.totalRecords);
       const verified = await readArchiveBlob({
@@ -2553,7 +2570,7 @@ export const main = async (chainProfile) => {
       samples: archiveCapacity,
     };
     const sealed = await sealArchiveStory({ archive: archive.connect(runDeployer), tokenId });
-    await recordTx("story-seal", sealed.tx);
+    await recordReceipt("story-seal", sealed.receipt);
     const storyState = await deepFamilyReader.getStoryState(tokenId);
     assertCondition(storyState.isSealed, "Story is not sealed");
     const rejectedPayload = encodeStoryRecord({
@@ -2591,6 +2608,7 @@ export const main = async (chainProfile) => {
       mother,
       personResult: addResult,
       recordTx,
+      recordReceipt,
       proofArtifacts: personProofArtifactPaths,
     });
     report.shielded.receipts = await verifyShieldedReceipts({
@@ -2603,7 +2621,7 @@ export const main = async (chainProfile) => {
 
     await recordTx(
       "cancel-endorsement",
-      await deepFamily.connect(runDeployer).cancelEndorsement(personHash),
+      () => deepFamily.connect(runDeployer).cancelEndorsement(personHash),
     );
     assertCondition(
       (await deepFamily.endorsedVersionIndex(personHash, runDeployer.address)) === 0n,
@@ -2757,11 +2775,11 @@ export const main = async (chainProfile) => {
         implementationAfter === ethers.getAddress(v2Address),
         "ERC-1967 implementation slot was not updated",
       );
-      const deepFamilyV2 = await ethers.getContractAt(
+      const deepFamilyV2 = instrumentChainContract(await ethers.getContractAt(
         "DeepFamilyV2Mock",
         addresses.deepFamily,
         runDeployer,
-      );
+      ));
       assertCondition((await deepFamilyV2.version()) === "V2", "Upgraded proxy does not expose V2");
       assertCondition(
         (await deepFamilyV2.owner()) === timelockAddress,
@@ -2808,7 +2826,7 @@ export const main = async (chainProfile) => {
           storyStateAfterUpgrade.recordsHead === storyState.recordsHead,
         "Upgrade changed the sealed story state",
       );
-      await recordTx("v2-set-new-value", await deepFamilyV2.setNewValue(42));
+      await recordTx("v2-set-new-value", () => deepFamilyV2.setNewValue(42));
       assertCondition(
         (await deepFamilyV2.newValue()) === 42n,
         "V2 appended storage is not writable",
@@ -2850,7 +2868,7 @@ export const main = async (chainProfile) => {
       );
       await recordTx(
         "deploy-replacement-canonical-governance-safe",
-        await runDeployer.sendTransaction(preparedReplacementSafe.deploymentTransaction),
+        () => runDeployer.sendTransaction(preparedReplacementSafe.deploymentTransaction),
       );
       const replacementSafeAddress = preparedReplacementSafe.safeAddress;
       const replacementSafeProfile = await assertCanonicalSafeProfile({
@@ -2924,17 +2942,14 @@ export const main = async (chainProfile) => {
         "GovernanceTimelock",
         runDeployer,
       );
-      const replacementTimelock = await ReplacementTimelockFactory.deploy(
-        replacementTimelockConfig.minDelay,
-        replacementTimelockConfig.governanceMultisig,
+      const replacementTimelockRequest = await ReplacementTimelockFactory.getDeployTransaction(
+        replacementTimelockConfig.minDelay, replacementTimelockConfig.governanceMultisig,
       );
-      const replacementTimelockDeploymentTx = replacementTimelock.deploymentTransaction();
-      assertCondition(
-        replacementTimelockDeploymentTx,
-        "Replacement GovernanceTimelock deployment transaction is unavailable",
-      );
-      await recordTx("deploy-replacement-GovernanceTimelock", replacementTimelockDeploymentTx);
-      const replacementTimelockAddress = await replacementTimelock.getAddress();
+      const replacementTimelockReceipt = await recordTx("deploy-replacement-GovernanceTimelock",
+        () => runDeployer.sendTransaction(replacementTimelockRequest), { replacementPolicy: "reject" });
+      assertCondition(ethers.isAddress(replacementTimelockReceipt.contractAddress), "Replacement GovernanceTimelock deployment address is unavailable");
+      const replacementTimelockAddress = ethers.getAddress(replacementTimelockReceipt.contractAddress);
+      const replacementTimelock = instrumentChainContract(ReplacementTimelockFactory.attach(replacementTimelockAddress));
       report.addresses.replacementTimelock = replacementTimelockAddress;
 
       if (config.verify) {
@@ -3226,11 +3241,11 @@ export const main = async (chainProfile) => {
       const oldTreasuryAtOwnerMigrationSchedule = await token.balanceOf(timelockAddress);
       await recordTx(
         "migration-window-endorsement-approve",
-        await token.connect(runDeployer).approve(addresses.deepFamily, reward),
+        () => token.connect(runDeployer).approve(addresses.deepFamily, reward),
       );
       await recordTx(
         "migration-window-endorsement",
-        await deepFamilyV2.connect(runDeployer).endorseVersion(personHash, 1),
+        () => deepFamilyV2.connect(runDeployer).endorseVersion(personHash, 1),
       );
       const oldTreasuryBeforeOwnerMigration = await token.balanceOf(timelockAddress);
       assertCondition(
@@ -3239,7 +3254,7 @@ export const main = async (chainProfile) => {
       );
       await recordTx(
         "migration-window-cancel-endorsement",
-        await deepFamilyV2.connect(runDeployer).cancelEndorsement(personHash),
+        () => deepFamilyV2.connect(runDeployer).cancelEndorsement(personHash),
       );
 
       await Promise.all([
@@ -3884,6 +3899,7 @@ export const main = async (chainProfile) => {
     report.status = "failed";
     report.failedStep = currentStep;
     report.error = safeErrorMessage(error, secretValues);
+    report.chainError = getChainErrorDetails(error);
     if (report.onchain.status !== "passed") report.onchain.status = "failed";
   } finally {
     if (oldGovernanceTimelockAddress === undefined) {

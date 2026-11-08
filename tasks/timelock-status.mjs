@@ -1,3 +1,4 @@
+import { createChainContract, instrumentChainContract } from "@deepfamily/chain-client";
 /**
  * Usage:
  *   npx hardhat --config hardhat.config.mjs timelock-status --network confluxTestnet
@@ -93,7 +94,7 @@ const inspectMultisig = async ({ ethers, address, issues }) => {
   }
 
   try {
-    const multisig = new ethers.Contract(address, MULTISIG_INSPECTION_ABI, ethers.provider);
+    const multisig = createChainContract(address, MULTISIG_INSPECTION_ABI, ethers.provider);
     const [threshold, rawOwners] = await Promise.all([
       multisig.getThreshold(),
       multisig.getOwners(),
@@ -249,8 +250,8 @@ export const action = async (args, hre) => {
     const tokenAddress = ethers.getAddress(
       await readDeploymentAddress(connection, "DeepFamilyToken"),
     );
-    const deepFamily = await ethers.getContractAt("DeepFamily", proxyAddress);
-    const tokenContract = await ethers.getContractAt("DeepFamilyToken", tokenAddress);
+    const deepFamily = instrumentChainContract(await ethers.getContractAt("DeepFamily", proxyAddress));
+    const tokenContract = instrumentChainContract(await ethers.getContractAt("DeepFamilyToken", tokenAddress));
     const tokenOwner = ethers.getAddress(await tokenContract.owner());
     const configuredToken = ethers.getAddress(await deepFamily.DEEP_FAMILY_TOKEN_CONTRACT());
     const configuredMain = ethers.getAddress(await tokenContract.deepFamilyContract());

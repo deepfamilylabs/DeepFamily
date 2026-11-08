@@ -1,13 +1,14 @@
+import type { ContractReceipt } from "../../../shared/clients/transactionTypes";
 import { type JsonRpcSigner } from "ethers";
 import {
   createDeepFamilyContract,
   createArchiveContract,
   createArchiveInterface,
 } from "../../../shared/clients/contractFactory";
-import { parseReceiptEvents, waitForTransactionReceipt } from "../api/txGateway";
+import { parseReceiptEvents } from "../api/txGateway";
 import { normalizeStoryTxError } from "../../../shared/lib/errors";
-import { withTransactionHash } from "../api/exactTransactionReceipt";
-import { readConfirmedDetails, verifyConfirmedDetails } from "./confirmedTransactionError";
+import { executeChainTransaction, withTransactionHash } from "@deepfamily/chain-client";
+import { readConfirmedDetails, verifyConfirmedDetails } from "@deepfamily/chain-client";
 
 import {
   archivePreviewRejectedError,
@@ -21,17 +22,25 @@ export interface SealStoryResult {
   recordsHead: string;
   transactionHash: string;
   blockNumber: number;
+  receipt: ContractReceipt;
   events: {
     StorySealed: { tokenId: string; totalRecords: number; recordsHead: string; sealer: string };
   };
 }
 
-export async function sealStoryService(
-  signer: JsonRpcSigner,
-  contractAddress: string,
-  tokenId: string,
-  confirmTransactionPreview?: (preview: ArchiveTransactionPreview) => boolean | Promise<boolean>,
-): Promise<SealStoryResult> {
+export interface SealStoryCommand {
+  signer: JsonRpcSigner;
+  contractAddress: string;
+  tokenId: string;
+  confirmTransactionPreview?: (preview: ArchiveTransactionPreview) => boolean | Promise<boolean>;
+  assertActive?: () => void;
+  onSubmitted?: (transactionHash: string) => void;
+  onConfirmed?: (transactionHash: string, receipt: ContractReceipt) => void;
+}
+
+export async function sealStoryService({
+  signer, contractAddress, tokenId, confirmTransactionPreview, assertActive, onSubmitted, onConfirmed,
+}: SealStoryCommand): Promise<SealStoryResult> {
   const deepFamily = createDeepFamilyContract(contractAddress, signer);
   let errorContract = deepFamily;
   let transactionHash: string | undefined;
@@ -56,9 +65,10 @@ export async function sealStoryService(
     if (!confirmTransactionPreview || !(await confirmTransactionPreview(preview))) {
       throw archivePreviewRejectedError("Story seal cancelled before wallet request");
     }
-    const [currentNetwork, currentAuthor] = await Promise.all([
+    const [currentNetwork, currentAuthor, fromBlock] = await Promise.all([
       signer.provider.getNetwork(),
       signer.getAddress(),
+      signer.provider.getBlockNumber(),
     ]);
     if (
       currentNetwork.chainId !== network.chainId ||
@@ -68,9 +78,16 @@ export async function sealStoryService(
         key: "archive.errors.walletScopeChanged",
       });
     }
-    const tx = await contract.sealStory(...args, { gasLimit: preview.gasLimit });
-    transactionHash = tx.hash;
-    const receipt = await waitForTransactionReceipt(tx);
+    const tracked = await executeChainTransaction<ContractReceipt>({
+      fromBlock,
+      assertActive,
+      send: () => contract.sealStory(...args, { gasLimit: preview.gasLimit }),
+      expected: { chainId: network.chainId, from: author, to: archiveAddress,
+        data: contract.interface.encodeFunctionData("sealStory", args), value: 0n },
+      onSubmitted: (hash) => { transactionHash = hash; onSubmitted?.(hash); },
+    });
+    const { receipt } = tracked;
+    transactionHash = tracked.transactionHash;
     const event = parseReceiptEvents(receipt, createArchiveInterface(), archiveAddress).find(
       (item) => item.name === "StorySealed",
     );
@@ -82,14 +99,15 @@ export async function sealStoryService(
       event.args.recordsHead !== state.recordsHead ||
       BigInt(event.args.totalPayloadLength) !== BigInt(state.totalPayloadLength) ||
       event.args.sealer.toLowerCase() !== author.toLowerCase() ||
-      String(receipt.hash ?? receipt.transactionHash).toLowerCase() !== tx.hash.toLowerCase()
+      String(receipt.hash ?? receipt.transactionHash).toLowerCase() !== tracked.transactionHash.toLowerCase()
     ) {
       throw archiveValidationError("Story seal receipt does not match the expected state", {
         key: "archive.errors.confirmationMismatch",
       });
     }
-    return await verifyConfirmedDetails(tx.hash, async () => {
-      const finalState = await readConfirmedDetails(tx.hash, () =>
+    onConfirmed?.(tracked.transactionHash, receipt);
+    return await verifyConfirmedDetails(tracked.transactionHash, async () => {
+      const finalState = await readConfirmedDetails(tracked.transactionHash, () =>
         contract.storyState(tokenId, { blockTag: receipt.blockNumber }),
       );
       if (
@@ -111,8 +129,9 @@ export async function sealStoryService(
       };
       return {
         ...sealed,
-        transactionHash: tx.hash,
-        blockNumber: receipt.blockNumber,
+        transactionHash: tracked.transactionHash,
+        blockNumber: Number(receipt.blockNumber),
+        receipt,
         events: { StorySealed: sealed },
       };
     });

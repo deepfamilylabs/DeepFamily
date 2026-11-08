@@ -1,3 +1,4 @@
+import { executeChainTransaction } from "@deepfamily/chain-client";
 import { task } from "hardhat/config";
 import { ArgumentType } from "hardhat/types/arguments";
 import fs from "node:fs";
@@ -112,24 +113,23 @@ const action = async (args, hre) => {
   console.log("Sender:", sender);
   console.log("Submitting addPersonVersion ...");
 
-  const tx = await deepFamily
-    .connect(signer)
-    .addPersonVersion(
+  const { receipt, transactionHash } = await executeChainTransaction({
+    provider: ethers.provider,
+    send: () => deepFamily.connect(signer).addPersonVersion(
       proofEnvelope,
       personProofPublicSignals,
       Number(args.fatherVersion),
       Number(args.motherVersion),
       metadataEnvelope,
-    );
-
-  console.log("Tx:", tx.hash);
-  const receipt = await tx.wait();
+    ),
+    onSubmitted: (hash) => console.log("Tx:", hash),
+    label: "zk-add-person-version",
+  });
+  console.log("Confirmed transaction:", transactionHash);
   console.log("Mined in block:", receipt.blockNumber);
 
   try {
-    const iface = new ethers.Interface([
-      "event PersonHashZKVerified(bytes32 indexed personHash, address indexed prover)",
-    ]);
+    const iface = deepFamily.interface;
     for (const log of receipt.logs || []) {
       try {
         const parsed = iface.parseLog(log);

@@ -1,3 +1,4 @@
+import type { TransactionErrorContext } from "@deepfamily/chain-client";
 import type { TFunction } from "i18next";
 import type { FriendlyError } from "../../../../../shared/lib/errors";
 import type {
@@ -60,12 +61,9 @@ export interface MintNFTSuccessResultView {
   events: { PersonNFTMinted: any };
 }
 
-export interface MintNFTErrorResultView {
+export interface MintNFTErrorResultView extends TransactionErrorContext {
   type: string;
   message: string;
   details: string;
   retryable?: boolean;
-  transactionHash?: string;
-  transactionConfirmed?: boolean;
-  verificationFailure?: "read" | "mismatch";
 }

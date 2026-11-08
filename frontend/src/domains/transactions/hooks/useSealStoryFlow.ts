@@ -6,7 +6,7 @@ import { sealStoryService, type SealStoryResult } from "../services/sealStorySer
 import { useWallet } from "../../wallet";
 import { useTxFlow, type TxFlowRunner } from "./useTxFlow";
 
-import type { ArchiveTransactionPreview } from "../services/archiveTransaction";
+import { archivePreviewRejectedError, type ArchiveTransactionPreview } from "../services/archiveTransaction";
 
 export type SealStoryFlowArgs = {
   tokenId: string;
@@ -26,12 +26,12 @@ export function useSealStoryFlow() {
 
       update("submitting", t("story.sealing", "Sealing story..."));
 
-      return await sealStoryService(
-        signer as any,
-        contractAddress,
-        args.tokenId,
-        args.confirmTransactionPreview,
-      );
+      return await sealStoryService({
+        ...args, signer, contractAddress,
+        assertActive: () => { if (!update.isCurrent()) throw archivePreviewRejectedError("Story seal cancelled before wallet request"); },
+        onSubmitted: update.submitted,
+        onConfirmed: update.confirmed,
+      });
     },
     [signer, contractAddress, t],
   );

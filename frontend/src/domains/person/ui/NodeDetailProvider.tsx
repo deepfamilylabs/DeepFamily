@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from "react";
 import NodeDetailModal from "./NodeDetailModal";
-import type { TrustedEndorserAccess } from "./NodeDetailModalSections";
+import type { TrustedEndorserAccess } from "../model/trustedEndorserTypes";
 import {
   resolveNodeDetailTokenId,
   resolveSelectedNodeData,
