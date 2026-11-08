@@ -2,15 +2,19 @@ import { useRef, type MutableRefObject } from "react";
 import type { Provider } from "ethers";
 import { getChainErrorDetails } from "@deepfamily/chain-client";
 import { useTransactionCenter } from "../../transactions";
+import type { ShieldedSubmissionContext } from "../../transactions/context/TransactionCenterContext";
 import type { ShieldedSubmissionTracking } from "../services/shieldedSubmissionTracking";
 import type { ShieldedSubmissionAnchor } from "../services/shieldedWalletSubmission";
 
 export type ShieldedTrackedSubmission = ShieldedSubmissionTracking & {
   id: string; label: string; kind: "action" | "approval" | "authorization";
+  actionStep?: ShieldedSubmissionContext["actionStep"];
+  /** Session scope is local only; never copied into the transaction centre. */
+  feedbackScope?: string;
 };
 
 type SubmissionSpec = Pick<ShieldedTrackedSubmission, "id" | "label" | "kind"> &
-  Partial<Pick<ShieldedTrackedSubmission, "pool" | "outputCommitments">>;
+  Partial<Pick<ShieldedTrackedSubmission, "pool" | "outputCommitments" | "actionStep" | "feedbackScope">>;
 
 /** Coordinate public records without retaining credentials, private notes, or witnesses. */
 export function useShieldedSubmissionCoordinator(input: {
@@ -35,7 +39,8 @@ export function useShieldedSubmissionCoordinator(input: {
           id: spec.id, kind: "shielded", label: spec.label, phase: "busy",
           shieldedSubmission: {
             chainId: String(input.chainId), poolAddress: input.poolAddress, kind: spec.kind,
-            ...anchor, ...(spec.outputCommitments ? { outputCommitments: spec.outputCommitments } : {}),
+            ...anchor, ...(spec.actionStep ? { actionStep: spec.actionStep } : {}),
+            ...(spec.outputCommitments ? { outputCommitments: spec.outputCommitments } : {}),
           },
         });
         if (!input.isCurrent()) return;

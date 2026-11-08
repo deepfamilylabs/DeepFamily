@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { CheckCircle2, Loader2 } from "lucide-react";
+import { buildTimeline, TransactionTimeline } from "../../transactions/ui/shared/TransactionTimeline";
 
 export type ShieldedProgressStage =
   | "preparing"
@@ -9,8 +9,11 @@ export type ShieldedProgressStage =
   | "submitting"
   | "confirming";
 
+export type ShieldedProgressActivity = "working" | "awaiting";
+
 /** The stages a pool action reports while it is proven and sent. */
 export const SHIELDED_ACTION_STAGES = [
+  "preparing",
   "proving",
   "checkingGas",
   "submitting",
@@ -171,48 +174,28 @@ export function ShieldedPeriodBar({
 export function ShieldedProgressList({
   stage,
   stages = SHIELDED_ACTION_STAGES,
+  activity = stage === "submitting" ? "awaiting" : "working",
 }: {
   stage: ShieldedProgressStage | null;
   stages?: readonly ShieldedProgressStage[];
+  /** Wallet requests wait for the user and use the shared nonspinning marker. */
+  activity?: ShieldedProgressActivity;
 }) {
   const { t } = useTranslation();
-  const current = stage ? stages.indexOf(stage) : -1;
   return (
-    <ol className="flex flex-col gap-2.5">
-      {stages.map((item, index) => {
-        const state = index < current ? "done" : index === current ? "active" : "pending";
-        return (
-          <li
-            key={item}
-            aria-current={state === "active" ? "step" : undefined}
-            className={`flex items-center gap-2.5 text-[13px] ${
-              state === "active"
-                ? "font-semibold text-orange-800 dark:text-orange-300"
-                : state === "done"
-                  ? "text-ink/80"
-                  : "text-ink-muted"
-            }`}
-          >
-            {state === "done" ? (
-              <CheckCircle2
-                className="h-[18px] w-[18px] shrink-0 text-success"
-                aria-hidden="true"
-              />
-            ) : state === "active" ? (
-              <Loader2
-                className="h-[18px] w-[18px] shrink-0 animate-spin text-orange-600 dark:text-orange-300"
-                aria-hidden="true"
-              />
-            ) : (
-              <span
-                aria-hidden="true"
-                className="h-[18px] w-[18px] shrink-0 rounded-full border-2 border-hairline-strong"
-              />
-            )}
-            {t(`shielded.stages.${item}`)}
-          </li>
-        );
+    <TransactionTimeline
+      label={t("transaction.center")}
+      steps={buildTimeline({
+        steps: stages.map((item) => ({
+          id: item,
+          label: t(`shielded.stageLabels.${item}`),
+          detail: item === stage && item === "submitting"
+            ? t("shielded.stages.submitting")
+            : undefined,
+        })),
+        currentId: stage,
+        awaiting: activity === "awaiting",
       })}
-    </ol>
+    />
   );
 }

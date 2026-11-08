@@ -1,5 +1,5 @@
 import { readArchiveBlob } from "@deepfamily/protocol-core";
-import { type Contract, id, isError, keccak256, type Signer, type ContractTransactionResponse, type TransactionReceipt } from "ethers";
+import { type Contract, id, isError, keccak256, type Provider, type Signer, type ContractTransactionResponse, type TransactionReceipt } from "ethers";
 import { executeChainTransaction, runChainRead, normalizeChainError, withConfirmedTransaction } from "@deepfamily/chain-client";
 import { createPrivateLetterContract } from "../../../shared/clients/privateLetterClient";
 import { getEventScanConfig } from "../../../shared/config/env";
@@ -15,6 +15,91 @@ export type PrivateLetterChainRecord = {
   registeredAt: string; deadline: string; ciphertextHash: string; ciphertext: Uint8Array;
   transactionHash: string;
 };
+/** Public values needed to reconcile one original message without its proof or ciphertext. */
+export type ExpectedPrivateLetterRegistration = {
+  messageId: string;
+  recipientBinding: string;
+  deadline: string;
+  ciphertextHash: string;
+};
+export type PrivateLetterCheckResult =
+  | { state: "pending" }
+  | { state: "confirmed" | "failed"; transactionHash: string };
+
+function matchesLetterEvent(
+  contract: Contract,
+  address: string,
+  log: TransactionReceipt["logs"][number],
+  expected: ExpectedPrivateLetterRegistration,
+): boolean {
+  if (log.address.toLowerCase() !== address.toLowerCase()) return false;
+  try {
+    const event = contract.interface.parseLog(log);
+    return event?.name === "LetterRegistered" && BigInt(event.args.messageId) === BigInt(expected.messageId) &&
+      BigInt(event.args.recipientBinding) === BigInt(expected.recipientBinding) &&
+      BigInt(event.args.deadline) === BigInt(expected.deadline) &&
+      String(event.args.blob.payloadHash).toLowerCase() === expected.ciphertextHash.toLowerCase();
+  } catch { return false; }
+}
+
+/** Reconcile public state only. An absent registration or expired proof never authorizes a resend. */
+export function checkPrivateLetter(input: {
+  address: string; provider: Provider; chainId: string;
+  expected: ExpectedPrivateLetterRegistration; transactionHash?: string;
+}): Promise<PrivateLetterCheckResult> {
+  return runChainRead({ read: async () => {
+    const { provider, expected } = input;
+    if ((await provider.getNetwork()).chainId !== BigInt(input.chainId))
+      throw normalizeChainError(new Error("Private letter reader is connected to the wrong network"), { category: "validation", operation: "read" });
+    const blockNumber = await provider.getBlockNumber();
+    if (!Number.isSafeInteger(blockNumber) || blockNumber < 0) throw new Error("Private letter check block is invalid");
+    const anchor = await provider.getBlock(blockNumber);
+    if (!anchor?.hash) throw new Error("Private letter check block is unavailable");
+    const anchorCurrent = async () => (await provider.getBlock(blockNumber))?.hash === anchor.hash;
+    const contract = createPrivateLetterContract(input.address, provider);
+    const record = await contract.letterRecord(expected.messageId, { blockTag: blockNumber });
+    // The desired registration may be under a replacement hash. Check it before
+    // interpreting a failed original receipt as failure of the message itself.
+    if (BigInt(record.registeredAt) !== 0n) {
+      if (BigInt(record.recipientBinding) !== BigInt(expected.recipientBinding) ||
+        BigInt(record.deadline) !== BigInt(expected.deadline) ||
+        String(record.blob.payloadHash).toLowerCase() !== expected.ciphertextHash.toLowerCase())
+        throw normalizeChainError(new Error("Message number belongs to another registered letter"), { category: "verification", operation: "verify" });
+      const filter = contract.filters.LetterRegistered(expected.messageId);
+      const fromBlock = Number(await contract.creationBlock({ blockTag: blockNumber }));
+      const chunk = getEventScanConfig().blockChunk;
+      const matches: { transactionHash: string }[] = [];
+      for (let start = fromBlock; start <= blockNumber; start += chunk) {
+        const logs = await contract.queryFilter(filter, start, Math.min(blockNumber, start + chunk - 1));
+        for (const log of logs) {
+          if (!matchesLetterEvent(contract, input.address, log, expected) ||
+            BigInt(contract.interface.parseLog(log)!.args.registeredAt) !== BigInt(record.registeredAt))
+            throw normalizeChainError(new Error("Private letter registration event does not match its record"), { category: "verification", operation: "verify" });
+          matches.push(log);
+        }
+      }
+      if (matches.length !== 1) throw new Error("Existing letter registration could not be confirmed");
+      if (!await anchorCurrent()) return { state: "pending" };
+      return { state: "confirmed", transactionHash: matches[0].transactionHash };
+    }
+    if (!input.transactionHash) return { state: "pending" };
+    const receipt = await provider.getTransactionReceipt(input.transactionHash);
+    if (!receipt || receipt.blockNumber > blockNumber) return { state: "pending" };
+    if (receipt.hash.toLowerCase() !== input.transactionHash.toLowerCase() ||
+      receipt.to?.toLowerCase() !== input.address.toLowerCase())
+      throw normalizeChainError(new Error("Private letter receipt does not match the original transaction"), { category: "verification", operation: "verify" });
+    if ((await provider.getBlock(receipt.blockNumber))?.hash !== receipt.blockHash || !await anchorCurrent())
+      return { state: "pending" };
+    if (receipt.status === 0) return { state: "failed", transactionHash: input.transactionHash };
+    if (receipt.status === 1) throw withConfirmedTransaction(
+      new Error(receipt.logs.some(log => matchesLetterEvent(contract, input.address, log, expected))
+        ? "Letter receipt is confirmed but the registration record could not be verified"
+        : "Letter transaction did not register the expected authenticated message"),
+      input.transactionHash, "mismatch",
+    );
+    return { state: "pending" };
+  } });
+}
 
 /** This proof can no longer execute, so retrying may safely prepare a fresh message. */
 export class PrivateLetterPreparationExpiredError extends Error {
@@ -73,7 +158,8 @@ async function readPrivateLetterHistory(contract: Contract): Promise<PrivateLett
 }
 
 /** Wallet submission has no plaintext, credential, identity, recipient key or witness. */
-export async function submitPrivateLetter(input: { address: string; signer: Signer; chainId: string; letter: ProvenPrivateLetter; onWalletRequest?: () => () => void; onBroadcast?: (hash: string) => void; isCurrent?: () => boolean }) {
+export async function submitPrivateLetter(input: { address: string; signer: Signer; chainId: string; letter: ProvenPrivateLetter; onWalletRequest?: () => () => void; onBroadcast?: (hash: string) => void; onStage?: (stage: "checking" | "submitting" | "confirming") => void; isCurrent?: () => boolean }) {
+  input.onStage?.("checking");
   const provider = input.signer.provider;
   if (!provider || (await provider.getNetwork()).chainId !== BigInt(input.chainId))
     throw normalizeChainError(new Error("Transaction wallet is connected to the wrong network"), { category: "wallet", operation: "submit" });
@@ -112,6 +198,7 @@ export async function submitPrivateLetter(input: { address: string; signer: Sign
         throw normalizeChainError(new Error("The transaction wallet changed before letter submission"), { category: "cancelled", operation: "submit" });
     },
     send: async () => {
+      input.onStage?.("submitting");
       const finishWalletRequest = input.onWalletRequest?.();
       try {
         return await contract.registerLetter(delivery, ciphertext, proof, { chainId: BigInt(input.chainId) });
@@ -124,7 +211,7 @@ export async function submitPrivateLetter(input: { address: string; signer: Sign
       data: contract.interface.encodeFunctionData("registerLetter", [delivery, ciphertext, proof]),
       value: 0n,
     },
-    onSubmitted: input.onBroadcast,
+    onSubmitted: hash => { input.onStage?.("confirming"); input.onBroadcast?.(hash); },
     requireSuccess: false,
   });
   const receipt = confirmed.receipt;

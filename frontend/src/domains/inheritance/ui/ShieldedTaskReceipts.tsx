@@ -49,6 +49,7 @@ export function ShieldedFundReceipt({
   periods,
   days,
   startsAt,
+  existingSchedule = false,
   heirName,
   versionLabel,
   entryLabel,
@@ -58,6 +59,8 @@ export function ShieldedFundReceipt({
   days?: bigint;
   /** Estimated start of a new arrangement; an existing arrangement keeps its own clock. */
   startsAt?: bigint;
+  /** Additional funding retains the original schedule; period numbers do not restart. */
+  existingSchedule?: boolean;
   heirName?: string;
   versionLabel?: string;
   entryLabel: string;
@@ -79,7 +82,7 @@ export function ShieldedFundReceipt({
     });
   const dueLabel = (period: bigint) =>
     startsAt !== undefined && days !== undefined
-      ? t("shielded.claimPeriodDue", {
+      ? t("shielded.fundingEstimatedDue", {
           symbol,
           date:
             formatShieldedTimestamp(startsAt + period * days * SECONDS_PER_DAY, "date") ??
@@ -110,7 +113,11 @@ export function ShieldedFundReceipt({
       }
       details={
         <>
-          {valid ? (
+          {valid && existingSchedule ? (
+            <p className="text-sm text-ink">
+              {t("shielded.fundingAdditionalPeriods", { symbol, periods: String(periods) })}
+            </p>
+          ) : valid ? (
             <div className="space-y-2.5">
               <ShieldedPeriodBar
                 segments={segments}

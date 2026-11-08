@@ -15,3 +15,4 @@ export { PanelButton } from "./ui/inheritanceControls";
 export type { ShieldedAssetToolbarProps } from "./ui/ShieldedAssetToolbar";
 
 export { loadShieldedModules, loadShieldedAssetMetadata, createShieldedAssetPool, ShieldedConfigurationMismatchError, ShieldedWalletChangedError } from "./services/shieldedPageService";
+export { normalizeShieldedUiError } from "./model/shieldedUiErrors";

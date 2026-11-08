@@ -175,7 +175,6 @@ export class ShieldedAssetSession {
   private independentKeyMaterial: IndependentKeyMaterial | null = null;
   private independentKey: ShieldedPublicIndependentKey | null = null;
   private sourceMetadata: SourceMetadata | undefined;
-  private allowHistoryVerification = false;
   private createdHere = false;
   private knownPendingRoot = false;
   private sequence = 0;
@@ -230,7 +229,6 @@ export class ShieldedAssetSession {
     this.independentKeyMaterial = null;
     this.independentKey = null;
     this.sourceMetadata = undefined;
-    this.allowHistoryVerification = false;
     this.createdHere = false;
     this.knownPendingRoot = false;
     this.wallets.clear();
@@ -465,7 +463,6 @@ export class ShieldedAssetSession {
       this.root = root.slice();
       this.independentKeyMaterial = keys;
       this.sourceMetadata = metadata;
-      this.allowHistoryVerification = false;
       this.createdHere = false;
       this.knownPendingRoot = false;
       this.independentKey = {
@@ -552,7 +549,7 @@ export class ShieldedAssetSession {
       "walletSignature",
       generated.sourceMetadata,
       params.expectedFingerprint,
-      params.expectedFingerprint ? "signature" : undefined,
+      "signature",
     );
     const backupRequired = params.pendingBackupFingerprints?.includes(this.independentKey!.keyFingerprint);
     if (backupRequired) {
@@ -563,7 +560,6 @@ export class ShieldedAssetSession {
       this.independentKey!.recoveryVerified = false;
       delete this.independentKey!.recoveryPath;
     }
-    this.allowHistoryVerification = !params.expectedFingerprint && !backupRequired;
     return this.state();
   }
 
@@ -574,7 +570,7 @@ export class ShieldedAssetSession {
     requireValue(this.root && this.independentKey, "Unlock the existing independent key root before exporting it.");
     requireValue(
       this.createdHere || this.knownPendingRoot || this.independentKey.recoveryVerified,
-      "Confirm the original key fingerprint or owned history before backing up a recovery candidate.",
+      "Unlock the independent key before backing it up.",
     );
     requireValue(
       params.format === "mnemonic" || params.format === "shieldedKey",
@@ -615,7 +611,9 @@ export class ShieldedAssetSession {
           : decodeShieldedIndependentKey(material);
       material = "";
       await this.context(params.context);
-      // A parsable backup alone does not confirm the original credentials or wallet.
+      // A saved backup restores its exact root under the supplied credentials.
+      // Unlocking it must also work on a new device before it has any chain
+      // history. A known original pin still protects the local backup drill.
       await this.installRoot(
         root,
         params.expectedCredentialsHandle,
@@ -623,20 +621,9 @@ export class ShieldedAssetSession {
         "imported",
         undefined,
         params.expectedFingerprint,
-        params.expectedFingerprint ? params.format : undefined,
+        params.format,
       );
       this.independentKey!.backupRequired = false;
-      // The tab's original public creation challenge also survives a full lock
-      // or reload. Entering the saved backup under the same independent-key credentials
-      // completes its real drill even when the new wallet has no history yet.
-      const matchesCreationChallenge = params.pendingBackupFingerprints?.includes(
-        this.independentKey!.keyFingerprint,
-      );
-      if (matchesCreationChallenge) {
-        this.independentKey!.recoveryVerified = true;
-        this.independentKey!.recoveryPath = params.format;
-      }
-      this.allowHistoryVerification = !this.independentKey!.recoveryVerified;
       return this.state();
     } finally {
       material = "";
@@ -676,7 +663,6 @@ export class ShieldedAssetSession {
     this.independentKeyMaterial = null;
     this.independentKey = null;
     this.sourceMetadata = undefined;
-    this.allowHistoryVerification = false;
     this.createdHere = false;
     this.knownPendingRoot = false;
     this.wallets.delete("independent");
@@ -684,31 +670,6 @@ export class ShieldedAssetSession {
     this.pending = null;
     this.policyDrafts.clear();
     return this.state();
-  }
-
-  /** Positive VALUE, or an independent BUDGET checked against the unlocked identity, under this owner. */
-  private confirmsCandidateRoot(notes: ReturnType<typeof listUnspentRecoveredShieldedNotes>) {
-    const owner = this.independentKeyMaterial?.ownerCommitment;
-    const identityCommitment = this.identity?.identityCommitment;
-    return notes.some(({ note }) =>
-      note.kind === "value"
-        ? note.amount > 0n && this.independentKeyMaterial !== null && note.ownerCommitment === computeShieldedValueOwnerCommitment(this.independentKeyMaterial.ownerSecret, note.nonce)
-        : identityCommitment !== undefined &&
-          note.binding !== "identity" &&
-          getBigInt(note.keyMode ?? 0) === 1n &&
-          note.remaining > 0n &&
-          note.heirOwnerCommitment === owner &&
-          note.heirIdentityCommitment === identityCommitment,
-    );
-  }
-
-  private historyCandidate(): string | null {
-    return this.independentKey &&
-      this.allowHistoryVerification &&
-      !this.independentKey.recoveryVerified &&
-      !this.independentKey.backupRequired
-      ? this.independentKey.keyFingerprint
-      : null;
   }
 
   async prepareLetter(params: ShieldedAssetWorkerCallMap["prepareLetter"]["params"]): Promise<ShieldedAssetWorkerCallMap["prepareLetter"]["result"]> {
@@ -755,7 +716,7 @@ export class ShieldedAssetSession {
     for (const record of records) {
       for (const slot of ["identity", "independent"] as const) {
         if (slot === "identity" ? !this.identity : !this.independentKeyMaterial) continue;
-        // Historical reading is available while a restored key is still a candidate.
+        // Reading existing letters does not spend funds or complete a pending backup drill.
         const keys = this.keys(slot, false);
         try {
           const envelope = await decryptShieldedLetter({ chainId: ctx.chainId, lettersAddress: ctx.lettersAddress, messageId: record.messageId,
@@ -902,10 +863,6 @@ export class ShieldedAssetSession {
           pendingIdentity: true,
         });
       }
-      if (slot === "independent" && this.historyCandidate() && this.confirmsCandidateRoot(notes)) {
-        this.independentKey!.recoveryVerified = true;
-        this.independentKey!.recoveryPath = "history";
-      }
       for (const policy of listRecoveredShieldedPolicies(wallet)) {
         if (
           !this.identity ||
@@ -1014,6 +971,9 @@ export class ShieldedAssetSession {
           amount: String(claim?.amount ?? 0n),
           amountPerPeriod: String(option.notes[0].note.amountPerPeriod),
           totalRemaining: String(option.overview.totalRemaining),
+          ...(option.overview.duePeriods === undefined
+            ? {}
+            : { duePeriods: String(option.overview.duePeriods) }),
           periodDays: String(option.notes[0].note.periodDays),
           status: option.overview.status,
           ...(option.overview.nextDueAt === undefined
@@ -1107,6 +1067,18 @@ export class ShieldedAssetSession {
     this.pending = null;
     const keys = this.keys(request.slot);
     const ctx = request.context;
+    // Reject an invalid final destination before replaying history or preparing merges.
+    let withdrawalRecipient: string | undefined;
+    if (request.action === "unshield") {
+      const publicRecipient = request.publicRecipient?.trim();
+      requireValue(publicRecipient, "Choose a public withdrawal destination.");
+      withdrawalRecipient = getAddress(publicRecipient);
+      requireValue(BigInt(withdrawalRecipient) !== 0n, "Unshield recipient must be nonzero");
+      requireValue(
+        withdrawalRecipient !== getAddress(ctx.poolAddress),
+        "Unshield recipient must not be the pool",
+      );
+    }
     const summary = await this.recover({ context: ctx });
     const wallet = this.wallets.get(request.slot);
     requireValue(wallet, "Recover this independent key slot before preparing a transaction.");
@@ -1137,16 +1109,6 @@ export class ShieldedAssetSession {
       };
       await this.validateReceiveDestination(receiveDestination, ctx, env);
       current();
-    }
-    let withdrawalRecipient: string | undefined;
-    if (request.action === "unshield") {
-      requireValue(request.publicRecipient, "Choose a public withdrawal destination.");
-      withdrawalRecipient = getAddress(request.publicRecipient);
-      requireValue(BigInt(withdrawalRecipient) !== 0n, "Unshield recipient must be nonzero");
-      requireValue(
-        withdrawalRecipient !== getAddress(ctx.poolAddress),
-        "Unshield recipient must not be the pool",
-      );
     }
     if (request.action === "fund") {
       requireValue(
@@ -1654,9 +1616,6 @@ export class ShieldedAssetSession {
     });
     current();
     const pools: ShieldedAssetWorkerCallMap["discover"]["result"]["pools"] = [];
-    // A candidate root may be confirmed by valid history in any verified factory pool.
-    const candidate = this.historyCandidate();
-    let candidateConfirmed = false;
     for (const item of found.pools) {
       if (!item.configurationVerified || !item.pool || item.poolDeploymentBlock === undefined) {
         pools.push({
@@ -1689,8 +1648,6 @@ export class ShieldedAssetSession {
           );
           const notes = listUnspentRecoveredShieldedNotes(wallet, keys);
           current();
-          if (slot === "independent" && candidate && this.confirmsCandidateRoot(notes))
-            candidateConfirmed = true;
           for (const event of notes) {
             if (seen.has(String(event.commitment))) continue;
             seen.add(String(event.commitment));
@@ -1720,10 +1677,6 @@ export class ShieldedAssetSession {
       anchor?.hash === found.blockHash,
       "Discovery block was reorganized. Re-run recovery.",
     );
-    if (candidateConfirmed && this.independentKey && this.independentKey.keyFingerprint === candidate) {
-      this.independentKey.recoveryVerified = true;
-      this.independentKey.recoveryPath = "history";
-    }
     return {
       complete: found.enumerationComplete && pools.every((pool) => pool.status === "recovered"),
       pools,

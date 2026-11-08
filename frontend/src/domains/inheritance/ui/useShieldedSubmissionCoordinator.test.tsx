@@ -21,6 +21,55 @@ function fixture() {
 }
 
 describe("shielded public submission coordination", () => {
+  it.each(["merge", "payment"] as const)(
+    "retains the public %s step across broadcast and receipt without copying session data",
+    (actionStep) => {
+      const f = fixture();
+      const pending = f.hook.result.current.coordinator.capture({
+        id: "step", label: "private transaction", kind: "action", actionStep,
+        feedbackScope: "private-session-sentinel",
+        outputCommitments: ["123", "456"],
+      }, provider);
+      const anchor = { nonce: 4, fromBlock: 10, signerAddress: poolAddress };
+      act(() => pending.onSubmitting(anchor));
+      act(() => { pending.onBroadcast("0xstep"); pending.onReceipt("0xstep", 1); });
+
+      expect(f.hook.result.current.centre?.records[0]).toMatchObject({
+        phase: "done", transactionHash: "0xstep",
+      });
+      expect(f.hook.result.current.centre?.records[0].shieldedSubmission).toEqual({
+        chainId: "31337", poolAddress, kind: "action", actionStep,
+        ...anchor, outputCommitments: ["123", "456"],
+      });
+      expect(JSON.stringify(f.hook.result.current.centre?.records)).not.toContain("private-session-sentinel");
+      expect(f.input.onSettled).toHaveBeenCalledWith(
+        expect.objectContaining({ actionStep, feedbackScope: "private-session-sentinel", hash: "0xstep" }),
+        1,
+      );
+    },
+  );
+
+  it("updates a departed owner's public merge receipt without repopulating local feedback", () => {
+    const f = fixture();
+    const pending = f.hook.result.current.coordinator.capture({
+      id: "old-merge", label: "merge", kind: "action", actionStep: "merge",
+      feedbackScope: "old-owner", outputCommitments: ["123"],
+    }, provider);
+    act(() => pending.onSubmitting({ nonce: 4, fromBlock: 10, signerAddress: poolAddress }));
+    const tracking = f.input.tracking.current;
+    f.stop();
+    act(() => { pending.onBroadcast("0xmerge"); pending.onReceipt("0xmerge", 1); });
+
+    expect(f.hook.result.current.centre?.records[0]).toMatchObject({
+      id: "old-merge", phase: "done", transactionHash: "0xmerge",
+      shieldedSubmission: { actionStep: "merge", outputCommitments: ["123"] },
+    });
+    expect(f.input.tracking.current).toBe(tracking);
+    expect(f.input.onPending).toHaveBeenCalledOnce();
+    expect(f.input.onSettled).not.toHaveBeenCalled();
+    expect(f.input.onRejected).not.toHaveBeenCalled();
+  });
+
   it("records a late public receipt without mutating a departed session", () => {
     const f = fixture();
     const pending = f.hook.result.current.coordinator.capture({id:"old", label:"approval", kind:"approval"}, provider);

@@ -2,12 +2,13 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AlertTriangle, Check, Loader2, Receipt } from "lucide-react";
 import { useTransactionCenter, type TransactionRecord } from "../context/TransactionCenterContext";
-import type { TransactionPhase } from "./shared/transactionPhase";
+
 
 const LINK_CLASSES = "transition-colors hover:text-ink focus-visible:text-ink";
 
-function PhaseIcon({ phase }: { phase: TransactionPhase }) {
+function PhaseIcon({ phase }: { phase: TransactionRecord["phase"] }) {
   if (phase === "done") return <Check className="h-3.5 w-3.5 text-success" aria-hidden />;
+  if (phase === "unknown") return <AlertTriangle className="h-3.5 w-3.5 text-ink-muted" aria-hidden />;
   if (phase === "failed") return <AlertTriangle className="h-3.5 w-3.5 text-danger" aria-hidden />;
   return (
     <Loader2
@@ -131,7 +132,9 @@ function TransactionRow({ record }: { record: TransactionRecord }) {
       ? t("transaction.success", "Transaction successful")
       : record.phase === "failed"
         ? record.error?.message || t("errors.unknown", "Submission failed.")
-        : t("transaction.pending", "Transaction pending confirmation...");
+        : record.phase === "unknown"
+          ? record.error?.message || t("transaction.unknown")
+          : t("transaction.pending", "Transaction pending confirmation...");
 
   return (
     <li className="rounded-lg px-1.5 py-1.5 hover:bg-surface-alt">

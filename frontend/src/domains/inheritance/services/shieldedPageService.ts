@@ -89,6 +89,7 @@ export async function createShieldedAssetPool(input: {
   factoryAddress: string;
   assetAddress: string;
   isCurrent: () => boolean;
+  onWalletRequest?: () => void;
   onSubmitted?: (hash: string) => void;
 }) {
   const provider = input.signer.provider;
@@ -104,7 +105,10 @@ export async function createShieldedAssetPool(input: {
   return executeChainTransaction<TransactionReceipt, ContractTransactionResponse>({
     fromBlock,
     assertActive: () => { if (!input.isCurrent()) throw new ShieldedWalletChangedError(); },
-    send: (): Promise<ContractTransactionResponse> => factory.createPool(input.assetAddress),
+    send: (): Promise<ContractTransactionResponse> => {
+      input.onWalletRequest?.();
+      return factory.createPool(input.assetAddress);
+    },
     expected: { chainId: input.chainId, from: account, to: input.factoryAddress, value: 0n },
     onSubmitted: input.onSubmitted,
     requireSuccess: false,

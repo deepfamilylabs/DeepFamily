@@ -25,8 +25,9 @@ export type ShieldedPublicIndependentKey = {
   keyFingerprint: string;
   rootSource: "random" | "walletSignature" | "imported";
   signerAddress?: string;
+  /** Backup or signature restoration completed. Not external authentication of the original wallet. */
   recoveryVerified: boolean;
-  recoveryPath?: "signature" | "history" | "mnemonic" | "shieldedKey";
+  recoveryPath?: "signature" | "mnemonic" | "shieldedKey";
   /** Public creation challenge; re-signing cannot replace an independent backup. */
   backupRequired?: boolean;
 };
@@ -88,6 +89,8 @@ export type ShieldedClaimSummary = {
   amountPerPeriod: string;
   /** Includes future periods, even when there is no currently claimable batch. */
   totalRemaining?: string;
+  /** Verified funded, unpaid periods already due; omitted when the scan is limited. */
+  duePeriods?: string;
   periodDays?: string;
   status: string;
   nextDueAt?: string;
@@ -96,7 +99,7 @@ export type ShieldedClaimSummary = {
   futurePeriods?: string;
 };
 export type ShieldedWalletSummary = {
-  /** Public recovery-gate updates, including a signature candidate confirmed by history. */
+  /** Public session state after recovering the wallet's asset history. */
   sessionState?: ShieldedAssetSessionState;
   /** Whether the unlocked identity's family records loaded; omitted without identity proof capability. */
   familyRecordsAvailable?: boolean;

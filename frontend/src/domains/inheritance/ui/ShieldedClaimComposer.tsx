@@ -22,6 +22,7 @@ const UPCOMING_ROWS = 6;
 
 export type ShieldedClaimScheduleRow =
   | { kind: "claimable"; index: string; period: bigint; dueAt?: bigint }
+  | { kind: "dueBacklog"; periods: bigint }
   | { kind: "upcoming"; period: bigint; dueAt: bigint }
   | { kind: "gap" };
 
@@ -44,13 +45,17 @@ export function buildShieldedClaimSchedule(
             : undefined,
       }),
     );
+  const otherDue =
+    claim.duePeriods === undefined ? 0n : BigInt(claim.duePeriods) - BigInt(claimable.length);
+  const dueRows: ShieldedClaimScheduleRow[] =
+    otherDue > 0n ? [...claimable, { kind: "dueBacklog", periods: otherDue }] : claimable;
   if (
     claim.nextDueAt === undefined ||
     claim.nextPeriodIndex === undefined ||
     claim.futurePeriods === undefined ||
     claim.periodDays === undefined
   )
-    return claimable;
+    return dueRows;
   const count = BigInt(claim.futurePeriods);
   const first = BigInt(claim.nextPeriodIndex);
   const step = BigInt(claim.periodDays) * SECONDS_PER_DAY;
@@ -67,7 +72,7 @@ export function buildShieldedClaimSchedule(
       rows.push(upcoming(offset));
     rows.push({ kind: "gap" }, upcoming(count - 1n));
   }
-  return [...claimable, ...rows];
+  return [...dueRows, ...rows];
 }
 
 /** The budget note a claim draws from, which carries its start time and interval. */
@@ -157,25 +162,15 @@ export function ShieldedClaimComposer(props: ShieldedClaimComposerProps) {
     );
   }
 
-  const status = !wallet
-    ? t("shielded.claimOverview.checking", { symbol })
-    : budgets.length === 0
-      ? t("shielded.claimOverview.noFunds", { symbol })
-      : t("shielded.claimOverview.ineligible", { symbol });
-
   return (
     <>
       {header}
-      <TaskSection
-        id={`${titleId}-budget`}
-        step={1}
-        title={t("shielded.fields.budgetNote", { symbol })}
-      >
-        {claims.length === 0 ? (
-          <p role="status" className="rounded-xl bg-surface-alt px-3.5 py-3 text-sm text-ink-muted">
-            {status}
-          </p>
-        ) : (
+      {claims.length > 0 ? (
+        <TaskSection
+          id={`${titleId}-budget`}
+          step={1}
+          title={t("shielded.fields.budgetNote", { symbol })}
+        >
           <fieldset
             disabled={busy}
             className="grid min-w-0 grid-cols-[repeat(auto-fit,minmax(min(13.75rem,100%),1fr))] gap-2"
@@ -223,7 +218,6 @@ export function ShieldedClaimComposer(props: ShieldedClaimComposerProps) {
               );
             })}
           </fieldset>
-        )}
         {claimUnavailable || claimSelectionUnavailable ? (
           <WarningNotice>
             {t("shielded.claimSelectionUnavailable", { symbol })}
@@ -239,8 +233,10 @@ export function ShieldedClaimComposer(props: ShieldedClaimComposerProps) {
               {t("shielded.reselectClaim", { symbol })}
             </button>
           </WarningNotice>
-        ) : null}
+
+      ) : null}
       </TaskSection>
+      ) : null}
 
       {/* With nothing to list, the receipt alone states why no period can be claimed. */}
       {selectedClaim && schedule.length > 0 ? (
@@ -274,7 +270,22 @@ export function ShieldedClaimComposer(props: ShieldedClaimComposerProps) {
             {schedule.map((row, rowIndex) => {
               const previous = schedule[rowIndex - 1];
               const divider =
-                row.kind === "upcoming" && (!previous || previous.kind === "claimable");
+                row.kind === "upcoming" &&
+                (!previous || previous.kind === "claimable" || previous.kind === "dueBacklog");
+              if (row.kind === "dueBacklog") {
+                return (
+                  <p
+                    key="due-backlog"
+                    className="relative ml-10 rounded-xl bg-surface-alt px-3.5 py-2 text-xs leading-relaxed text-ink-muted"
+                  >
+                    {t("shielded.claimDueBacklog", {
+                      symbol,
+                      periods: String(row.periods),
+                      batch: selectedClaim.periodIndices.length,
+                    })}
+                  </p>
+                );
+              }
               if (row.kind === "gap") {
                 return (
                   <div key="gap" aria-hidden="true" className="flex items-center gap-2.5 py-0.5">

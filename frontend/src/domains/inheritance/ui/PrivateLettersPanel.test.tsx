@@ -227,9 +227,10 @@ it("shows the public hash while waiting and retains it after an uncertain receip
   render(<PrivateLettersPanel {...props()} />);
   fillLetter();
   fireEvent.click(screen.getByRole("button", {name: tr("send")}));
-  expect(await screen.findByText(/shielded.privateLetters.pending.*0xpending/)).toBeTruthy();
+  expect(await screen.findByText(/shielded.walletKeys.transactionHash.*0xpending/)).toBeTruthy();
+  expect(screen.getAllByText("shielded.stages.confirming")).toHaveLength(1);
   await act(async () => reject(Object.assign(new Error("RPC unavailable"), {transactionHash:"0xpending"})));
-  expect(screen.getByRole("alert").textContent).toBe(tr("confirmationPending"));
+  expect(screen.queryByRole("alert")).toBeNull();
   expect(screen.getByText(/shielded.privateLetters.confirmationPending.*0xpending/)).toBeTruthy();
   expect((screen.getByLabelText(tr("body")) as HTMLTextAreaElement).value).toBe("Private letter text");
 });
@@ -241,7 +242,116 @@ it("does not call a confirmed but unverified registration sent successfully", as
   render(<PrivateLettersPanel {...props()} />);
   fillLetter();
   fireEvent.click(screen.getByRole("button", {name: tr("send")}));
-  expect((await screen.findByRole("alert")).textContent).toBe(tr("confirmedDetailsUnavailable"));
+  expect((await screen.findByRole("alert")).textContent).toContain(tr("confirmedDetailsUnavailable"));
+  expect(screen.getAllByRole("alert")).toHaveLength(1);
   expect(screen.getByText(/shielded.privateLetters.confirmedDetailsUnavailable.*0xconfirmed/)).toBeTruthy();
   expect(screen.queryByText(/shielded.privateLetters.sent/)).toBeNull();
+});
+
+it("preserves the original message across attempted edits and a read-mode change", async () => {
+  mocks.submit.mockRejectedValueOnce(Object.assign(new Error("receipt unavailable"), { transactionHash: "0xoriginal" }))
+    .mockResolvedValueOnce({ transactionHash: "0xoriginal" });
+  const initial = props();
+  const view = render(<PrivateLettersPanel {...initial} />);
+  fillLetter();
+  fireEvent.click(screen.getByRole("button", { name: tr("send") }));
+  await screen.findByText(/confirmationPending.*0xoriginal/);
+  const body = screen.getByLabelText(tr("body")) as HTMLTextAreaElement;
+  const code = screen.getByLabelText(tr("recipientCode")) as HTMLTextAreaElement;
+  expect(body.disabled).toBe(true);
+  fireEvent.change(body, { target: { value: "A different letter" } });
+  fireEvent.change(code, { target: { value: "a-different-recipient" } });
+  expect(body.value).toBe("Private letter text");
+  expect(code.value).toBe("receive-code");
+  view.rerender(<PrivateLettersPanel {...initial} context={{ ...context, stateReadMode: "chain" }} />);
+  expect(screen.getByText(/confirmationPending.*0xoriginal/)).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: tr("checkOriginal") }));
+  await screen.findByText(/privateLetters.sent.*0xoriginal/);
+  expect(mocks.worker).toHaveBeenCalledTimes(1);
+  expect(mocks.submit).toHaveBeenCalledTimes(2);
+  expect(mocks.submit.mock.calls.map(([input]) => input.letter)).toEqual([letter, letter]);
+});
+
+it("retains a wallet request with an unknown result even before a hash is available", async () => {
+  mocks.submit.mockImplementationOnce(async input => {
+    input.onWalletRequest()();
+    throw Object.assign(new Error("wallet connection lost"), { code: "NETWORK_ERROR" });
+  }).mockRejectedValueOnce(Object.assign(new Error("RPC interrupted"), { code: "NETWORK_ERROR" }));
+  render(<PrivateLettersPanel {...props()} />);
+  fillLetter();
+  fireEvent.click(screen.getByRole("button", { name: tr("send") }));
+  await screen.findByText(tr("confirmationPending"));
+  expect(screen.queryByRole("alert")).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: tr("checkOriginal") }));
+  await waitFor(() => expect(mocks.submit).toHaveBeenCalledTimes(2));
+  await waitFor(() => expect((screen.getByRole("button", { name: tr("checkOriginal") }) as HTMLButtonElement).disabled).toBe(false));
+  expect(screen.getByText(tr("confirmationPending"))).toBeTruthy();
+  expect(mocks.worker).toHaveBeenCalledTimes(1);
+});
+
+it("starts another draft in one click while retaining the original message for idempotent checks", async () => {
+  mocks.submit.mockRejectedValueOnce(Object.assign(new Error("RPC unavailable"), { transactionHash: "0xoriginal" }))
+    .mockResolvedValueOnce({ transactionHash: "0xoriginal" })
+    .mockResolvedValueOnce({ transactionHash: "0xnew" });
+  render(<PrivateLettersPanel {...props()} />);
+  fillLetter();
+  fireEvent.click(screen.getByRole("button", { name: tr("send") }));
+  await screen.findByText(/confirmationPending.*0xoriginal/);
+  fireEvent.click(screen.getByRole("button", { name: tr("newLetter") }));
+  expect((screen.getByLabelText(tr("body")) as HTMLTextAreaElement).value).toBe("");
+  expect((screen.getByLabelText(tr("body")) as HTMLTextAreaElement).disabled).toBe(false);
+  expect(screen.getByText(/confirmationPending.*0xoriginal/)).toBeTruthy();
+  fireEvent.change(screen.getByLabelText(tr("recipientCode")), { target: { value: "new-code" } });
+  fireEvent.change(screen.getByLabelText(tr("body")), { target: { value: "New unsent draft" } });
+  fireEvent.click(screen.getByRole("button", { name: tr("checkOriginal") }));
+  await screen.findByText(/privateLetters.sent.*0xoriginal/);
+  expect(mocks.worker).toHaveBeenCalledTimes(1);
+  expect(mocks.submit.mock.calls[1][0].letter).toBe(letter);
+  expect((screen.getByLabelText(tr("recipientCode")) as HTMLTextAreaElement).value).toBe("new-code");
+  expect((screen.getByLabelText(tr("body")) as HTMLTextAreaElement).value).toBe("New unsent draft");
+  const nextLetter = { ...letter, delivery: { ...letter.delivery, messageId: "8" } };
+  mocks.worker.mockResolvedValueOnce(nextLetter);
+  fireEvent.click(screen.getByRole("button", { name: tr("send") }));
+  await screen.findByText(/privateLetters.sent.*0xnew/);
+  expect(mocks.worker).toHaveBeenCalledTimes(2);
+  expect(mocks.submit.mock.calls.map(([input]) => input.letter.delivery.messageId)).toEqual(["7", "7", "8"]);
+  expect(screen.getByText(/privateLetters.sent.*0xoriginal/)).toBeTruthy();
+});
+
+it("reports a rejected wallet request as cancelled with an editable draft", async () => {
+  mocks.submit.mockRejectedValueOnce({ code: "ACTION_REJECTED", message: "User rejected" });
+  render(<PrivateLettersPanel {...props()} />);
+  fillLetter();
+  fireEvent.click(screen.getByRole("button", { name: tr("send") }));
+  expect((await screen.findByRole("alert")).textContent).toBe("errors.contractError.USER_REJECTED");
+  expect(screen.queryByText(tr("confirmationPending"))).toBeNull();
+  expect(screen.queryByRole("button", { name: tr("checkOriginal") })).toBeNull();
+  expect((screen.getByLabelText(tr("body")) as HTMLTextAreaElement).disabled).toBe(false);
+});
+
+it("explains that sending requires a connected transaction wallet", () => {
+  render(<PrivateLettersPanel {...props()} signer={null} />);
+  expect(screen.getByText("wallet.connectDescription")).toBeTruthy();
+  expect((screen.getByRole("button", { name: tr("send") }) as HTMLButtonElement).disabled).toBe(true);
+});
+
+it("keeps an in-flight send current when only the read strategy changes", async () => {
+  let finish!: (value: { transactionHash: string }) => void;
+  const onBusyChange = vi.fn();
+  mocks.submit.mockImplementationOnce(async input => {
+    input.onBroadcast("0xinflight");
+    return new Promise(resolve => { finish = resolve; });
+  });
+  const initial = { ...props(), onBusyChange };
+  const view = render(<PrivateLettersPanel {...initial} />);
+  fillLetter();
+  fireEvent.click(screen.getByRole("button", { name: tr("send") }));
+  await screen.findByText(/transactionHash.*0xinflight/);
+  view.rerender(<PrivateLettersPanel {...initial} context={{ ...context, stateReadMode: "chain" }} />);
+  expect(onBusyChange.mock.calls).toEqual([[true]]);
+  expect((screen.getByRole("button", { name: tr("checkOriginal") }) as HTMLButtonElement).disabled).toBe(true);
+  await act(async () => finish({ transactionHash: "0xinflight" }));
+  expect(screen.getByText(/privateLetters.sent.*0xinflight/)).toBeTruthy();
+  expect(onBusyChange.mock.calls).toEqual([[true], [false]]);
+  expect(mocks.worker).toHaveBeenCalledTimes(1);
 });

@@ -13,6 +13,7 @@ import {
   createShieldedAssetPool,
   ShieldedConfigurationMismatchError,
   ShieldedWalletChangedError,
+  normalizeShieldedUiError,
   type ShieldedAsset,
   type ShieldedPageModules,
   type ShieldedPanelNavigation,
@@ -22,7 +23,6 @@ import { getShieldedPoolFactoryAddress } from "../shared/config/env";
 import { getAddress, ZeroAddress } from "ethers";
 import { SUPPORTED_NETWORKS } from "../shared/config/networks";
 import { EmptyState, PageHead } from "../shared/ui";
-import { getFriendlyErrorMessage, normalizeErrorToError, type NormalizedError } from "../shared/lib/errors";
 
 type PageError =
   | {
@@ -31,10 +31,11 @@ type PageError =
         | "shielded.configurationMismatch"
         | "shielded.unreachable"
         | "shielded.walletChanged"
-        | "shielded.transactionFailed";
+        | "shielded.transactionFailed"
+        | "errors.contractError.InvalidToken";
       values?: { hash: string };
     }
-  | { cause: NormalizedError };
+  | { cause: unknown };
 
 type ModulesState =
   | { status: "loading" }
@@ -49,7 +50,7 @@ function sameAddress(a: string, b: string): boolean {
 function pageError(error: unknown): PageError {
   if (error instanceof ShieldedConfigurationMismatchError) return { key: "shielded.configurationMismatch" };
   if (error instanceof ShieldedWalletChangedError) return { key: "shielded.walletChanged" };
-  return { cause: normalizeErrorToError(error) };
+  return { cause: error };
 }
 
 const INITIAL_NAVIGATION: ShieldedPanelNavigation = {
@@ -104,7 +105,8 @@ function InheritanceContent() {
   const selectedAddress = selectedAssetAddress;
   const [importAddress, setImportAddress] = useState("");
   const [importedAssets, setImportedAssets] = useState<ShieldedAsset[]>([]);
-  const [creatingPool, setCreatingPool] = useState(false);
+  const [poolCreationStage, setPoolCreationStage] = useState<"preparing" | "wallet" | "confirming" | null>(null);
+  const creatingPool = poolCreationStage !== null;
   const [importing, setImporting] = useState(false);
   const [assetError, setAssetError] = useState<PageError | null>(null);
   const [revision, setRevision] = useState(0);
@@ -143,7 +145,7 @@ function InheritanceContent() {
   }, []);
   useLayoutEffect(() => {
     poolCreationEpoch.current += 1;
-    setCreatingPool(false);
+    setPoolCreationStage(null);
   }, [assetContext, selectedAddress, wallet.signer, wallet.address]);
 
   useEffect(() => {
@@ -193,12 +195,19 @@ function InheritanceContent() {
   );
   const importAsset = async () => {
     if (importing || sessionBusy) return;
+    let assetAddress: string;
+    try {
+      assetAddress = getAddress(importAddress.trim());
+    } catch {
+      setAssetError({ key: "errors.contractError.InvalidToken" });
+      return;
+    }
     setImporting(true);
     setAssetError(null);
     const importingContext = assetContext;
     try {
       const asset = await loadShieldedAssetMetadata({
-        assetAddress: getAddress(importAddress.trim()),
+        assetAddress,
         rpcUrl: config.rpcUrl,
         chainId: config.chainId,
         nativeSymbol,
@@ -221,7 +230,7 @@ function InheritanceContent() {
     }
   };
   const createPool = async () => {
-    if (state.status !== "missingPool" || !wallet.signer || wrongNetwork || !factoryAddress) return;
+    if (creatingPool || state.status !== "missingPool" || !wallet.signer || wrongNetwork || !factoryAddress) return;
     const signer = wallet.signer;
     const asset = state.asset;
     const context = currentPoolOperation.current;
@@ -233,7 +242,7 @@ function InheritanceContent() {
       currentPoolOperation.current.selectedAddress === asset.address &&
       currentPoolOperation.current.signer === signer &&
       currentPoolOperation.current.account === context.account;
-    setCreatingPool(true);
+    setPoolCreationStage("preparing");
     setAssetError(null);
     try {
       if (!context.account) throw new ShieldedWalletChangedError();
@@ -244,6 +253,12 @@ function InheritanceContent() {
         factoryAddress,
         assetAddress: asset.address,
         isCurrent,
+        onWalletRequest: () => {
+          if (isCurrent()) setPoolCreationStage("wallet");
+        },
+        onSubmitted: () => {
+          if (isCurrent()) setPoolCreationStage("confirming");
+        },
       });
       if (receipt.status !== 1) {
         if (isCurrent())
@@ -255,13 +270,26 @@ function InheritanceContent() {
     } catch (error) {
       if (isCurrent()) setAssetError(pageError(error));
     } finally {
-      if (isCurrent()) setCreatingPool(false);
+      if (isCurrent()) setPoolCreationStage(null);
     }
   };
-  const errorMessage = (error: PageError) =>
-    "cause" in error
-      ? getFriendlyErrorMessage(error.cause, t, t("shielded.unreachable"), { preferDetailsForUnknown: true })
-      : t(error.key, error.values);
+  const errorFeedback = (error: PageError, className: string) => {
+    const friendly = "cause" in error
+      ? normalizeShieldedUiError(error.cause, t, { fallbackKey: "shielded.unreachable" })
+      : null;
+    const message = friendly?.message ?? ("key" in error ? t(error.key, error.values) : "");
+    return (
+      <>
+        <p role="alert" className={className}>{message}</p>
+        {friendly?.details && friendly.details !== message ? (
+          <details className="max-w-md text-xs text-ink-muted">
+            <summary className="cursor-pointer">{t("transaction.errorDetails")}</summary>
+            <p className="mt-2 whitespace-pre-wrap break-words">{friendly.details}</p>
+          </details>
+        ) : null}
+      </>
+    );
+  };
   const head = <PageHead title={t("shielded.title")} />;
   const readyModules =
     state.status === "ready" &&
@@ -293,11 +321,7 @@ function InheritanceContent() {
           {t("shielded.assets.importWarning")}
         </p>
       ) : null}
-      {assetError ? (
-        <p role="alert" className="max-w-md text-sm text-danger">
-          {errorMessage(assetError)}
-        </p>
-      ) : null}
+      {assetError ? errorFeedback(assetError, "max-w-md text-sm text-danger") : null}
     </div>
   );
 
@@ -349,18 +373,19 @@ function InheritanceContent() {
             disabled={creatingPool || wrongNetwork || !wallet.signer}
             onClick={() => void createPool()}
           >
-            {t(creatingPool ? "shielded.assets.creating" : "shielded.assets.create")}
+            {t(poolCreationStage === "preparing"
+              ? "shielded.walletKeys.preparing"
+              : poolCreationStage === "wallet"
+                ? "shielded.stages.submitting"
+                : poolCreationStage === "confirming"
+                  ? "shielded.stages.confirming"
+                  : "shielded.assets.create")}
           </PanelButton>
         </div>
       ) : null}
       {state.status === "loading" ? <p role="status">{t("shielded.loading")}</p> : null}
       {state.status === "unavailable" ? (
-        <p
-          role="alert"
-          className="rounded-xl border border-warning/30 bg-warning/5 p-4 text-sm text-ink"
-        >
-          {errorMessage(state.error)}
-        </p>
+        errorFeedback(state.error, "rounded-xl border border-warning/30 bg-warning/5 p-4 text-sm text-ink")
       ) : null}
       {wrongNetwork ? (
         <div

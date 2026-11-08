@@ -126,4 +126,25 @@ describe("ShieldedPublicStateSyncStatus", () => {
     fireEvent.click(pauseButton);
     expect(pause).not.toHaveBeenCalled();
   });
+
+  it("can leave animation to the transaction timeline while retaining synchronization details and pause", () => {
+    const pause = vi.fn();
+    const props = {
+      progress: [{ domain: "lineage", phase: "verify", completed: 1, total: 4 }] as const,
+      paused: false, pauseDisabled: false, onPause: pause,
+    };
+    const { container, rerender } = render(<ShieldedPublicStateSyncStatus {...props} animate={false} />);
+    expect(container.querySelectorAll('[class*="animate-spin"]')).toHaveLength(0);
+    expect(screen.getByRole("status").textContent).toBe("shielded.publicStateSync.verifying");
+    const trigger = screen.getByRole("button", { name: "shielded.publicStateSync.details" });
+    fireEvent.click(trigger);
+    expect(screen.getByRole("progressbar").getAttribute("value")).toBe("1");
+    fireEvent.click(screen.getByRole("button", { name: "shielded.publicStateSync.pause" }));
+    expect(pause).toHaveBeenCalledOnce();
+
+    rerender(<ShieldedPublicStateSyncStatus {...props} />);
+    expect(container.querySelectorAll('[class*="animate-spin"]')).toHaveLength(1);
+    expect(trigger.getAttribute("aria-expanded")).toBe("true");
+    expect(screen.getByRole("progressbar").getAttribute("value")).toBe("1");
+  });
 });

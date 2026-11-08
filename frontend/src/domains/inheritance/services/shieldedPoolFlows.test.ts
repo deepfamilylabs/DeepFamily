@@ -405,7 +405,7 @@ describe("shielded pool asset-worker proof submission", () => {
         break;
       case "gas balance":
         f.setBalance(1n);
-        message = "Transaction wallet needs at least";
+        message = "required native currency";
         break;
       case "fee review":
         onGasEstimate.mockRejectedValueOnce(new Error("Fee review canceled"));
@@ -647,9 +647,10 @@ describe("shielded pool asset-worker proof submission", () => {
     const f = fixture();
     const amount = 10n ** 17n;
     f.setBalance(amount + 120_000n * 1_000_000_000n - 1n);
-    await expect(submitShield({ ...f.common, assetKind: "native", amount })).rejects.toThrow(
-      "deposit and gas",
-    );
+    await expect(submitShield({ ...f.common, assetKind: "native", amount })).rejects.toMatchObject({
+      code: "SHIELDED_GAS_BALANCE", required: amount + 120_000n * 1_000_000_000n,
+      deposit: amount,
+    });
     expect(f.methods.shield).not.toHaveBeenCalled();
   });
   it("checks gas and signs the exact public shield call with its prepared proof", async () => {
@@ -713,7 +714,7 @@ describe("shielded pool asset-worker proof submission", () => {
   it("refuses to send when the gas wallet cannot pay the estimated CFX fee", async () => {
     const f = fixture(1);
     f.setBalance(1n);
-    await expect(submitClaim(f.common)).rejects.toThrow("Transaction wallet needs at least");
+    await expect(submitClaim(f.common)).rejects.toMatchObject({ code: "SHIELDED_GAS_BALANCE", deposit: 0n, balance: 1n });
     expect(f.methods.claim).not.toHaveBeenCalled();
   });
 

@@ -1,10 +1,10 @@
 import { useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
-import { CheckCircle2, Info, Loader2 } from "lucide-react";
+import { CheckCircle2, Info } from "lucide-react";
 import type { ShieldedActionPreview } from "../../../shared/workers/shieldedAssetWorkerTypes";
 import { formatShieldedAmount } from "../model/shieldedDisplay";
 import { PanelButton, shortHex } from "./inheritanceControls";
-import { ShieldedProgressList, type ShieldedProgressStage } from "./ShieldedTaskReceipt";
+import { ShieldedProgressList, type ShieldedProgressActivity, type ShieldedProgressStage } from "./ShieldedTaskReceipt";
 import type { ShieldedValueBalance } from "./ShieldedWalletActions";
 
 /** A step of the current plan that has already been sent and confirmed. */
@@ -22,6 +22,8 @@ export interface ShieldedSpendReviewProps {
   action: "privateTransfer" | "unshield";
   notes: readonly ShieldedValueBalance[];
   candidateCommitments: readonly string[];
+  /** Show the permitted range only when the user explicitly restricted it. */
+  manualSelection?: boolean;
   /** Confirmed consolidation outputs available when this preview was prepared. */
   generatedCommitments?: readonly string[];
   decimals: number;
@@ -32,8 +34,10 @@ export interface ShieldedSpendReviewProps {
   /** The plan's first step is being proven and sent. */
   running?: boolean;
   stage?: ShieldedProgressStage | null;
+  activity?: ShieldedProgressActivity;
   onConfirm?: () => void;
   onCancel?: () => void;
+  stopRequested?: boolean;
 }
 
 type StepStatus = "done" | "running" | "awaiting" | "pending";
@@ -44,6 +48,7 @@ export function ShieldedSpendReview({
   action,
   notes,
   candidateCommitments,
+  manualSelection = false,
   generatedCommitments = [],
   decimals,
   symbol,
@@ -51,8 +56,10 @@ export function ShieldedSpendReview({
   completedSteps = [],
   running = false,
   stage = null,
+  activity,
   onConfirm,
   onCancel,
+  stopRequested = false,
 }: ShieldedSpendReviewProps) {
   const { t } = useTranslation();
   const headingRef = useRef<HTMLHeadingElement>(null);
@@ -114,16 +121,11 @@ export function ShieldedSpendReview({
   const statusIcon = (status: StepStatus) =>
     status === "done" ? (
       <CheckCircle2 className="h-5 w-5 shrink-0 text-success" aria-hidden="true" />
-    ) : status === "running" ? (
-      <Loader2
-        className="h-5 w-5 shrink-0 animate-spin text-orange-600 dark:text-orange-300"
-        aria-hidden="true"
-      />
     ) : (
       <span
         aria-hidden="true"
         className={`h-5 w-5 shrink-0 rounded-full border-2 ${
-          status === "awaiting"
+          status === "awaiting" || status === "running"
             ? "border-orange-500 bg-orange-100 dark:bg-orange-400/20"
             : "border-hairline-strong"
         }`}
@@ -175,13 +177,15 @@ export function ShieldedSpendReview({
         </dl>
       </div>
       <div className="space-y-1 rounded-xl bg-surface-alt px-3.5 py-3 text-[13px] leading-relaxed">
-        <p className="text-ink-muted">
-          {t("shielded.spendReview.candidates", {
-            count: candidates.length,
-            amount: amount(candidateTotal),
-            symbol,
-          })}
-        </p>
+        {manualSelection ? (
+          <p className="text-ink-muted">
+            {t("shielded.spendReview.candidates", {
+              count: candidates.length,
+              amount: amount(candidateTotal),
+              symbol,
+            })}
+          </p>
+        ) : null}
         <p className="font-semibold text-ink">
           {t("shielded.spendReview.used", { count: used.size, amount: amount(usedTotal), symbol })}
         </p>
@@ -254,13 +258,15 @@ export function ShieldedSpendReview({
                   {title(offset + stepIndex + 1, final)}
                 </h4>
               </div>
-              <p className="text-xs text-ink-muted">
-                {t("shielded.spendReview.inputs", {
-                  count: step.inputs.length,
-                  amount: amount(inputTotal),
-                  symbol,
-                })}
-              </p>
+              {total > 1 ? (
+                <p className="text-xs text-ink-muted">
+                  {t("shielded.spendReview.inputs", {
+                    count: step.inputs.length,
+                    amount: amount(inputTotal),
+                    symbol,
+                  })}
+                </p>
+              ) : null}
               <ul className="flex flex-wrap gap-1 text-xs">
                 {step.inputs.map((input) => (
                   <li
@@ -303,7 +309,7 @@ export function ShieldedSpendReview({
               )}
               {status === "running" ? (
                 <div className="border-t border-orange-200/70 pt-3 dark:border-orange-400/20">
-                  <ShieldedProgressList stage={stage} />
+                  <ShieldedProgressList stage={stage} activity={activity} />
                 </div>
               ) : null}
             </li>
@@ -328,6 +334,11 @@ export function ShieldedSpendReview({
             </PanelButton>
           ) : null}
         </div>
+      ) : null}
+      {running && onCancel && !(steps.length === 1 && stage === "confirming") ? (
+        <PanelButton disabled={stopRequested} onClick={onCancel}>
+          {t(stopRequested ? "shielded.spendReview.stopping" : "shielded.spendReview.stop")}
+        </PanelButton>
       ) : null}
     </section>
   );

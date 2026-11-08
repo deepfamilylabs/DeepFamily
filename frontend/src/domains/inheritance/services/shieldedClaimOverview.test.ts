@@ -149,6 +149,7 @@ describe("shielded claim overview", () => {
     // Two of the three funded periods are due now; one remains for the schedule ahead.
     expect(result.nextPeriodIndex).toBe(2n);
     expect(result.futurePeriods).toBe(1n);
+    expect(result.duePeriods).toBe(2n);
   });
 
   it("skips paid periods shared across budgets and deduplicates budget commitments", () => {
@@ -166,6 +167,7 @@ describe("shielded claim overview", () => {
     expect(result.nextDueAt).toBe(start + 2n * period);
     expect(result.nextPeriodIndex).toBe(1n);
     expect(result.futurePeriods).toBe(2n);
+    expect(result.duePeriods).toBe(0n);
   });
 
   it("does not invent a next date when allocations sharing a policy started on different days", () => {
@@ -178,6 +180,7 @@ describe("shielded claim overview", () => {
     expect(result.nextDueAt).toBeUndefined();
     expect(result.nextPeriodIndex).toBeUndefined();
     expect(result.futurePeriods).toBeUndefined();
+    expect(result.duePeriods).toBeUndefined();
   });
 
   it("keeps no funds, exhausted funds, and invalid budgets distinct", () => {
@@ -189,6 +192,33 @@ describe("shielded claim overview", () => {
     expect(
       getShieldedClaimOverview([budget(2n, { amountPerPeriod: 0n })], wallet, secret, start).status,
     ).toBe("noFunds");
+  });
+});
+
+describe("verified due-period counts", () => {
+  it("counts the funded overdue backlog without expanding the three-period claim batch", () => {
+    const note = budget(1n, { remaining: 900n });
+    const result = getShieldedClaimOverview(
+      [note],
+      { ...scope, spentNullifiers: new Set() },
+      secret,
+      start + 6n * period,
+    );
+    expect(result.claim?.periodIndices).toEqual([0n, 1n, 2n]);
+    expect(result.duePeriods).toBe(6n);
+    expect(result.futurePeriods).toBe(3n);
+  });
+
+  it("caps the overdue count at funding and subtracts periods already paid", () => {
+    const note = budget(1n, { remaining: 400n });
+    const wallet = { ...scope, spentNullifiers: new Set([spent(note.note, 0n), spent(note.note, 2n)]) };
+    const result = getShieldedClaimOverview([note], wallet, secret, start + 5n * period);
+    expect(result.duePeriods).toBe(3n);
+    expect(result.claim?.periodIndices).toEqual([1n, 3n, 4n]);
+    expect(result.futurePeriods).toBe(1n);
+    const allDue = getShieldedClaimOverview([note], wallet, secret, start + 100n * period);
+    expect(allDue.duePeriods).toBe(4n);
+    expect(allDue.nextDueAt).toBeUndefined();
   });
 });
 

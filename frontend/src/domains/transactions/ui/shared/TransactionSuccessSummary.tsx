@@ -28,7 +28,7 @@ export function TransactionSuccessSummary({
 }: {
   t: (key: string, fallback: string) => string;
   title: string;
-  description: string;
+  description?: string;
   rows: SuccessRow[];
 }) {
   const panelRef = useFocusOnMount<HTMLDivElement>();
@@ -50,7 +50,7 @@ export function TransactionSuccessSummary({
           <h3 id={titleId} className="text-sm font-semibold text-ink">
             {title}
           </h3>
-          <p className="text-xs text-ink-muted">{description}</p>
+          {description ? <p className="text-xs text-ink-muted">{description}</p> : null}
         </div>
       </div>
 

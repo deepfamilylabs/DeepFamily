@@ -155,3 +155,23 @@ it("retains confirmation context when a successful receipt lacks the authenticat
     transactionHash:"0xtx",transactionConfirmed:true,verificationFailure:"mismatch",
   });
 });
+
+it("reports the wallet and confirmation stages only when those stages begin", async () => {
+  const f = submissionFixture();
+  const stages: string[] = [];
+  const finishWalletRequest = vi.fn();
+  const onWalletRequest = vi.fn(() => finishWalletRequest);
+  mocks.wait.mockImplementationOnce(async input => {
+    expect(stages).toEqual(["checking"]);
+    await input.send();
+    expect(stages).toEqual(["checking", "submitting"]);
+    input.onSubmitted("0xtx");
+    return { transactionHash: "0xtx", receipt: { status: 1, logs: [{
+      ...f.iface.encodeEventLog(f.iface.getEvent("LetterRegistered")!, [7, f.blob, 9, 1200, 1000]), address: f.input.address,
+    }] } };
+  });
+  await submitPrivateLetter({ ...f.input, onStage: stage => stages.push(stage), onWalletRequest });
+  expect(stages).toEqual(["checking", "submitting", "confirming"]);
+  expect(onWalletRequest).toHaveBeenCalledOnce();
+  expect(finishWalletRequest).toHaveBeenCalledOnce();
+});

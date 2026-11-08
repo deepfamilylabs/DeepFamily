@@ -9,6 +9,7 @@ export type ShieldedSubmissionContext = {
   chainId: string;
   poolAddress: string;
   kind: "action" | "approval" | "authorization";
+  actionStep?: "merge" | "payment";
   nonce?: number;
   signerAddress?: string;
   fromBlock?: number;
@@ -20,7 +21,7 @@ export type TransactionRecord = {
   kind: TransactionKind;
   /** What the transaction acts on, as the list row shows it. */
   label: string;
-  phase: TransactionPhase;
+  phase: TransactionPhase | "unknown";
   transactionHash?: string;
   shieldedSubmission?: ShieldedSubmissionContext;
   error?: FriendlyError | null;
@@ -42,7 +43,7 @@ type TransactionCenterValue = {
 
 const TransactionCenterContext = createContext<TransactionCenterValue | null>(null);
 
-const SETTLED: TransactionPhase[] = ["done", "failed"];
+const SETTLED: TransactionRecord["phase"][] = ["done", "failed", "unknown"];
 
 /**
  * Where transactions live once they outlast the modal that started them.

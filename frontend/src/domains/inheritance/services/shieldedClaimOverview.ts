@@ -23,6 +23,8 @@ export type ShieldedClaimOverview = {
   status: "claimable" | "notDue" | "exhausted" | "noFunds" | "scanLimited";
   /** All valid, eligible, unspent budget balances; this is not a one-click payout. */
   totalRemaining: bigint;
+  /** Funded, unpaid periods already due; absent if the capped scan cannot verify the count. */
+  duePeriods?: bigint;
   /** Exactly the budget and period batch used by automatic claim selection. */
   claim?: {
     budget: ShieldedSelectableBudgetNote;
@@ -116,20 +118,26 @@ function futureFundedPeriod(
   wallet: PeriodWallet,
   derivedSecretField: BigNumberish,
   now: bigint,
-): { nextDueAt?: bigint; nextPeriodIndex?: bigint; futurePeriods?: bigint; scanLimited: boolean } {
+): {
+  nextDueAt?: bigint;
+  nextPeriodIndex?: bigint;
+  futurePeriods?: bigint;
+  duePeriods?: bigint;
+  scanLimited: boolean;
+} {
   const elapsed = now - funding.eligibleFrom;
   const periodSeconds = funding.periodDays * SECONDS_PER_DAY;
   const dueCount = elapsed > 0n ? elapsed / periodSeconds : 0n;
   // Every spent period needs its own nullifier. This lower bound avoids walking
   // huge old clocks when all remaining funds are already needed by due periods.
   if (dueCount - BigInt(wallet.spentNullifiers.size) >= funding.fundedPeriods) {
-    return { scanLimited: false };
+    return { duePeriods: funding.fundedPeriods, scanLimited: false };
   }
 
   let unpaidDuePeriods = 0n;
   for (let index = 0n; index < SHIELDED_CLAIM_OVERVIEW_SCAN_LIMIT; index += 1n) {
     const dueAt = funding.eligibleFrom + (index + 1n) * periodSeconds;
-    if (dueAt > MAX_UINT64) return { scanLimited: false };
+    if (dueAt > MAX_UINT64) return { duePeriods: unpaidDuePeriods, scanLimited: false };
     const nullifier = computeShieldedPeriodNullifier(
       {
         derivedSecretField,
@@ -144,10 +152,12 @@ function futureFundedPeriod(
         nextDueAt: dueAt,
         nextPeriodIndex: index,
         futurePeriods: funding.fundedPeriods - unpaidDuePeriods,
+        duePeriods: unpaidDuePeriods,
         scanLimited: false,
       };
     unpaidDuePeriods += 1n;
-    if (unpaidDuePeriods >= funding.fundedPeriods) return { scanLimited: false };
+    if (unpaidDuePeriods >= funding.fundedPeriods)
+      return { duePeriods: funding.fundedPeriods, scanLimited: false };
   }
   return { scanLimited: true };
 }
@@ -173,6 +183,7 @@ export function getShieldedClaimOverview(
     return {
       status: budgets.length ? "exhausted" : "noFunds",
       totalRemaining,
+      duePeriods: 0n,
       scanLimited: false,
     };
   }
@@ -204,6 +215,7 @@ export function getShieldedClaimOverview(
   let nextDueAt: bigint | undefined;
   let schedule: { nextPeriodIndex?: bigint; futurePeriods?: bigint } = {};
   let scanLimited = false;
+  let duePeriods = 0n;
   for (const funding of policies.values()) {
     // Distinct initial enrollments under one policy can start on different
     // dates while sharing the period-nullifier sequence. A single date would
@@ -214,6 +226,7 @@ export function getShieldedClaimOverview(
     }
     const future = futureFundedPeriod(funding, wallet, derivedSecretField, now);
     scanLimited ||= future.scanLimited;
+    duePeriods += future.duePeriods ?? 0n;
     if (
       future.nextDueAt !== undefined &&
       (nextDueAt === undefined || future.nextDueAt < nextDueAt)
@@ -230,6 +243,7 @@ export function getShieldedClaimOverview(
   return {
     status: claim ? "claimable" : scanLimited ? "scanLimited" : "notDue",
     totalRemaining,
+    ...(scanLimited ? {} : { duePeriods }),
     claim,
     nextDueAt,
     ...(single ? schedule : {}),

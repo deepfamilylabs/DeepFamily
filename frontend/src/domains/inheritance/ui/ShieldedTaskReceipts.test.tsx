@@ -52,10 +52,10 @@ describe("ShieldedFundReceipt", () => {
     expect(within(receipt).getByText("第 1 期 · 100 DEEP")).toBeTruthy();
     expect(within(receipt).getByText("第 12 期 · 100 DEEP")).toBeTruthy();
     expect(
-      within(receipt).getByText(`到期：${formatShieldedTimestamp(startsAt + 30n * DAY, "date")}`),
+      within(receipt).getByText(`预计到期：${formatShieldedTimestamp(startsAt + 30n * DAY, "date")}`),
     ).toBeTruthy();
     expect(
-      within(receipt).getByText(`到期：${formatShieldedTimestamp(startsAt + 360n * DAY, "date")}`),
+      within(receipt).getByText(`预计到期：${formatShieldedTimestamp(startsAt + 360n * DAY, "date")}`),
     ).toBeTruthy();
     expect(within(receipt).getByText("曹丕")).toBeTruthy();
     expect(within(receipt).getByText("第1版")).toBeTruthy();
@@ -80,6 +80,27 @@ describe("ShieldedFundReceipt", () => {
     expect(within(receipt).getByText("—", { selector: "span" })).toBeTruthy();
     expect(within(receipt).queryByText(/到期：/)).toBeNull();
     expect(within(receipt).getAllByText("—", { selector: "dd" })).toHaveLength(3);
+  });
+
+  it("describes extra funding without restarting the period numbers or dates", () => {
+    withI18n(
+      <ShieldedFundReceipt
+        symbol="DEEP"
+        decimals={0}
+        walletName="身份凭据"
+        rate={100n}
+        periods={3n}
+        days={30n}
+        startsAt={startsAt}
+        existingSchedule
+        entryLabel="公开预算"
+      />,
+    );
+    const receipt = screen.getByRole("complementary", { name: "预览存入" });
+    expect(within(receipt).getByText("追加 3 期，沿用原领取时间。")).toBeTruthy();
+    expect(within(receipt).queryByText("第 1 期 · 100 DEEP")).toBeNull();
+    expect(within(receipt).queryByText(/预计到期：/)).toBeNull();
+    expect(within(receipt).getByText("300")).toBeTruthy();
   });
 });
 

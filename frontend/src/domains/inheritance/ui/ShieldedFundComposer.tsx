@@ -5,6 +5,7 @@ import type {
   ShieldedWalletSummary,
 } from "../../../shared/workers/shieldedAssetWorkerTypes";
 import { ThemedSelect } from "../../transactions/ui/shared/ThemedSelect";
+import { parseShieldedPeriodDays } from "../model/shieldedBudgetPeriod";
 import { formatShieldedAmount } from "../model/shieldedDisplay";
 import {
   SHIELDED_FUNDING_ENTRY_KEYS as ENTRY_KEYS,
@@ -78,10 +79,19 @@ export function ShieldedFundComposer(props: ShieldedFundComposerProps) {
   const { symbol, decimals, busy, wallet, titleId } = props;
   const versionLabelId = useId();
   const periodLabelId = useId();
+  const periodErrorId = useId();
   const [customPeriodDays, setCustomPeriodDays] = useState(
     !SHIELDED_PERIOD_DAY_PRESETS.some((days) => String(days) === props.periodDays),
   );
   const selectedPolicy = wallet?.policies.find((policy) => policy.handle === props.policyHandle);
+  let periodDaysError: string | undefined;
+  if (!selectedPolicy && customPeriodDays) {
+    try {
+      parseShieldedPeriodDays(props.periodDays);
+    } catch {
+      periodDaysError = t("shielded.periodDaysInvalid", { symbol });
+    }
+  }
   const fundingVersion = selectedPolicy?.rootVersionIndex ?? props.rootVersion;
   const familyUnavailable = wallet?.familyRecordsAvailable === false;
   const noParentVersions = !!wallet && !familyUnavailable && wallet.parentVersions.length === 0;
@@ -239,9 +249,15 @@ export function ShieldedFundComposer(props: ShieldedFundComposerProps) {
         </div>
         {!selectedPolicy && customPeriodDays ? (
           <div className="max-w-[12.5rem]">
-            <FieldBlock label={t("shielded.fields.customPeriodDays", { symbol })}>
+            <FieldBlock
+              label={t("shielded.fields.customPeriodDays", { symbol })}
+              error={periodDaysError}
+              errorId={periodErrorId}
+            >
               <input
                 aria-label={t("shielded.fields.customPeriodDays", { symbol })}
+                aria-invalid={!!periodDaysError}
+                aria-describedby={periodDaysError ? periodErrorId : undefined}
                 className={FIELD_INPUT}
                 inputMode="numeric"
                 disabled={busy}
@@ -418,9 +434,10 @@ export function ShieldedFundComposer(props: ShieldedFundComposerProps) {
           )
         ) : null}
         {props.templateHandle ? (
-          <p className="break-all text-xs text-ink-muted">
-            {tr("originalTemplate")}: {shortHex(props.templateHandle)}
-          </p>
+          <details className="text-xs text-ink-muted">
+            <summary className="cursor-pointer">{tr("originalTemplate")}</summary>
+            <p className="mt-2 break-all font-mono">{props.templateHandle}</p>
+          </details>
         ) : null}
       </TaskSection>
     </>

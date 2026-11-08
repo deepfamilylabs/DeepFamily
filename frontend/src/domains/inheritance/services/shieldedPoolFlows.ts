@@ -22,6 +22,7 @@ import { executeChainTransaction, runChainRead } from "@deepfamily/chain-client"
 import { readPublicSubmissionAnchor, type ShieldedSubmissionAnchor } from "./shieldedWalletSubmission";
 export type { ShieldedSubmissionAnchor } from "./shieldedWalletSubmission";
 import { assertShieldedDepositBalance } from "./shieldedDepositBalance";
+import { ShieldedGasBalanceError } from "../model/shieldedGasBalanceError";
 
 /** Submissions contain only public action data and a proof produced by the asset Worker. */
 export type { ShieldedPoolActionData } from "../../../shared/zk/shieldedActionTypes";
@@ -216,7 +217,7 @@ async function assertTransactionGas(
   const balance = await provider.getBalance(signerAddress);
   const required = gasLimit * maximumGasPrice + value;
   if (balance < required) {
-    throw new Error(`Transaction wallet needs at least ${required} wei for the deposit and gas`);
+    throw new ShieldedGasBalanceError(required, balance, value);
   }
   return {
     review: {

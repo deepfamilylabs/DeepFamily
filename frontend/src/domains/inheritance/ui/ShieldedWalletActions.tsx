@@ -173,6 +173,8 @@ export function ShieldedValueNotePicker({
   decimals,
   symbol,
   busy,
+  automatic,
+  onAutomaticChange,
 }: {
   notes: readonly ShieldedValueBalance[];
   selectedCommitments: readonly string[];
@@ -180,16 +182,13 @@ export function ShieldedValueNotePicker({
   decimals: number;
   symbol: string;
   busy: boolean;
+  automatic?: boolean;
+  onAutomaticChange?: (automatic: boolean) => void;
 }) {
   const { t } = useTranslation();
   const values = notes.filter((item) => BigInt(item.amount) > 0n);
   const missing = selectedCommitments.filter(
     (commitment) => !values.some((item) => item.commitment === commitment),
-  );
-  const total = values.reduce(
-    (amount, item) =>
-      selectedCommitments.includes(item.commitment) ? amount + BigInt(item.amount) : amount,
-    0n,
   );
   const toggle = (commitment: string, checked: boolean) => {
     if (!checked) onChange(selectedCommitments.filter((value) => value !== commitment));
@@ -201,15 +200,27 @@ export function ShieldedValueNotePicker({
       <legend className="mb-1 text-[13px] font-medium text-ink/80">
         {t("shielded.fields.valueCandidates", { symbol })}
       </legend>
-      <p className="text-xs leading-relaxed text-ink-muted">
-        {t("shielded.walletKeys.valueCandidatesHint", { symbol })}
-      </p>
+      {!automatic ? (
+        <p className="text-xs leading-relaxed text-ink-muted">
+          {t("shielded.walletKeys.valueCandidatesHint", { symbol })}
+        </p>
+      ) : null}
+      {onAutomaticChange ? (
+        <div className="flex flex-wrap gap-2">
+          <PanelButton size="compact" variant={automatic ? "primary" : undefined} onClick={() => onAutomaticChange(true)} aria-pressed={!!automatic}>
+            {t("shielded.walletKeys.automaticValueSelection")}
+          </PanelButton>
+          <PanelButton size="compact" variant={!automatic ? "primary" : undefined} onClick={() => onAutomaticChange(false)} aria-pressed={!automatic}>
+            {t("shielded.walletKeys.manualValueSelection")}
+          </PanelButton>
+        </div>
+      ) : null}
       {values.length === 0 && missing.length === 0 ? (
         <p className="rounded-xl bg-surface-alt px-3.5 py-3 text-sm text-ink-muted">
           {t("shielded.noRecoveredNote", { symbol })}
         </p>
       ) : null}
-      {values.length > 0 || missing.length > 0 ? (
+      {!automatic && (values.length > 0 || missing.length > 0) ? (
         <div className="grid grid-cols-[repeat(auto-fill,minmax(min(9.5rem,100%),1fr))] gap-1.5">
           {values.map((item, index) => {
             const checked = selectedCommitments.includes(item.commitment);
@@ -257,15 +268,6 @@ export function ShieldedValueNotePicker({
           ))}
         </div>
       ) : null}
-      {selectedCommitments.length > 0 && missing.length === 0 ? (
-        <p aria-live="polite" className="break-words text-xs text-ink-muted">
-          {t("shielded.valueSelectionSummary", {
-            symbol,
-            count: selectedCommitments.length,
-            amount: formatShieldedAmount(total, decimals),
-          })}
-        </p>
-      ) : null}
     </fieldset>
   );
 }
@@ -288,9 +290,12 @@ export interface ShieldedWalletActionsProps {
     onConfirmedChange: (value: boolean) => void;
   };
   withdrawalRecipient: string;
+  withdrawalRecipientError?: string;
   onWithdrawalRecipientChange: (value: string) => void;
   values: readonly ShieldedValueBalance[];
   selectedCommitments: readonly string[];
+  automaticSelection?: boolean;
+  onAutomaticSelectionChange?: (automatic: boolean) => void;
   onSelectedCommitmentsChange: (commitments: string[]) => void;
 }
 
@@ -305,9 +310,12 @@ export function ShieldedWalletActions({
   onAmountChange,
   recipient,
   withdrawalRecipient,
+  withdrawalRecipientError,
   onWithdrawalRecipientChange,
   values,
   selectedCommitments,
+  automaticSelection,
+  onAutomaticSelectionChange,
   onSelectedCommitmentsChange,
 }: ShieldedWalletActionsProps) {
   const { t } = useTranslation();
@@ -390,6 +398,8 @@ export function ShieldedWalletActions({
             {amountField(t("shielded.fields.transferAmount", { symbol }))}
             <ShieldedValueNotePicker
               notes={values}
+              automatic={automaticSelection}
+              onAutomaticChange={onAutomaticSelectionChange}
               selectedCommitments={selectedCommitments}
               onChange={onSelectedCommitmentsChange}
               decimals={decimals}
@@ -407,14 +417,19 @@ export function ShieldedWalletActions({
                 aria-label={t("shielded.fields.exitRecipient", { symbol })}
                 className={`${FIELD_BASE} font-mono text-sm`}
                 disabled={busy}
+                aria-invalid={!!withdrawalRecipientError || undefined}
+                aria-describedby={withdrawalRecipientError ? `${titleId}-withdrawal-error` : undefined}
                 value={withdrawalRecipient}
                 onChange={(event) => onWithdrawalRecipientChange(event.target.value)}
                 placeholder="0x…"
                 spellCheck={false}
               />
+              {withdrawalRecipientError ? <p id={`${titleId}-withdrawal-error`} className="text-xs text-danger">{withdrawalRecipientError}</p> : null}
             </FieldBlock>
             <ShieldedValueNotePicker
               notes={values}
+              automatic={automaticSelection}
+              onAutomaticChange={onAutomaticSelectionChange}
               selectedCommitments={selectedCommitments}
               onChange={onSelectedCommitmentsChange}
               decimals={decimals}

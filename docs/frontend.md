@@ -322,9 +322,9 @@ periods that can be claimed now; on a phone the task list becomes a row of chips
 Each form sits beside a receipt that totals the
 result and holds its confirmation; on a phone the receipt is a bar pinned above
 the status bar. Funding is numbered as arrangement, child and entry, and its
-receipt previews the schedule from the first period to the last. A new
-arrangement's dates are estimated from the funding start delay; an existing one
-keeps its own clock. Claiming lists the due periods to choose and the funded
+receipt previews estimated dates from the first period to the last for a new
+arrangement. A refill shows the number of added periods and keeps the original
+claim schedule without restarting period numbering. Claiming lists the due periods to choose and the funded
 periods ahead, from the Worker's next period index and count. A spend plan lists
 its confirmed steps, with their hashes, above the remaining ones and shows proving
 and sending progress inside the step being sent.
@@ -333,7 +333,7 @@ A wallet card's **Receive code** opens a side sheet that generates the code at
 once; **Generate receive code** appears only to retry a failure. Only a usable
 independent key (verified, backup complete) offers **Receive code** and **Keys**
 (backup). A newly created key offers only its mandatory **Back up and verify independent
-key**; with no key or an unconfirmed candidate, the card offers **Unlock independent key**
+key**; with no key, the card offers **Unlock independent key**
 and **Create independent key**. Creation lists its generation methods unselected, and
 choosing one creates the key at once. Receive codes do not manage keys. A claim
 with an unusable independent key only points to that card: an existing budget can be
@@ -363,10 +363,10 @@ Budget funding has three entries:
   person hash and terms; it publishes identity and terms without child secrets,
   an independent root or a receive code.
 - **Private (identity credentials)** fixes `keyMode = 0` and uses an
-  identity-derived receive code. Only this entry offers code generation from
+  identity-derived budget receive credential. Only this entry offers code generation from
   the child's complete identity credentials, which also reconstruct its keys.
 - **Private (independent key)** fixes `keyMode = 1` and uses the recipient's independent-key
-  receive code. Its spending/viewing keys need both the independent key root and the
+  budget receive credential. Its spending/viewing keys need both the independent key root and the
   independently derived independent-key identity secret. Claims retain identity and
   family, period and enrollment checks.
 
@@ -414,22 +414,33 @@ Create and verify a new key in this order:
    save nor compare fingerprints.
 
 Existing keys have three recovery paths after unlocking the original
-credentials: full recovery words, Shielded Key, or a reproducible original
-wallet signature. Words and Key decode to the same root and mark its source
-`imported`; they do not prove original source or signer. Wallet/device changes
-can produce a different valid signature and root, even for the same address and
-message. The Worker requires the current credentials handle and rechecks it
-before installing asynchronous results.
+credentials: full recovery words, Shielded Key, or an original-wallet signature.
+All three routes unlock the derived key directly, without a saved fingerprint,
+funds history, local cache or original device. Words and Key decode to the same
+root and mark its source `imported`. This works for a newly verified wallet that has never received funds,
+after a full lock, and on another computer. The backup formats and derivation
+remain unchanged; users save only the existing 24 words or Shielded Key.
 
-With a trusted original key fingerprint, the application automatically checks
-all three paths and rejects a mismatch without replacing its evidence. Without
-such evidence, all paths create an unconfirmed candidate and allow scanning.
-Verified positive unspent VALUE under that owner, or mode-1 BUDGET under that
-owner and the original unlocked identity, can confirm it after commitment,
-decryption and scan-anchor checks. Public budgets and other slots cannot confirm
-the candidate. Valid material, empty scans, zero/spent notes and unverified pools
-do not establish original-wallet recovery. Candidates cannot spend, receive or
-export official backups. Failure never creates another root or changes key mode.
+Successful recovery means the application has installed the key derived from the
+provided backup or signature and credentials; it does not externally authenticate that they
+are the user's original backup or identity. Different identity details or a
+different passphrase derive another wallet even with the same root backup.
+An empty scan cannot validate the input. The restore form explains this boundary
+without requiring users to save, enter or compare an additional fingerprint.
+The Worker requires the current credentials handle and rechecks it before
+installing asynchronous results. When an internal expected fingerprint is
+available for a backup drill, a mismatch is still rejected before root installation.
+
+Signature recovery applies only to keys originally generated by wallet signing;
+randomly generated keys require their saved words or Shielded Key. It requires
+the original signing wallet as well as the original
+identity details and passphrase. Wallet/device changes can produce a different
+valid signature and root, even for the same address and message. The form explains
+this limitation without blocking the derived wallet: if the original balance is
+not found, use the saved 24 words or Shielded Key. No history scan is required to
+unlock by signature, and an empty scan does not prove that the signature, backup
+or credentials match the original. Failure never creates another root or changes
+key mode.
 
 Pending new-wallet fingerprints are internal trusted challenges retained in
 `sessionStorage` across full locks and same-tab reloads, with memory as the
@@ -439,22 +450,25 @@ these `pendingBackupFingerprints` automatically to import and signature-restore
 requests; users do not save, enter or compare them.
 
 After unlocking the original person details and passphrase again, manually
-importing saved words or Key completes a pending drill if the re-derived key
-fingerprint matches its retained original challenge, including a newly created
-wallet without funds history. Only that completed challenge is removed. A
+importing saved words or Key unlocks the derived key even without a retained
+challenge or funds history. A matching pending challenge completes the original
+drill and only that completed challenge is removed. A
 matching re-sign can restore the pending backup-export flow, retaining
 `backupRequired`; it cannot finish the material drill. Wrong credentials,
-wrong material, failed imports and unmatched candidates do not consume the
+wrong material and failed imports do not consume the
 original challenge. The panel clears learned fingerprints, backup
 acknowledgement, verification progress and displayed secrets whenever the
-credentials handle changes; successfully verified history can establish new
-in-memory evidence only for the current credentials session.
+credentials handle changes. History scans find assets and no longer control
+whether a recovered key can be used.
 
 Closing the tab or moving to another device does not transfer the challenge.
-With no original challenge or other trusted evidence, all three recovery paths
-remain candidates until valid funds history confirms them. These local workflow
+The original raw backup and original credentials are sufficient to unlock there;
+local challenges are not a prerequisite. Original-wallet signature recovery is
+also directly usable, subject to the signature reproducibility limitation above.
+These local workflow
 markers do not prove where users saved material or introduce another spending
-condition in the circuits.
+condition in the circuits. This recovery change does not alter circuits, public
+signals, contracts, backup formats or key derivation.
 
 | Operation                                    | Required material                                                                                                                                  |
 | -------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -474,17 +488,25 @@ or root-source label.
 
 Initial and continuation funding share `shielded_fund`, with the same 27 public signals and Fund action. The proof-bound `fundMode` selects initial funding with both 64-level qualification paths or continuation funding with the historical budget template; donor and template note paths retain their 32-level bounds. The Worker downloads and caches one WASM/proving-key pair for both modes, and rejects unsupported modes before proving.
 
-The page automatically scans only the selected pool after identity unlock, after a transaction, or when returning from confirmed independent key recovery. The overview refresh control and the candidate-recovery scan rescan the selected pool and then discover and scan every pool in the currently configured chain and factory, listing each pool's verified raw balances or an unknown balance; this does not traverse past factories or other chains. Factory enumeration verifies `PoolCreated` history against `poolCount`. Pool recovery verifies immutable wiring, public trees, action history and `nullifierCount` at a fixed block/hash anchor. Bad pools have independent failure boundaries and unknown balances; healthy pools retain their results. A failed family-record check preserves recovered VALUE balances and reports that family records are unavailable beside the parent-version field; it is distinct from a confirmed empty version list. Refreshing retries the check and restores version selection after a successful read. Historical spent and zero-value donor change notes preserve authenticated original Fund templates, private viewing keys, policy openings and allocation keys. Claim remainders cannot replace those templates. Later pools under the same configured factory need no new root backup. To scan another chain/factory scope, use its trusted application configuration. Recovery words and Key do not embed discovery metadata.
+The page automatically scans only the selected pool after identity unlock, after a transaction, or when returning from confirmed independent key recovery. The overview refresh control rescans the selected pool and then discovers and scans every pool in the currently configured chain and factory, listing each pool's verified raw balances or an unknown balance; this does not traverse past factories or other chains. Factory enumeration verifies `PoolCreated` history against `poolCount`. Pool recovery verifies immutable wiring, public trees, action history and `nullifierCount` at a fixed block/hash anchor. Bad pools have independent failure boundaries and unknown balances; healthy pools retain their results. A failed family-record check preserves recovered VALUE balances and reports that family records are unavailable beside the parent-version field; it is distinct from a confirmed empty version list. Refreshing retries the check and restores version selection after a successful read. Historical spent and zero-value donor change notes preserve authenticated original Fund templates, private viewing keys, policy openings and allocation keys. Claim remainders cannot replace those templates. Later pools under the same configured factory need no new root backup. To scan another chain/factory scope, use its trusted application configuration. Recovery words and Key do not embed discovery metadata.
 
 For ordinary-wallet deposits, **Deposit to** selects identity credentials or the independent key as the new VALUE notes' owner. This determines spending authority and recovery requirements, rather than a different encryption algorithm: both use the same HPKE note encryption and `shield` circuit. Transfers, withdrawals and donor budget funding use **Use balance from** to select the existing VALUE owner. Each request carries that explicit `slot`; the Worker requires its available keys, including verified recovery and completed backup for the independent key. Receive-code type and the budget claim filter do not change either choice. If a selected key becomes unavailable or changes, prepared work is invalidated and the user must restore it or explicitly choose another key; the application never silently switches to another owner.
 
-An independent deposit or payment choice is bound to the selected key fingerprint and retained across pool navigation. Restoring the same key preserves that choice; opening a different verified key requires explicitly selecting it again before a deposit or payment can be prepared.
+An independent deposit or payment choice is bound to the selected key fingerprint and retained across pool navigation. Restoring the same key preserves that choice; opening a different verified key requires explicitly selecting it again before a deposit or payment can be prepared. Key sources and fingerprints are available in collapsed key details, including on the wallet card; expanding those details does not accept a replacement key.
 
-Budget funding automatically supplies the selected donor owner's available positive VALUE notes as the allowed candidate range. Transfers and withdrawals both allow manual candidate selection within the selected owner, including more than four candidates when consolidation is needed. The Worker treats these selections as an allowed candidate range, does not require consuming every candidate and never uses notes outside it or from another owner. Transfers and withdrawals default to their single-input circuits (`shielded_private_transfer` and `shielded_unshield`, 10 public signals). If a permitted note covers the amount, selection uses the smallest adequate single note so the Worker downloads only that smaller circuit’s artifacts. Otherwise it selects up to four notes and uses the `_4` circuit and artifact filenames (`shielded_private_transfer_4` or `shielded_unshield_4`, 16 public signals), padding unused slots when two or three notes are spent. For example, paying 3 from permitted notes of 1, 2 and 10 consumes the single note of 10 and returns 7 as change; allowing only 1 and 2 uses the four-input variant in one transaction. When no single note suffices, selection first avoids extra consolidation transactions, then seeks an exact amount within four inputs; otherwise it prefers less change, breaking equal-change ties with fewer inputs. Single notes and pairs are checked across all permitted candidates; larger combinations use a deterministic 250,000-visit search budget with amount bounds and duplicate-value pruning. Exhausting that budget retains the best valid covering subset found, without claiming a globally optimal result or limiting which candidates may be permitted. Amount comparisons use bigint token units. Budget funding retains its single-input final operation and does not add a consolidation merely to avoid change when an adequate donor note exists. When a payment needs preparatory consolidation, the Worker plans the complete same-owner consolidation/payment sequence and validates integer conservation and output capacity before the first step. It does not automatically move funds between owners. Claim options group budgets by allowance for display, but each claim spends exactly one budget note and up to three due, unpaid period indices; the selected identity and original budget authorization still control claim eligibility.
+Budget funding, transfers and withdrawals default to automatic note selection from the selected owner's available positive VALUE notes. Transfers and withdrawals also offer manual selection to limit the permitted candidate range, including more than four candidates when consolidation is needed. The Worker does not require consuming every permitted candidate and never uses notes outside that range or from another owner. Transfers and withdrawals default to their single-input circuits (`shielded_private_transfer` and `shielded_unshield`, 10 public signals). If a permitted note covers the amount, selection uses the smallest adequate single note so the Worker downloads only that smaller circuit’s artifacts. Otherwise it selects up to four notes and uses the `_4` circuit and artifact filenames (`shielded_private_transfer_4` or `shielded_unshield_4`, 16 public signals), padding unused slots when two or three notes are spent. For example, paying 3 from permitted notes of 1, 2 and 10 consumes the single note of 10 and returns 7 as change; allowing only 1 and 2 uses the four-input variant in one transaction. When no single note suffices, selection first avoids extra consolidation transactions, then seeks an exact amount within four inputs; otherwise it prefers less change, breaking equal-change ties with fewer inputs. Single notes and pairs are checked across all permitted candidates; larger combinations use a deterministic 250,000-visit search budget with amount bounds and duplicate-value pruning. Exhausting that budget retains the best valid covering subset found, without claiming a globally optimal result or limiting which candidates may be permitted. Amount comparisons use bigint token units. Budget funding retains its single-input final operation and does not add a consolidation merely to avoid change when an adequate donor note exists. When a payment needs preparatory consolidation, the Worker plans the complete same-owner consolidation/payment sequence and validates integer conservation and output capacity before the first step. It does not automatically move funds between owners. Claim options group budgets by allowance for display, but each claim spends exactly one budget note and up to three due, unpaid period indices; the selected identity and original budget authorization still control claim eligibility.
 
-Transfers and withdrawals show a spend review before proving. The review distinguishes the allowed candidates from the balances the plan actually consumes, and shows each transaction's inputs, payment or consolidation amount, change and destination. Confirmation applies to the next transaction only. Each step is then proved and locally verified, its gas is estimated and checked, and the wallet signs the transaction with the reviewed fee caps, nonce and expected chain ID. After a consolidation receipt the flow scans again and prepares a fresh review using only the original candidate range, minus the spent inputs and plus the positive consolidated outputs. Original balance numbers remain stable during the plan; new confirmed consolidation outputs are labelled as merged balances. Cancelling stops future work without undoing completed transactions. Waiting for review preserves the normal idle lock; locking, navigation, changes to the request or a wallet change invalidate the pending confirmation. The flow also stops when a step does not shorten the plan or a transaction fails or is rejected. There is no automatic retry or consumption outside the candidate range. Deposits, budget funding and claims keep their existing confirmation flows.
+Transfers and withdrawals show the complete transaction plan for one review before proving. The review shows the balances the plan actually consumes, each transaction's inputs, payment or consolidation amount, change and destination. Manual selection also shows the permitted candidate range; automatic selection omits that extra summary. Single-step plans omit the repeated per-step input total. Confirming approves the displayed plan; each on-chain transaction still requires its own wallet confirmation. Each step is then proved and locally verified, its gas is estimated and checked, and the wallet signs it with the reviewed fee caps, nonce and expected chain ID. After a consolidation receipt the flow scans again, replacing spent inputs with the positive consolidated outputs. It continues under the existing review only if the rebuilt continuation matches the approved remainder; a changed plan requires a new review. Original balance numbers remain stable during the plan; new confirmed consolidation outputs are labelled as merged balances. The user can stop the remaining transactions while the plan is running, preserving completed transactions. Waiting for review preserves the normal idle lock; locking, navigation, changes to the request or a wallet change invalidate approval. The flow also stops when a step does not shorten the plan or a transaction fails or is rejected. There is no automatic retry or consumption outside the candidate range. Progress uses neutral stage labels; only wallet confirmation adds an instruction asking the user to act. Deposits, budget funding and claims keep their existing confirmation flows.
 
-The ordinary wallet `G` supplies deposits and gas; it does not determine either slot's owner. Signature source `S` is needed only for signature-root creation/restoration and may differ from `G`. Changing `G` invalidates prepared work without rederiving funds. ERC-20 deposits check the connected wallet's token balance before approval and proof preparation, and read it again after proving before gas estimation. A sufficient allowance does not establish a sufficient token balance. When allowance is insufficient, the deposit button explicitly approves the selected amount first. Approval checks the public receipt and allowance, keeps the current unlocked task, then offers deposit confirmation; approval itself does not deposit funds. Transaction feedback identifies the operation, and starting a new approval or deposit clears the previous inline result so an estimation failure cannot appear beside an earlier success. Public wallets, their funding links, deposit/exit amounts, timing and unusual amounts can associate private activity; the panel explains these limits without claiming complete anonymity.
+The ordinary wallet `G` supplies deposits and gas; it does not determine either slot's owner. Signature source `S` is needed only for signature-root creation/restoration and may differ from `G`. Changing `G` invalidates prepared work without rederiving funds. ERC-20 deposits check the connected wallet's token balance before approval and proof preparation, and read it again after proving before gas estimation. A sufficient allowance does not establish a sufficient token balance. Allowance reads distinguish loading, failed checks and insufficient approval. The flow reads allowance again immediately before deciding whether to request approval. When allowance is insufficient, **Approve and deposit** starts the selected-amount approval and continues to the deposit after its public receipt succeeds and the allowance, balance and unchanged request are rechecked. Both transactions still require wallet confirmation. Approval alone does not deposit funds, and an account, network, amount or selected-owner change prevents the old request from continuing. Transaction feedback identifies approval and deposit separately, and starting either operation clears the previous inline result so a later failure cannot appear beside an earlier success. Public wallets, their funding links, deposit/exit amounts, timing and unusual amounts can associate private activity; the panel explains these limits without claiming complete anonymity.
+
+Transaction errors and progress belong to the active wallet sheet while it is open, and are not repeated in the background receipt. Completed consolidation steps remain distinct from a finished payment; if the plan stops or a later transaction fails, the completed count stays visible and automatic balance refresh preserves the transaction error. Empty claim states distinguish unavailable eligibility data, exhausted funding and unconfirmed family eligibility. When more than three periods are due, a verified remaining count explains the next batch; limited scans omit an unverified count. Candidate totals have one display owner. Missing asset precision stays explicit in amount fields, balances, errors and saved receipts as raw units.
+
+Inheritance actions reuse the Add Person transaction timeline and success summary. Only the active working step animates; wallet confirmation uses the awaiting-user marker, and transaction buttons and plan headings do not add their own spinners. A confirmed final payment replaces the form and submission button with a completion view containing its actual amount, action and hash, without a second confirmation sentence. It stays visible while balances refresh. **Start another transaction** opens a new form with the submitted amount, funding-period count or claim-period selection cleared; asset and wallet choices remain. Explicitly choosing another task or wallet also clears the completed task's submitted input, while preserving unrelated drafts. Approval and consolidation receipts, failed or cancelled transactions, and unresolved submissions preserve the form and draft. After a successful claim, balance refresh does not automatically select more periods. A late confirmed receipt enters completion only if the original request, secret session and connected wallet are still current; a new payment requires fresh valid amount or period input.
+
+Unknown letter submissions retain their original message ID, transaction hash and expected public registration fields. The current unresolved draft also retains its preparation until it is resolved or explicitly replaced; archived checks retain no proof or ciphertext. Checking a letter only reads its authenticated registration and original receipt; it never requests a wallet transaction or discards an unresolved result because a proof expired. Editing cannot discard an unresolved submission; explicitly starting another letter retains the original result and check action. Preparation, wallet confirmation, chain confirmation and inbox reads use one progress display. Cancellation and transactions not submitted remain distinct from unknown or failed public results, including after read-strategy changes. Read-strategy changes preserve in-flight sends; wallet/session invalidation still clears prepared secret material.
+
+An existing verified key's settings offer optional backup inspection and recovery review. A newly generated key still requires its original backup verification. Credential expiry applies only to a newly generated receive code or budget receive credential and does not change budget schedules or revoke old credentials. Identity-wide revocation includes both credential types and wallets on the current chain, keeps its confirmed receipt visible, and takes effect within the authorization lifetime.
 
 A receive code needs the unlocked identity and selected slot, with independent-key mode past its recovery gate. Its proof binds identity, owner, viewing key, key mode and credential version. Version 1 determines the identity suite, independent-key suite and derivation rules; the three constant identifiers are absent from both credential encoding and proof inputs. Ordinary packets are 385 bytes before Bech32m encoding, producing 629-character `dfrecv` codes instead of 657 characters; Fund packets are 401 bytes (655 characters). Ordinary encoding uses one header byte, `(version << 1) | keyMode`, and packs the big-endian counter and expiry into the first 16 bytes of the address diversifier, followed by 16 fresh random bytes. Decoding reconstructs the same 8 ordinary or 9 Fund issuer signals; circuits and verifiers are unchanged. The former 402-byte ordinary and Fund layouts are rejected. Ordinary codes generate a fresh diversified receive address on each issuance and bind `ownerCommitment = Poseidon3(1013, ownerSecret, ownerNonce)`, where the complete address digest determines `ownerNonce`. The random tail supplies 128 bits of fresh diversifier randomness, without establishing a security level for the entire protocol. Packing does not hide the counter or expiry, and the unchanged authorization alias can still link codes and budget credentials. Budget receiving credentials use the same packed one-byte header and retain their standalone counter and expiry, original X25519 key and fixed `Poseidon2(1013, ownerSecret)` owner. The code fingerprint includes the authenticated receiving address and excludes randomized proof bytes. The main-thread verification display and the asset Worker's payment preparation both verify the code; preparation also checks the intended child/mode before any consolidation. A valid proof does not authenticate which independent root the recipient intended: anyone holding the recipient's identity credentials can produce another valid mode-1 code. Payers do not confirm a fingerprint, so the code must come from the recipient over a trusted channel and should be shared privately.
 
@@ -524,7 +546,7 @@ Pool changes within the same factory preserve secrets and drop the previous
 pool's preparations. Busy work suspends idle locking; fee approval waiting does
 not.
 
-Before requesting a wallet transaction, the flow records its public nonce, block and expected outputs. Unknown results block another submission and display pending feedback while the page automatically checks the result. Public transaction context and receipt tracking live in the in-memory transaction center, survive secret locking and application navigation, and resume automatically when returning to the same pool. Automatic checks can locate unknown hashes by replaying unfiltered public output events and checking the original nonce at the same block; unresolved checks retry every five seconds. Explicit wallet rejection releases the pending guard; ambiguous RPC failures do not. Clearing secrets cannot revoke a wallet request already issued, and returning to the page never automatically resubmits it.
+Before requesting a wallet transaction, the flow records its public nonce, block and expected outputs. Unknown results block another submission and display pending feedback while the page automatically checks the result. Tracking records label consolidation and final-payment submissions separately. Public records contain no private plan amounts; scoped current-plan receipts retain those only while the original session is current. Late consolidation confirmation reports only consolidation success and does not complete the final payment. Unknown approval outcomes use a neutral, clearable result and refresh allowance rather than claiming failure or continuing payment. Public transaction context and receipt tracking live in the in-memory transaction center, survive secret locking and application navigation, and resume automatically when returning to the same pool. Automatic checks can locate unknown hashes by replaying unfiltered public output events and checking the original nonce at the same block; unresolved checks retry every five seconds. Explicit wallet rejection releases the pending guard; ambiguous RPC failures do not. Clearing secrets cannot revoke a wallet request already issued, and returning to the page never automatically resubmits it.
 
 Initial Fund and Claim prepare both lineage trees, their checkpoint ID and `asOf` at the same
 authenticated block. Proof generation and the final submission check use `isKnownCheckpoint`, so

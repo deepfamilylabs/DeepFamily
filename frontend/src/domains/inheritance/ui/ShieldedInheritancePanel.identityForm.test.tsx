@@ -293,7 +293,8 @@ describe("Shielded identity form privacy with a real session and form", () => {
     enterIdentity();
     fireEvent.click(screen.getByRole("button", { name: "shielded.unlock" }));
 
-    expect((await screen.findByRole("alert")).textContent).toBe("Unlock failed");
+    expect((await screen.findByRole("alert")).textContent).toBe("shielded.unknownError");
+    expect(screen.getByText("Unlock failed").closest("details")?.open).toBe(false);
     expect(
       (screen.getByRole("button", { name: "shielded.unlock" }) as HTMLButtonElement).disabled,
     ).toBe(false);

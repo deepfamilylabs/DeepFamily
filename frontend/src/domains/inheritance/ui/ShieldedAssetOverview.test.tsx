@@ -297,7 +297,12 @@ describe("ShieldedAssetOverview desktop cards", () => {
     });
     const independentRadio = screen.getByRole("radio", { name: "独立密钥" }) as HTMLInputElement;
     expect(independentRadio.checked).toBe(false);
-    expect(screen.getByTitle(fingerprint)).toBeTruthy();
+    const details = screen.getByTitle(fingerprint).closest("details")!;
+    expect(details.open).toBe(false);
+    // Opening optional details must not accept the loaded replacement key.
+    fireEvent.click(details.querySelector("summary")!);
+    expect(details.open).toBe(true);
+    expect(independentRadio.checked).toBe(false);
     expect(onSelectWallet).not.toHaveBeenCalled();
 
     fireEvent.click(cardSelectionLabel("独立密钥"));

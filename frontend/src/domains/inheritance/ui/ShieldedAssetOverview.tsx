@@ -328,15 +328,20 @@ export function ShieldedAssetOverview({
                   </p>
                 )}
                 {wallet.fingerprint ? (
-                  <p className="flex min-w-0 items-center gap-1.5 text-xs text-ink-muted">
-                    <span className="shrink-0">{tr("keyFingerprint")}</span>
-                    <code
-                      className="min-w-0 truncate font-mono text-ink/80"
-                      title={wallet.fingerprint}
-                    >
-                      {shortHex(wallet.fingerprint)}
-                    </code>
-                  </p>
+                  <details className="relative z-20 min-w-0 text-xs text-ink-muted">
+                    <summary className="cursor-pointer font-medium text-ink/80 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary/40">
+                      {tr("keyDetails")}
+                    </summary>
+                    <p className="mt-2 flex min-w-0 items-center gap-1.5">
+                      <span className="shrink-0">{tr("keyFingerprint")}</span>
+                      <code
+                        className="min-w-0 truncate font-mono text-ink/80"
+                        title={wallet.fingerprint}
+                      >
+                        {shortHex(wallet.fingerprint)}
+                      </code>
+                    </p>
+                  </details>
                 ) : null}
               </div>
               <div className="mt-auto min-w-0">

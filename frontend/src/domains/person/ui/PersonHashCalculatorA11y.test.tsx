@@ -23,9 +23,6 @@ vi.mock("react-i18next", () => ({
       const template = typeof fallbackOrOptions === "string" ? fallbackOrOptions : key;
       const values =
         fallbackOrOptions && typeof fallbackOrOptions === "object" ? fallbackOrOptions : options;
-      if (key === "search.hashCalculator.passphraseCharCount") {
-        return `Characters used: ${String(values?.count ?? "")}`;
-      }
       return template.replace(/{{\s*(\w+)\s*}}/g, (_match, name) => String(values?.[name] ?? ""));
     },
     i18n: { language: "en" },

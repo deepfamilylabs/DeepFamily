@@ -68,12 +68,35 @@ describe("transaction centre", () => {
     expect(result.current!.records.map((record) => record.id)).toEqual(["a"]);
   });
 
+  it("keeps an unknown result for review without counting it as ongoing work", () => {
+    const { result } = renderHook(() => useTransactionCenter(), { wrapper });
+    act(() => {
+      result.current!.upsert({ id: "approval", kind: "shielded", label: "Approval", phase: "busy", transactionHash: "0xapproval" });
+      result.current!.upsert({ id: "working", kind: "mint", label: "Mint", phase: "busy" });
+    });
+    act(() => {
+      result.current!.upsert({
+        id: "approval", kind: "shielded", label: "Approval", phase: "unknown",
+        error: { type: "transaction", message: "Approval needs checking", details: "" },
+      });
+    });
+
+    expect(result.current!.pendingCount).toBe(1);
+    expect(result.current!.records.find((record) => record.id === "approval")).toMatchObject({
+      phase: "unknown", transactionHash: "0xapproval",
+      error: { message: "Approval needs checking" },
+    });
+    act(() => result.current!.clearSettled());
+    expect(result.current!.records.map((record) => record.id)).toEqual(["working"]);
+  });
+
   it("preserves public shielded submission context across hash and phase updates", () => {
     const { result } = renderHook(() => useTransactionCenter(), { wrapper });
     const shieldedSubmission: ShieldedSubmissionContext = {
       chainId: "31337",
       poolAddress: `0x${"12".repeat(20)}`,
       kind: "action",
+      actionStep: "merge",
       nonce: 7,
       signerAddress: `0x${"34".repeat(20)}`,
       fromBlock: 42,

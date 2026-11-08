@@ -660,7 +660,11 @@ describe("InheritancePage private pool entry", () => {
       });
       chooseAsset("ETH");
       if (result === "missing") await screen.findByText("shielded.assets.noPool");
-      else await screen.findByText("Pool temporarily unreachable");
+      else {
+        expect((await screen.findByRole("alert")).textContent).toBe("shielded.unreachable");
+        const diagnostic = screen.getByText("Pool temporarily unreachable");
+        expect(diagnostic.closest("details")?.open).toBe(false);
+      }
       expect(screen.queryByTestId("shielded-panel")).toBeNull();
       expect(screen.queryByRole("button", { name: "unlock-test-session" })).toBeNull();
       chooseAsset("DEEP");
@@ -715,6 +719,36 @@ describe("InheritancePage private pool entry", () => {
     expect(mocks.createPool).toHaveBeenCalledWith(mocks.config.tokenAddress);
     expect(mocks.resolveShieldedAssetPool).toHaveBeenCalledTimes(2);
     expect(screen.getByTestId("shielded-pool").textContent).toBe(mocks.poolAddress);
+  });
+
+  it("shows the actual preparation, wallet, and chain stages of pool creation", async () => {
+    mocks.poolAddress = "";
+    const network = deferred<{ chainId: bigint }>();
+    const broadcast = deferred<ReturnType<typeof poolCreationTransaction>>();
+    const confirmation = deferred<{ status: number }>();
+    mocks.wallet.signer = {
+      provider: { getNetwork: () => network.promise, getBlockNumber: async () => 20 },
+      getAddress: async () => mocks.wallet.address,
+    };
+    mocks.createPool.mockImplementation(() => broadcast.promise);
+    render(<InheritancePage />);
+    fireEvent.click(await screen.findByRole("button", { name: "shielded.assets.create" }));
+    expect(screen.getByRole("button", { name: "shielded.walletKeys.preparing" })).toBeTruthy();
+    expect(mocks.createPool).not.toHaveBeenCalled();
+
+    await act(async () => network.resolve({ chainId: 31337n }));
+    expect(await screen.findByRole("button", { name: "shielded.stages.submitting" })).toBeTruthy();
+    expect(mocks.createPool).toHaveBeenCalledOnce();
+
+    await act(async () => broadcast.resolve(poolCreationTransaction(() => confirmation.promise)));
+    const waiting = await screen.findByRole("button", { name: "shielded.stages.confirming" });
+    expect((waiting as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.queryByText("shielded.stages.submitting")).toBeNull();
+
+    mocks.poolAddress = "0x0000000000000000000000000000000000000020";
+    await act(async () => confirmation.resolve({ status: 1 }));
+    await screen.findByTestId("shielded-panel");
+    expect(screen.queryByText("shielded.stages.confirming")).toBeNull();
   });
 
   it("detects a repriced ethers contract transaction and opens its canonical pool", async () => {
@@ -833,6 +867,40 @@ describe("InheritancePage private pool entry", () => {
       expect(screen.queryByRole("alert")).toBeNull();
     },
   );
+
+  it.each(["bad", "0x8Ba1f109551bD432803012645Ac136ddd64DBA72"])(
+    "reports an invalid imported token address before requesting metadata: %s",
+    async (address) => {
+      render(<InheritancePage />);
+      await screen.findByTestId("shielded-panel");
+      const readsBefore = mocks.readShieldedAsset.mock.calls.length;
+      const selectedAsset = screen.getByTestId("shielded-asset").textContent;
+      fireEvent.click(screen.getByRole("button", { name: "shielded.assets.add" }));
+      const field = screen.getByRole("textbox", { name: "shielded.assets.tokenAddress" });
+      fireEvent.change(field, { target: { value: address } });
+      fireEvent.click(screen.getByRole("button", { name: "shielded.assets.import" }));
+      expect((await screen.findByRole("alert")).textContent).toBe("errors.contractError.InvalidToken");
+      expect(screen.queryByText("shielded.invalidExitRecipient")).toBeNull();
+      expect(mocks.readShieldedAsset).toHaveBeenCalledTimes(readsBefore);
+      expect(screen.getByTestId("shielded-asset").textContent).toBe(selectedAsset);
+      expect((field as HTMLInputElement).value).toBe(address);
+      expect((screen.getByRole("button", { name: "shielded.assets.import" }) as HTMLButtonElement).disabled).toBe(false);
+    },
+  );
+
+  it.each(["", "   "])("keeps an empty imported token address blocked without requesting metadata: %j", async (address) => {
+    render(<InheritancePage />);
+    await screen.findByTestId("shielded-panel");
+    const readsBefore = mocks.readShieldedAsset.mock.calls.length;
+    fireEvent.click(screen.getByRole("button", { name: "shielded.assets.add" }));
+    const field = screen.getByRole("textbox", { name: "shielded.assets.tokenAddress" });
+    fireEvent.change(field, { target: { value: address } });
+    const submit = screen.getByRole("button", { name: "shielded.assets.import" });
+    expect((submit as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.submit(field.closest("form")!);
+    expect(mocks.readShieldedAsset).toHaveBeenCalledTimes(readsBefore);
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
 
   it("imports token metadata and passes its actual precision to the selected asset pool", async () => {
     mocks.assetPrecision = 6;

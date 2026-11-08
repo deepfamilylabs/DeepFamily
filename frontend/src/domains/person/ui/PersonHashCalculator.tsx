@@ -35,7 +35,6 @@ import {
   validatePassphraseStrength,
   normalizePassphraseForHash,
   classifyProtocolPassphraseRisk,
-  getGraphemeLength as getGraphemeLengthUtil,
   type ProtocolPassphraseRisk,
 } from "../../../shared/crypto/passphraseStrength";
 import { safeCanonicalizeFullName } from "../../../shared/identity/fullName";
@@ -46,7 +45,6 @@ const MAX_FULL_NAME_BYTES = 256;
 const getByteLength = (str: string): number => {
   return new TextEncoder().encode(str).length;
 };
-const getGraphemeLength = getGraphemeLengthUtil;
 
 // Field error component
 const FieldError: React.FC<{ message?: string }> = ({ message }) => (
@@ -410,7 +408,6 @@ export const PersonHashCalculator = forwardRef<
     // may retain a raw or normalized copy of the identity passphrase.
     const {
       risk: passphraseRisk,
-      graphemeLength: passphraseGraphemeLength,
       hasPassphrase,
       strength: passwordStrength,
     } = useMemo(() => {
@@ -418,7 +415,6 @@ export const PersonHashCalculator = forwardRef<
       const normalized = normalizePassphraseForHash(rawPassphrase);
       return {
         risk: classifyProtocolPassphraseRisk(rawPassphrase),
-        graphemeLength: getGraphemeLength(normalized),
         hasPassphrase: normalized.length > 0,
         strength: validatePassphraseStrength(normalized, false),
       };
@@ -1033,14 +1029,6 @@ export const PersonHashCalculator = forwardRef<
               </>
             ) : null}
 
-            {showPassphraseGuidance && hasPassphrase && (
-              <div className="mt-1 text-[11px] text-ink-muted">
-                {t("search.hashCalculator.passphraseCharCount", {
-                  count: passphraseGraphemeLength,
-                })}
-              </div>
-            )}
-
             {/* Password strength indicator */}
             {showPassphraseGuidance && hasPassphrase && (
               <div className="mt-1 space-y-1">
@@ -1115,25 +1103,6 @@ export const PersonHashCalculator = forwardRef<
                             : t("search.hashCalculator.passwordStrength.excellent", "Excellent")}
                   </span>
                 </div>
-                {/* Display entropy */}
-                <div className="text-[11px] text-ink-muted">
-                  {t(
-                    "search.hashCalculator.entropyDisplay",
-                    "Raw entropy: {{raw}} bits · Adjusted strength score: {{adjusted}}",
-                    {
-                      raw: Math.round(passwordStrength.rawEntropy),
-                      adjusted: Math.round(passwordStrength.entropy),
-                    },
-                  )}
-                </div>
-                {passwordStrength.level === "weak" && (
-                  <div className="text-xs text-amber-600 dark:text-amber-400">
-                    {t(
-                      "search.hashCalculator.passwordTips.weak",
-                      "Tip: Use at least 15+ mixed characters or 20+ letters for better security",
-                    )}
-                  </div>
-                )}
               </div>
             )}
           </div>

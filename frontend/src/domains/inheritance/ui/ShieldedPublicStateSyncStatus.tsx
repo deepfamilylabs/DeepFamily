@@ -8,6 +8,8 @@ type SyncStatusProps = {
   paused: boolean;
   pauseDisabled: boolean;
   onPause: () => void;
+  /** A transaction timeline may already own the page's active working marker. */
+  animate?: boolean;
 };
 
 export function ShieldedPublicStateSyncStatus(props: SyncStatusProps) {
@@ -20,7 +22,7 @@ export function ShieldedPublicStateSyncStatus(props: SyncStatusProps) {
   return <ActiveSyncStatus {...props} />;
 }
 
-function ActiveSyncStatus({ progress, pauseDisabled, onPause }: SyncStatusProps) {
+function ActiveSyncStatus({ progress, pauseDisabled, onPause, animate = true }: SyncStatusProps) {
   const { t } = useTranslation();
   const id = useId();
   const container = useRef<HTMLElement>(null);
@@ -64,7 +66,7 @@ function ActiveSyncStatus({ progress, pauseDisabled, onPause }: SyncStatusProps)
         onClick={() => setExpanded((value) => !value)}
         className="inline-flex h-9 min-w-0 items-center gap-1.5 rounded-lg px-2 text-left transition-colors hover:bg-surface-alt hover:text-ink focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary/30"
       >
-        <Loader2 aria-hidden="true" className="h-3.5 w-3.5 shrink-0 motion-safe:animate-spin" />
+        <Loader2 aria-hidden="true" className={`h-3.5 w-3.5 shrink-0 ${animate ? "motion-safe:animate-spin" : ""}`} />
         <span id={`${id}-summary`} role="status" aria-live="polite" className="truncate">
           {t(`shielded.publicStateSync.${verifying ? "verifying" : "syncing"}`)}
         </span>

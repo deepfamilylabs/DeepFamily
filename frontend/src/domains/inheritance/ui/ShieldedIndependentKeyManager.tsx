@@ -42,20 +42,13 @@ export interface ShieldedIndependentKeyManagerProps {
   canSign: boolean;
   /** Credentials are already unlocked; proofs may be unavailable for their identity suite. */
   identityReady?: boolean;
-  /** A scan without a matching historical note does not confirm the original wallet. */
-  recoveryScanned?: boolean;
-  /** Candidate results belong to the recovery attempt that produced them. */
-  showRecoveryCandidate: boolean;
   /** Each generation method creates the key directly; there is no separate confirm step. */
   onCreate: (source: "random" | "walletSignature") => void;
   onExport: () => void;
   onBeginVerification: () => void;
   onImport: () => void;
   onRestoreSignature: () => void;
-  /** Scans the selected pool, then every verified factory pool; history there can confirm a candidate. */
-  onRecover: () => void;
   discoveryReport?: ReactNode;
-  onShowRestore: () => void;
   onCopyFingerprint: () => void;
   /** The initial entry has no workspace navigation and can still open identity unlock. */
   onUnlockIdentity?: () => void;
@@ -126,9 +119,8 @@ export function ShieldedIndependentKeyManager(props: ShieldedIndependentKeyManag
   const backupPending = !!independentKey?.backupRequired || !!props.exportedFingerprint;
   const verification = props.verificationStarted;
   const backup = props.flow === "backup" || backupPending || verification;
+  const optionalBackup = !!independentKey?.recoveryVerified && !independentKey.backupRequired;
   const restored = !!independentKey?.recoveryVerified && !independentKey.backupRequired && !backup;
-  const candidate = props.flow === "restore" && props.showRecoveryCandidate &&
-    !!independentKey && !independentKey.recoveryVerified && !independentKey.backupRequired && !backup;
   const fingerprint = independentKey?.keyFingerprint || props.fingerprint || "";
   const sourceLabel = independentKey
     ? tr(
@@ -142,29 +134,34 @@ export function ShieldedIndependentKeyManager(props: ShieldedIndependentKeyManag
 
   const keySummary =
     sourceLabel || fingerprint ? (
-      <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2 rounded-xl bg-surface-alt px-3.5 py-3 text-xs text-ink-muted">
-        {sourceLabel ? (
-          <span className="rounded-full border border-hairline bg-surface px-2 py-0.5 font-medium text-ink/80">
-            {sourceLabel}
-          </span>
-        ) : null}
-        {fingerprint ? (
-          <span className="flex min-w-0 items-center gap-1.5">
-            <span className="shrink-0">{tr("keyFingerprint")}</span>
-            <code className="min-w-0 truncate font-mono text-ink/80" title={fingerprint}>
-              {shortHex(fingerprint)}
-            </code>
-            <CopyIconButton
-              size="xs"
-              label={tr("copyKeyFingerprint")}
-              onClick={props.onCopyFingerprint}
-            />
-          </span>
-        ) : null}
-      </div>
+      <details className="min-w-0 rounded-xl bg-surface-alt px-3.5 py-3 text-xs text-ink-muted">
+        <summary className="cursor-pointer font-medium text-ink/80 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary/40">
+          {tr("keyDetails")}
+        </summary>
+        <div className="mt-3 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
+          {sourceLabel ? (
+            <span className="rounded-full border border-hairline bg-surface px-2 py-0.5 font-medium text-ink/80">
+              {sourceLabel}
+            </span>
+          ) : null}
+          {fingerprint ? (
+            <span className="flex min-w-0 items-center gap-1.5">
+              <span className="shrink-0">{tr("keyFingerprint")}</span>
+              <code className="min-w-0 truncate font-mono text-ink/80" title={fingerprint}>
+                {shortHex(fingerprint)}
+              </code>
+              <CopyIconButton
+                size="xs"
+                label={tr("copyKeyFingerprint")}
+                onClick={props.onCopyFingerprint}
+              />
+            </span>
+          ) : null}
+        </div>
+      </details>
     ) : null;
 
-  const stepper = backup ? (
+  const stepper = backup && (!optionalBackup || verification) ? (
     <ol className="flex items-center gap-2.5">
       {(
         [
@@ -288,12 +285,9 @@ export function ShieldedIndependentKeyManager(props: ShieldedIndependentKeyManag
         </>
       ) : verification ? (
         <>
-          <div className="space-y-2">
-            <p role="status" className="text-sm leading-relaxed text-ink">
-              {tr("reenterBackup")}
-            </p>
-            <p className="text-[13px] leading-relaxed text-ink-muted">{tr("backupVerifyHint")}</p>
-          </div>
+          <p role="status" className="text-sm leading-relaxed text-ink">
+            {tr("reenterBackup")}
+          </p>
           {keySummary}
           {secretInput(props.backupFormat)}
           {actions(
@@ -311,7 +305,9 @@ export function ShieldedIndependentKeyManager(props: ShieldedIndependentKeyManag
         </>
       ) : backup ? (
         <>
-          <p className="text-sm leading-relaxed text-ink">{tr("independentBackupGate")}</p>
+          {optionalBackup ? null : <p className="text-sm leading-relaxed text-ink">
+            {tr("independentBackupGate")}
+          </p>}
           {keySummary}
           {independentKey ? (
             <>
@@ -365,27 +361,6 @@ export function ShieldedIndependentKeyManager(props: ShieldedIndependentKeyManag
               <WarningNotice>{tr("backupSessionLocked")}</WarningNotice>
               {props.exportedFingerprint ? savedConfirmation : null}
             </>
-          )}
-        </>
-      ) : candidate ? (
-        <>
-          <WarningNotice>{tr("recoveryCandidate")}</WarningNotice>
-          {keySummary}
-          {props.recoveryScanned ? (
-            <p role="status" className="text-sm leading-relaxed text-ink-muted">
-              {tr("recoveryCandidateHistoryMissing")}
-            </p>
-          ) : null}
-          {props.discoveryReport}
-          {actions(
-            <div className="flex flex-wrap gap-3">
-              <PanelButton variant="primary" busy={busy} disabled={busy} onClick={props.onRecover}>
-                {tr("recover")}
-              </PanelButton>
-              <PanelButton disabled={busy} onClick={props.onShowRestore}>
-                {tr("restoreAnotherMethod")}
-              </PanelButton>
-            </div>,
           )}
         </>
       ) : props.flow === "create" ? (
@@ -443,6 +418,7 @@ export function ShieldedIndependentKeyManager(props: ShieldedIndependentKeyManag
           />
           {props.restorePath === "signature" ? (
             <div className="space-y-3">
+              <p className="text-xs leading-relaxed text-ink-muted">{tr("signatureRecoveryHint")}</p>
               {isAddress(props.account) ? (
                 <details className="text-xs text-ink-muted">
                   <summary className="cursor-pointer">{tr("signatureMessage")}</summary>
@@ -456,7 +432,10 @@ export function ShieldedIndependentKeyManager(props: ShieldedIndependentKeyManag
               ) : null}
             </div>
           ) : (
-            secretInput(props.restorePath)
+            <>
+              {secretInput(props.restorePath)}
+              <p className="text-xs leading-relaxed text-ink-muted">{tr("recoveryCredentialsHint")}</p>
+            </>
           )}
           {actions(
             <PanelButton

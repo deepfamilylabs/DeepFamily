@@ -83,7 +83,7 @@ describe("buildShieldedClaimSchedule", () => {
       claim({ periodIndices: [], futurePeriods: "40" }),
       budget,
     );
-    expect(rows.map((row) => (row.kind === "gap" ? "gap" : String(row.period)))).toEqual([
+    expect(rows.map((row) => ("period" in row ? String(row.period) : row.kind))).toEqual([
       "7",
       "8",
       "9",
@@ -105,6 +105,29 @@ describe("buildShieldedClaimSchedule", () => {
       { kind: "claimable", index: "5", period: 6n, dueAt: undefined },
     ]);
   });
+
+  it("marks omitted due periods before showing the future schedule", () => {
+    const rows = buildShieldedClaimSchedule(
+      claim({ periodIndices: ["0", "1", "2"], duePeriods: "6" }),
+      budget,
+    );
+    expect(rows[3]).toEqual({ kind: "dueBacklog", periods: 3n });
+    expect(rows[4]).toEqual({ kind: "upcoming", period: 7n, dueAt: start + 7n * 30n * DAY });
+  });
+
+  it("keeps a verified backlog even when every funded period is already due", () => {
+    const rows = buildShieldedClaimSchedule(
+      claim({
+        periodIndices: ["0", "1", "2"],
+        duePeriods: "6",
+        nextDueAt: undefined,
+        nextPeriodIndex: undefined,
+        futurePeriods: undefined,
+      }),
+      budget,
+    );
+    expect(rows[rows.length - 1]).toEqual({ kind: "dueBacklog", periods: 3n });
+  });
 });
 
 describe("ShieldedClaimComposer", () => {
@@ -119,7 +142,11 @@ describe("ShieldedClaimComposer", () => {
     children: [],
   } as ShieldedWalletSummary;
 
-  function renderComposer(claimPeriods: string[], onClaimPeriodsChange = vi.fn()) {
+  function renderComposer(
+    claimPeriods: string[],
+    onClaimPeriodsChange = vi.fn(),
+    selectedWallet = wallet,
+  ) {
     render(
       <I18nextProvider i18n={i18n}>
         <ShieldedClaimComposer
@@ -127,7 +154,7 @@ describe("ShieldedClaimComposer", () => {
           symbol="DEEP"
           decimals={0}
           busy={false}
-          wallet={wallet}
+          wallet={selectedWallet}
           slot="identity"
           identityReady
           independentKeyReady={false}
@@ -159,5 +186,15 @@ describe("ShieldedClaimComposer", () => {
     expect(within(budgets).getByText("预算 1 · 剩余 900 DEEP")).toBeTruthy();
     expect(within(budgets).getByText("每 30 天")).toBeTruthy();
     expect((within(budgets).getByRole("radio") as HTMLInputElement).checked).toBe(true);
+  });
+
+  it("explains the overdue gap without making the later periods selectable", () => {
+    renderComposer(["0", "1", "2"], vi.fn(), {
+      ...wallet,
+      claims: [claim({ periodIndices: ["0", "1", "2"], duePeriods: "6" })],
+    });
+    const periods = screen.getByRole("group", { name: "领取期次" });
+    expect(within(periods).getByText("另有 3 期已到期，领取本批 3 期后可继续。")).toBeTruthy();
+    expect(within(periods).getAllByRole("checkbox")).toHaveLength(3);
   });
 });
