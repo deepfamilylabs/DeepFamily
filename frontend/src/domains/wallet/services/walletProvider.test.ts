@@ -30,6 +30,8 @@ function createHarness() {
   const state = {
     walletChain: LOCAL_CHAIN,
     rpcChain: LOCAL_CHAIN,
+    walletBlock: 1583,
+    rpcBlock: 109,
     pending: new Map([
       [ACCOUNT, 1345n],
       [OTHER_ACCOUNT, 17n],
@@ -48,6 +50,11 @@ function createHarness() {
   const request = vi.fn(async ({ method, params }: Parameters<Eip1193Provider["request"]>[0]) => {
     if (method === "eth_chainId") return state.walletChain;
     if (method === "eth_accounts" || method === "eth_requestAccounts") return [ACCOUNT];
+    if (method === "eth_blockNumber") return `0x${state.walletBlock.toString(16)}`;
+    if (method === "eth_getTransactionCount" && Array.isArray(params)) {
+      const address = String(params[0]).toLowerCase();
+      return `0x${(state.cachedWalletNonce.get(address) ?? state.pending.get(address) ?? 0n).toString(16)}`;
+    }
     if (method !== "eth_sendTransaction" || !Array.isArray(params)) {
       throw new Error(`Unexpected injected-wallet request: ${method}`);
     }
@@ -78,6 +85,7 @@ function createHarness() {
     state.rpcRequests.push(payload);
     if (state.response) return state.response(payload, init!);
     if (payload.method === "eth_chainId") return rpcResponse(payload, state.rpcChain);
+    if (payload.method === "eth_blockNumber") return rpcResponse(payload, `0x${state.rpcBlock.toString(16)}`);
     if (payload.method === "eth_getTransactionCount") {
       const [address, block] = payload.params;
       const nonce = state.pending.get(String(address).toLowerCase()) ?? 0n;
@@ -111,6 +119,74 @@ afterEach(() => {
 });
 
 describe("createWalletProvider local development transactions", () => {
+  it("pins an approval's nonce and scan block to the restarted node instead of MetaMask's old state", async () => {
+    const { raw, state } = createHarness();
+    state.cachedWalletNonce.set(ACCOUNT, 1583n);
+    state.pending.set(ACCOUNT, 109n);
+    const provider = createProvider(raw);
+
+    const [nonce, fromBlock] = await Promise.all([
+      provider.getTransactionCount(ACCOUNT, "pending"), provider.getBlockNumber(),
+    ]);
+    expect({ nonce, fromBlock }).toEqual({ nonce: 109, fromBlock: 109 });
+    await provider.send("eth_sendTransaction", [{ ...APPROVE, nonce: `0x${nonce.toString(16)}` }]);
+
+    expect(state.transactions).toEqual([{ ...APPROVE, nonce: "0x6d" }]);
+    expect(state.pending.get(ACCOUNT)).toBe(110n);
+  });
+
+  it("does not reuse a cached nonce or block number after another local chain reset", async () => {
+    const { raw, state } = createHarness();
+    const provider = createProvider(raw);
+    await Promise.all([provider.getTransactionCount(ACCOUNT, "pending"), provider.getBlockNumber()]);
+    state.pending.set(ACCOUNT, 3n);
+    state.rpcBlock = 12;
+
+    expect(await provider.getTransactionCount(ACCOUNT, "pending")).toBe(3);
+    expect(await provider.getBlockNumber()).toBe(12);
+  });
+
+  it("keeps historical nonce reads at their requested block", async () => {
+    const { raw, state } = createHarness();
+    state.response = (request) => rpcResponse(request,
+      request.method === "eth_chainId" ? LOCAL_CHAIN : "0x2",
+    );
+    expect(await createProvider(raw).getTransactionCount(ACCOUNT, 42)).toBe(2);
+    expect(state.rpcRequests).toContainEqual(expect.objectContaining({
+      method: "eth_getTransactionCount", params: [ACCOUNT, "0x2a"],
+    }));
+  });
+
+  it.each([
+    { dev: true, chain: "0x1" },
+    { dev: true, chain: "0x47" },
+    { dev: false, chain: LOCAL_CHAIN },
+  ])("keeps transaction-state reads in the wallet outside local development: %j", async ({ dev, chain }) => {
+    vi.stubEnv("DEV", dev);
+    const { raw, state, fetch } = createHarness();
+    state.walletChain = chain;
+    state.cachedWalletNonce.set(ACCOUNT, 1583n);
+    const provider = createProvider(raw);
+
+    expect(await provider.getTransactionCount(ACCOUNT, "pending")).toBe(1583);
+    expect(await provider.getBlockNumber()).toBe(1583);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it.each(["eth_getTransactionCount", "eth_blockNumber"])("rejects a network change during a local %s read", async (method) => {
+    const { raw, state } = createHarness();
+    state.response = (request) => {
+      if (request.method === method) state.walletChain = "0x1";
+      return rpcResponse(request, request.method === "eth_chainId" ? LOCAL_CHAIN : "0x6d");
+    };
+    const provider = createProvider(raw);
+
+    await expect(method === "eth_blockNumber"
+      ? provider.getBlockNumber()
+      : provider.getTransactionCount(ACCOUNT, "pending")).rejects.toThrow();
+    expect(state.transactions).toEqual([]);
+  });
+
   it("reproduces the stale wallet nonce through an unwrapped ethers BrowserProvider", async () => {
     const { raw, state, fetch } = createHarness();
     const provider = createProvider(raw, false);

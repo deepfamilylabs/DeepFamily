@@ -27,16 +27,21 @@ async function localRpcRequest(method: string, params: unknown[]): Promise<unkno
   return payload.result;
 }
 
-async function freshLocalNonce(address: string): Promise<string> {
+async function freshLocalRead(method: string, params: unknown[]): Promise<unknown> {
   // Read the node directly: the wallet's RPC and nonce tracker can lag behind
   // instantly mined Hardhat transactions, including the preceding approval.
-  const [chainId, nonce] = await Promise.all([
+  const [chainId, result] = await Promise.all([
     localRpcRequest("eth_chainId", []),
-    localRpcRequest("eth_getTransactionCount", [address, "pending"]),
+    localRpcRequest(method, params),
   ]);
   if (chainId !== LOCAL_CHAIN_ID) {
     throw new Error("Local development RPC is connected to the wrong network");
   }
+  return result;
+}
+
+async function freshLocalNonce(address: string): Promise<string> {
+  const nonce = await freshLocalRead("eth_getTransactionCount", [address, "pending"]);
   if (
     typeof nonce !== "string" ||
     !/^0x(?:0|[1-9a-f][0-9a-f]*)$/i.test(nonce) ||
@@ -70,12 +75,24 @@ function serializeLocalSend<T>(
   return result;
 }
 
-/** Keep ordinary wallet nonce management; refresh it only for local dev sends. */
+/** Read local nonce/scan anchors from the node and refresh implicit local send nonces. */
 export function createWalletProvider(rawProvider: Eip1193Provider): BrowserProvider {
   if (!isDevMode()) return new BrowserProvider(rawProvider);
 
   const provider: Eip1193Provider = {
     async request(request) {
+      if (request.method === "eth_blockNumber" ||
+          (request.method === "eth_getTransactionCount" && Array.isArray(request.params))) {
+        const chainId = await rawProvider.request({ method: "eth_chainId", params: [] });
+        if (chainId !== LOCAL_CHAIN_ID) return rawProvider.request(request);
+        // Shielded approval and spend flows pin an explicit nonce and a scan
+        // block before sending. Those reads must also survive a Hardhat reset.
+        const result = await freshLocalRead(request.method, Array.isArray(request.params) ? request.params : []);
+        if (await rawProvider.request({ method: "eth_chainId", params: [] }) !== chainId) {
+          throw new Error("Wallet network changed while reading local transaction state");
+        }
+        return result;
+      }
       if (request.method !== "eth_sendTransaction" || !Array.isArray(request.params)) {
         return rawProvider.request(request);
       }
@@ -104,5 +121,7 @@ export function createWalletProvider(rawProvider: Eip1193Provider): BrowserProvi
       });
     },
   };
-  return new BrowserProvider(provider);
+  // A reset can happen within ethers' normal cache window, even after the
+  // injected wallet's own cached transaction count has been bypassed.
+  return new BrowserProvider(provider, undefined, { cacheTimeout: -1 });
 }
