@@ -67,10 +67,10 @@ export async function ensureZkArtifacts({
   }
   throw new Error(
     `Current ZK artifacts are unavailable or stale (${failure.message}). ` +
-      "Restore the manifest-pinned files with npm run zk:assets:fetch, or explicitly generate " +
-      "a complete artifact set with npm run zk:setup. In the setup checkout, commit the Brotli " +
-      "copies from npm run zk:assets:compress, or publish the files with npm run " +
-      "zk:assets:publish, before fetching them elsewhere. " +
+      "Restore the manifest-pinned files with npm run zk:assets:fetch. For local development, " +
+      "explicitly generate a complete development artifact set with npm run zk:setup:dev; " +
+      "production setup uses npm run zk:setup. Publish the matching files from the setup " +
+      "checkout with npm run zk:assets:publish before fetching them elsewhere. " +
       "Local deployment never regenerates proving keys.",
     { cause: failure },
   );
