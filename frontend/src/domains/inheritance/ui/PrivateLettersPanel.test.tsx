@@ -2,12 +2,12 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { StrictMode, useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { Signer } from "ethers";
+import { keccak256, type Provider, type Signer } from "ethers";
 import type { ShieldedWorkerContext } from "../../../shared/workers/shieldedAssetWorkerTypes";
 import { PrivateLetterPreparationExpiredError } from "../services/privateLetterChain";
 import { PrivateLettersPanel } from "./PrivateLettersPanel";
 
-const mocks = vi.hoisted(() => ({ worker: vi.fn(), submit: vi.fn(), lock: null as null | (() => void), walletChange: null as null | (() => void), walletGeneration: 0 }));
+const mocks = vi.hoisted(() => ({ worker: vi.fn(), submit: vi.fn(), check: vi.fn(), lock: null as null | (() => void), walletChange: null as null | (() => void), walletGeneration: 0 }));
 vi.mock("react-i18next", () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
 vi.mock("../../../shared/workers/shieldedAssetWorkerClient", () => ({
   shieldedAssetWorkerCall: mocks.worker,
@@ -17,7 +17,7 @@ vi.mock("../../wallet", () => ({
   getWalletConnectionGeneration: () => mocks.walletGeneration,
   subscribeWalletConnectionChange: (listener: () => void) => { mocks.walletChange = listener; return () => { mocks.walletChange = null; }; },
 }));
-vi.mock("../services/privateLetterChain", async original => ({ ...await original<typeof import("../services/privateLetterChain")>(), submitPrivateLetter: mocks.submit }));
+vi.mock("../services/privateLetterChain", async original => ({ ...await original<typeof import("../services/privateLetterChain")>(), submitPrivateLetter: mocks.submit, checkPrivateLetter: mocks.check }));
 
 const context: ShieldedWorkerContext = {
   rpcUrl: "http://localhost:8545", chainId: "31337", factoryAddress: "0x1111111111111111111111111111111111111111",
@@ -26,9 +26,11 @@ const context: ShieldedWorkerContext = {
   poolDeploymentBlock: 1, assetKind: "native", lettersAddress: "0x5555555555555555555555555555555555555555",
 };
 const letter = { delivery: { messageId: "7", checkpointId: "1", asOf: "900", deadline: "1200", recipientBinding: "9" }, ciphertext: "0x010203", proof: "0x1234" };
+const expectedRegistration = { messageId: "7", recipientBinding: "9", deadline: "1200", ciphertextHash: keccak256(letter.ciphertext) };
+const provider = {} as Provider;
 type InboxResult = { letters: { messageId: string; body: string; registeredAt: string }[]; unavailable: number };
 const tr = (key: string) => `shielded.privateLetters.${key}`;
-const props = () => ({ mode: "write" as const, context, signer: {} as Signer, disabled: false, recoveryReady: true });
+const props = () => ({ mode: "write" as const, context, provider, signer: {} as Signer, disabled: false, recoveryReady: true });
 function fillLetter() {
   fireEvent.change(screen.getByLabelText(tr("recipientCode")), { target: { value: "receive-code" } });
   fireEvent.change(screen.getByLabelText(tr("body")), { target: { value: "Private letter text" } });
@@ -40,7 +42,7 @@ function InboxPage({ sessionScope = "original", instance = "original" }: { sessi
     <PrivateLettersPanel key={instance} {...props()} mode="inbox" sessionScope={sessionScope} disabled={busy} onBusyChange={setBusy} />
   </>;
 }
-beforeEach(() => { vi.clearAllMocks(); mocks.walletGeneration = 0; mocks.worker.mockReset().mockResolvedValue(letter); mocks.submit.mockReset(); });
+beforeEach(() => { vi.clearAllMocks(); mocks.walletGeneration = 0; mocks.worker.mockReset().mockResolvedValue(letter); mocks.submit.mockReset(); mocks.check.mockReset(); });
 afterEach(cleanup);
 
 describe("private letter composer", () => {
@@ -249,8 +251,8 @@ it("does not call a confirmed but unverified registration sent successfully", as
 });
 
 it("preserves the original message across attempted edits and a read-mode change", async () => {
-  mocks.submit.mockRejectedValueOnce(Object.assign(new Error("receipt unavailable"), { transactionHash: "0xoriginal" }))
-    .mockResolvedValueOnce({ transactionHash: "0xoriginal" });
+  mocks.submit.mockRejectedValueOnce(Object.assign(new Error("receipt unavailable"), { transactionHash: "0xoriginal" }));
+  mocks.check.mockResolvedValueOnce({ state: "confirmed", transactionHash: "0xoriginal" });
   const initial = props();
   const view = render(<PrivateLettersPanel {...initial} />);
   fillLetter();
@@ -268,31 +270,85 @@ it("preserves the original message across attempted edits and a read-mode change
   fireEvent.click(screen.getByRole("button", { name: tr("checkOriginal") }));
   await screen.findByText(/privateLetters.sent.*0xoriginal/);
   expect(mocks.worker).toHaveBeenCalledTimes(1);
-  expect(mocks.submit).toHaveBeenCalledTimes(2);
-  expect(mocks.submit.mock.calls.map(([input]) => input.letter)).toEqual([letter, letter]);
+  expect(mocks.submit).toHaveBeenCalledTimes(1);
+  expect(mocks.check).toHaveBeenCalledExactlyOnceWith({
+    address: context.lettersAddress, provider, chainId: context.chainId,
+    expected: { ...expectedRegistration, state: "unknown", transactionHash: "0xoriginal" },
+    transactionHash: "0xoriginal",
+  });
+  expect(body.value).toBe("");
+  expect(code.value).toBe("");
 });
 
 it("retains a wallet request with an unknown result even before a hash is available", async () => {
   mocks.submit.mockImplementationOnce(async input => {
     input.onWalletRequest()();
     throw Object.assign(new Error("wallet connection lost"), { code: "NETWORK_ERROR" });
-  }).mockRejectedValueOnce(Object.assign(new Error("RPC interrupted"), { code: "NETWORK_ERROR" }));
+  });
+  mocks.check.mockRejectedValueOnce(Object.assign(new Error("RPC interrupted"), { code: "NETWORK_ERROR" }));
   render(<PrivateLettersPanel {...props()} />);
   fillLetter();
   fireEvent.click(screen.getByRole("button", { name: tr("send") }));
   await screen.findByText(tr("confirmationPending"));
   expect(screen.queryByRole("alert")).toBeNull();
   fireEvent.click(screen.getByRole("button", { name: tr("checkOriginal") }));
-  await waitFor(() => expect(mocks.submit).toHaveBeenCalledTimes(2));
+  await waitFor(() => expect(mocks.check).toHaveBeenCalledTimes(1));
   await waitFor(() => expect((screen.getByRole("button", { name: tr("checkOriginal") }) as HTMLButtonElement).disabled).toBe(false));
   expect(screen.getByText(tr("confirmationPending"))).toBeTruthy();
   expect(mocks.worker).toHaveBeenCalledTimes(1);
+  expect(mocks.submit).toHaveBeenCalledTimes(1);
+  expect(mocks.check).toHaveBeenCalledWith(expect.objectContaining({
+    expected: { ...expectedRegistration, state: "unknown", transactionHash: "" },
+    transactionHash: undefined,
+  }));
+  expect((screen.getByLabelText(tr("body")) as HTMLTextAreaElement).disabled).toBe(true);
+  expect((screen.getByLabelText(tr("body")) as HTMLTextAreaElement).value).toBe("Private letter text");
+});
+
+it("keeps a pending original locked and checks it again without another wallet submission", async () => {
+  mocks.submit.mockRejectedValueOnce(Object.assign(new Error("receipt unavailable"), { transactionHash: "0xoriginal" }));
+  mocks.check.mockResolvedValueOnce({ state: "pending" })
+    .mockResolvedValueOnce({ state: "confirmed", transactionHash: "0xreplacement" });
+  render(<PrivateLettersPanel {...props()} />);
+  fillLetter();
+  fireEvent.click(screen.getByRole("button", { name: tr("send") }));
+  await screen.findByText(/confirmationPending.*0xoriginal/);
+  fireEvent.click(screen.getByRole("button", { name: tr("checkOriginal") }));
+  await waitFor(() => expect(mocks.check).toHaveBeenCalledTimes(1));
+  await waitFor(() => expect((screen.getByRole("button", { name: tr("checkOriginal") }) as HTMLButtonElement).disabled).toBe(false));
+  expect(screen.getByText(/confirmationPending.*0xoriginal/)).toBeTruthy();
+  expect((screen.getByLabelText(tr("body")) as HTMLTextAreaElement).disabled).toBe(true);
+  fireEvent.click(screen.getByRole("button", { name: tr("checkOriginal") }));
+  await screen.findByText(/privateLetters.sent.*0xreplacement/);
+  expect(mocks.check.mock.calls.map(([input]) => input.transactionHash)).toEqual(["0xoriginal", "0xoriginal"]);
+  expect(mocks.worker).toHaveBeenCalledTimes(1);
+  expect(mocks.submit).toHaveBeenCalledTimes(1);
+});
+
+it("makes a failed original editable while retaining its draft and receipt", async () => {
+  mocks.submit.mockRejectedValueOnce(Object.assign(new Error("receipt unavailable"), { transactionHash: "0xoriginal" }));
+  mocks.check.mockResolvedValueOnce({ state: "failed", transactionHash: "0xoriginal" });
+  render(<PrivateLettersPanel {...props()} />);
+  fillLetter();
+  fireEvent.click(screen.getByRole("button", { name: tr("send") }));
+  await screen.findByText(/confirmationPending.*0xoriginal/);
+  fireEvent.click(screen.getByRole("button", { name: tr("checkOriginal") }));
+  expect((await screen.findByRole("alert")).textContent).toContain("transaction.failed");
+  expect(screen.getByText(/transaction.failed.*0xoriginal/)).toBeTruthy();
+  expect(screen.queryByRole("button", { name: tr("checkOriginal") })).toBeNull();
+  expect((screen.getByRole("button", { name: tr("send") }) as HTMLButtonElement).disabled).toBe(false);
+  expect((screen.getByLabelText(tr("recipientCode")) as HTMLTextAreaElement).value).toBe("receive-code");
+  expect((screen.getByLabelText(tr("body")) as HTMLTextAreaElement).value).toBe("Private letter text");
+  expect((screen.getByLabelText(tr("body")) as HTMLTextAreaElement).disabled).toBe(false);
+  expect(mocks.worker).toHaveBeenCalledTimes(1);
+  expect(mocks.submit).toHaveBeenCalledTimes(1);
+  expect(mocks.check).toHaveBeenCalledTimes(1);
 });
 
 it("starts another draft in one click while retaining the original message for idempotent checks", async () => {
   mocks.submit.mockRejectedValueOnce(Object.assign(new Error("RPC unavailable"), { transactionHash: "0xoriginal" }))
-    .mockResolvedValueOnce({ transactionHash: "0xoriginal" })
     .mockResolvedValueOnce({ transactionHash: "0xnew" });
+  mocks.check.mockResolvedValueOnce({ state: "confirmed", transactionHash: "0xoriginal" });
   render(<PrivateLettersPanel {...props()} />);
   fillLetter();
   fireEvent.click(screen.getByRole("button", { name: tr("send") }));
@@ -306,7 +362,11 @@ it("starts another draft in one click while retaining the original message for i
   fireEvent.click(screen.getByRole("button", { name: tr("checkOriginal") }));
   await screen.findByText(/privateLetters.sent.*0xoriginal/);
   expect(mocks.worker).toHaveBeenCalledTimes(1);
-  expect(mocks.submit.mock.calls[1][0].letter).toBe(letter);
+  expect(mocks.submit).toHaveBeenCalledTimes(1);
+  expect(mocks.check).toHaveBeenCalledWith(expect.objectContaining({
+    expected: { ...expectedRegistration, state: "unknown", transactionHash: "0xoriginal" },
+    transactionHash: "0xoriginal",
+  }));
   expect((screen.getByLabelText(tr("recipientCode")) as HTMLTextAreaElement).value).toBe("new-code");
   expect((screen.getByLabelText(tr("body")) as HTMLTextAreaElement).value).toBe("New unsent draft");
   const nextLetter = { ...letter, delivery: { ...letter.delivery, messageId: "8" } };
@@ -314,7 +374,7 @@ it("starts another draft in one click while retaining the original message for i
   fireEvent.click(screen.getByRole("button", { name: tr("send") }));
   await screen.findByText(/privateLetters.sent.*0xnew/);
   expect(mocks.worker).toHaveBeenCalledTimes(2);
-  expect(mocks.submit.mock.calls.map(([input]) => input.letter.delivery.messageId)).toEqual(["7", "7", "8"]);
+  expect(mocks.submit.mock.calls.map(([input]) => input.letter.delivery.messageId)).toEqual(["7", "8"]);
   expect(screen.getByText(/privateLetters.sent.*0xoriginal/)).toBeTruthy();
 });
 

@@ -590,7 +590,9 @@ export function ShieldedInheritancePanel({
     }
   }
   const selectedCandidates = manualValueSelection ? candidates : values.map((note) => note.commitment);
-  const actionRequestKey = JSON.stringify([
+  // A submitted payment still belongs to this draft after recovery replaces its
+  // notes, templates and claim handles. Preparation also checks that live state.
+  const completionRequestKey = JSON.stringify([
     contextKey,
     session.credentials?.handle,
     session.identity?.handle,
@@ -600,22 +602,28 @@ export function ShieldedInheritancePanel({
     selectedKeyFingerprint,
     amount,
     manualValueSelection,
-    selectedCandidates,
     code,
-    effectiveEntry,
-    template?.handle,
-    template?.ownerCommitment,
+    entry,
     rootVersion,
     periodDays,
     periods,
     policyHandle,
     personHash,
-    claimHandle,
-    claimPeriods,
     withdrawalRecipient,
     recipientConfirmed,
     verifiedRecipient?.fingerprint,
     recipientInputMethod,
+  ]);
+  const currentCompletionRequestKey = useRef(completionRequestKey);
+  currentCompletionRequestKey.current = completionRequestKey;
+  const actionRequestKey = JSON.stringify([
+    completionRequestKey,
+    selectedCandidates,
+    effectiveEntry,
+    template?.handle,
+    template?.ownerCommitment,
+    claimHandle,
+    claimPeriods,
   ]);
   const currentRequestKey = useRef(actionRequestKey);
   currentRequestKey.current = actionRequestKey;
@@ -1791,7 +1799,7 @@ export function ShieldedInheritancePanel({
   function completePayment(id: string, hash: string) {
     const completed = paymentCompletion.current;
     if (!completed || completed.id !== id || !mounted.current ||
-      completed.requestKey !== currentRequestKey.current ||
+      completed.requestKey !== currentCompletionRequestKey.current ||
       completed.generation !== getShieldedAssetWorkerGeneration() ||
       completed.walletGeneration !== getWalletConnectionGeneration() ||
       completed.signer !== walletRef.current.signer || completed.account !== walletRef.current.account) return;
@@ -1981,7 +1989,7 @@ export function ShieldedInheritancePanel({
             outputCommitments: result.data.outputCommitments.map((value) => getBigInt(value).toString()),
           }, chosen.provider!);
           if (planned.steps.length <= 1) paymentCompletion.current = {
-            id: txId, requestKey: requested, generation, action,
+            id: txId, requestKey: completionRequestKey, generation, action,
             amount: result.amount, symbol: displayAssetSymbol, decimals: modules.tokenDecimals ?? 0,
             walletGeneration: getWalletConnectionGeneration(), signer: chosen, account,
           };
@@ -2628,11 +2636,15 @@ export function ShieldedInheritancePanel({
         independentKeyReady={independentKeyReady && independentKeySelectionMatches}
         claimHandle={claimHandle}
         onClaimChange={(handle) => {
+          paymentCompletion.current = null;
           setClaimHandle(handle);
           setClaimPeriods(claims.find((claim) => claim.handle === handle)?.periodIndices ?? []);
         }}
         claimPeriods={claimPeriods}
-        onClaimPeriodsChange={setClaimPeriods}
+        onClaimPeriodsChange={(indices) => {
+          paymentCompletion.current = null;
+          setClaimPeriods(indices);
+        }}
       />
     );
     receipt = (
@@ -2737,7 +2749,10 @@ export function ShieldedInheritancePanel({
         selectedCommitments={selectedCandidates}
         automaticSelection={!manualValueSelection}
         onAutomaticSelectionChange={(automatic) => { setManualValueSelection(!automatic); setCandidates([]); }}
-        onSelectedCommitmentsChange={setCandidates}
+        onSelectedCommitmentsChange={(commitments) => {
+          paymentCompletion.current = null;
+          setCandidates(commitments);
+        }}
       />
     );
     const notices = (

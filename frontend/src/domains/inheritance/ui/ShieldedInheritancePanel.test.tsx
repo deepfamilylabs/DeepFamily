@@ -3830,11 +3830,18 @@ describe("Worker-backed shielded wallet", () => {
     ["unshield", "failure after merge"],
     ["privateTransfer", "final result unknown"],
     ["unshield", "final result unknown"],
+    ["privateTransfer", "final result unknown with automatic selection"],
+    ["unshield", "final result unknown with automatic selection"],
+    ["privateTransfer", "final result unknown after amount edit"],
+    ["unshield", "final result unknown after amount edit"],
     ["privateTransfer", "late merge confirmation"],
     ["privateTransfer", "stop while rebuilding"],
   ] as const)(
     "handles %s consolidation when the receipt completes after %s",
     async (action, sessionChange) => {
+      const finalResultUnknown = sessionChange.startsWith("final result unknown");
+      const automaticSelection = sessionChange === "final result unknown with automatic selection";
+      const changedPendingAmount = sessionChange === "final result unknown after amount edit";
       const commitments = Array.from({ length: 9 }, (_, index) => String(index + 11));
       mocks.verify.mockResolvedValue({ purpose: "receive", personHash: identity.personHash, keyMode: 0, fingerprint: "recipient-fingerprint" });
       let previews = 0;
@@ -3842,9 +3849,14 @@ describe("Worker-backed shielded wallet", () => {
       mocks.call.mockImplementation(async (method, params) => {
         if (method === "recover") return {
           ...emptyWallet,
-          notes: commitments.map((commitment) => ({
-            commitment, ownerCommitment: "1", slot: "identity", kind: "value", amount: "1000000000000000000",
-          })),
+          notes: finalResultUnknown && previews > 1
+            ? [
+                { commitment: "200", ownerCommitment: "1", slot: "identity", kind: "value", amount: "8000000000000000000" },
+                { commitment: commitments[8], ownerCommitment: "1", slot: "identity", kind: "value", amount: "1000000000000000000" },
+              ]
+            : commitments.map((commitment) => ({
+                commitment, ownerCommitment: "1", slot: "identity", kind: "value", amount: "1000000000000000000",
+              })),
         };
         if (method === "prove") return previews === 1
           ? { action: "privateTransfer", data: { outputCommitments: [200n, 201n] }, proof: {} }
@@ -3875,7 +3887,7 @@ describe("Worker-backed shielded wallet", () => {
       let releaseFirst!: () => void;
       let releaseSecond!: () => void;
       let finishLateMerge!: (receipt: unknown) => void;
-      if (sessionChange === "late merge confirmation") {
+      if (sessionChange === "late merge confirmation" || finalResultUnknown) {
         mocks.receipt.mockImplementation(() => new Promise((resolve) => { finishLateMerge = resolve; }));
       }
       mocks.submit
@@ -3893,7 +3905,7 @@ describe("Worker-backed shielded wallet", () => {
         })
         .mockImplementation(async (input) => {
           if (sessionChange === "failure after merge") throw new Error("next transaction rejected");
-          if (sessionChange === "final result unknown") {
+          if (finalResultUnknown) {
             input.onSubmitting({ nonce: 7, fromBlock: 30, signerAddress: address });
             input.onBroadcast("0xpaymentpending");
             throw new Error("final receipt unavailable");
@@ -3904,10 +3916,14 @@ describe("Worker-backed shielded wallet", () => {
       const rendered = await renderUnlockedPanel();
       chooseAction(action);
       fireEvent.change(screen.getByLabelText(action === "privateTransfer" ? "shielded.fields.transferAmount" : "shielded.fields.amount"), { target: { value: "8.5" } });
-      for (const commitment of commitments) selectValue(commitment);
-      expect(screen.getAllByRole("checkbox", { name: "shielded.valueOption" })).toHaveLength(9);
-      expect(screen.getAllByRole("checkbox", { name: "shielded.valueOption" }).every((input) => (input as HTMLInputElement).checked)).toBe(true);
-      expect(screen.getByText(label("valueCandidatesHint"))).toBeTruthy();
+      if (automaticSelection) {
+        expect(screen.queryByRole("checkbox", { name: "shielded.valueOption" })).toBeNull();
+      } else {
+        for (const commitment of commitments) selectValue(commitment);
+        expect(screen.getAllByRole("checkbox", { name: "shielded.valueOption" })).toHaveLength(9);
+        expect(screen.getAllByRole("checkbox", { name: "shielded.valueOption" }).every((input) => (input as HTMLInputElement).checked)).toBe(true);
+        expect(screen.getByText(label("valueCandidatesHint"))).toBeTruthy();
+      }
       if (action === "privateTransfer") {
         fireEvent.change(screen.getByLabelText("shielded.receiveCodeInputLabel"), { target: { value: "recipient-code" } });
         await waitFor(() => expect(mocks.verify).toHaveBeenCalled());
@@ -3990,7 +4006,7 @@ describe("Worker-backed shielded wallet", () => {
         expect(screen.getByText(sentTransaction.transactionHash)).toBeTruthy();
         return;
       }
-      if (sessionChange === "final result unknown") {
+      if (finalResultUnknown) {
         await waitUntilIdle();
         expect(mocks.submit).toHaveBeenCalledTimes(2);
         expect(screen.getByText(/shielded\.walletKeys\.paymentPending/)).toBeTruthy();
@@ -3999,6 +4015,34 @@ describe("Worker-backed shielded wallet", () => {
         expect(screen.queryByRole("status", { name: "transaction.success" })).toBeNull();
         expect((screen.getByRole("button", { name: submitLabel }) as HTMLButtonElement).disabled).toBe(true);
         expect((screen.getByLabelText(paymentAmountLabel) as HTMLInputElement).value).toBe("8.5");
+        await waitFor(() => expect(finishLateMerge).toBeTypeOf("function"));
+        // A queued edit belongs to a newer draft even while its field is disabled.
+        if (changedPendingAmount)
+          fireEvent.change(screen.getByLabelText(paymentAmountLabel), { target: { value: "9" } });
+        mocks.receipt.mockResolvedValue({ status: 1 });
+        await act(async () => finishLateMerge({ status: 1 }));
+        if (changedPendingAmount) {
+          await waitFor(() => expect(screen.queryByText(/0xpaymentpending.*transaction\.success$/)).toBeTruthy());
+          await waitUntilIdle();
+          expect(screen.queryByRole("status", { name: "transaction.success" })).toBeNull();
+          expect(screen.queryByRole("button", { name: label("startNewPayment") })).toBeNull();
+          expect((screen.getByLabelText(paymentAmountLabel) as HTMLInputElement).value).toBe("9");
+          expect(mocks.submit).toHaveBeenCalledTimes(2);
+          return;
+        }
+        const completed = await screen.findByRole("status", { name: "transaction.success" });
+        expect(within(completed).getByText("8.5 CFX")).toBeTruthy();
+        expect(within(completed).getByTitle("0xpaymentpending")).toBeTruthy();
+        expect(screen.queryByLabelText(paymentAmountLabel)).toBeNull();
+        expect(screen.queryByRole("button", { name: submitLabel })).toBeNull();
+        await waitUntilIdle();
+        await startNewPayment();
+        expect((screen.getByLabelText(paymentAmountLabel) as HTMLInputElement).value).toBe("");
+        const nextSubmit = screen.getByRole("button", { name: submitLabel }) as HTMLButtonElement;
+        expect(nextSubmit.disabled).toBe(true);
+        fireEvent.click(nextSubmit);
+        expect(mocks.submit).toHaveBeenCalledTimes(2);
+        expect(mocks.call.mock.calls.filter(([method]) => method === "preview")).toHaveLength(2);
         return;
       }
       if (sessionChange === "changed plan") {
@@ -4620,8 +4664,11 @@ describe("Worker-backed shielded wallet", () => {
     },
   );
 
-  it("keeps claim periods unselected after success and repeated refreshes until the user selects again", async () => {
+  it.each(["immediate", "after balance refresh"] as const)("keeps claim periods unselected after %s confirmation and repeated refreshes until the user selects again", async (confirmation) => {
     let claimed = false;
+    let finishReceipt!: (receipt: unknown) => void;
+    if (confirmation === "after balance refresh")
+      mocks.receipt.mockImplementation(() => new Promise((resolve) => { finishReceipt = resolve; }));
     mocks.call.mockImplementation(async (method, params) => {
       if (method === "recover") return {
         ...emptyWallet,
@@ -4647,8 +4694,13 @@ describe("Worker-backed shielded wallet", () => {
         outputAmounts: ["2000000000000000000", "0"],
       };
     });
-    mocks.submit.mockImplementation(async () => {
+    mocks.submit.mockImplementation(async (input) => {
       claimed = true;
+      if (confirmation === "after balance refresh") {
+        input.onSubmitting({ nonce: 7, fromBlock: 30, signerAddress: address });
+        input.onBroadcast(sentTransaction.transactionHash);
+        throw new Error("claim receipt unavailable");
+      }
       return sentTransaction;
     });
     await renderUnlockedPanel();
@@ -4657,6 +4709,21 @@ describe("Worker-backed shielded wallet", () => {
     fireEvent.click(screen.getByRole("button", { name: submitLabel }));
     await waitFor(() => expect(mocks.submit).toHaveBeenCalledTimes(1));
     await waitUntilIdle();
+    if (confirmation === "after balance refresh") {
+      const scans = recoverCount();
+      refreshAssets();
+      await waitFor(() => expect(recoverCount()).toBeGreaterThan(scans));
+      await waitUntilIdle();
+      // Recovery has replaced both the original budget and its claim handle.
+      expect(screen.getByRole("checkbox", { name: "shielded.claimPeriodOption:3" })).toBeTruthy();
+      await waitFor(() => expect(finishReceipt).toBeTypeOf("function"));
+      mocks.receipt.mockResolvedValue({ status: 1 });
+      await act(async () => finishReceipt({ status: 1 }));
+      const completed = await screen.findByRole("status", { name: "transaction.success" });
+      expect(within(completed).getByText("2 CFX")).toBeTruthy();
+      expect(within(completed).getByTitle(sentTransaction.transactionHash)).toBeTruthy();
+      await waitUntilIdle();
+    }
     expect(screen.queryByRole("checkbox", { name: /^shielded\.claimPeriodOption:/ })).toBeNull();
     expect(screen.queryByRole("button", { name: submitLabel })).toBeNull();
     for (let scan = 0; scan < 2; scan++) {
@@ -4714,6 +4781,8 @@ describe("Worker-backed shielded wallet", () => {
     await waitUntilIdle();
     expect((screen.getByLabelText("shielded.fields.amount") as HTMLInputElement).value).toBe("1");
     expect(screen.queryByRole("status", { name: /^transaction\.center/ })).toBeNull();
+    expect(screen.queryByRole("status", { name: "transaction.success" })).toBeNull();
+    expect(screen.queryByRole("button", { name: label("startNewPayment") })).toBeNull();
   });
   it.each(["preview", "prove"] as const)(
     "cancels %s on a connection event and preserves a newer local key operation",
@@ -5236,6 +5305,8 @@ describe("Worker-backed shielded wallet", () => {
     expect(document.querySelector<HTMLInputElement>('input[value="200"]')?.checked).toBe(true);
     expect(recoverCount()).toBe(scansBeforeReceipt);
     expect(mocks.identity.handle).toBe("identity:2");
+    expect(screen.queryByRole("status", { name: "transaction.success" })).toBeNull();
+    expect(screen.queryByRole("button", { name: label("startNewPayment") })).toBeNull();
     expect(mocks.submit).not.toHaveBeenCalled();
   });
   it.each([
