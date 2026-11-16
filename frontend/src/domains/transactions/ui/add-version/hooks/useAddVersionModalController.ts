@@ -107,7 +107,8 @@ export function useAddVersionModalController({
   initialPersonData,
 }: UseAddVersionModalControllerArgs) {
   const { t } = useTranslation();
-  const { signer } = useWallet();
+  const { signer, rawProvider, connectedWalletId, connectWithProvider, isConnecting,
+    ensureTransactionAuthorization } = useWallet();
   const { rpcUrl, chainId, contractAddress, readerAddress } = useConfig();
   const { isContractReady } = useContractClient();
   const toast = useToast();
@@ -240,7 +241,7 @@ export function useAddVersionModalController({
     (motherPresent && motherVersionLookup.status === "loading");
   const allConsentsChecked = areAddVersionConsentsSatisfied(consents);
   const isTransactionSubmitting =
-    addVersionStatus === "validating" || addVersionStatus === "confirming";
+    addVersionStatus === "validating" || addVersionStatus === "submitting" || addVersionStatus === "confirming";
   const isSubmitting = isSubmittingState || isTransactionSubmitting;
   const timelineStep = useTimelineProgress(
     ADD_VERSION_TIMELINE_STEPS,
@@ -489,6 +490,7 @@ export function useAddVersionModalController({
   const submitAddVersion = useAddVersionSubmit({
     t,
     signer,
+    ensureTransactionAuthorization,
     isContractReady,
     rpcUrl,
     chainId,
@@ -617,7 +619,9 @@ export function useAddVersionModalController({
         steps: [
           {
             id: "identity",
-            label: t("transaction.stepIdentity", "Derive identity material"),
+            label: commitmentProof.proofStep === "authorizing"
+              ? t("wallet.authorizing", "Confirm wallet authorization")
+              : t("transaction.stepIdentity", "Derive identity material"),
           },
           {
             id: "proof",
@@ -642,7 +646,11 @@ export function useAddVersionModalController({
                     "transaction.stepReviewDetail",
                     "Waiting for you to confirm and open your wallet",
                   )
-                : t("transaction.stepEstimating", "Estimating the transaction fee…"),
+                : phase === "failed"
+                  ? undefined
+                  : addVersionStatus === "submitting"
+                    ? t("wallet.confirmTransaction", "Confirm the transaction in your wallet")
+                    : t("transaction.stepEstimating", "Estimating the transaction fee…"),
           },
           {
             id: "confirm",
@@ -653,11 +661,15 @@ export function useAddVersionModalController({
         failed: phase === "failed" && !errorResult?.transactionConfirmed,
         complete: phase === "done" || errorResult?.transactionConfirmed === true,
         // This step stops for the user; it must not look like work in progress.
-        awaiting: phase === "review",
+        awaiting: phase === "review" || addVersionStatus === "submitting" || commitmentProof.proofStep === "authorizing",
       }),
       transactionPreview,
       successResult,
       errorResult,
+      isWalletConnecting: isConnecting,
+      onWalletReauthorize: rawProvider && connectedWalletId === "metamask"
+        ? () => { void connectWithProvider(rawProvider, connectedWalletId, { requestPermissions: true }); }
+        : undefined,
     },
     footer: {
       phase,

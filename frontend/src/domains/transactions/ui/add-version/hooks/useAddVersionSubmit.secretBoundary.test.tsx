@@ -381,6 +381,7 @@ describe("AddVersion secret-state boundary", () => {
 
       const { result, unmount } = renderHook(() =>
         useAddVersionSubmit({
+          ensureTransactionAuthorization: async () => {},
           t: ((_key: string, fallback?: string) => fallback ?? _key) as any,
           signer,
           isContractReady: true,
@@ -537,6 +538,7 @@ describe("AddVersion secret-state boundary", () => {
     const capturedSettlement = vi.fn();
     const { result } = renderHook(() =>
       useAddVersionSubmit({
+          ensureTransactionAuthorization: async () => {},
         t: ((_key: string, fallback?: string) => fallback ?? _key) as any,
         signer: { getAddress: vi.fn(async () => SUBMITTER) } as any,
         isContractReady: true,
@@ -684,6 +686,7 @@ describe("AddVersion secret-state boundary", () => {
 
       const { result } = renderHook(() =>
         useAddVersionSubmit({
+          ensureTransactionAuthorization: async () => {},
           t: ((_key: string, fallback?: string) => fallback ?? _key) as any,
           signer,
           isContractReady: true,
@@ -812,6 +815,7 @@ describe("AddVersion secret-state boundary", () => {
 
     const { result, rerender } = renderHook(() =>
       useAddVersionSubmit({
+          ensureTransactionAuthorization: async () => {},
         t: ((_key: string, fallback?: string) => fallback ?? _key) as any,
         signer,
         isContractReady: true,

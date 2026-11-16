@@ -53,6 +53,7 @@ import type {
 interface UseAddVersionSubmitArgs {
   t: AddVersionT;
   signer?: ethers.Signer | null;
+  ensureTransactionAuthorization: (account: string, chainId: number, assertActive?: () => void) => Promise<void>;
   isContractReady: boolean;
   rpcUrl: string;
   chainId: number;
@@ -235,6 +236,7 @@ function sameHex(left: string | undefined, right: string | undefined): boolean {
 export function useAddVersionSubmit({
   t,
   signer,
+  ensureTransactionAuthorization,
   isContractReady,
   rpcUrl,
   chainId,
@@ -343,7 +345,7 @@ export function useAddVersionSubmit({
       setSuccessResult(null);
       setErrorResult(null);
       setIsSubmitting(true);
-      setProofStep("preparing");
+      setProofStep(submissionPackageRef.current ? "handoff" : "authorizing");
 
       let rawPassphrase = "";
       let personIdentity: IdentityMaterial | null = null;
@@ -497,8 +499,18 @@ export function useAddVersionSubmit({
           submitterAddress,
         });
 
+        // Finish wallet permission prompts before deriving secrets or building
+        // a proof bound to the submitter. Restored MetaMask sessions renew once.
+        await ensureTransactionAuthorization(submitterAddress, chainId, assertCurrentAttempt);
+        assertCurrentAttempt();
+        const current = latestRuntimeScopeRef.current;
+        if (!current.signer) throw addVersionScopeChangedError();
+        await assertAddVersionTransactionScope({ expected: scope, ...current, signer: current.signer });
+        assertCurrentAttempt();
+
         // Application-level KDF concurrency is deliberately one: each awaited
         // identity job finishes before the next role is sent to the worker.
+        setProofStep("preparing");
         cryptoWorkStarted = true;
         personIdentity = await resolveIdentityMaterial(personCalcRef.current);
         assertCurrentAttempt();
@@ -546,7 +558,7 @@ export function useAddVersionSubmit({
 
         // This public commitment preflight happens before compression, Groth16,
         // or file encryption so random re-encryption cannot waste proof work.
-        await assertNewPersonVersion({ contractAddress: scope.contractAddress, runner: signer,
+        await assertNewPersonVersion({ contractAddress: scope.contractAddress, runner: getReadonlyProvider(rpcUrl, chainId),
           personHash: personIdentity.personHash, versionHash });
         assertCurrentAttempt();
 
@@ -788,6 +800,7 @@ export function useAddVersionSubmit({
       setSuccessResult,
       settleTransaction,
       signer,
+      ensureTransactionAuthorization,
       submissionPackageRef,
       submissionAttemptRef,
       t,

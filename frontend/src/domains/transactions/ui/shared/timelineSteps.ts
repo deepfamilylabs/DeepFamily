@@ -45,7 +45,7 @@ export function addVersionTimelineStep(input: TimelineSignals): string | null {
   if (input.status === "confirming") return "confirm";
   if (input.proofStep === "encrypting") return "encrypt";
   if (input.proofStep === "generating" || input.proofStep === "verifying") return "proof";
-  if (input.proofStep === "preparing") return "identity";
+  if (input.proofStep === "authorizing" || input.proofStep === "preparing") return "identity";
   // Includes the "handoff" step, which names the moment the submit hook passes
   // the frozen package on — not the moment the transaction leaves.
   if (input.isBusy) return "review";

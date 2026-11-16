@@ -5,12 +5,17 @@ import { useAddVersionFlow } from "./useAddVersionFlow";
 
 const mocks = vi.hoisted(() => ({
   wallet: {
+    ensureTransactionAuthorization: vi.fn(async () => {}),
     signer: {
       id: "signer",
       getAddress: vi.fn(async () => "0x00000000000000000000000000000000000000aa"),
-      provider: { send: vi.fn(async () => "0x7b") },
+      provider: {
+        send: vi.fn(async (method: string) =>
+          method === "eth_accounts" ? ["0x00000000000000000000000000000000000000aa"] : "0x7b",
+        ),
+      },
     },
-  } as { signer: any },
+  } as { signer: any; ensureTransactionAuthorization: ReturnType<typeof vi.fn> },
   config: {
     rpcUrl: "https://rpc.example",
     chainId: 123,
@@ -67,10 +72,15 @@ const flowArgs = {
 
 describe("useAddVersionFlow", () => {
   beforeEach(() => {
+    mocks.wallet.ensureTransactionAuthorization.mockReset().mockResolvedValue(undefined);
     mocks.wallet.signer = {
       id: "signer",
       getAddress: vi.fn(async () => "0x00000000000000000000000000000000000000aa"),
-      provider: { send: vi.fn(async () => "0x7b") },
+      provider: {
+        send: vi.fn(async (method: string) =>
+          method === "eth_accounts" ? ["0x00000000000000000000000000000000000000aa"] : "0x7b",
+        ),
+      },
     };
     mocks.config.rpcUrl = "https://rpc.example";
     mocks.config.chainId = 123;
@@ -170,6 +180,114 @@ describe("useAddVersionFlow", () => {
     );
   });
 
+  it("ensures transaction permission before estimation and only reads accounts at send", async () => {
+    let authorized = false;
+    const sendTransaction = vi.fn();
+    const account = await mocks.wallet.signer.getAddress();
+    mocks.wallet.ensureTransactionAuthorization.mockImplementation(async () => { authorized = true; });
+    mocks.wallet.signer.provider.send.mockImplementation(async (method: string) =>
+      method === "eth_accounts" ? [account] : "0x7b",
+    );
+    mocks.executeAddVersionFlow.mockImplementation(async (params) => {
+      // MetaMask would otherwise reject the preparation or send with 4100,
+      // even though getAddress() still returns the cached connected account.
+      expect(authorized).toBe(true);
+      await params.assertWalletScope();
+      expect(authorized).toBe(true);
+      sendTransaction();
+      return { transactionHash: "0xtx" };
+    });
+    const { result } = renderHook(() => useAddVersionFlow());
+    await act(async () => {
+      await expect(result.current.runOrThrow(flowArgs)).resolves.toMatchObject({ transactionHash: "0xtx" });
+    });
+    expect(sendTransaction).toHaveBeenCalledOnce();
+    expect(mocks.wallet.ensureTransactionAuthorization).toHaveBeenCalledOnce();
+    expect(mocks.wallet.signer.provider.send.mock.calls.filter(
+      ([method]: [string]) => method === "eth_accounts",
+    )).toHaveLength(2);
+  });
+
+  it.each(["empty", "different account", "rejected"])(
+    "stops before estimation when authorization returns %s",
+    async (response) => {
+      mocks.wallet.signer.provider.send.mockImplementation(async (method: string) => {
+        if (method !== "eth_accounts") return "0x7b";
+        if (response === "rejected") throw Object.assign(new Error("User rejected authorization"), { code: 4001 });
+        return response === "empty" ? [] : ["0x00000000000000000000000000000000000000bb"];
+      });
+      const { result } = renderHook(() => useAddVersionFlow());
+      await act(async () => {
+        await expect(result.current.runOrThrow(flowArgs)).rejects.toMatchObject({
+          code: response === "empty" ? 4100 : response === "rejected" ? 4001 : "ADD_VERSION_SCOPE_CHANGED",
+        });
+      });
+      expect(mocks.executeAddVersionFlow).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(["reset", "unmount"] as const)(
+    "stops after a pending authorization when cancelled by %s",
+    async (cancel) => {
+      let resolveAuthorization!: (accounts: string[]) => void;
+      mocks.wallet.signer.provider.send.mockImplementation(async (method: string) => {
+        if (method !== "eth_accounts") return "0x7b";
+        return new Promise<string[]>((resolve) => { resolveAuthorization = resolve; });
+      });
+      const hook = renderHook(() => useAddVersionFlow());
+      let pending!: Promise<unknown>;
+      act(() => { pending = hook.result.current.runOrThrow(flowArgs); });
+      await vi.waitFor(() => expect(resolveAuthorization).toBeTypeOf("function"));
+      act(() => {
+        if (cancel === "reset") hook.result.current.reset();
+        else hook.unmount();
+      });
+      await act(async () => {
+        resolveAuthorization(["0x00000000000000000000000000000000000000aa"]);
+        await expect(pending).rejects.toMatchObject({ code: "ADD_VERSION_PREVIEW_REJECTED" });
+      });
+      expect(mocks.executeAddVersionFlow).not.toHaveBeenCalled();
+    },
+  );
+
+  it("does not retry a transaction rejected with 4100 after authorization", async () => {
+    const sendTransaction = vi.fn(async () => {
+      throw Object.assign(new Error("Unauthorized transaction"), { code: 4100 });
+    });
+    mocks.executeAddVersionFlow.mockImplementation(async (params) => {
+      await params.assertWalletScope();
+      return sendTransaction();
+    });
+    const { result } = renderHook(() => useAddVersionFlow());
+    await act(async () => {
+      await expect(result.current.runOrThrow(flowArgs)).rejects.toMatchObject({ code: 4100 });
+    });
+    expect(sendTransaction).toHaveBeenCalledOnce();
+    expect(result.current.error).toMatchObject({ type: "WALLET_UNAUTHORIZED" });
+  });
+
+  it("blocks a different authorized account at the final send boundary", async () => {
+    let authorizations = 0;
+    const sendTransaction = vi.fn();
+    mocks.wallet.signer.provider.send.mockImplementation(async (method: string) => {
+      if (method !== "eth_accounts") return "0x7b";
+      authorizations += 1;
+      return [authorizations === 1
+        ? "0x00000000000000000000000000000000000000aa"
+        : "0x00000000000000000000000000000000000000bb"];
+    });
+    mocks.executeAddVersionFlow.mockImplementation(async (params) => {
+      await params.assertWalletScope();
+      sendTransaction();
+      return {};
+    });
+    const { result } = renderHook(() => useAddVersionFlow());
+    await act(async () => {
+      await expect(result.current.runOrThrow(flowArgs)).rejects.toMatchObject({ code: "ADD_VERSION_SCOPE_CHANGED" });
+    });
+    expect(sendTransaction).not.toHaveBeenCalled();
+  });
+
   it("shows the shared local nonce guidance when the wallet rejects a send", async () => {
     const error = Object.assign(new Error("could not coalesce error"), {
       code: "UNKNOWN_ERROR",
@@ -225,6 +343,10 @@ describe("useAddVersionFlow", () => {
       await expect(result.current.runOrThrow(flowArgs)).resolves.toBe(serviceResult);
     });
 
+    expect(mocks.wallet.signer.provider.send.mock.calls.filter(
+      ([method]: [string]) => method === "eth_accounts",
+    )).toHaveLength(1);
+    expect(mocks.wallet.ensureTransactionAuthorization).toHaveBeenCalledOnce();
     expect(mocks.executeAddVersionFlow).toHaveBeenCalledTimes(2);
     const first = mocks.executeAddVersionFlow.mock.calls[0][0];
     const second = mocks.executeAddVersionFlow.mock.calls[1][0];
@@ -437,14 +559,19 @@ describe("useAddVersionFlow", () => {
 
   it("stops before sending when reset occurs during the final wallet scope RPC", async () => {
     let resolveWalletChain!: (value: string) => void;
-    mocks.wallet.signer.provider.send.mockResolvedValueOnce("0x7b").mockImplementationOnce(
-      () =>
-        new Promise<string>((resolve) => {
+    let submitting = false;
+    mocks.wallet.signer.provider.send.mockImplementation(async (method: string) => {
+      if (method === "eth_accounts") return ["0x00000000000000000000000000000000000000aa"];
+      if (submitting) {
+        return new Promise<string>((resolve) => {
           resolveWalletChain = resolve;
-        }),
-    );
+        });
+      }
+      return "0x7b";
+    });
     const walletRequest = vi.fn();
     mocks.executeAddVersionFlow.mockImplementation(async (params) => {
+      submitting = true;
       await params.assertWalletScope();
       walletRequest();
       return {};
@@ -454,7 +581,7 @@ describe("useAddVersionFlow", () => {
     act(() => {
       pending = result.current.runOrThrow(flowArgs);
     });
-    await vi.waitFor(() => expect(mocks.wallet.signer.provider.send).toHaveBeenCalledTimes(2));
+    await vi.waitFor(() => expect(resolveWalletChain).toBeTypeOf("function"));
     act(() => result.current.reset());
     await act(async () => {
       resolveWalletChain("0x7b");
@@ -577,7 +704,11 @@ describe("useAddVersionFlow", () => {
     mocks.wallet.signer = {
       id: "signer",
       getAddress: vi.fn(async () => "0x00000000000000000000000000000000000000aa"),
-      provider: { send: vi.fn(async () => "0x7b") },
+      provider: {
+        send: vi.fn(async (method: string) =>
+          method === "eth_accounts" ? ["0x00000000000000000000000000000000000000aa"] : "0x7b",
+        ),
+      },
     };
     mocks.config.contractAddress = "";
 

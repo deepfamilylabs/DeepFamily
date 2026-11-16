@@ -6,6 +6,7 @@ import { getAddChainParams } from "../../../shared/config";
 import { normalizeFriendlyError, sanitizeErrorForLogging } from "../../../shared/lib/errors";
 import { SUPPORTED_WALLETS } from "../config/wallets";
 import { createWalletProvider } from "../services/walletProvider";
+import { createWalletAuthorization } from "../services/walletAuthorization";
 import {
   getWalletConnectionGeneration,
   invalidateWalletConnection,
@@ -35,7 +36,12 @@ export interface WalletOption {
 
 interface WalletContextValue extends WalletState {
   connect: () => Promise<void>;
-  connectWithProvider: (provider: any, walletId?: string) => Promise<void>;
+  connectWithProvider: (
+    provider: any,
+    walletId?: string,
+    options?: { requestPermissions?: boolean },
+  ) => Promise<void>;
+  ensureTransactionAuthorization: (account: string, chainId: number, assertActive?: () => void) => Promise<void>;
   disconnect: () => void;
   switchChain: (chainId: number) => Promise<void>;
   switchOrAddChain: (chainId: number) => Promise<boolean>;
@@ -100,6 +106,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   walletStateRef.current = walletState;
   const activeRawProviderRef = useRef<any | null>(null);
   const mountedRef = useRef(true);
+  const [authorization] = useState(createWalletAuthorization);
   const connectionIsCurrent = useCallback(
     (rawProvider: any, generation: number) =>
       mountedRef.current &&
@@ -107,6 +114,29 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       getWalletConnectionGeneration() === generation,
     [],
   );
+  const ensureTransactionAuthorization = useCallback(async (account: string, chainId: number, assertActive?: () => void) => {
+    assertActive?.();
+    const { rawProvider, connectedWalletId } = walletStateRef.current;
+    if (!rawProvider) {
+      throw Object.assign(new Error("Wallet provider is unavailable"), { code: "CHAIN_WALLET_UNAVAILABLE" });
+    }
+    const generation = getWalletConnectionGeneration();
+    await authorization.ensure({
+      provider: rawProvider,
+      walletId: connectedWalletId,
+      account,
+      chainId,
+      generation,
+      assertActive: () => {
+        assertActive?.();
+        if (!connectionIsCurrent(rawProvider, generation)) {
+          throw Object.assign(new Error("Wallet connection changed before transaction preparation"), {
+            code: "CHAIN_WALLET_SCOPE_CHANGED",
+          });
+        }
+      },
+    });
+  }, [authorization, connectionIsCurrent]);
   useEffect(() => {
     mountedRef.current = true;
     // Development effect replay can preserve a selected connection's React state.
@@ -122,6 +152,25 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
 
   const [showWalletSelection, setShowWalletSelection] = useState(false);
   const [showNetworkSelection, setShowNetworkSelection] = useState(false);
+  const [announcedWallets, setAnnouncedWallets] = useState<WalletOption[]>([]);
+
+  useEffect(() => {
+    const handleAnnounce = (event: Event) => {
+      const detail = (event as CustomEvent).detail;
+      const provider = detail?.provider;
+      const rdns = detail?.info?.rdns;
+      if (typeof provider?.request !== "function" || typeof rdns !== "string") return;
+      const config = SUPPORTED_WALLETS.find((wallet) => wallet.rdns?.includes(rdns)) ??
+        SUPPORTED_WALLETS.find((wallet) => !wallet.rdns && wallet.detect(provider));
+      if (!config) return;
+      setAnnouncedWallets((previous) => previous.some((wallet) => wallet.id === config.id)
+        ? previous
+        : [...previous, { id: config.id, name: config.name, icon: config.icon, provider }]);
+    };
+    window.addEventListener("eip6963:announceProvider", handleAnnounce);
+    window.dispatchEvent(new Event("eip6963:requestProvider"));
+    return () => window.removeEventListener("eip6963:announceProvider", handleAnnounce);
+  }, []);
 
   const refreshConnection = useCallback(
     async (rawProvider: any, generation: number, nextChainId?: number) => {
@@ -195,12 +244,10 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   const getAvailableWallets = useCallback((): WalletOption[] => {
     if (typeof window === "undefined") return [];
 
-    const wallets: WalletOption[] = [];
+    // Prefer each extension's independently announced provider. Shared legacy
+    // injection objects can be replaced or routed by another installed wallet.
+    const wallets: WalletOption[] = [...announcedWallets];
     const eth: any = window.ethereum;
-
-    if (!eth) {
-      return [];
-    }
 
     const addWallet = (provider: any) => {
       for (const config of SUPPORTED_WALLETS) {
@@ -215,9 +262,9 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       }
     };
 
-    // Strategy 1: Check providers array (EIP-1193 multi-provider)
-    if (Array.isArray(eth.providers) && eth.providers.length > 0) {
-      eth.providers.forEach((provider: any, index: number) => {
+    // Legacy fallbacks for extensions that do not announce through EIP-6963.
+    if (Array.isArray(eth?.providers)) {
+      eth.providers.forEach((provider: any) => {
         addWallet(provider);
       });
     }
@@ -232,10 +279,10 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     }
 
     return wallets;
-  }, []);
+  }, [announcedWallets]);
 
   const connectWithProvider = useCallback(
-    async (selectedProvider: any, walletId?: string) => {
+    async (selectedProvider: any, walletId?: string, options?: { requestPermissions?: boolean }) => {
       // Use the selected provider directly instead of getBoundProvider
       if (!selectedProvider) {
         toast.warning(t("wallet.noWallet", "Wallet not available"));
@@ -266,6 +313,16 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       );
 
       try {
+        const requestPermissions = options?.requestPermissions || detectedWalletId === "metamask";
+        if (requestPermissions) {
+          // A user-initiated MetaMask connection renews the grant, rather than
+          // merely accepting the existing eth_requestAccounts response.
+          await selectedProvider.request({
+            method: "wallet_requestPermissions",
+            params: [{ eth_accounts: {} }],
+          });
+          if (!current()) return;
+        }
         // Use the selected provider directly to avoid interception
         const accounts = await selectedProvider.request({ method: "eth_requestAccounts" });
         if (!current()) return;
@@ -278,6 +335,20 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
         const address = await signer.getAddress();
         const network = await provider.getNetwork();
         if (!current()) return;
+        if (requestPermissions) {
+          authorization.remember({
+            provider: selectedProvider,
+            walletId: detectedWalletId,
+            account: address,
+            chainId: Number(network.chainId),
+            generation,
+            assertActive: () => {
+              if (!current()) throw Object.assign(new Error("Wallet connection changed"), {
+                code: "CHAIN_WALLET_SCOPE_CHANGED",
+              });
+            },
+          });
+        }
 
         // Save wallet type to localStorage for auto-reconnect
         try {
@@ -322,7 +393,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
         await restoreRetiredConnection(previousRawProvider);
       }
     },
-    [showWalletError, t, toast, connectionIsCurrent, restoreRetiredConnection],
+    [authorization, showWalletError, t, toast, connectionIsCurrent, restoreRetiredConnection],
   );
 
   const connect = useCallback(async () => {
@@ -737,6 +808,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     ...walletState,
     connect,
     connectWithProvider,
+    ensureTransactionAuthorization,
     disconnect,
     switchChain,
     switchOrAddChain,

@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import React from "react";
+import { BrowserProvider } from "ethers";
 import { act, cleanup, render, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { WalletProvider, useWallet } from "./WalletContext";
@@ -57,7 +58,7 @@ function provider(address = A, chainId = 31337n) {
 function rawProvider() {
   const listeners = new Map<string, Set<(...args: any[]) => void>>();
   return {
-    request: vi.fn(async (_input: { method: string }): Promise<any> => [A]),
+    request: vi.fn(async ({ method }: { method: string }): Promise<any> => method === "eth_chainId" ? "0x7a69" : [A]),
     on: vi.fn((event: string, listener: (...args: any[]) => void) => {
       const subscribers = listeners.get(event) ?? new Set();
       subscribers.add(listener);
@@ -89,6 +90,198 @@ describe("WalletProvider connection invalidation", () => {
     cleanup();
     vi.useRealTimers();
     vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
+
+  function announce(provider: unknown, rdns = "io.metamask") {
+    window.dispatchEvent(new CustomEvent("eip6963:announceProvider", {
+      detail: { info: { rdns }, provider },
+    }));
+  }
+
+  it("uses MetaMask's announced provider when a shared injection is controlled by another wallet", async () => {
+    const shared = { ...rawProvider(), isMetaMask: true };
+    const metamask = rawProvider();
+    metamask.request.mockImplementation(async ({ method }) => {
+      if (method === "eth_chainId") return "0x47";
+      if (method === "eth_getBalance") return "0x0";
+      if (method === "eth_sendTransaction") return `0x${"ab".repeat(32)}`;
+      return [A];
+    });
+    const fluent = { ...rawProvider(), isFluent: true };
+    vi.stubGlobal("ethereum", shared);
+    vi.stubGlobal("fluent", fluent);
+    mount();
+    act(() => {
+      announce(metamask);
+      announce(metamask);
+    });
+    const wallets = current.getAvailableWallets();
+    expect(wallets.map((wallet) => wallet.id)).toEqual(["metamask", "fluent"]);
+    expect(wallets[0].provider).toBe(metamask);
+    expect(wallets[1].provider).toBe(fluent);
+
+    const browser = new BrowserProvider(metamask);
+    mocks.provider.mockReturnValueOnce(browser);
+    try {
+      await act(async () => { await current.connectWithProvider(wallets[0].provider, wallets[0].id); });
+      expect(current.rawProvider).toBe(metamask);
+      expect(current.connectedWalletId).toBe("metamask");
+      expect(mocks.provider).toHaveBeenCalledWith(metamask);
+      const transaction = { from: A, to: B, value: "0x0" };
+      await expect(current.provider!.send("eth_sendTransaction", [transaction])).resolves.toBe(`0x${"ab".repeat(32)}`);
+      expect(metamask.request).toHaveBeenCalledWith({ method: "eth_sendTransaction", params: [transaction] });
+      expect(shared.request).not.toHaveBeenCalled();
+      expect(fluent.request).not.toHaveBeenCalled();
+    } finally {
+      browser.destroy();
+    }
+  });
+
+  it("requests independent providers before restoring the saved MetaMask connection", async () => {
+    const shared = { ...rawProvider(), isMetaMask: true };
+    const metamask = rawProvider();
+    vi.stubGlobal("ethereum", shared);
+    localStorage.setItem("deepfamily_last_wallet_type", "metamask");
+    mocks.provider.mockReturnValue(provider());
+    const handleRequest = vi.fn(() => announce(metamask));
+    window.addEventListener("eip6963:requestProvider", handleRequest);
+    try {
+      mount();
+      await waitFor(() => expect(current.rawProvider).toBe(metamask));
+      expect(handleRequest).toHaveBeenCalledOnce();
+      expect(mocks.provider).toHaveBeenCalledWith(metamask);
+      expect(shared.request).not.toHaveBeenCalled();
+      expect(metamask.request).toHaveBeenCalledWith({ method: "eth_accounts" });
+    } finally {
+      window.removeEventListener("eip6963:requestProvider", handleRequest);
+    }
+  });
+
+  it("discovers late announcements and Fluent without a shared ethereum injection", () => {
+    vi.stubGlobal("ethereum", undefined);
+    const fluent = { ...rawProvider(), isFluent: true };
+    vi.stubGlobal("fluent", fluent);
+    mount();
+    expect(current.getAvailableWallets().map((wallet) => wallet.id)).toEqual(["fluent"]);
+    const metamask = rawProvider();
+    act(() => announce(metamask));
+    expect(current.getAvailableWallets().find((wallet) => wallet.id === "metamask")?.provider).toBe(metamask);
+    act(() => {
+      announce({});
+      announce({ ...rawProvider(), isMetaMask: true }, "org.otherwallet");
+    });
+    expect(current.getAvailableWallets()).toHaveLength(2);
+  });
+
+  it("explicitly renews MetaMask permission when reconnecting after a 4100 rejection", async () => {
+    mount();
+    const { raw } = await connect();
+    raw.request.mockClear();
+    const renewed = provider();
+    mocks.provider.mockReturnValueOnce(renewed);
+    await act(async () => {
+      await current.connectWithProvider(raw, "metamask", { requestPermissions: true });
+    });
+    expect(raw.request.mock.calls).toEqual([
+      [{ method: "wallet_requestPermissions", params: [{ eth_accounts: {} }] }],
+      [{ method: "eth_requestAccounts" }],
+    ]);
+    expect(current.signer).toBe(renewed.signer);
+    expect(current.rawProvider).toBe(raw);
+    expect(raw.request.mock.calls.some(([request]) => request.method === "eth_sendTransaction")).toBe(false);
+  });
+
+  it("grants permission during a normal MetaMask connection and does not prompt again for writes", async () => {
+    mount();
+    const raw = rawProvider();
+    mocks.provider.mockReturnValueOnce(provider());
+    await act(async () => { await current.connectWithProvider(raw, "metamask"); });
+    expect(raw.request).toHaveBeenCalledWith({ method: "wallet_requestPermissions", params: [{ eth_accounts: {} }] });
+    await current.ensureTransactionAuthorization(A, 31337);
+    await current.ensureTransactionAuthorization(A, 31337);
+    expect(raw.request.mock.calls.filter(([call]) => call.method === "wallet_requestPermissions")).toHaveLength(1);
+    expect(raw.request.mock.calls.some(([call]) => call.method === "eth_sendTransaction")).toBe(false);
+  });
+
+  it("restores MetaMask silently and renews permission only on the first user-initiated write", async () => {
+    const raw = { ...rawProvider(), isMetaMask: true };
+    vi.stubGlobal("ethereum", raw);
+    localStorage.setItem("deepfamily_last_wallet_type", "metamask");
+    mocks.provider.mockReturnValue(provider());
+    mount();
+    await waitFor(() => expect(current.address).toBe(A));
+    expect(raw.request.mock.calls.some(([call]) => call.method === "wallet_requestPermissions")).toBe(false);
+    await current.ensureTransactionAuthorization(A, 31337);
+    await current.ensureTransactionAuthorization(A, 31337);
+    expect(raw.request.mock.calls.filter(([call]) => call.method === "wallet_requestPermissions")).toHaveLength(1);
+  });
+
+  it("keeps Fluent's ordinary connection and transaction preparation free of extra permission prompts", async () => {
+    mount();
+    const raw = rawProvider();
+    mocks.provider.mockReturnValueOnce(provider());
+    await act(async () => { await current.connectWithProvider(raw, "fluent"); });
+    await current.ensureTransactionAuthorization(A, 31337);
+    expect(raw.request.mock.calls.some(([call]) => call.method === "wallet_requestPermissions")).toBe(false);
+  });
+
+  it("stops transaction authorization if the connection is retired while the wallet prompt is open", async () => {
+    const raw = { ...rawProvider(), isMetaMask: true };
+    vi.stubGlobal("ethereum", raw);
+    localStorage.setItem("deepfamily_last_wallet_type", "metamask");
+    mocks.provider.mockReturnValue(provider());
+    mount();
+    await waitFor(() => expect(current.address).toBe(A));
+    const pendingPermission = deferred<unknown>();
+    raw.request.mockImplementation(async ({ method }) => {
+      if (method === "wallet_requestPermissions") return pendingPermission.promise;
+      return method === "eth_chainId" ? "0x7a69" : [A];
+    });
+    const preparing = current.ensureTransactionAuthorization(A, 31337);
+    const stopped = expect(preparing).rejects.toMatchObject({ code: "CHAIN_WALLET_SCOPE_CHANGED" });
+    await waitFor(() => expect(raw.request).toHaveBeenCalledWith({
+      method: "wallet_requestPermissions", params: [{ eth_accounts: {} }],
+    }));
+    act(() => current.disconnect());
+    pendingPermission.resolve([]);
+    await stopped;
+    expect(current.signer).toBeNull();
+    expect(current.address).toBeNull();
+  });
+
+  it("stops a rejected permission renewal without requesting accounts or sending", async () => {
+    mount();
+    const { raw } = await connect();
+    raw.request.mockReset().mockRejectedValue(Object.assign(new Error("Rejected"), { code: 4001 }));
+    mocks.provider.mockReturnValueOnce(provider());
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    await act(async () => {
+      await current.connectWithProvider(raw, "metamask", { requestPermissions: true });
+    });
+    expect(raw.request).toHaveBeenCalledOnce();
+    expect(raw.request).toHaveBeenCalledWith({ method: "wallet_requestPermissions", params: [{ eth_accounts: {} }] });
+    expect(current.isConnecting).toBe(false);
+    expect(mocks.toast.warning).toHaveBeenCalledWith("Connection rejected by user");
+  });
+
+  it("does not continue a permission renewal after the user disconnects", async () => {
+    mount();
+    const { raw } = await connect();
+    const permission = deferred<unknown>();
+    raw.request.mockReset().mockReturnValue(permission.promise);
+    let pending!: Promise<void>;
+    act(() => {
+      pending = current.connectWithProvider(raw, "metamask", { requestPermissions: true });
+    });
+    act(() => current.disconnect());
+    await act(async () => {
+      permission.resolve([]);
+      await pending;
+    });
+    expect(raw.request).toHaveBeenCalledOnce();
+    expect(current.address).toBeNull();
+    expect(current.signer).toBeNull();
   });
 
   it("keeps the selected provider usable after StrictMode setup-cleanup-setup", async () => {

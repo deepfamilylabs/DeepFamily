@@ -6,6 +6,7 @@ export interface WalletConfig {
   name: string;
   icon: string;
   installUrl: string;
+  rdns?: readonly string[];
   detect: (provider: any) => boolean;
   // 样式配置
   colors: {
@@ -21,6 +22,7 @@ export const SUPPORTED_WALLETS: WalletConfig[] = [
     name: "MetaMask",
     icon: metamaskIcon,
     installUrl: "https://metamask.io/download/",
+    rdns: ["io.metamask", "io.metamask.flask", "io.metamask.mobile"],
     detect: (provider) => provider?.isMetaMask && !provider?.isFluent && !provider?.isFluentWallet,
     colors: {
       gradient: "from-[#E2761B] to-[#CD6116]",

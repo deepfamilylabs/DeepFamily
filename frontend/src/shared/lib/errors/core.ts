@@ -59,6 +59,25 @@ const MAX_COLLECTED_STRING_LENGTH = 4096;
 const STANDARD_ERROR_SELECTOR = "0x08c379a0";
 const STANDARD_PANIC_SELECTOR = "0x4e487b71";
 
+const WALLET_RPC_METHODS = new Set([
+  "eth_accounts", "eth_requestAccounts", "eth_chainId", "eth_call", "eth_estimateGas",
+  "eth_sendTransaction", "eth_getTransactionCount", "eth_blockNumber",
+  "wallet_requestPermissions", "wallet_switchEthereumChain", "wallet_addEthereumChain",
+]);
+
+// Retain only a known method name for troubleshooting. Request parameters can
+// include proof material or calldata and must never enter this diagnostic.
+const getWalletRpcMethod = (error: any): string | undefined => {
+  const candidates = [
+    error?.info?.payload?.method,
+    error?.payload?.method,
+    error?.cause?.info?.payload?.method,
+    error?.cause?.payload?.method,
+    error?.error?.info?.payload?.method,
+  ];
+  return candidates.find((method) => typeof method === "string" && WALLET_RPC_METHODS.has(method));
+};
+
 /**
  * Return a minimal, whitelisted error shape safe for console logging.
  * Avoids leaking large nested objects that may contain sensitive UI state.
@@ -509,7 +528,7 @@ export const REASON_FRIENDLY_MAP: Record<string, string> = {
   NETWORK_ERROR: "Network error. Please check your connection.",
   USER_REJECTED: "Transaction was cancelled by user.",
   WALLET_NOT_CONNECTED: "Please connect your wallet.",
-  WALLET_UNAUTHORIZED: "Wallet authorization is required for this action.",
+  WALLET_UNAUTHORIZED: "The wallet has not authorized this account or request. Unlock your wallet and reconnect this site with the account shown on this page, then try again.",
   WALLET_METHOD_UNSUPPORTED: "Wallet does not support this request.",
   WALLET_DISCONNECTED: "Wallet is disconnected. Please reconnect your wallet.",
   WALLET_CHAIN_DISCONNECTED: "Wallet is not connected to the requested network.",
@@ -916,10 +935,13 @@ const resolveFriendlyPresentation = (error: any, t: TFunction): FriendlyError =>
     const fallback = REASON_FRIENDLY_MAP[reason] || humanMessage || "Transaction failed.";
     const translated = t(`errors.contractError.${reason}`, fallback);
     const friendly = typeof translated === "string" ? translated : fallback;
+    const walletMethod = reason === "WALLET_UNAUTHORIZED" ? getWalletRpcMethod(error) : undefined;
     return {
       type: reason,
       message: friendly,
-      details: friendly,
+      details: walletMethod
+        ? `${t("errors.walletRequest", "Wallet request")}: ${walletMethod}`
+        : friendly,
       reason,
       code,
       retryable: isRetryableReason(reason),

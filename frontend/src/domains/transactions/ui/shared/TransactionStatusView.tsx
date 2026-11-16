@@ -16,7 +16,7 @@ export type TransactionStatusSlots = {
   failed?: {
     title: string;
     error: { type: string; message: string; details: string } | null;
-    retry?: { label: string; onClick: () => void };
+    retry?: { label: string; onClick: () => void; disabled?: boolean };
   };
   blocked?: React.ReactNode;
 };

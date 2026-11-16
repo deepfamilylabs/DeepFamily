@@ -800,6 +800,9 @@
     "loadingMore": "加载更多..."
   },
   "wallet": {
+    "authorizing": "确认钱包授权",
+    "confirmTransaction": "请在钱包中确认交易",
+    "reauthorize": "重新授权钱包",
     "connect": "连接钱包",
     "connecting": "连接中...",
     "connectDescription": "连接钱包以继续",
@@ -1340,6 +1343,7 @@
     "label": "Logo"
   },
   "errors": {
+    "walletRequest": "钱包请求",
     "contractError": {
       "InvalidPersonHash": "人物哈希无效。",
       "InvalidFatherVersionIndex": "父亲版本索引无效或缺失。",
@@ -1449,7 +1453,7 @@
       "NETWORK_ERROR": "网络异常，请检查连接。",
       "USER_REJECTED": "交易已取消。",
       "WALLET_NOT_CONNECTED": "请先连接钱包。",
-      "WALLET_UNAUTHORIZED": "钱包需要授权后才能执行此操作。",
+      "WALLET_UNAUTHORIZED": "钱包尚未授权当前账户或请求。请解锁钱包，并使用页面显示的账户重新连接当前网站后重试。",
       "WALLET_METHOD_UNSUPPORTED": "当前钱包不支持此请求。",
       "WALLET_DISCONNECTED": "钱包已断开，请重新连接。",
       "WALLET_CHAIN_DISCONNECTED": "钱包未连接到请求的网络。",

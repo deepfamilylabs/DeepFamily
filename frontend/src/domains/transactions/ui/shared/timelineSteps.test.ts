@@ -41,6 +41,7 @@ describe("timeline step derivation", () => {
   });
 
   it("walks each flow's steps in declared order as its signals arrive", () => {
+    expect(addVersionTimelineStep({ ...idle, proofStep: "authorizing", isBusy: true })).toBe("identity");
     expect(mintTimelineStep({ ...idle, proofStep: "preparing", isBusy: true })).toBe("identity");
     expect(mintTimelineStep({ ...idle, proofStep: "generating", isBusy: true })).toBe("proof");
     expect(mintTimelineStep({ ...idle, isBusy: true })).toBe("review");

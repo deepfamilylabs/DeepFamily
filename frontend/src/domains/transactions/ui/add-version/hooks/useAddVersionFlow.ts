@@ -27,7 +27,7 @@ interface UseAddVersionFlowOptions {
 }
 
 export function useAddVersionFlow(options: UseAddVersionFlowOptions = {}) {
-  const { signer } = useWallet();
+  const { signer, ensureTransactionAuthorization } = useWallet();
   const { rpcUrl, chainId, contractAddress, readerAddress } = useConfig();
   const { t } = useTranslation();
   const latestRuntimeScopeRef = useRef({ signer, chainId, contractAddress, readerAddress });
@@ -100,6 +100,38 @@ export function useAddVersionFlow(options: UseAddVersionFlowOptions = {}) {
           throw addVersionScopeChangedError();
         }
         const reconcileTransactionHash = priorSubmission?.transactionHash;
+        const authorizeSubmitter = async () => {
+          assertActiveRequest();
+          // The permission prompt already completed before preparation. A
+          // final passive account read must never open a second prompt.
+          const provider = signer.provider;
+          if (!provider || typeof provider.send !== "function") {
+            throw Object.assign(new Error("Wallet provider is unavailable"), {
+              code: "CHAIN_WALLET_UNAVAILABLE",
+            });
+          }
+          const accounts: unknown = await provider.send("eth_accounts", []);
+          assertActiveRequest();
+          if (!Array.isArray(accounts) || accounts.length === 0) {
+            throw Object.assign(new Error("Wallet account authorization is required"), { code: 4100 });
+          }
+          if (!accounts.some((account) =>
+            typeof account === "string" && account.toLowerCase() === submitterAddress.toLowerCase(),
+          )) {
+            // Proofs and encrypted metadata are bound to this submitter. Never
+            // substitute another account returned by the permission prompt.
+            throw addVersionScopeChangedError();
+          }
+          await assertCurrentScope();
+          assertActiveRequest();
+        };
+        // Receipt reconciliation needs no new account permission or wallet popup.
+        if (!reconcileTransactionHash) {
+          await ensureTransactionAuthorization(submitterAddress, chainId, assertActiveRequest);
+          assertActiveRequest();
+          await assertCurrentScope();
+          await authorizeSubmitter();
+        }
         const getTransactionReceipt =
           typeof receiptProvider?.getTransactionReceipt === "function"
             ? (txHash: string) => receiptProvider.getTransactionReceipt(txHash)
@@ -122,9 +154,11 @@ export function useAddVersionFlow(options: UseAddVersionFlowOptions = {}) {
           assertWalletScope: async () => {
             assertActiveRequest();
             await assertCurrentScope();
+            await authorizeSubmitter();
             // Closing can supersede the request while the wallet's chain or
             // account RPC is pending, immediately before the send boundary.
             assertActiveRequest();
+            update("submitting", t("wallet.confirmTransaction", "Confirm the transaction in your wallet"));
           },
           onTransactionConfirmed: update.confirmed,
           onTransactionSubmitted: (transactionHash) => {
@@ -173,7 +207,7 @@ export function useAddVersionFlow(options: UseAddVersionFlowOptions = {}) {
         throw error;
       }
     },
-    [chainId, confirmTransactionPreview, contractAddress, readerAddress, rpcUrl, signer, t],
+    [chainId, confirmTransactionPreview, contractAddress, readerAddress, rpcUrl, signer, t, ensureTransactionAuthorization],
   );
 
   const flow = useTxFlow<AddVersionResult, [AddVersionFlowArgs], FriendlyError>(runner, {

@@ -16,6 +16,8 @@ interface AddVersionStatusPanelProps {
   transactionPreview: AddVersionTransactionPreview | null;
   successResult: AddVersionSuccessResultView | null;
   errorResult: AddVersionErrorResultView | null;
+  isWalletConnecting?: boolean;
+  onWalletReauthorize?: () => void;
 }
 
 export function AddVersionStatusPanel({
@@ -25,6 +27,8 @@ export function AddVersionStatusPanel({
   transactionPreview,
   successResult,
   errorResult,
+  isWalletConnecting,
+  onWalletReauthorize,
 }: AddVersionStatusPanelProps) {
   return (
     <TransactionStatusView
@@ -47,6 +51,16 @@ export function AddVersionStatusPanel({
               : t("addVersion.verificationMismatchTitle", "Transaction Confirmed; Data Verification Failed")
             : t("addVersion.failed", "Transaction Failed"),
           error: errorResult,
+          retry: errorResult?.type === "WALLET_UNAUTHORIZED" &&
+            !errorResult.transactionHash && !errorResult.transactionConfirmed && onWalletReauthorize
+            ? {
+                label: isWalletConnecting
+                  ? t("wallet.connecting", "Connecting...")
+                  : t("wallet.reauthorize", "Reauthorize Wallet"),
+                onClick: onWalletReauthorize,
+                disabled: isWalletConnecting,
+              }
+            : undefined,
         },
       }}
     />

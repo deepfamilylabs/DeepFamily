@@ -38,6 +38,7 @@ export function TransactionErrorResult({
   retry?: {
     label: string;
     onClick: () => void;
+    disabled?: boolean;
   };
 }) {
   const panelRef = useFocusOnMount<HTMLDivElement>();
@@ -100,6 +101,7 @@ export function TransactionErrorResult({
           <TransactionButton
             variant="secondary"
             onClick={retry.onClick}
+            disabled={retry.disabled}
             className="w-full sm:w-auto"
           >
             {retry.label}

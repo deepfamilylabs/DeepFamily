@@ -800,6 +800,9 @@
     "loadingMore": "Loading more..."
   },
   "wallet": {
+    "authorizing": "Confirm wallet authorization",
+    "confirmTransaction": "Confirm the transaction in your wallet",
+    "reauthorize": "Reauthorize Wallet",
     "connect": "Connect Wallet",
     "connecting": "Connecting...",
     "connectDescription": "Connect your wallet to continue",
@@ -1340,6 +1343,7 @@
     "label": "Logo"
   },
   "errors": {
+    "walletRequest": "Wallet request",
     "contractError": {
       "InvalidPersonHash": "Person hash is invalid for the provided inputs.",
       "InvalidFatherVersionIndex": "Father version index is invalid or missing.",
@@ -1449,7 +1453,7 @@
       "NETWORK_ERROR": "Network error. Please check your connection.",
       "USER_REJECTED": "Transaction was cancelled by user.",
       "WALLET_NOT_CONNECTED": "Please connect your wallet.",
-      "WALLET_UNAUTHORIZED": "Wallet authorization is required for this action.",
+      "WALLET_UNAUTHORIZED": "The wallet has not authorized this account or request. Unlock your wallet and reconnect this site with the account shown on this page, then try again.",
       "WALLET_METHOD_UNSUPPORTED": "Wallet does not support this request.",
       "WALLET_DISCONNECTED": "Wallet is disconnected. Please reconnect your wallet.",
       "WALLET_CHAIN_DISCONNECTED": "Wallet is not connected to the requested network.",

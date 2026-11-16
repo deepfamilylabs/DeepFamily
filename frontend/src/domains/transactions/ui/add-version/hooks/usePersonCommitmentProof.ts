@@ -17,6 +17,7 @@ interface GeneratePersonCommitmentProofArgs {
 /** Where the add-version work is, as a step the timeline can place. */
 export type AddVersionProofStep =
   | ""
+  | "authorizing"
   | "preparing"
   | "generating"
   | "verifying"

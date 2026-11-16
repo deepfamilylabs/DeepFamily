@@ -54,6 +54,11 @@ const successfulFlowResult = () => ({
 });
 
 const mocks = vi.hoisted(() => ({
+  ensureTransactionAuthorization: vi.fn(async () => {}),
+  walletId: null as string | null,
+  rawWalletProvider: { request: vi.fn() },
+  walletConnecting: false,
+  connectWithProvider: vi.fn(async () => {}),
   signer: {
     getAddress: vi.fn(),
   },
@@ -115,6 +120,11 @@ vi.mock("react-i18next", () => ({
 vi.mock("../../wallet", () => ({
   useWallet: () => ({
     signer: mocks.signer,
+    ensureTransactionAuthorization: mocks.ensureTransactionAuthorization,
+    rawProvider: mocks.rawWalletProvider,
+    connectedWalletId: mocks.walletId,
+    connectWithProvider: mocks.connectWithProvider,
+    isConnecting: mocks.walletConnecting,
   }),
 }));
 
@@ -440,6 +450,10 @@ async function expectFreshParentSubmission(
 
 describe("AddVersionModal", () => {
   beforeEach(() => {
+    mocks.ensureTransactionAuthorization.mockReset().mockResolvedValue(undefined);
+    mocks.walletId = null;
+    mocks.walletConnecting = false;
+    mocks.connectWithProvider.mockClear();
     mocks.signer.getAddress.mockReset();
     mocks.addVersionRunOrThrow.mockReset();
     mocks.addVersionFlow = { status: "idle" };
@@ -1365,6 +1379,94 @@ describe("AddVersionModal", () => {
     expect(formSectionsHidden()).toBe(false);
     expect(screen.queryByRole("alert")).toBeNull();
   });
+
+  it("renews MetaMask permissions on explicit recovery and retries the same public package", async () => {
+    mocks.walletId = "metamask";
+    mocks.addVersionRunOrThrow
+      .mockRejectedValueOnce(Object.assign(new Error("Unauthorized"), {
+        code: 4100,
+        type: "WALLET_UNAUTHORIZED",
+        info: { payload: { method: "eth_sendTransaction" } },
+      }))
+      .mockResolvedValueOnce(successfulFlowResult());
+    const modal = renderAddVersionModal();
+    await fillRequiredFields();
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: /Add Version/i })); });
+    await waitFor(() => expect(mocks.toastError).toHaveBeenCalled());
+    expect(screen.getByRole("alert").textContent).toContain("WALLET_UNAUTHORIZED");
+    const recovery = await screen.findByRole("button", { name: "Reauthorize Wallet" });
+    const preparedArgs = mocks.addVersionRunOrThrow.mock.calls[0][0];
+    const proofWork = mocks.zkWorkerCall.mock.calls.length;
+    const encryptionWork = mocks.cryptoWorkerCall.mock.calls.length;
+    await act(async () => { fireEvent.click(recovery); });
+    expect(mocks.connectWithProvider).toHaveBeenCalledWith(
+      mocks.rawWalletProvider, "metamask", { requestPermissions: true },
+    );
+    mocks.walletConnecting = true;
+    modal.refresh();
+    const pendingAuthorization = screen.getByRole("button", { name: "Connecting..." }) as HTMLButtonElement;
+    expect(pendingAuthorization.disabled).toBe(true);
+    fireEvent.click(pendingAuthorization);
+    expect(mocks.connectWithProvider).toHaveBeenCalledOnce();
+    mocks.walletConnecting = false;
+    modal.refresh();
+    expect(mocks.addVersionRunOrThrow).toHaveBeenCalledOnce();
+    expect(mocks.zkWorkerCall).toHaveBeenCalledTimes(proofWork);
+    expect(mocks.cryptoWorkerCall).toHaveBeenCalledTimes(encryptionWork);
+    fireEvent.click(screen.getByRole("button", { name: /Back to edit/i }));
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: /Add Version/i })); });
+    expect(mocks.addVersionRunOrThrow).toHaveBeenCalledTimes(2);
+    expect(mocks.addVersionRunOrThrow.mock.calls[1][0]).toBe(preparedArgs);
+    expect(mocks.zkWorkerCall).toHaveBeenCalledTimes(proofWork);
+    expect(mocks.cryptoWorkerCall).toHaveBeenCalledTimes(encryptionWork);
+  });
+
+  it("finishes wallet authorization before deriving secrets or generating a proof", async () => {
+    let completeAuthorization!: () => void;
+    mocks.ensureTransactionAuthorization.mockImplementation(() => new Promise<void>((resolve) => {
+      completeAuthorization = resolve;
+    }));
+    mocks.addVersionRunOrThrow.mockResolvedValue(successfulFlowResult());
+    renderAddVersionModal();
+    await fillRequiredFields();
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: /Add Version/i })); });
+    await waitFor(() => expect(mocks.ensureTransactionAuthorization).toHaveBeenCalledWith(submitter, 71, expect.any(Function)));
+    expect(screen.getByText("Confirm wallet authorization")).toBeTruthy();
+    expect(mocks.cryptoWorkerCall).not.toHaveBeenCalled();
+    expect(mocks.zkWorkerCall).not.toHaveBeenCalled();
+    expect(mocks.secretInputRead).not.toHaveBeenCalled();
+    expect(mocks.addVersionRunOrThrow).not.toHaveBeenCalled();
+    await act(async () => { completeAuthorization(); });
+    await waitFor(() => expect(mocks.toastSuccess).toHaveBeenCalledOnce());
+    expect(mocks.addVersionRunOrThrow).toHaveBeenCalledOnce();
+    expect(screen.queryByText("Transaction Failed")).toBeNull();
+  });
+
+  it.each(["rejected", "closed", "account changed"])(
+    "does no cryptographic work when authorization is %s",
+    async (outcome) => {
+      let completeAuthorization!: () => void;
+      let rejectAuthorization!: (error: Error) => void;
+      mocks.ensureTransactionAuthorization.mockImplementation(() => new Promise<void>((resolve, reject) => {
+        completeAuthorization = resolve;
+        rejectAuthorization = reject;
+      }));
+      renderAddVersionModal();
+      await fillRequiredFields();
+      await act(async () => { fireEvent.click(screen.getByRole("button", { name: /Add Version/i })); });
+      await waitFor(() => expect(mocks.ensureTransactionAuthorization).toHaveBeenCalledOnce());
+      if (outcome === "closed") fireEvent.click(screen.getByRole("button", { name: "Close" }));
+      if (outcome === "account changed") mocks.signer.getAddress.mockResolvedValue(`0x${"bb".repeat(20)}`);
+      await act(async () => {
+        if (outcome === "rejected") rejectAuthorization(Object.assign(new Error("Authorization rejected"), { code: 4001 }));
+        else completeAuthorization();
+      });
+      expect(mocks.cryptoWorkerCall).not.toHaveBeenCalled();
+      expect(mocks.zkWorkerCall).not.toHaveBeenCalled();
+      expect(mocks.secretInputRead).not.toHaveBeenCalled();
+      expect(mocks.addVersionRunOrThrow).not.toHaveBeenCalled();
+    },
+  );
 
   it("stops before Groth16, encryption, or transaction submission when gzip cannot fit", async () => {
     const defaultCryptoCall = mocks.cryptoWorkerCall.getMockImplementation();

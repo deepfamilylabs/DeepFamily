@@ -60,6 +60,35 @@ const collectLocalContractErrors = () => {
 };
 
 describe("errors", () => {
+  it.each(["eth_requestAccounts", "eth_estimateGas", "eth_sendTransaction"])(
+    "identifies an unauthorized %s request without exposing its parameters",
+    (method) => {
+      const error = Object.assign(new Error("could not coalesce error"), {
+        code: "UNKNOWN_ERROR",
+        info: {
+          error: { code: 4100, message: "Unauthorized" },
+          payload: { method, params: [{ data: "private-calldata", witness: "private-witness" }] },
+        },
+      });
+      const friendly = getFriendlyError(normalizeChainError(error), passthroughT as any);
+      expect(friendly).toMatchObject({
+        type: "WALLET_UNAUTHORIZED",
+        details: `Wallet request: ${method}`,
+      });
+      expect(JSON.stringify(friendly)).not.toContain("private-");
+    },
+  );
+
+  it("does not display an arbitrary method from an unauthorized RPC payload", () => {
+    const error = {
+      code: 4100,
+      info: { payload: { method: "private-secret-method", params: ["private-params"] } },
+    };
+    const friendly = getFriendlyError(error, passthroughT as any);
+    expect(friendly.details).toBe(friendly.message);
+    expect(JSON.stringify(friendly)).not.toContain("private-");
+  });
+
   it("keeps one canonical contract across the UI conversion entry points", () => {
     const raw = normalizeChainError(Object.assign(new Error("RPC unavailable"), {
       code: "NETWORK_ERROR",
