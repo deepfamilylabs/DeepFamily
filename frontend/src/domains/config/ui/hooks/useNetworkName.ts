@@ -1,4 +1,3 @@
-import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { NETWORK_PRESETS } from "../../../../shared/config";
 import { useConfig } from "../../context";
@@ -16,18 +15,16 @@ import { loadCustomNetworks } from "../../services";
  */
 export function useNetworkName(): string {
   const { chainId } = useConfig();
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
 
-  return useMemo(() => {
-    if (!Number.isSafeInteger(chainId) || chainId <= 0) {
-      return t("statusBar.unknownNetwork", "Unknown network");
-    }
-    const preset = NETWORK_PRESETS.find((entry) => entry.chainId === chainId);
-    if (preset) return t(preset.nameKey, preset.defaultName);
-    const custom = loadCustomNetworks().find((entry) => entry.chainId === chainId);
-    if (custom) return custom.name;
-    // A chain reached through a saved RPC that matches nothing on file: its
-    // number is the only name anyone has for it.
-    return t("familyTree.config.unnamedNetwork", "chain {{chainId}}", { chainId });
-  }, [chainId, t, i18n.language]);
+  if (!Number.isSafeInteger(chainId) || chainId <= 0) {
+    return t("statusBar.unknownNetwork", "Unknown network");
+  }
+  const preset = NETWORK_PRESETS.find((entry) => entry.chainId === chainId);
+  if (preset) return t(preset.nameKey, preset.defaultName);
+  const custom = loadCustomNetworks().find((entry) => entry.chainId === chainId);
+  if (custom) return custom.name;
+  // A chain reached through a saved RPC that matches nothing on file: its
+  // number is the only name anyone has for it.
+  return t("familyTree.config.unnamedNetwork", "chain {{chainId}}", { chainId });
 }

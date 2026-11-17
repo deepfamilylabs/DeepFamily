@@ -130,6 +130,7 @@ function reconcileConfirmedPersonVersion(
 }
 
 export function useTreeCacheActions(options: UseTreeCacheActionsOptions) {
+  const { setNodesData, setEdgesUnion, setEdgesStrict, setReachableNodeIds, setProgress, refresh } = options;
   const nodesStorageKey = `${options.storageNS}::nodesData`;
   const storageScopeRef = useRef({ storageNS: options.storageNS });
   if (storageScopeRef.current.storageNS !== options.storageNS) {
@@ -191,9 +192,9 @@ export function useTreeCacheActions(options: UseTreeCacheActionsOptions) {
 
   const clearAllCaches = useCallback(() => {
     pauseAutomaticMetadataUnlock(options.storageNS);
-    options.setNodesData({});
-    options.setEdgesUnion({});
-    options.setEdgesStrict({});
+    setNodesData({});
+    setEdgesUnion({});
+    setEdgesStrict({});
     // Query invalidation needs the old node snapshot to discover its detail keys.
     // Once that scan is complete, clear the imperative ref before returning:
     // React may not commit setNodesData({}) until a later render, and a confirmed
@@ -201,8 +202,8 @@ export function useTreeCacheActions(options: UseTreeCacheActionsOptions) {
     // its new durable snapshot.
     clearTreeQueryCaches(true);
     options.nodesDataRef.current = {};
-    options.setReachableNodeIds([]);
-    options.setProgress(undefined);
+    setReachableNodeIds([]);
+    setProgress(undefined);
     // No rebuild is queued by clearing alone, so the tree stays settled: an empty
     // store is the honest result until the next refresh, not a load in progress.
     if (options.useIndexedDbCache && isIndexedDBSupported()) {
@@ -216,12 +217,12 @@ export function useTreeCacheActions(options: UseTreeCacheActionsOptions) {
     clearTreeQueryCaches,
     options.edgesStrictKey,
     options.edgesUnionKey,
-    options.setEdgesStrict,
-    options.setEdgesUnion,
-    options.setNodesData,
+    setEdgesStrict,
+    setEdgesUnion,
+    setNodesData,
     options.nodesDataRef,
-    options.setProgress,
-    options.setReachableNodeIds,
+    setProgress,
+    setReachableNodeIds,
     nodesStorageKey,
     options.storageNS,
     options.useIndexedDbCache,
@@ -233,7 +234,7 @@ export function useTreeCacheActions(options: UseTreeCacheActionsOptions) {
     // Keep the imperative ref in lockstep immediately: callers may unmount or
     // start another cache operation before React runs the normal ref effect.
     options.nodesDataRef.current = lockedSnapshot;
-    options.setNodesData((current) => {
+    setNodesData((current) => {
       const lockedCurrent = clearAllMetadataUnlocks(current);
       options.nodesDataRef.current = lockedCurrent;
       return lockedCurrent;
@@ -247,44 +248,44 @@ export function useTreeCacheActions(options: UseTreeCacheActionsOptions) {
     nodesStorageKey,
     options.storageNS,
     options.nodesDataRef,
-    options.setNodesData,
+    setNodesData,
     options.useIndexedDbCache,
   ]);
 
   const invalidateTreeRootCache = useCallback(() => {
-    options.setReachableNodeIds([]);
-    options.setProgress(undefined);
-    options.setEdgesUnion({});
-    options.setEdgesStrict({});
+    setReachableNodeIds([]);
+    setProgress(undefined);
+    setEdgesUnion({});
+    setEdgesStrict({});
     clearTreeQueryCaches(false);
     if (options.useIndexedDbCache && isIndexedDBSupported()) {
       deleteBlob(options.edgesUnionKey).catch(() => {});
       deleteBlob(options.edgesStrictKey).catch(() => {});
     }
-    options.refresh();
+    refresh();
   }, [
     clearTreeQueryCaches,
     options.edgesStrictKey,
     options.edgesUnionKey,
-    options.refresh,
-    options.setEdgesStrict,
-    options.setEdgesUnion,
-    options.setProgress,
-    options.setReachableNodeIds,
+    refresh,
+    setEdgesStrict,
+    setEdgesUnion,
+    setProgress,
+    setReachableNodeIds,
     options.useIndexedDbCache,
   ]);
 
   const updateTotalVersions = useCallback(
     (personHash: string, totalVersions: number) => {
-      options.setNodesData((prev) => applyTotalVersionsToNodes(prev, personHash, totalVersions));
+      setNodesData((prev) => applyTotalVersionsToNodes(prev, personHash, totalVersions));
     },
-    [options.setNodesData],
+    [setNodesData],
   );
 
   const refreshInvalidatedEdges = useCallback(
     async (invalidation: ReturnType<typeof getInvalidateKeysAfterPersonVersionAdded>) => {
       if (!options.api) {
-        options.refresh();
+        refresh();
         return;
       }
       const { unionUpserts, strictUpserts, newReachableChildren } =
@@ -299,15 +300,15 @@ export function useTreeCacheActions(options: UseTreeCacheActionsOptions) {
         });
 
       if (Object.keys(unionUpserts).length) {
-        options.setEdgesUnion((prev) => ({ ...prev, ...unionUpserts }));
+        setEdgesUnion((prev) => ({ ...prev, ...unionUpserts }));
       }
       if (Object.keys(strictUpserts).length) {
-        options.setEdgesStrict((prev) => ({ ...prev, ...strictUpserts }));
+        setEdgesStrict((prev) => ({ ...prev, ...strictUpserts }));
       }
 
       if (newReachableChildren.length) {
-        options.setNodesData((prev) => addPlaceholderNodes(prev, newReachableChildren));
-        options.setReachableNodeIds((prev) => mergeReachableNodeIds(prev, newReachableChildren));
+        setNodesData((prev) => addPlaceholderNodes(prev, newReachableChildren));
+        setReachableNodeIds((prev) => mergeReachableNodeIds(prev, newReachableChildren));
       }
     },
     [
@@ -315,11 +316,11 @@ export function useTreeCacheActions(options: UseTreeCacheActionsOptions) {
       options.childrenPageLimit,
       options.edgesStrictRef,
       options.reachableNodeIdsRef,
-      options.refresh,
-      options.setEdgesStrict,
-      options.setEdgesUnion,
-      options.setNodesData,
-      options.setReachableNodeIds,
+      refresh,
+      setEdgesStrict,
+      setEdgesUnion,
+      setNodesData,
+      setReachableNodeIds,
       options.totalVersionsTtlMs,
       updateTotalVersions,
     ],
@@ -353,17 +354,17 @@ export function useTreeCacheActions(options: UseTreeCacheActionsOptions) {
       }
 
       if (invalidation.versionDetailKeys.length > 0) {
-        options.setNodesData((prev) =>
+        setNodesData((prev) =>
           zeroVersionDetailFetchTimes(prev, invalidation.versionDetailKeys),
         );
       }
 
       if (invalidation.unionKeys.length > 0) {
-        options.setEdgesUnion((prev) => removeUnionEdges(prev, invalidation.unionKeys));
+        setEdgesUnion((prev) => removeUnionEdges(prev, invalidation.unionKeys));
       }
 
       if (invalidation.strictKeys.length > 0 || invalidation.strictPrefixes.length > 0) {
-        options.setEdgesStrict((prev) =>
+        setEdgesStrict((prev) =>
           removeStrictEdges({
             edgesStrict: prev,
             strictKeys: invalidation.strictKeys,
@@ -382,7 +383,7 @@ export function useTreeCacheActions(options: UseTreeCacheActionsOptions) {
           unionKeys: invalidation.unionKeys,
           strictKeys: invalidation.strictKeys,
           strictPrefixes: invalidation.strictPrefixes,
-        }).catch(() => options.refresh());
+        }).catch(() => refresh());
       }
     },
     [
@@ -390,10 +391,10 @@ export function useTreeCacheActions(options: UseTreeCacheActionsOptions) {
       options.contractAddress,
       options.eventInterfaceRef,
       options.queryCacheRef,
-      options.refresh,
-      options.setEdgesStrict,
-      options.setEdgesUnion,
-      options.setNodesData,
+      refresh,
+      setEdgesStrict,
+      setEdgesUnion,
+      setNodesData,
       refreshInvalidatedEdges,
     ],
   );
@@ -401,11 +402,11 @@ export function useTreeCacheActions(options: UseTreeCacheActionsOptions) {
   const bumpEndorsementCount = useCallback(
     (personHash: string, versionIndex: number, delta: number = 1) => {
       if (!personHash || !Number.isFinite(Number(versionIndex))) return;
-      options.setNodesData((prev) =>
+      setNodesData((prev) =>
         bumpNodeEndorsementCount(prev, personHash, Number(versionIndex), delta),
       );
     },
-    [options.setNodesData],
+    [setNodesData],
   );
 
   const markVersionMinted = useCallback(
@@ -419,7 +420,7 @@ export function useTreeCacheActions(options: UseTreeCacheActionsOptions) {
       const { personHash, versionIndex, tokenId, tokenURI, receipt } = params;
       if (!personHash || !Number.isFinite(Number(versionIndex)) || !tokenId) return;
       const id = makeNodeId(personHash, Number(versionIndex));
-      options.setNodesData((prev) => {
+      setNodesData((prev) => {
         const current = prev[id] ?? {
           personHash,
           versionIndex: Number(versionIndex),
@@ -436,7 +437,7 @@ export function useTreeCacheActions(options: UseTreeCacheActionsOptions) {
         hints: { personHash, versionIndex: Number(versionIndex), tokenId: String(tokenId) },
       } as TreeTxInvalidationInput);
     },
-    [options.setNodesData, invalidateByTx],
+    [setNodesData, invalidateByTx],
   );
 
   const cacheValidatedPersonVersion = useCallback(
@@ -449,7 +450,7 @@ export function useTreeCacheActions(options: UseTreeCacheActionsOptions) {
       const latest = options.nodesDataRef.current[id];
       if (!latest) throw new Error("Cannot cache metadata for a node that is no longer loaded");
       rebaseValidatedMetadataUnlock(latest, node);
-      options.setNodesData((current) => {
+      setNodesData((current) => {
         if (!isMetadataCacheRevisionCurrent(expectedRevision)) return current;
         const currentNode = current[id];
         if (!currentNode) return current;
@@ -460,7 +461,7 @@ export function useTreeCacheActions(options: UseTreeCacheActionsOptions) {
         }
       });
     },
-    [isMetadataCacheRevisionCurrent, options.nodesDataRef, options.setNodesData],
+    [isMetadataCacheRevisionCurrent, options.nodesDataRef, setNodesData],
   );
 
   const cacheConfirmedPersonVersion = useCallback(
@@ -487,7 +488,7 @@ export function useTreeCacheActions(options: UseTreeCacheActionsOptions) {
         reconcileConfirmedPersonVersion(options.nodesDataRef.current[id], committed),
       );
       options.nodesDataRef.current = nextNodes;
-      options.setNodesData((current) => {
+      setNodesData((current) => {
         if (!isMetadataCacheRevisionCurrent(expectedRevision)) return current;
         try {
           return upsertNode(current, reconcileConfirmedPersonVersion(current[id], committed));
@@ -522,7 +523,7 @@ export function useTreeCacheActions(options: UseTreeCacheActionsOptions) {
       isMetadataCacheRevisionCurrent,
       options.storageNS,
       options.nodesDataRef,
-      options.setNodesData,
+      setNodesData,
       options.useIndexedDbCache,
     ],
   );
@@ -584,7 +585,7 @@ export function useTreeCacheActions(options: UseTreeCacheActionsOptions) {
       if (!selected) return;
       const { versionDetails, nftDetails, storyData } = details;
       if (versionDetails) {
-        options.setNodesData((prev) =>
+        setNodesData((prev) =>
           applyNodeDetailVersionDetails({
             nodesData: prev,
             selected,
@@ -594,7 +595,7 @@ export function useTreeCacheActions(options: UseTreeCacheActionsOptions) {
         );
       }
       if (nftDetails) {
-        options.setNodesData((prev) =>
+        setNodesData((prev) =>
           applyNodeDetailNftDetails({
             nodesData: prev,
             selected,
@@ -605,7 +606,7 @@ export function useTreeCacheActions(options: UseTreeCacheActionsOptions) {
         );
       }
     },
-    [options.setNodesData],
+    [setNodesData],
   );
 
   return {

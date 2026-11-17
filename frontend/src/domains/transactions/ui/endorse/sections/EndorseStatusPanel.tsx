@@ -1,7 +1,7 @@
 import { Star } from "lucide-react";
 import { TransactionStatusView } from "../../shared/TransactionStatusView";
 import type { TransactionPhase } from "../../shared/transactionPhase";
-import type { TimelineStep } from "../../shared/TransactionTimeline";
+import type { TimelineStep } from "../../../../../shared/ui/TransactionTimeline";
 import { EndorseSuccessResult } from "../EndorseSuccessResult";
 import type { EndorseErrorResultView, EndorseSuccessResultView, EndorseT } from "../model/endorseTypes";
 

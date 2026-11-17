@@ -8,7 +8,7 @@ import {
   ModalSectionHeading,
   getFieldErrorA11y,
 } from "../../../../../shared/ui";
-import { ThemedSelect } from "../../shared/ThemedSelect";
+import { ThemedSelect } from "../../../../../shared/ui/ThemedSelect";
 import type { MintNFTFormValues, MintNFTT } from "../model/mintNftTypes";
 
 const FIELD_LABEL = `${MODAL_LABEL} mb-1`;

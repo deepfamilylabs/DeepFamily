@@ -94,10 +94,12 @@ app  →  pages  →  domains  →  shared  →  (workers / abi / i18n / assets)
 ```
 
 - `shared/` must not import from `domains/`, `pages/`, or `app/`.
-- `domains/*` must not import from sibling domains. Cross-domain needs belong in `shared/` or are wired at the `pages/` / `app/` layer.
+- A domain can consume a sibling domain only through its public `index.ts` entry. Implementation files remain private to their owning domain. Framework-free models and generic UI used across domains belong in `shared/`.
 - Contract result parsers, `NodeData` merge helpers, and shared read gateways used by multiple domains live under `shared/model` or `shared/clients`; import them from there rather than through domain re-exports.
 - `pages/` compose domains; they should not contain reusable logic — extract to the relevant domain instead.
 - Code imported by a worker (`workers/*.worker.ts`) must stay worker-safe: no React, no DOM, no `window`. Put such code under `shared/crypto/`, `shared/zk/`, or `shared/lib/`.
+
+`project/architecture` resolves relative paths before enforcing layer direction and domain entries, including re-exports, dynamic imports and TypeScript import types. Its negative fixtures cover new domains without a manual domain list. ESLint also treats Hooks ordering and dependency violations as errors. Lifecycle subscriptions use stable callbacks; event callbacks that need current committed state can use `shared/ui/useLatestCallback` without restarting their subscriptions.
 
 Cross-runtime identity, encryption, archive, and ZK protocol definitions live in the private
 `@deepfamily/protocol-core` workspace. Shared proof definitions and codecs remain browser- and
@@ -217,6 +219,8 @@ must never become retryable merely because a later read or UI update failed.
 Avoid long-lived nullable transaction state shapes such as `status + error | null + result | null` for complex flows. If multiple transaction UIs need a shared state model, make the shared model a discriminated union instead of adapting UI code around nullable fields.
 
 Sensitive inputs must not enter React state, reducer state, props, persistent storage, or logs. Passphrases, seeds, and raw identity material should be read only at the user action boundary and passed directly to a worker client or service, then cleared as soon as possible. Reducers may store non-sensitive derived status, validation results, task progress, friendly errors, and final non-sensitive results.
+
+Before the asset Worker posts a successful result, `shared/workers/shieldedAssetResults.ts` validates it against the method's strict DTO schema. Unknown fields are rejected recursively and schema diagnostics stay in the Worker. `exportRecoveryMaterial` is the explicit recovery-secret export; its result must still go directly to the transient recovery field. This guards DTO structure, not arbitrary information encoded inside an allowed string, and does not replace secret-lifetime tests or the other Workers' purpose-specific contracts.
 
 ### Error handling
 
@@ -761,10 +765,17 @@ This reads `deployments/localhost/` and writes `frontend/.env.local`, including 
 npm run frontend:dev        # Vite dev server (auto ABI sync)
 npm run frontend:build      # Production build
 npm run frontend:preview    # Serve the built bundle
+npm run check:fast          # Commit hook and CI: static checks and negative guard fixtures
 npm run frontend:check      # lint + source-rules + typecheck + locales + XSS scan + build + vitest
+npm run check:integration   # Contract/frontend suites, real proofs, CSP and local browser acceptance
+npm run check               # Fast + circuits + integration + Solidity static analysis
 ```
 
-`frontend:check` is the gate to run before committing — it matches what CI runs.
+The commit hook and the first CI job both run `check:fast`, which needs neither downloaded proving files nor Python. `scripts/check.mjs` defines the profiles used by local commands and CI. Full checks require the pinned Circom compiler, Powers of Tau, matching proving files and the Python analyzer environment described in `contract-security-checks.md`. Failed profiles stop at the first failed command and record completed coverage and the working-tree state in `test-results/checks/`.
+
+`npm run browser:check --workspace deepfamily-frontend` deploys an isolated, in-process local EVM, builds a separate production bundle and drives the real pages with synthetic identities and a controlled injected wallet. It checks adding a version and reading it after reload, native deposit/funding/claim, claim replay rejection, and account/network changes while a wallet request is pending. It uses the committed real verifiers and matching proving files; it does not connect to an external chain or reuse local deployments. Reports, screenshots and Playwright traces are saved in `test-results/browser-acceptance/`; `BROWSER_ACCEPTANCE_VIDEO=1` also records videos. Chrome is the default, with `BROWSER_ACCEPTANCE_EXECUTABLE_PATH` and `BROWSER_ACCEPTANCE_CHROME_CHANNEL` available for other installations. CSP scans save separate screenshots and traces in `frontend/.csp-scan/evidence/`. CI retains these artifacts on success and failure.
+
+Verification reports live under `test-results/`, separate from Hardhat's `artifacts/`: a full Hardhat build prunes non-contract JSON directories there, and `hardhat clean` removes the entire directory. Each check overwrites its previous local report; browser acceptance also replaces its screenshots and traces. Copy a run elsewhere before rerunning if it needs to be kept.
 
 ### Full local stack (contracts + UI)
 

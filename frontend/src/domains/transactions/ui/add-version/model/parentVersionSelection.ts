@@ -1,5 +1,5 @@
-import type { PersonVersionLookup } from "../../../hooks/usePersonVersionOptions";
-import { preferredPersonVersion } from "../../../model/personVersionSelection";
+import type { PersonVersionLookup } from "../../../../../shared/model/personVersionTypes";
+import { preferredPersonVersion } from "../../../../../shared/model/personVersionSelection";
 
 export interface ParentVersionSelectionUpdate {
   /** The hash this index was decided for; null once the identity is cleared. */

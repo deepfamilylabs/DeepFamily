@@ -1,4 +1,4 @@
-import type { PersonVersionOption } from "../hooks/usePersonVersionOptions";
+import type { PersonVersionOption } from "./personVersionTypes";
 
 /**
  * The version a contributor is most likely to mean: the one the community has

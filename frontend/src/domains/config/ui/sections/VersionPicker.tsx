@@ -1,8 +1,8 @@
 import { useTranslation } from "react-i18next";
 import { Field } from "./ConfigControls";
-import { ThemedSelect } from "../../../transactions/ui/shared/ThemedSelect";
-import { describeVersionOrigin } from "../../../transactions/model/personVersionMeta";
-import type { PersonVersionLookup } from "../../../transactions/hooks/usePersonVersionOptions";
+import { ThemedSelect } from "../../../../shared/ui/ThemedSelect";
+import { describeVersionOrigin } from "../../../../shared/model/personVersionMeta";
+import type { PersonVersionLookup } from "../../../../shared/model/personVersionTypes";
 
 export interface VersionPickerProps {
   value: number;

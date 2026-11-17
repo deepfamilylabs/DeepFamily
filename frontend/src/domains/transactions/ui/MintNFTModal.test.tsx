@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import React, { forwardRef, useEffect, useImperativeHandle } from "react";
+import React, { forwardRef, useEffect, useRef, useImperativeHandle } from "react";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ethers } from "ethers";
@@ -142,7 +142,7 @@ vi.mock("../../person", () => ({
       clearSecretInputs: () => mocks.clearSecretInputs(),
     }));
 
-    useEffect(() => {
+    const publishInitialForm = useRef(() => {
       props.onPublicFormChange?.({
         fullName: mocks.personFullName,
         gender: 2,
@@ -154,7 +154,8 @@ vi.mock("../../person", () => ({
       });
       // The real calculator reports this from user-controlled form state; the
       // mock injects it once to avoid parent state update loops.
-    }, []);
+    });
+    useEffect(() => publishInitialForm.current(), []);
 
     return (
       <div data-testid="person-hash-calculator">

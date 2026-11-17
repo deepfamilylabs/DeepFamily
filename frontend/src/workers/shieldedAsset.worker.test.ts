@@ -39,3 +39,17 @@ it.each([
   expect(mocks.safeMessage).toHaveBeenCalledExactlyOnceWith(failure, "recover");
   expect(request.params).toBeUndefined();
 });
+
+it("refuses a successful session result containing credentials before posting it", async () => {
+  mocks.call.mockResolvedValue({
+    credentials: { handle: "credentials:1", ownerSecret: "private-output-sentinel" },
+    identity: null, independentKey: null,
+  });
+  const request = { id: 2, method: "unlockIdentity", params: { rawPassphrase: "private-input-sentinel" } };
+  handler({ data: request });
+  await vi.waitFor(() => expect(postMessage).toHaveBeenCalledOnce());
+  const message = postMessage.mock.calls[0][0];
+  expect(message.ok).toBe(false);
+  expect(JSON.stringify(message)).not.toContain("sentinel");
+  expect(request.params).toBeUndefined();
+});

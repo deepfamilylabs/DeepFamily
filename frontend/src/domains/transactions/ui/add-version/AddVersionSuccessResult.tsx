@@ -1,5 +1,5 @@
 import { ethers } from "ethers";
-import { TransactionSuccessSummary, type SuccessRow } from "../shared/TransactionSuccessSummary";
+import { TransactionSuccessSummary, type SuccessRow } from "../../../../shared/ui/TransactionSuccessSummary";
 
 type AddVersionT = (key: string, fallback: string, options?: Record<string, unknown>) => string;
 

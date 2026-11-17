@@ -2,6 +2,7 @@ import { ShieldedAssetSession, shieldedAssetErrorMessage } from "./shieldedAsset
 import { installTrustedWorkerUrlPolicy } from "../shared/workers/trustedWorkerUrls";
 import type { ShieldedAssetWorkerCallMap, ShieldedAssetWorkerFailure } from "../shared/workers/shieldedAssetWorkerTypes";
 import { serializeChainError } from "@deepfamily/chain-client";
+import { publicShieldedAssetResult } from "../shared/workers/shieldedAssetResults";
 
 installTrustedWorkerUrlPolicy();
 const session = new ShieldedAssetSession();
@@ -11,7 +12,7 @@ self.addEventListener("message", (event: MessageEvent) => {
   const request = event.data as { id: number; method: keyof ShieldedAssetWorkerCallMap; params: never };
   queue = queue.then(async () => {
     try {
-      const result = await session.call(request.method, request.params);
+      const result = publicShieldedAssetResult(request.method, await session.call(request.method, request.params));
       self.postMessage({ id: request.id, ok: true, result });
     } catch (error) {
       const failure: ShieldedAssetWorkerFailure = { id: request.id, ok: false,

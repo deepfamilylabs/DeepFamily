@@ -75,7 +75,7 @@ export function PrivateLettersPanel(props: {
   }, []);
   useEffect(() => subscribeShieldedAssetWorkerLock(() => {
     const wasWorking = activeOperation.current !== null;
-    epoch.current++; activeOperation.current = null; setCode(""); setBody(""); setInbox(null); setError(""); setSubmission(null); setPreviousSubmissions([]); prepared.current = null; setWorking(false);
+    epoch.current++; activeOperation.current = null; setCode(""); setBody(""); setInbox(null); setErrorState(null); setSubmission(null); setPreviousSubmissions([]); prepared.current = null; setWorking(false);
     if (wasWorking) busyChange.current?.(false);
   }), []);
   useEffect(() => subscribeWalletConnectionChange(invalidateSending), [invalidateSending]);
@@ -96,7 +96,7 @@ export function PrivateLettersPanel(props: {
     // The read strategy changes neither the recipient nor the unlocked keys.
     // Keep their displayed content until the new read finishes.
     if (previousContentScope.current !== contentScope) {
-      setCode(""); setBody(""); setInbox(null); setError(""); setSubmission(null); setPreviousSubmissions([]);
+      setCode(""); setBody(""); setInbox(null); setErrorState(null); setSubmission(null); setPreviousSubmissions([]);
       prepared.current = null;
     } else {
       setSubmission(value => value?.state === "pending" ? { ...value, state: "unknown" } : value);
@@ -116,7 +116,7 @@ export function PrivateLettersPanel(props: {
     let broadcastHash = "";
     let walletRequested = false;
     activeOperation.current = "send";
-    setWorking(true); setStage(letter ? "checking" : "preparing"); props.onBusyChange?.(true); setError("");
+    setWorking(true); setStage(letter ? "checking" : "preparing"); props.onBusyChange?.(true); setErrorState(null);
     try {
       letter ??= await shieldedAssetWorkerCall("prepareLetter", {
         context: props.context, code, body,
@@ -171,7 +171,7 @@ export function PrivateLettersPanel(props: {
       else setSubmission(value);
     };
     activeOperation.current = "check";
-    setWorking(true); setStage("checking"); props.onBusyChange?.(true); setError("");
+    setWorking(true); setStage("checking"); props.onBusyChange?.(true); setErrorState(null);
     try {
       const result = await checkPrivateLetter({ address: props.context.lettersAddress, provider: reader,
         chainId: props.context.chainId, expected: original!, transactionHash: original!.transactionHash || undefined });
@@ -194,13 +194,13 @@ export function PrivateLettersPanel(props: {
   function startNewLetter() {
     if (busy) return;
     if (submission && unresolved(submission)) setPreviousSubmissions(items => [...items, submission]);
-    setSubmission(null); prepared.current = null; setCode(""); setBody(""); setError("");
+    setSubmission(null); prepared.current = null; setCode(""); setBody(""); setErrorState(null);
   }
   async function recover() {
     if (props.mode !== "inbox" || busy || !props.context.lettersAddress || !props.recoveryReady) return;
     const version = epoch.current;
     activeOperation.current = "recover";
-    setWorking(true); setStage("recovering"); props.onBusyChange?.(true); setError("");
+    setWorking(true); setStage("recovering"); props.onBusyChange?.(true); setErrorState(null);
     try {
       const result = await shieldedAssetWorkerCall("recoverLetters", { context: props.context }, { timeoutMs: 1_200_000 });
       if (mounted.current && version === epoch.current) setInbox(result);

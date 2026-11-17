@@ -4,7 +4,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import RootHashField from "./RootHashField";
 import VersionPicker from "./VersionPicker";
-import type { PersonVersionLookup } from "../../../transactions/hooks/usePersonVersionOptions";
+import type { PersonVersionLookup } from "../../../../shared/model/personVersionTypes";
 
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({
@@ -17,7 +17,7 @@ vi.mock("react-i18next", () => ({
   }),
 }));
 
-vi.mock("../../../transactions/ui/shared/ThemedSelect", () => ({
+vi.mock("../../../../shared/ui/ThemedSelect", () => ({
   ThemedSelect: ({ options, disabled }: any) => (
     <div data-testid="themed-select" data-disabled={String(Boolean(disabled))}>
       {options.map((option: any) => (

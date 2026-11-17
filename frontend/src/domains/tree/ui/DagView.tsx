@@ -52,16 +52,16 @@ const DagView = noPropsForwardRef<FamilyTreeViewHandle>((ref) => {
       }
     }
     if (Object.keys(next).length) setMeasuredWidths(next);
-  }, [nodes, nodeWidth]);
+  }, [nodes, nodeWidth, MAX_NODE_WIDTH]);
 
   const [hover, setHover] = useState<{ id: string; x: number; y: number; hash: string } | null>(
     null,
   );
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const toContainer = (svgX: number, svgY: number) => ({
+  const toContainer = useCallback((svgX: number, svgY: number) => ({
     left: transform.x + svgX * transform.k,
     top: transform.y + svgY * transform.k,
-  });
+  }), [transform.x, transform.y, transform.k]);
   const recomputeHoverPosition = useCallback(() => {
     const anchorId = ctxSelectedId || hover?.id;
     if (!anchorId) return;
@@ -75,7 +75,7 @@ const DagView = noPropsForwardRef<FamilyTreeViewHandle>((ref) => {
       if (prev.x === scr.left && prev.y === scr.top) return prev;
       return { ...prev, x: scr.left, y: scr.top };
     });
-  }, [ctxSelectedId, hover?.id, positions, measuredWidths, nodeWidth, transform]);
+  }, [ctxSelectedId, hover?.id, positions, measuredWidths, nodeWidth, toContainer]);
   useEffect(() => {
     recomputeHoverPosition();
   }, [transform, recomputeHoverPosition]);
@@ -92,7 +92,7 @@ const DagView = noPropsForwardRef<FamilyTreeViewHandle>((ref) => {
         });
       }
     } else if (!hover) setHover(null);
-  }, [ctxSelectedId, positions, measuredWidths, nodeWidth, transform, selectedHash, hover]);
+  }, [ctxSelectedId, positions, measuredWidths, nodeWidth, toContainer, selectedHash, hover]);
 
   const miniNodes = useMemo(
     () =>

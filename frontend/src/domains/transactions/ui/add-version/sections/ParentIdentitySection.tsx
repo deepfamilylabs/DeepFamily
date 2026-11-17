@@ -3,9 +3,9 @@ import { Link } from "react-router-dom";
 import { MODAL_CHIP } from "../../../../../shared/ui";
 import { BookOpen, ChevronDown, ChevronRight, Users } from "lucide-react";
 import { PersonHashCalculator, type PersonHashCalculatorHandle } from "../../../../person";
-import { ThemedSelect } from "../../shared/ThemedSelect";
-import { describeVersionOrigin } from "../../../model/personVersionMeta";
-import type { PersonVersionLookup } from "../../../hooks/usePersonVersionOptions";
+import { ThemedSelect } from "../../../../../shared/ui/ThemedSelect";
+import { describeVersionOrigin } from "../../../../../shared/model/personVersionMeta";
+import type { PersonVersionLookup } from "../../../../../shared/model/personVersionTypes";
 import type {
   AddVersionT,
   ParentKind,

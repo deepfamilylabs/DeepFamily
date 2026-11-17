@@ -410,7 +410,7 @@ export const PersonHashCalculator = forwardRef<
       risk: passphraseRisk,
       hasPassphrase,
       strength: passwordStrength,
-    } = useMemo(() => {
+    } = (() => {
       const rawPassphrase = passphraseInputRef.current?.value ?? "";
       const normalized = normalizePassphraseForHash(rawPassphrase);
       return {
@@ -418,10 +418,10 @@ export const PersonHashCalculator = forwardRef<
         hasPassphrase: normalized.length > 0,
         strength: validatePassphraseStrength(normalized, false),
       };
-    }, [passphraseRevision]);
+    })();
     const isPassphraseDisallowed = passphraseRisk === "disallowed";
 
-    const buildTransformedData = (
+    const buildTransformedData = useCallback((
       values?: Partial<HashFormInput>,
     ): Omit<HashForm, "passphrase"> => {
       const snapshot = values ?? getValues();
@@ -442,7 +442,7 @@ export const PersonHashCalculator = forwardRef<
             : Number(snapshot.birthDay),
         gender: Number(snapshot.gender || 0),
       };
-    };
+    }, [getValues]);
 
     const [computedHash, setComputedHash] = useState("");
     const [isComputingHash, setIsComputingHash] = useState(false);
@@ -561,10 +561,9 @@ export const PersonHashCalculator = forwardRef<
       }),
       [
         getValues,
-        passphraseRevision,
+        buildTransformedData,
         requirePassphraseConfirmation,
         clearSecretInputs,
-        independentKeyCredentials,
       ],
     );
 
@@ -581,7 +580,7 @@ export const PersonHashCalculator = forwardRef<
         ...transformedData,
         hasPassphrase,
       });
-    }, [fullName, isBirthBC, birthYear, birthMonth, birthDay, gender, passphraseRevision]);
+    }, [fullName, isBirthBC, birthYear, birthMonth, birthDay, gender, passphraseRevision, hasPassphrase, buildTransformedData]);
 
     useEffect(() => {
       // Any edited field invalidates the previously computed hash immediately.
@@ -658,6 +657,8 @@ export const PersonHashCalculator = forwardRef<
       isPassphraseDisallowed,
       identitySuiteId,
       computeHash,
+      hasPassphrase,
+      buildTransformedData,
       independentKeyCredentials,
     ]);
 

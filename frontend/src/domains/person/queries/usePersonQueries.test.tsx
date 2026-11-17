@@ -68,6 +68,15 @@ describe("person query hooks", () => {
     mocks.gateway.getStoryRecords.mockReset();
   });
 
+  it("refetches a missing person even when clearing data leaves the same null value", async () => {
+    mocks.gateway.getVersionDetails.mockResolvedValue(null);
+    const { result } = renderHook(() => usePersonDetails("0xperson", 2));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(mocks.gateway.getVersionDetails).toHaveBeenCalledTimes(1);
+    act(() => result.current.refetch());
+    await waitFor(() => expect(mocks.gateway.getVersionDetails).toHaveBeenCalledTimes(2));
+  });
+
   it("usePersonDetails fetches version details with TTL and exposes loading/data", async () => {
     const deferred = createDeferred<any>();
     mocks.gateway.getVersionDetails.mockReturnValue(deferred.promise);

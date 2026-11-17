@@ -1,9 +1,9 @@
 import { AlertCircle, BookOpen } from "lucide-react";
 import { Link } from "react-router-dom";
 import { ModalSectionHeading, getFieldErrorA11y, modalField } from "../../../../../shared/ui";
-import { ThemedSelect } from "../../shared/ThemedSelect";
-import type { PersonVersionLookup } from "../../../hooks/usePersonVersionOptions";
-import { describeVersionOrigin } from "../../../model/personVersionMeta";
+import { ThemedSelect } from "../../../../../shared/ui/ThemedSelect";
+import type { PersonVersionLookup } from "../../../../../shared/model/personVersionTypes";
+import { describeVersionOrigin } from "../../../../../shared/model/personVersionMeta";
 import type { EndorseT } from "../model/endorseTypes";
 
 export interface EndorseTargetFormProps {

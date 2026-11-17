@@ -34,16 +34,14 @@ jobs:
         run: python -m pip install -r security/slither-requirements.txt
 
       - name: Check Solidity security
-        run: |
-          npm run build -- --force
-          node scripts/check-solidity-security.mjs
+        run: npm run security:solidity
 
       - name: Keep Solidity analysis report
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: solidity-security-report
-          path: artifacts/security/slither.json
+          path: test-results/security/slither.json
           if-no-files-found: warn
           retention-days: 7
 

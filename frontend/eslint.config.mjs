@@ -1,32 +1,8 @@
 import tsParser from "@typescript-eslint/parser";
 import reactHooks from "eslint-plugin-react-hooks";
+import projectRules from "./scripts/eslint/architecture.mjs";
 
 const srcFiles = ["src/**/*.{ts,tsx}"];
-
-const restrictedImportRule = (patterns) => [
-  "error",
-  {
-    patterns: patterns.map((group) => ({ group })),
-  },
-];
-
-const noAppOrPages = [["**/app/**"], ["**/pages/**"]];
-const noDomainInternal = [["**/domains/*/*"], ["**/domains/*/**/*"]];
-const noPersonInternal = [["**/person/*"], ["**/person/**/*"]];
-const noTreeInternal = [["**/tree/*"], ["**/tree/**/*"]];
-const noTreeModel = [["**/tree/model"], ["**/tree/model/**"]];
-const noTransactionsInternal = [["**/transactions/*"], ["**/transactions/**/*"]];
-const noWalletInternal = [["**/wallet/*"], ["**/wallet/**/*"]];
-const noSiblingConfigInternal = [
-  ["../../config/*"],
-  ["../../config/**/*"],
-  ["../../../config/*"],
-  ["../../../config/**/*"],
-  ["../../../../config/*"],
-  ["../../../../config/**/*"],
-  ["../../../../../config/*"],
-  ["../../../../../config/**/*"],
-];
 
 export default [
   {
@@ -70,115 +46,12 @@ export default [
     },
     plugins: {
       "react-hooks": reactHooks,
+      project: projectRules,
     },
-  },
-  {
-    files: ["src/shared/**/*.{ts,tsx}"],
     rules: {
-      "no-restricted-imports": restrictedImportRule([
-        ["**/app/**"],
-        ["**/domains/**"],
-        ["**/pages/**"],
-        ["**/components/**"],
-        ["**/context/**"],
-        ["**/hooks/**"],
-      ]),
-    },
-  },
-  {
-    files: ["src/domains/**/*.{ts,tsx}"],
-    rules: {
-      "no-restricted-imports": restrictedImportRule(noAppOrPages),
-    },
-  },
-  {
-    files: ["src/domains/tree/**/*.{ts,tsx}"],
-    rules: {
-      "no-restricted-imports": restrictedImportRule([
-        ...noAppOrPages,
-        ...noSiblingConfigInternal,
-        ...noPersonInternal,
-        ...noTransactionsInternal,
-        ...noWalletInternal,
-      ]),
-    },
-  },
-  {
-    files: ["src/domains/config/**/*.{ts,tsx}"],
-    rules: {
-      "no-restricted-imports": restrictedImportRule([
-        ...noAppOrPages,
-        ...noTreeInternal,
-        ...noTreeModel,
-        ...noWalletInternal,
-        ["**/wallet/config"],
-        ["**/wallet/config/**"],
-      ]),
-    },
-  },
-  {
-    files: [
-      "src/domains/person/**/*.{ts,tsx}",
-      "src/domains/transactions/**/*.{ts,tsx}",
-      "src/domains/wallet/**/*.{ts,tsx}",
-    ],
-    rules: {
-      "no-restricted-imports": restrictedImportRule([
-        ...noAppOrPages,
-        ...noTreeModel,
-      ]),
-    },
-  },
-  {
-    files: ["src/domains/person/**/*.{ts,tsx}"],
-    rules: {
-      "no-restricted-imports": restrictedImportRule([
-        ...noAppOrPages,
-        ...noSiblingConfigInternal,
-        ...noTreeInternal,
-        ...noTreeModel,
-        ...noTransactionsInternal,
-        ...noWalletInternal,
-      ]),
-    },
-  },
-  {
-    files: ["src/domains/transactions/**/*.{ts,tsx}"],
-    rules: {
-      "no-restricted-imports": restrictedImportRule([
-        ...noAppOrPages,
-        ...noPersonInternal,
-        ...noSiblingConfigInternal,
-        ...noTreeInternal,
-        ...noTreeModel,
-        ...noWalletInternal,
-      ]),
-    },
-  },
-  {
-    files: ["src/domains/wallet/**/*.{ts,tsx}"],
-    rules: {
-      "no-restricted-imports": restrictedImportRule([
-        ...noAppOrPages,
-        ...noPersonInternal,
-        ...noSiblingConfigInternal,
-        ...noTreeModel,
-        ...noTransactionsInternal,
-      ]),
-    },
-  },
-  {
-    files: [
-      "src/app/**/*.{ts,tsx}",
-      "src/pages/**/*.{ts,tsx}",
-      "src/components/**/*.{ts,tsx}",
-      "src/hooks/**/*.{ts,tsx}",
-      "src/context/**/*.{ts,tsx}",
-    ],
-    rules: {
-      "no-restricted-imports": restrictedImportRule([
-        ...noDomainInternal,
-      ]),
+      "react-hooks/rules-of-hooks": "error",
+      "react-hooks/exhaustive-deps": "error",
+      "project/architecture": "error",
     },
   },
   {
@@ -188,17 +61,24 @@ export default [
       "no-restricted-imports": [
         "error",
         {
-          paths: [{
-            name: "ethers",
-            importNames: ["Contract", "BrowserProvider", "JsonRpcProvider", "ContractFactory"],
-            allowTypeImports: true,
-            message: "Create contract and RPC clients inside a domain service; pages compose domain operations.",
-          }],
-          patterns: [
-            ...noDomainInternal.map((group) => ({ group })),
+          paths: [
             {
-              group: ["**/clients/contractFactory", "**/clients/providerFactory", "**/clients/providerRegistry"],
-              message: "Pages must use domain services rather than construct contract or RPC clients.",
+              name: "ethers",
+              importNames: ["Contract", "BrowserProvider", "JsonRpcProvider", "ContractFactory"],
+              allowTypeImports: true,
+              message:
+                "Create contract and RPC clients inside a domain service; pages compose domain operations.",
+            },
+          ],
+          patterns: [
+            {
+              group: [
+                "**/clients/contractFactory",
+                "**/clients/providerFactory",
+                "**/clients/providerRegistry",
+              ],
+              message:
+                "Pages must use domain services rather than construct contract or RPC clients.",
             },
           ],
         },

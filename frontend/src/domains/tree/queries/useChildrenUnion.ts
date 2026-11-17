@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { NodeId } from "../../../shared/model";
 import { TTL } from "../../../shared/cache/ttl";
 import { defaultErrorTranslator, getFriendlyErrorMessage } from "../../../shared/lib/errors";
@@ -21,10 +21,10 @@ export function useChildrenUnion(
   const [totalVersions, setTotalVersions] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const triggerRef = useRef(0);
+  const [refreshRevision, setRefreshRevision] = useState(0);
 
   const refetch = useCallback(() => {
-    triggerRef.current += 1;
+    setRefreshRevision((revision) => revision + 1);
     setError(null);
   }, []);
 
@@ -63,7 +63,7 @@ export function useChildrenUnion(
     return () => {
       cancelled = true;
     };
-  }, [gateway, parentHash, pageLimit, triggerRef.current]);
+  }, [gateway, parentHash, pageLimit, refreshRevision]);
 
   return { childIds, totalVersions, loading, error, refetch };
 }

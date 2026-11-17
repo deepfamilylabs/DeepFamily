@@ -14,7 +14,8 @@
     "csp:scan": "node ./scripts/csp-scan.mjs",
     "config:local": "node ./scripts/update-local-config.mjs",
     "sync:abi": "node ./scripts/sync-abi.mjs",
-    "locales:check": "node ./scripts/compare-locales.mjs --check"
+    "locales:check": "node ./scripts/compare-locales.mjs --check",
+    "browser:check": "hardhat --config ../hardhat.config.mjs run --no-compile scripts/browser-acceptance.mjs"
   },
   "dependencies": {
     "@deepfamily/chain-client": "0.1.0",

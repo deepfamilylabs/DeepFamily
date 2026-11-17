@@ -27,7 +27,7 @@ import { useDisclosureProof } from "./useDisclosureProof";
 import { useMintNftFlow } from "./useMintNftFlow";
 import { useTransactionPreviewDecision } from "../../shared/useTransactionPreviewDecision";
 import { resolveTransactionPhase } from "../../shared/transactionPhase";
-import { buildTimeline, useTimelineProgress } from "../../shared/TransactionTimeline";
+import { buildTimeline, useTimelineProgress } from "../../../../../shared/ui/TransactionTimeline";
 import { MINT_TIMELINE_STEPS, mintTimelineStep } from "../../shared/timelineSteps";
 import { useTransactionCenterEntry } from "../../shared/useTransactionCenterEntry";
 import { useTransactionTargetSelection } from "../../shared/useTransactionTargetSelection";
@@ -279,14 +279,7 @@ export function useMintNftModalController({
     }
 
     resetBusinessState();
-  }, [
-    initialPersonHash,
-    initialVersionIndex,
-    isOpen,
-    resetDisclosureProof,
-    resetMintNftFlow,
-    resetBusinessState,
-  ]);
+  }, [initialPersonHash, initialVersionIndex, isOpen, resetDisclosureProof, resetMintNftFlow, resetBusinessState, seedTarget]);
 
   // Minting can only target a version the wallet already endorsed, so which
   // version a lookup preselects is a minting rule, not a shared one.

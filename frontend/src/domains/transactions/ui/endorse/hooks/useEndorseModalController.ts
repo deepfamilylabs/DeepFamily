@@ -8,7 +8,7 @@ import { useTreeMutations, useTreeNodeAccess } from "../../../../tree";
 import { useResponsiveModalMode } from "../../../../../shared/ui";
 import { useTransactionModalFrameState } from "../../shared/useTransactionModalFrameState";
 import { resolveTransactionPhase } from "../../shared/transactionPhase";
-import { buildTimeline, useTimelineProgress } from "../../shared/TransactionTimeline";
+import { buildTimeline, useTimelineProgress } from "../../../../../shared/ui/TransactionTimeline";
 import { ENDORSE_TIMELINE_STEPS, endorseTimelineStep } from "../../shared/timelineSteps";
 import { useTransactionCenterEntry } from "../../shared/useTransactionCenterEntry";
 import { useTransactionTargetSelection } from "../../shared/useTransactionTargetSelection";

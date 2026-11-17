@@ -2,6 +2,7 @@ import { expect } from "chai";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { checkPlan } from "../scripts/check.mjs";
 
 import {
   buildZkBuildCommands,
@@ -76,10 +77,10 @@ describe("public ZK command surface", function () {
     expect(scripts["contracts:check"]).to.match(/npm test -- --no-compile$/u);
     expect(scripts.test).not.to.include("--no-compile");
     expect(scripts["dev:fund"]).to.include("run --no-compile scripts/fund-wallet.mjs");
-    expect(scripts["frontend:check"].match(/locales:check/gu)).to.have.length(1);
-    expect(scripts["frontend:check"]).to.include(
-      "npm run locales:check --workspace deepfamily-frontend",
-    );
+    expect(scripts["frontend:check"]).to.equal("node scripts/check.mjs frontend");
+    expect(
+      checkPlan("frontend").filter((command) => command.includes("locales:check")),
+    ).to.deep.equal([["npm", "run", "locales:check", "--workspace", "deepfamily-frontend"]]);
     expect(scripts).not.to.have.property("frontend:locales:check");
     expect(scripts).not.to.have.property("frontend:sync:abi");
     const frontend = JSON.parse(fs.readFileSync("frontend/package.json", "utf8")).scripts;

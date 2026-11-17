@@ -1,4 +1,4 @@
-import type { PersonVersionLookup } from "../../../hooks/usePersonVersionOptions";
+import type { PersonVersionLookup } from "../../../../../shared/model/personVersionTypes";
 
 export interface MintVersionSelectionUpdate {
   decidedForHash: string;

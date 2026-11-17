@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { defaultErrorTranslator, getFriendlyErrorMessage } from "../../../shared/lib/errors";
 import type { NodeId } from "../../../shared/model";
 import { useTreeGateway } from "./useTreeGateway";
@@ -19,10 +19,10 @@ export function useChildrenStrict(
   const [childIds, setChildIds] = useState<NodeId[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const triggerRef = useRef(0);
+  const [refreshRevision, setRefreshRevision] = useState(0);
 
   const refetch = useCallback(() => {
-    triggerRef.current += 1;
+    setRefreshRevision((revision) => revision + 1);
     setError(null);
   }, []);
 
@@ -57,7 +57,7 @@ export function useChildrenStrict(
     return () => {
       cancelled = true;
     };
-  }, [gateway, parentHash, parentVersionIndex, pageLimit, triggerRef.current]);
+  }, [gateway, parentHash, parentVersionIndex, pageLimit, refreshRevision]);
 
   return { childIds, loading, error, refetch };
 }

@@ -1,8 +1,8 @@
 import { useId } from "react";
 import { AlertTriangle } from "lucide-react";
 import { TransactionButton } from "./TransactionButton";
-import { CopyValueButton } from "./TransactionSuccessSummary";
-import { useFocusOnMount } from "./useFocusOnMount";
+import { CopyValueButton } from "../../../../shared/ui/TransactionSuccessSummary";
+import { useFocusOnMount } from "../../../../shared/ui/useFocusOnMount";
 
 type ErrorResult = {
   type: string;

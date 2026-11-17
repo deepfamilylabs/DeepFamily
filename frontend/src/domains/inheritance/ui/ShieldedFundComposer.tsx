@@ -4,7 +4,7 @@ import type {
   ShieldedFundingEntry,
   ShieldedWalletSummary,
 } from "../../../shared/workers/shieldedAssetWorkerTypes";
-import { ThemedSelect } from "../../transactions/ui/shared/ThemedSelect";
+import { ThemedSelect } from "../../../shared/ui/ThemedSelect";
 import { parseShieldedPeriodDays } from "../model/shieldedBudgetPeriod";
 import { formatShieldedAmount } from "../model/shieldedDisplay";
 import {

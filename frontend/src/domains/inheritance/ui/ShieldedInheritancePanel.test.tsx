@@ -60,7 +60,7 @@ vi.mock("../../config", () => ({
     update: mocks.configUpdate,
   }),
 }));
-vi.mock("../../tree/context", () => ({ useTreeGraphData: () => ({ nodesData: {} }) }));
+vi.mock("../../tree", () => ({ useTreeGraphData: () => ({ nodesData: {} }) }));
 vi.mock("../../transactions", () => ({ useTransactionCenter: () => mocks.center }));
 vi.mock("../../wallet", () => ({
   getWalletConnectionGeneration: () => mocks.walletGeneration,
@@ -547,6 +547,31 @@ function restorePendingSubmission(kind: "action" | "approval" = "action", hash: 
 }
 
 describe("Worker-backed shielded wallet", () => {
+  it("clears the previous identity's notes while a replacement session recovers in the same pool", async () => {
+    mocks.identity = identity;
+    mocks.call.mockImplementation(async (method: string) => method === "recover" ? {
+      ...emptyWallet,
+      notes: [{ commitment: "100", ownerCommitment: "1", slot: "identity", kind: "value", amount: "1000000000000000000" }],
+    } : emptyDiscovery);
+    await renderPanel();
+    chooseAction("unshield");
+    selectValue("100");
+    let finishRecovery!: (value: unknown) => void;
+    mocks.call.mockImplementation(async (method: string) => method === "recover"
+      ? new Promise((resolve) => { finishRecovery = resolve; })
+      : emptyDiscovery);
+    await act(async () => publishSession({
+      credentials: { handle: "credentials:replacement" },
+      identity: { ...identity, handle: "identity:replacement" },
+      independentKey: null,
+    }));
+    await waitFor(() => expect(finishRecovery).toBeTypeOf("function"));
+    expect(document.querySelector('input[value="100"]')).toBeNull();
+    expect(within(screen.getByRole("group", { name: label("identityCredentials") })).queryByText("1", { exact: true })).toBeNull();
+    await act(async () => finishRecovery(emptyWallet));
+    await waitUntilIdle();
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.submit.mockReset().mockResolvedValue(sentTransaction);

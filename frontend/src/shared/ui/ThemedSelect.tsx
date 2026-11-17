@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState, type FocusEvent } from "react";
 import { ChevronDown } from "lucide-react";
-import { useListboxA11y } from "../../../../shared/ui/useListboxA11y";
+import { useListboxA11y } from "./useListboxA11y";
 
 interface ThemedSelectProps<T extends number | string> {
   value: T;

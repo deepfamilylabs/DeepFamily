@@ -126,7 +126,8 @@ cp .env.example .env
 # Set PRIVATE_KEY and HISTORICAL_DATA_FILES in .env before starting dev:all.
 cp frontend/.env.example frontend/.env.local
 # Set VITE_ZK_ASSET_BASE_URL in frontend/.env.local to the proving-file host.
-npm run check    # Frontend checks + contract lint/build/test
+npm run check:fast # Architecture, lint, types and guard checks
+npm run check      # Complete local CI suites, including real proofs and browser acceptance
 npm run dev:all  # Start local node + deploy + seed data + frontend
 ```
 
@@ -135,7 +136,7 @@ npm run dev:all  # Start local node + deploy + seed data + frontend
 ```bash
 npm install           # Install dependencies
 cp frontend/.env.example frontend/.env.local  # Then set VITE_ZK_ASSET_BASE_URL
-npm run check           # Run frontend + contract verification
+npm run check           # Run complete CI suites (requires pinned ZK and analyzer toolchains)
 npm run dev:node        # Start local Hardhat node
 npm run dev:deploy      # Check ZK artifacts and deploy the complete system
 npm run dev:fund        # Fund the PRIVATE_KEY wallet with local test ETH
@@ -160,7 +161,8 @@ Rerunning the seed resumes existing data and does not change an existing NFT's o
 ```bash
 npm test               # Protocol and contract tests, including real receive/full-depth proofs
 npm run frontend:check # Run frontend lint + typecheck + tests
-npm run check          # Run circuit constraints, frontend checks and contract lint/build/test
+npm run check:fast     # Run the same fast checks as the commit hook and first CI job
+npm run check          # Fast checks, circuit constraints, integration and Solidity analysis
 ```
 
 Real proof tests require the manifest-pinned artifacts; missing or mismatched files fail the
@@ -728,11 +730,16 @@ governance task rejects upgrade and ownership-transfer functions. See
 
 ### Standards
 
-- Prettier + Solhint + lint-staged pre-commit (husky)
+- Husky runs `npm run check:fast` before commit; formatting remains available through Prettier
 - Conventional Commits
 - Tests required for new features
 - Prefer `npm run check` before opening a PR
 - Update README / docs when changing core behaviors
+
+Local and CI gates share `scripts/check.mjs`. Full checks require the pinned Circom compiler,
+Powers of Tau, matching proving files and the analyzer environment in
+[contract-security-checks.md](docs/contract-security-checks.md). See
+[frontend verification](docs/frontend.md#development-commands) for profiles and browser evidence.
 
 ## License
 

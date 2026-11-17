@@ -7,7 +7,7 @@ import {
   shouldShowTrustedSourceFilterToggle,
 } from "../../../../shared/config/env";
 import { useTreeMutations, useVizOptions } from "../../../tree";
-import { usePersonVersionOptions } from "../../../transactions/hooks/usePersonVersionOptions";
+import { usePersonVersionOptions } from "../../../transactions";
 import { isHash32, reconcileRootVersionSelection, summarizeDataSourceHealth } from "../../model";
 import type { ReaderHealth } from "../../model";
 import type { RootHashPresence } from "../sections/RootHashField";
@@ -176,7 +176,7 @@ export function useFamilyTreeConfigForm() {
     // The defaults name their own version; the lookup for that hash must not
     // replace it.
     decidedVersionHashRef.current = localized.hash || null;
-  }, [defaults, getLocalizedFormDefaultRoot]);
+  }, [getLocalizedFormDefaultRoot]);
 
   const applyConfigChanges = useCallback(() => {
     if (!validateAll()) return;

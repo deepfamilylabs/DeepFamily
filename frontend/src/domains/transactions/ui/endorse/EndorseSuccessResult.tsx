@@ -1,4 +1,4 @@
-import { TransactionSuccessSummary, type SuccessRow } from "../shared/TransactionSuccessSummary";
+import { TransactionSuccessSummary, type SuccessRow } from "../../../../shared/ui/TransactionSuccessSummary";
 
 type EndorseSuccessResultProps = {
   t: (key: string, fallback: string) => string;

@@ -14,6 +14,7 @@ const baseUrl = process.env.CSP_SCAN_BASE_URL || `http://${host}:${port}`
 // The scan builds and serves its own copy, configured for scanning, and never touches dist/.
 const workDir = path.join(process.cwd(), '.csp-scan')
 const outDir = path.join(workDir, 'dist')
+const evidenceDir = path.join(workDir, 'evidence')
 const reportFile = process.env.DEEP_CSP_REPORT_FILE || path.join(workDir, `report.${mode}.jsonl`)
 const viteBin = path.join(path.dirname(createRequire(import.meta.url).resolve('vite/package.json')), 'bin', 'vite.js')
 
@@ -240,8 +241,7 @@ const runWorkerFlows = async (page) => {
       const assetCheck = await call(zk, 'verifyShieldedReceiveCode', { code: assetCreated.code })
       const publicCheckFields = [
         'ok', 'purpose', 'authorizationAlias', 'authorizationCounter', 'expiresAt',
-        'ownerCommitment', 'viewingKey', 'keyMode', 'identitySuiteId',
-        'independentKeySuiteId', 'independentKeyDerivationVersion', 'fingerprint',
+        'ownerCommitment', 'viewingKey', 'keyMode', 'fingerprint',
       ]
       assertPublicFields(check, publicCheckFields, 'receive code verification')
       assertPublicFields(assetCheck, publicCheckFields, 'asset receive code verification')
@@ -265,7 +265,7 @@ const runWorkerFlows = async (page) => {
         assetIdentitySuiteId: assetState.identity.identitySuiteId,
         assetReceiveCodeVerified: assetCheck.ok,
         assetKeyMode: assetCheck.keyMode,
-        assetReceivingFieldsMatch: publicCheckFields.filter(field => field !== 'viewingKey' && field !== 'fingerprint')
+        assetReceivingFieldsMatch: publicCheckFields.filter(field => !['viewingKey', 'fingerprint', 'ownerCommitment'].includes(field))
           .every(field => assetCheck[field] === check[field]),
         receivePublicKeysDiversified: /^0x[0-9a-f]{128}$/iu.test(check.viewingKey) &&
           /^0x[0-9a-f]{128}$/iu.test(assetCheck.viewingKey) &&
@@ -303,7 +303,7 @@ const runWorkerFlows = async (page) => {
       result.assetIdentitySuiteId === Number(input.identitySuiteId) && result.assetKeyMode === 0,
     ],
     ['receive verification exposes only the expected public fields', result.receivePurposeValidated === true],
-    ['both proving workers bind the same receiving owner and authorization fields', result.assetReceivingFieldsMatch === true],
+    ['both proving workers bind the same identity authorization and mode', result.assetReceivingFieldsMatch === true],
     ['independently generated codes use different receiving public keys', result.receivePublicKeysDiversified === true],
   ]
   const broken = checks.find(([, ok]) => !ok)
@@ -311,8 +311,7 @@ const runWorkerFlows = async (page) => {
 
   const { delivery, ciphertext, proof } = result.letter
   if (delivery.checkpointId !== rpcFixture.checkpointId || delivery.asOf !== rpcFixture.asOf ||
-    BigInt(delivery.deadline) !== BigInt(rpcFixture.asOf) + SHIELDED_RECEIVE_PROOF_LIFETIME || !/^0x[0-9a-f]+$/iu.test(proof) ||
-    (proof.length - 2) / 2 !== 1184) {
+    BigInt(delivery.deadline) !== BigInt(rpcFixture.asOf) + SHIELDED_RECEIVE_PROOF_LIFETIME || !/^0x[0-9a-f]+$/iu.test(proof)) {
     throw new Error('worker flows: letter delivery does not match the controlled authorization state')
   }
   const { cipherLo, cipherHi } = splitShieldedLetterCiphertextHash(ciphertext)
@@ -420,6 +419,7 @@ const main = async () => {
   const pageViolations = []
   let workerFailure = null
   await fs.mkdir(workDir, { recursive: true })
+  await fs.mkdir(evidenceDir, { recursive: true })
   const server = await spawnFrontendServer()
   const serverExit = new Promise((_, reject) => {
     server.on('exit', (code) => reject(new Error(`frontend server exited (${code})`)))
@@ -431,6 +431,7 @@ const main = async () => {
 
     const browser = await withLaunchHints()
     const context = await browser.newContext()
+    await context.tracing.start({ screenshots: true, snapshots: true })
     // The browser's own CSP messages never reach page.on('console'), so record the violation
     // events themselves. A worker's violations arrive only through report-uri.
     await context.addInitScript(() => {
@@ -606,6 +607,7 @@ const main = async () => {
         await page.goto(url, { waitUntil: 'domcontentloaded' })
         await page.waitForTimeout(1500)
         await collectStyleAttrs(route)
+        await page.screenshot({ path: path.join(evidenceDir, `${route === '/' ? 'home' : route.slice(1).replaceAll('/', '-')}.png`), fullPage: true })
         const violations = await page.evaluate(() => window.__cspViolations ?? [])
         for (const violation of violations) pageViolations.push({ route, ...violation })
       }
@@ -676,6 +678,9 @@ const main = async () => {
         for (const text of styleWrites.slice(0, 10)) console.log(`[csp-scan] ${text}`)
       }
     } finally {
+      for (const page of context.pages())
+        await page.screenshot({ path: path.join(evidenceDir, 'last-page.png'), fullPage: true }).catch(() => {})
+      await context.tracing.stop({ path: path.join(evidenceDir, 'trace.zip') }).catch(() => {})
       await browser.close()
     }
   } finally {

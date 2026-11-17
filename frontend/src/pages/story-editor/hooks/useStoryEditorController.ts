@@ -169,6 +169,8 @@ export function useStoryEditorController() {
   const sealStoryFlow = useSealStoryFlow();
   const nftQuery = useNFTDetails(validTokenId);
   const storyQuery = useStoryData(validTokenId);
+  const refetchStory = storyQuery.refetch;
+  const recheckAccess = access.recheck;
   const recordTypeOptions = useMemo(() => getEditableRecordTypeOptions(t), [t]);
 
   useEffect(() => {
@@ -434,7 +436,7 @@ export function useStoryEditorController() {
           scopedQueryClient.clear(storyKey(validTokenId));
           scopedQueryClient.clear(`${storyKey(validTokenId)}:meta`);
         }
-        storyQuery.refetch();
+        refetchStory();
 
         if (result.events.StoryRecordAppended) {
           toast.success(
@@ -458,7 +460,7 @@ export function useStoryEditorController() {
             scopedQueryClient.clear(storyKey(validTokenId));
             scopedQueryClient.clear(`${storyKey(validTokenId)}:meta`);
           }
-          storyQuery.refetch({ keepData: true });
+          refetchStory({ keepData: true });
         }
         // Reported by the caller, at the composer. A toast here as well meant two
         // tellings of one failure, in two wordings, from two sides of the screen.
@@ -475,7 +477,7 @@ export function useStoryEditorController() {
       meta,
       validTokenId,
       scopedQueryClient,
-      storyQuery.refetch,
+      refetchStory,
     ],
   );
 
@@ -502,7 +504,7 @@ export function useStoryEditorController() {
           scopedQueryClient.clear(storyKey(validTokenId));
           scopedQueryClient.clear(`${storyKey(validTokenId)}:meta`);
         }
-        storyQuery.refetch();
+        refetchStory();
 
         if (result.events.StorySealed) {
           toast.success(
@@ -525,7 +527,7 @@ export function useStoryEditorController() {
             scopedQueryClient.clear(storyKey(validTokenId));
             scopedQueryClient.clear(`${storyKey(validTokenId)}:meta`);
           }
-          storyQuery.refetch({ keepData: true });
+          refetchStory({ keepData: true });
         }
         // Reported by the caller, on the seal card. See onAddRecord.
         throw error;
@@ -540,7 +542,7 @@ export function useStoryEditorController() {
       records,
       validTokenId,
       scopedQueryClient,
-      storyQuery.refetch,
+      refetchStory,
       confirmTransactionPreview,
     ],
   );
@@ -577,7 +579,7 @@ export function useStoryEditorController() {
     setSubmitError(null);
 
     try {
-      if (!(await access.recheck())) {
+      if (!(await recheckAccess())) {
         setSubmitError(
           t("storyRecordEditor.ownerOnly", "Only the current NFT owner can edit this story."),
         );
@@ -617,7 +619,7 @@ export function useStoryEditorController() {
         }
         // Revalidate in place: dropping the records to a spinner mid-write reads
         // as the page reloading itself for no reason the writer can see.
-        storyQuery.refetch({ keepData: true });
+        refetchStory({ keepData: true });
         setSubmitError(
           t(
             "storyRecordEditor.storyMovedOn",
@@ -633,13 +635,13 @@ export function useStoryEditorController() {
   }, [
     validTokenId,
     canEdit,
-    access.recheck,
+    recheckAccess,
     formData,
     meta,
     onAddRecord,
     handleCancelEdit,
     scopedQueryClient,
-    storyQuery.refetch,
+    refetchStory,
     t,
   ]);
 
@@ -654,7 +656,7 @@ export function useStoryEditorController() {
     setSubmitting(true);
     setSealError(null);
     try {
-      if (!(await access.recheck())) {
+      if (!(await recheckAccess())) {
         setSealError(
           t("storyRecordEditor.ownerOnly", "Only the current NFT owner can edit this story."),
         );
@@ -669,7 +671,7 @@ export function useStoryEditorController() {
     } finally {
       setSubmitting(false);
     }
-  }, [validTokenId, canEdit, access.recheck, onSealStory, t]);
+  }, [validTokenId, canEdit, recheckAccess, onSealStory, t]);
 
   const titleText = personName
     ? t("storyRecordEditor.titleWithName", {

@@ -1,7 +1,7 @@
 import { AlertCircle } from "lucide-react";
 import { TransactionStatusView } from "../../shared/TransactionStatusView";
 import type { TransactionPhase } from "../../shared/transactionPhase";
-import type { TimelineStep } from "../../shared/TransactionTimeline";
+import type { TimelineStep } from "../../../../../shared/ui/TransactionTimeline";
 import { MintNFTSuccessResult } from "../MintNFTSuccessResult";
 import type { ArchiveTransactionPreview } from "../../../services/archiveTransaction";
 import type {

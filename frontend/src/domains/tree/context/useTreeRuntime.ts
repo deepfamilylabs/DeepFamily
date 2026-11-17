@@ -34,7 +34,7 @@ export function useTreeRuntime() {
     } catch {
       return null;
     }
-  }, [provider, contractAddress, readerAddress]);
+  }, [provider, readerAddress]);
 
   const nftContract = useMemo(() => {
     if (!provider || !contractAddress) return null;

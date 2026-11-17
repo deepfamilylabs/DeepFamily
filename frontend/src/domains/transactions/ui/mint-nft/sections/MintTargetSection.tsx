@@ -7,9 +7,9 @@ import {
   getFieldErrorA11y,
   modalField,
 } from "../../../../../shared/ui";
-import { ThemedSelect } from "../../shared/ThemedSelect";
-import type { PersonVersionLookup } from "../../../hooks/usePersonVersionOptions";
-import { describeVersionOrigin } from "../../../model/personVersionMeta";
+import { ThemedSelect } from "../../../../../shared/ui/ThemedSelect";
+import type { PersonVersionLookup } from "../../../../../shared/model/personVersionTypes";
+import { describeVersionOrigin } from "../../../../../shared/model/personVersionMeta";
 import type { MintNFTT } from "../model/mintNftTypes";
 
 export interface MintTargetSectionProps {

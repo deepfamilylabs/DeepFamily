@@ -145,8 +145,7 @@ function StepMarker({ state }: { state: TimelineStepState }) {
  */
 export function TransactionTimeline({ steps, label }: { steps: TimelineStep[]; label: string }) {
   const current = steps.find(
-    (step) =>
-      step.state === "current" || step.state === "awaiting" || step.state === "failed",
+    (step) => step.state === "current" || step.state === "awaiting" || step.state === "failed",
   );
 
   return (
@@ -183,9 +182,7 @@ export function TransactionTimeline({ steps, label }: { steps: TimelineStep[]; l
                 {step.label}
               </div>
               {step.detail &&
-              (step.state === "current" ||
-                step.state === "awaiting" ||
-                step.state === "failed") ? (
+              (step.state === "current" || step.state === "awaiting" || step.state === "failed") ? (
                 <p className="mt-0.5 text-xs leading-relaxed text-ink-muted">{step.detail}</p>
               ) : null}
             </div>

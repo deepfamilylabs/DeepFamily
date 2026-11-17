@@ -1,4 +1,4 @@
-import type { PersonVersionOption } from "../hooks/usePersonVersionOptions";
+import type { PersonVersionOption } from "./personVersionTypes";
 
 /** Matches the hash abbreviation used across the search results. */
 export function shortHash(value: string) {

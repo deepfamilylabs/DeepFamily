@@ -272,11 +272,12 @@ vi.mock("../../person", () => ({
       },
     }));
 
-    useEffect(() => {
+    const publishInitialForm = useRef(() => {
       props.onPublicFormChange?.(publicFormData);
       props.onPassphraseChange?.();
       publishParentHash();
-    }, []);
+    });
+    useEffect(() => publishInitialForm.current(), []);
 
     return (
       <div data-testid="person-hash-calculator">

@@ -4,13 +4,13 @@ import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ConsentCheckbox } from "./ConsentCheckbox";
 import { ConsentSection } from "./ConsentSection";
-import { ThemedSelect } from "./ThemedSelect";
+import { ThemedSelect } from "../../../../shared/ui/ThemedSelect";
 import { TransactionButton } from "./TransactionButton";
 import { TransactionErrorResult } from "./TransactionErrorResult";
 import { TransactionFooterBar } from "./TransactionFooterBar";
 import { TransactionPreviewPanel } from "./TransactionPreviewPanel";
-import { TransactionTimeline, buildTimeline, useTimelineProgress } from "./TransactionTimeline";
-import { TransactionSuccessSummary } from "./TransactionSuccessSummary";
+import { TransactionTimeline, buildTimeline, useTimelineProgress } from "../../../../shared/ui/TransactionTimeline";
+import { TransactionSuccessSummary } from "../../../../shared/ui/TransactionSuccessSummary";
 import { TransactionProgress } from "./TransactionProgress";
 import { TransactionStatusView } from "./TransactionStatusView";
 

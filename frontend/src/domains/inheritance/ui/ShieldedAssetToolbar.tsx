@@ -2,7 +2,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { Plus, X } from "lucide-react";
 import { ZeroAddress } from "ethers";
 import { useTranslation } from "react-i18next";
-import { ThemedSelect } from "../../transactions/ui/shared/ThemedSelect";
+import { ThemedSelect } from "../../../shared/ui/ThemedSelect";
 import type { ShieldedAsset } from "../services/shieldedAssetRegistry";
 import { PanelButton } from "./inheritanceControls";
 

@@ -4,6 +4,7 @@ node_modules/
 
 # Build outputs
 artifacts/
+/test-results/
 zk-artifacts/
 /circuits/ptau/*.ptau
 # Raw browser proving files are pinned by the circuit manifests and stay out of Git. Their Brotli
@@ -59,3 +60,4 @@ ds-bundle/
 .design-sync/learnings/
 .design-sync/node_modules
 frontend/.ds-css-entry.css
+frontend/.browser-acceptance/

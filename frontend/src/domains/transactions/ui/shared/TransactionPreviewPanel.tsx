@@ -1,7 +1,7 @@
 import { useId } from "react";
 import type React from "react";
 import { ArchiveTransactionDetails } from "../ArchiveTransactionDetails";
-import { useFocusOnMount } from "./useFocusOnMount";
+import { useFocusOnMount } from "../../../../shared/ui/useFocusOnMount";
 import type { ArchiveTransactionPreview } from "../../services/archiveTransaction";
 
 /**

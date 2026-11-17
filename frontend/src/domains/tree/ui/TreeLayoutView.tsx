@@ -29,7 +29,7 @@ const TreeLayoutView = noPropsForwardRef<FamilyTreeViewHandle>((ref) => {
       marginX: layout.TREE_MARGIN_X,
       marginY: layout.TREE_MARGIN_Y,
     });
-  }, [graph, rootId]);
+  }, [graph, rootId, layout.TREE_NODE_WIDTH, layout.TREE_NODE_HEIGHT, layout.TREE_GAP_X, layout.TREE_GAP_Y, layout.TREE_MARGIN_X, layout.TREE_MARGIN_Y]);
   const idToPos = useMemo(() => {
     const m = new Map<string, TreePositionedNode>();
     for (const pn of positioned) m.set(pn.id, pn);

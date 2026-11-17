@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { TTL } from "../../../shared/cache/ttl";
 import { defaultErrorTranslator, getFriendlyErrorMessage } from "../../../shared/lib/errors";
 import type { ParsedVersionDetails } from "../../../shared/clients/personReadGateway";
@@ -19,10 +19,10 @@ export function usePersonDetails(
   const [data, setData] = useState<ParsedVersionDetails | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const triggerRef = useRef(0);
+  const [refreshRevision, setRefreshRevision] = useState(0);
 
   const refetch = useCallback(() => {
-    triggerRef.current += 1;
+    setRefreshRevision((revision) => revision + 1);
     setData(null);
     setError(null);
   }, []);
@@ -58,7 +58,7 @@ export function usePersonDetails(
     return () => {
       cancelled = true;
     };
-  }, [gateway, personHash, versionIndex, triggerRef.current]);
+  }, [gateway, personHash, versionIndex, refreshRevision]);
 
   return { data, loading, error, refetch };
 }

@@ -125,7 +125,7 @@ function invokeMint(params: any) {
  * The flow and the custody of its pending decision, as the modal pairs them.
  * Cancellation is a property of that pairing, not of either half alone.
  */
-function renderFlowWithPreviewCustody() {
+function useFlowWithPreviewCustody() {
   const custody = useTransactionPreviewDecision<any>();
   const flow = useMintNftFlow({ confirmTransactionPreview: custody.confirmTransactionPreview });
   return {
@@ -290,7 +290,7 @@ describe("useMintNftFlow", () => {
         await validation.promise;
         return invokeMint(params);
       });
-      const hook = renderHook(() => renderFlowWithPreviewCustody());
+      const hook = renderHook(() => useFlowWithPreviewCustody());
       let pending!: Promise<unknown>;
       act(() => {
         pending = hook.result.current.runOrThrow(flowArgs);
@@ -325,7 +325,7 @@ describe("useMintNftFlow", () => {
         return mocks.receipt;
       });
 
-      const hook = renderHook(() => renderFlowWithPreviewCustody());
+      const hook = renderHook(() => useFlowWithPreviewCustody());
       let pending!: Promise<unknown>;
       act(() => {
         pending = hook.result.current.runOrThrow(flowArgs);
@@ -368,7 +368,7 @@ describe("useMintNftFlow", () => {
         if (!confirmation) throw new Error("Mint cancelled before wallet request");
         return mocks.receipt;
       });
-      const hook = renderHook(() => renderFlowWithPreviewCustody());
+      const hook = renderHook(() => useFlowWithPreviewCustody());
       let pending!: Promise<unknown>;
       act(() => {
         pending = hook.result.current.runOrThrow(flowArgs);

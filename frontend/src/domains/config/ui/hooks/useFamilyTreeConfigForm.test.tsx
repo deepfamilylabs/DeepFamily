@@ -78,7 +78,7 @@ vi.mock("../../../tree", () => ({
   useVizOptions: () => mocks.viz,
 }));
 
-vi.mock("../../../transactions/hooks/usePersonVersionOptions", () => ({
+vi.mock("../../../transactions", () => ({
   usePersonVersionOptions: () => mocks.versionLookup,
 }));
 

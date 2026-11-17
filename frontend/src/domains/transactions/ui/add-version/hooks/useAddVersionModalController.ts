@@ -14,7 +14,7 @@ import { useTreeMutations } from "../../../../tree";
 import type { PersonHashCalculatorHandle } from "../../../../person";
 import { useTransactionModalFrameState } from "../../shared/useTransactionModalFrameState";
 import { resolveTransactionPhase } from "../../shared/transactionPhase";
-import { buildTimeline, useTimelineProgress } from "../../shared/TransactionTimeline";
+import { buildTimeline, useTimelineProgress } from "../../../../../shared/ui/TransactionTimeline";
 import { ADD_VERSION_TIMELINE_STEPS, addVersionTimelineStep } from "../../shared/timelineSteps";
 import { useTransactionCenterEntry } from "../../shared/useTransactionCenterEntry";
 import { addVersionSchema } from "../model/addVersionSchema";

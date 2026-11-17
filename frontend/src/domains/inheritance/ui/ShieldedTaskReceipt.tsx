@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { buildTimeline, TransactionTimeline } from "../../transactions/ui/shared/TransactionTimeline";
+import { buildTimeline, TransactionTimeline } from "../../../shared/ui/TransactionTimeline";
 
 export type ShieldedProgressStage =
   | "preparing"

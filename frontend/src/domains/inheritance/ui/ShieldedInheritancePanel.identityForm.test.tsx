@@ -2,7 +2,7 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Signer } from "ethers";
-import type { PersonHashCalculatorHandle } from "../../person/ui/PersonHashCalculator";
+import type { PersonHashCalculatorHandle } from "../../person";
 import { ToastProvider } from "../../../shared/ui";
 import type { ShieldedAssetSessionState } from "../../../shared/workers/shieldedAssetWorkerTypes";
 import type { ShieldedPageModules } from "../model/shieldedPageTypes";
@@ -44,7 +44,7 @@ vi.mock("../../config", () => ({
     tokenAddress: "0x0000000000000000000000000000000000000003",
   }),
 }));
-vi.mock("../../tree/context", () => ({ useTreeGraphData: () => ({ nodesData: {} }) }));
+vi.mock("../../tree", () => ({ useTreeGraphData: () => ({ nodesData: {} }) }));
 vi.mock("../../transactions", () => ({ useTransactionCenter: () => null }));
 vi.mock("../../../shared/config/env", () => ({
   getShieldedPoolFactoryDeploymentBlock: () => 10,
@@ -80,7 +80,7 @@ vi.mock("../services/shieldedPoolFlows", () => ({
 // handle so the tests also check the values a subsequent unlock would submit.
 vi.mock("../../person", async () => {
   const React = await import("react");
-  const { PersonHashCalculator } = await import("../../person/ui/PersonHashCalculator");
+  const { default: PersonHashCalculator } = await vi.importActual<{ default: typeof import("../../person").PersonHashCalculator }>("../../person/ui/PersonHashCalculator");
   return {
     PersonHashCalculator: React.forwardRef<
       PersonHashCalculatorHandle,

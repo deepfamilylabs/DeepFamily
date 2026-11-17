@@ -1,7 +1,7 @@
 import type React from "react";
 import { TransactionErrorResult } from "./TransactionErrorResult";
 import { TransactionPreviewPanel } from "./TransactionPreviewPanel";
-import { TransactionTimeline, type TimelineStep } from "./TransactionTimeline";
+import { TransactionTimeline, type TimelineStep } from "../../../../shared/ui/TransactionTimeline";
 import { assertPhaseHandled, type TransactionPhase } from "./transactionPhase";
 import type { ArchiveTransactionPreview } from "../../services/archiveTransaction";
 

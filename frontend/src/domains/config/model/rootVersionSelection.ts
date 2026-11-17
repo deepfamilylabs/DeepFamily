@@ -1,5 +1,5 @@
-import type { PersonVersionLookup } from "../../transactions/hooks/usePersonVersionOptions";
-import { preferredPersonVersion } from "../../transactions/model/personVersionSelection";
+import type { PersonVersionLookup } from "../../../shared/model/personVersionTypes";
+import { preferredPersonVersion } from "../../../shared/model/personVersionSelection";
 
 export interface RootVersionSelectionUpdate {
   decidedForHash: string;

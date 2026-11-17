@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { TTL } from "../../../shared/cache/ttl";
 import { defaultErrorTranslator, getFriendlyErrorMessage } from "../../../shared/lib/errors";
 import type { ParsedNftDetails } from "../../../shared/clients/personReadGateway";
@@ -18,10 +18,10 @@ export function useNFTDetails(
   const [data, setData] = useState<ParsedNftDetails | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const triggerRef = useRef(0);
+  const [refreshRevision, setRefreshRevision] = useState(0);
 
   const refetch = useCallback(() => {
-    triggerRef.current += 1;
+    setRefreshRevision((revision) => revision + 1);
     setData(null);
     setError(null);
   }, []);
@@ -57,7 +57,7 @@ export function useNFTDetails(
     return () => {
       cancelled = true;
     };
-  }, [gateway, tokenId, triggerRef.current]);
+  }, [gateway, tokenId, refreshRevision]);
 
   return { data, loading, error, refetch };
 }

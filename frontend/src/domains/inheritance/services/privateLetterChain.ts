@@ -5,11 +5,8 @@ import { createPrivateLetterContract } from "../../../shared/clients/privateLett
 import { getEventScanConfig } from "../../../shared/config/env";
 import { createIdentityAuthorizationContract } from "./shieldedIdentityAuthorizationChain";
 
-export type ProvenPrivateLetter = {
-  delivery: { messageId: string; checkpointId: string; asOf: string; deadline: string; recipientBinding: string };
-  ciphertext: string;
-  proof: string;
-};
+import type { ProvenPrivateLetter } from "../../../shared/workers/shieldedAssetWorkerTypes";
+export type { ProvenPrivateLetter } from "../../../shared/workers/shieldedAssetWorkerTypes";
 export type PrivateLetterChainRecord = {
   messageId: string; recipientBinding: string;
   registeredAt: string; deadline: string; ciphertextHash: string; ciphertext: Uint8Array;

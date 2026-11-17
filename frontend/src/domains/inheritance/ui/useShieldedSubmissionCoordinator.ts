@@ -2,7 +2,7 @@ import { useRef, type MutableRefObject } from "react";
 import type { Provider } from "ethers";
 import { getChainErrorDetails } from "@deepfamily/chain-client";
 import { useTransactionCenter } from "../../transactions";
-import type { ShieldedSubmissionContext } from "../../transactions/context/TransactionCenterContext";
+import type { ShieldedSubmissionContext } from "../../transactions";
 import type { ShieldedSubmissionTracking } from "../services/shieldedSubmissionTracking";
 import type { ShieldedSubmissionAnchor } from "../services/shieldedWalletSubmission";
 

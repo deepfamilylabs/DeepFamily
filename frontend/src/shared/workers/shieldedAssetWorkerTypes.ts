@@ -10,6 +10,12 @@ export type ShieldedAssetWorkerFailure = {
   error: SerializedChainError;
 };
 
+export type ProvenPrivateLetter = {
+  delivery: { messageId: string; checkpointId: string; asOf: string; deadline: string; recipientBinding: string };
+  ciphertext: string;
+  proof: string;
+};
+
 /** Only public identifiers and display summaries cross the asset-session boundary. */
 export type ShieldedPublicIdentity = {
   handle: string;
@@ -217,7 +223,7 @@ export type ShieldedAssetWorkerCallMap = {
   };
   prepareLetter: {
     params: { context: ShieldedWorkerContext; code: string; body: string };
-    result: import("../../domains/inheritance/services/privateLetterChain").ProvenPrivateLetter;
+    result: ProvenPrivateLetter;
   };
   recoverLetters: {
     params: { context: ShieldedWorkerContext };

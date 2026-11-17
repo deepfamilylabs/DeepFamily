@@ -32,10 +32,10 @@ import { normalizeShieldedUiError, ShieldedUiMessageError } from "../model/shiel
 import { ShieldedGasBalanceError } from "../model/shieldedGasBalanceError";
 import { normalizeShieldedStateReadMode } from "../../../shared/config/shieldedStateReadMode";
 import { getWalletConnectionGeneration, subscribeWalletConnectionChange } from "../../wallet";
-import { useTreeGraphData } from "../../tree/context";
+import { useTreeGraphData } from "../../tree";
 import { getShieldedLocalRecipientLabels } from "../services/shieldedRecipientOptions";
 import { useTransactionCenter } from "../../transactions";
-import { TransactionSuccessSummary } from "../../transactions/ui/shared/TransactionSuccessSummary";
+import { TransactionSuccessSummary } from "../../../shared/ui/TransactionSuccessSummary";
 import type { ShieldedPageModules } from "../model/shieldedPageTypes";
 import { getShieldedPoolFactoryDeploymentBlock, getPrivateLetterArchiveAddress, getPrivateLetterArchiveDeploymentBlock } from "../../../shared/config/env";
 import {
@@ -83,6 +83,7 @@ import {
 import { useShieldedPageIdentitySession } from "./ShieldedIdentitySessionContext";
 import { type ShieldedRecipientCredentialsFormHandle } from "./ShieldedRecipientCredentialsForm";
 import { CopyIconButton } from "../../../shared/ui";
+import { useLatestCallback } from "../../../shared/ui/useLatestCallback";
 import {
   formatShieldedTimestamp,
   parseShieldedPeriodDays,
@@ -182,7 +183,7 @@ export function ShieldedInheritancePanel({
 }) {
   const { t } = useTranslation();
   const formId = useId();
-  const tr = (key: string) => t(`shielded.walletKeys.${key}`);
+  const tr = useCallback((key: string) => t(`shielded.walletKeys.${key}`), [t]);
   const config = useConfig();
   const { nodesData } = useTreeGraphData();
   const localRecipientLabels = useMemo(
@@ -627,20 +628,20 @@ export function ShieldedInheritancePanel({
   ]);
   const currentRequestKey = useRef(actionRequestKey);
   currentRequestKey.current = actionRequestKey;
-  function clearWalletSecretInputs() {
+  const clearWalletSecretInputs = useCallback(() => {
     exportedMaterial.current?.clear();
     if (recoveryMaterial.current) recoveryMaterial.current.value = "";
-  }
-  function clearSecretInputs() {
+  }, []);
+  const clearSecretInputs = useCallback(() => {
     identityForm.current?.clearSecretInputs();
     recipientForm.current?.clearSecretInputs();
     clearWalletSecretInputs();
-  }
+  }, [clearWalletSecretInputs]);
   const clearRef = useRef(clearSecretInputs);
   clearRef.current = clearSecretInputs;
   const lockRef = useRef(lock);
   lockRef.current = lock;
-  function settleSpendReview(review: SpendReview, confirmed: boolean) {
+  const settleSpendReview = useCallback((review: SpendReview, confirmed: boolean) => {
     const pending = pendingSpendReview.current;
     if (pending?.review !== review) return;
     pendingSpendReview.current = null;
@@ -650,11 +651,11 @@ export function ShieldedInheritancePanel({
     }
     if (!confirmed) void cancelShieldedAssetPreview().catch(() => undefined);
     pending.resolve(confirmed);
-  }
-  function cancelSpendReview() {
+  }, []);
+  const cancelSpendReview = useCallback(() => {
     const pending = pendingSpendReview.current;
     if (pending) settleSpendReview(pending.review, false);
-  }
+  }, [settleSpendReview]);
   function reviewSpend(review: SpendReview): Promise<boolean> {
     return new Promise((resolve) => {
       pendingSpendReview.current = { review, resolve };
@@ -665,7 +666,7 @@ export function ShieldedInheritancePanel({
       setSpendReview(review);
     });
   }
-  function invalidateWalletOperation() {
+  const invalidateWalletOperation = useCallback(() => {
     if (activeSignatureRequest.current !== null) {
       lockRef.current();
       return;
@@ -683,7 +684,9 @@ export function ShieldedInheritancePanel({
     paymentCompletion.current = null;
     latestSession.current.setBusy(false);
     void cancelShieldedAssetPreview().catch(() => undefined);
-  }
+  }, [cancelSpendReview]);
+  const clearFeedback = useLatestCallback(clearTransactionFeedback);
+  const invalidateSignatureRequest = useCallback(() => { signatureRequest.current += 1; }, []);
   useEffect(() => {
     mounted.current = true;
     // StrictMode and Fast Refresh re-run this effect on the same instance; an
@@ -705,7 +708,7 @@ export function ShieldedInheritancePanel({
       cancelSpendReview();
       autoRecoveryBlocked.current = true;
       independentKeyOpenedFromWorkspace.current = false;
-      signatureRequest.current++;
+      invalidateSignatureRequest();
       activeSignatureRequest.current = null;
       activeOperation.current = null;
       letterOperationPending.current = false;
@@ -716,10 +719,10 @@ export function ShieldedInheritancePanel({
         setBusy(false);
         setBalancesRefreshing(false);
         setStage("");
-        setError("");
+        setErrorState(null);
         setCodeError("");
         setReadModeRefreshing(false);
-        clearTransactionFeedback(true);
+        clearFeedback(true);
         latestSession.current.setBusy(false);
         setWalletSection("balances");
         setOwnCode("");
@@ -743,7 +746,7 @@ export function ShieldedInheritancePanel({
       letterOperationPending.current = false;
       readModeRefreshScope.current = null;
       cancelSpendReview();
-      signatureRequest.current++;
+      invalidateSignatureRequest();
       clear();
       document.removeEventListener("visibilitychange", hidden);
       window.removeEventListener("pagehide", pagehide);
@@ -752,7 +755,7 @@ export function ShieldedInheritancePanel({
       latestSession.current.setBusy(false);
       void cancelShieldedAssetPreview().catch(() => undefined);
     };
-  }, []);
+  }, [cancelSpendReview, clearFeedback, invalidateSignatureRequest, invalidateWalletOperation]);
   useEffect(() => subscribePublicStateSyncProgress((event) => {
     if (!mounted.current || !acceptPublicSyncProgress.current) return;
     setPublicSyncProgress((previous) => ({
@@ -762,8 +765,10 @@ export function ShieldedInheritancePanel({
     setPublicSyncPaused(false);
   }), []);
   useEffect(() => {
+    if (previousContext.current.contextKey === contextKey &&
+      previousContext.current.ownerContextKey === ownerContextKey) return;
     if (previousContext.current.ownerContextKey !== ownerContextKey && completedPayment)
-      clearTransactionFeedback();
+      clearFeedback();
     const preserveView = previousContext.current.contextKey !== contextKey &&
       previousContext.current.protocolContextKey === protocolContextKey &&
       previousContext.current.ownerContextKey === ownerContextKey;
@@ -798,7 +803,7 @@ export function ShieldedInheritancePanel({
           latestSession.current.setBusy(false);
         }
         setStage("");
-        setError("");
+        setErrorState(null);
         setCodeError("");
         setProgress(null);
         setExecutingReview(null);
@@ -818,14 +823,7 @@ export function ShieldedInheritancePanel({
     }
     setOwnCode("");
     draftPolicy.current = null;
-  }, [
-    session.credentials?.handle,
-    session.identity?.handle,
-    session.independentKey?.keyFingerprint,
-    contextKey,
-    protocolContextKey,
-    ownerContextKey,
-  ]);
+  }, [session.credentials?.handle, session.identity?.handle, session.independentKey?.keyFingerprint, contextKey, protocolContextKey, ownerContextKey, completedPayment, clearFeedback, session.identity, independentKeyReady, cancelSpendReview]);
   useEffect(() => {
     if (!pendingRecord || receiptTracking.current?.id === pendingRecord.id) return;
     const provider = modules.pool.runner?.provider;
@@ -858,9 +856,9 @@ export function ShieldedInheritancePanel({
     previousGasWallet.current = { signer, account };
     if (previous.signer === signer && previous.account === account) return;
     clearSecretInputs();
-    signatureRequest.current++;
+    invalidateSignatureRequest();
     invalidateWalletOperation();
-  }, [signer, account]);
+  }, [signer, account, clearSecretInputs, invalidateSignatureRequest, invalidateWalletOperation]);
   useEffect(() => {
     if (draftPolicy.current?.key !== draftKey) {
       draftPolicy.current = null;
@@ -889,12 +887,7 @@ export function ShieldedInheritancePanel({
       pendingBackupDrill.current = null;
       setExpectedFingerprint(session.independentKey.keyFingerprint);
     }
-  }, [
-    session.credentials?.handle,
-    session.independentKey?.keyFingerprint,
-    session.independentKey?.recoveryVerified,
-    session.independentKey?.backupRequired,
-  ]);
+  }, [session.credentials?.handle, session.independentKey?.keyFingerprint, session.independentKey?.recoveryVerified, session.independentKey?.backupRequired, clearSecretInputs]);
   useEffect(() => {
     const first = wallet?.claims.find((claim) => claim.slot === slot && claim.handle === claimHandle) ??
       wallet?.claims.find((claim) => claim.slot === slot && claim.status === "claimable") ??
@@ -907,7 +900,7 @@ export function ShieldedInheritancePanel({
   useEffect(() => {
     cancelSpendReview();
     void cancelShieldedAssetPreview().catch(() => undefined);
-  }, [actionRequestKey]);
+  }, [actionRequestKey, cancelSpendReview]);
   useEffect(() => {
     const { signer, token, assetKind, account, poolAddress, walletGeneration } = allowanceScope;
     if (!signer || !token || assetKind !== "erc20") return;
@@ -1021,14 +1014,7 @@ export function ShieldedInheritancePanel({
       cancelled = true;
       if (timer) clearTimeout(timer);
     };
-  }, [
-    busy,
-    submissionPending,
-    contextKey,
-    transactionHash,
-    pendingRecord?.id,
-    transactionFeedbackDismissed,
-  ]);
+  }, [busy, submissionPending, contextKey, transactionHash, pendingRecord?.id, transactionFeedbackDismissed, setError]);
   async function run(
     task: (current: () => boolean) => Promise<void>,
     label: string,
@@ -1057,7 +1043,7 @@ export function ShieldedInheritancePanel({
           wallet.account === walletRef.current.account));
     setBusy(true);
     latestSession.current.setBusy(true);
-    if (resetError) setError("");
+    if (resetError) setErrorState(null);
     setStage(label);
     latestSession.current.touch();
     try {
@@ -1142,7 +1128,7 @@ export function ShieldedInheritancePanel({
     autoRecoveryBlocked.current = true;
     independentKeyOpenedFromWorkspace.current = false;
     focusDestination.current = "access";
-    signatureRequest.current++;
+    invalidateSignatureRequest();
     activeSignatureRequest.current = null;
     activeOperation.current = null;
     letterOperationPending.current = false;
@@ -1151,10 +1137,10 @@ export function ShieldedInheritancePanel({
     setBusy(false);
     setBalancesRefreshing(false);
     setStage("");
-    setError("");
+    setErrorState(null);
     setCodeError("");
     setReadModeRefreshing(false);
-    clearTransactionFeedback(true);
+    clearFeedback(true);
     latestSession.current.setBusy(false);
     clearSecretInputs();
     latestSession.current.lock();
@@ -1191,7 +1177,7 @@ export function ShieldedInheritancePanel({
   }
   function selectWallet(next: ShieldedKeySlot) {
     if (busy || submissionPending) return;
-    if (completedPayment) clearTransactionFeedback();
+    if (completedPayment) clearFeedback();
     setCompletedSpendSteps([]);
     setCompletedMergeHashes([]);
     setSlot(next);
@@ -1206,20 +1192,20 @@ export function ShieldedInheritancePanel({
       setCodeSlot(next);
       setOwnCode("");
     }
-    setError("");
+    setErrorState(null);
   }
   /** Closes the wallet sheet; its secrets are cleared and the workspace stays as it was. */
   function closeWalletSheet() {
     if (busy) return;
     clearWalletSecretInputs();
-    setError("");
+    setErrorState(null);
     setWalletSection("balances");
     setOwnCode("");
     if (hasSession) setWalletScreen("workspace");
   }
   function openReceiveCode(next: ShieldedKeySlot, purpose: "receive" | "fund" = "receive") {
     if (busy || submissionPending) return;
-    setError("");
+    setErrorState(null);
     clearWalletSecretInputs();
     receiveCodeScope.current = "";
     setCodeSlot(next);
@@ -1236,7 +1222,7 @@ export function ShieldedInheritancePanel({
     focusDestination.current = showWorkspace ? null : "access";
     setIndependentKeyFlow(flow);
     setWalletScreen("manage");
-    setError("");
+    setErrorState(null);
   }
   /** Setup entries honor their action; unfinished creation never hijacks unlocking. */
   function openIndependentKeyManager(flow: "restore" | "create" | "backup") {
@@ -1329,7 +1315,7 @@ export function ShieldedInheritancePanel({
     setAction(next);
     if (walletSection !== "keys") setWalletScreen(!session.credentials ? "identity" : "workspace");
     setCandidates([]);
-    setError("");
+    setErrorState(null);
   }
   /** Return with the operation's fresh public state, without resetting task drafts. */
   function returnToTask(state: ShieldedAssetSessionState = latestSession.current) {
@@ -1607,8 +1593,9 @@ export function ShieldedInheritancePanel({
       }
     }
   }
+  const recoverAutomatically = useLatestCallback(recover);
   useEffect(() => {
-    if (!session.identity && !independentKeyReady) {
+    if (!session.identity?.handle && !independentKeyReady) {
       autoRecoveryScope.current = "";
       return;
     }
@@ -1621,15 +1608,8 @@ export function ShieldedInheritancePanel({
     ]);
     if (autoRecoveryScope.current === scope) return;
     autoRecoveryScope.current = scope;
-    void recover(false, true);
-  }, [
-    session.identity?.handle,
-    session.independentKey?.keyFingerprint,
-    independentKeyReady,
-    contextKey,
-    walletScreen,
-    busy,
-  ]);
+    void recoverAutomatically(false, true);
+  }, [session.identity?.handle, session.independentKey?.keyFingerprint, independentKeyReady, contextKey, walletScreen, busy, recoverAutomatically]);
   async function createCode(receivingSlot: ShieldedKeySlot = codeSlot) {
     await run(async (current) => {
       if (!Number.isFinite(new Date(codeExpiry).getTime()) || new Date(codeExpiry).getTime() <= Date.now()) throw new ShieldedUiMessageError(t("shielded.privateLetters.expiryFuture"));
@@ -1645,7 +1625,7 @@ export function ShieldedInheritancePanel({
     await run(async (current) => {
       if (!signer) throw new ShieldedUiMessageError(t("shielded.walletNotReady"));
       const chosen = signer;
-      clearTransactionFeedback();
+      clearFeedback();
       const result = await shieldedAssetWorkerCall("authorizeIdentityCounter", { context }, { timeoutMs: 1_200_000 });
       if (!current()) return;
       if ((await chosen.provider?.getNetwork())?.chainId !== modules.chainId ||
@@ -1686,6 +1666,7 @@ export function ShieldedInheritancePanel({
   // Each explicit open or wallet switch generates a receive code once; after a failure the
   // button retries.
   // A layout effect starts the job before paint, so the retry button never flashes first.
+  const createReceiveCode = useLatestCallback(createCode);
   useLayoutEffect(() => {
     if (walletSection !== "receiveCode" && walletSection !== "fundReceiveCredential") {
       receiveCodeScope.current = "";
@@ -1701,19 +1682,8 @@ export function ShieldedInheritancePanel({
     ]);
     if (receiveCodeScope.current === scope) return;
     receiveCodeScope.current = scope;
-    void createCode(codeSlot);
-  }, [
-    walletSection,
-    ownCode,
-    codeSlot,
-    codePurpose,
-    session.identity?.handle,
-    session.independentKey?.keyFingerprint,
-    receiveCodeReady,
-    contextKey,
-    busy,
-    submissionPending,
-  ]);
+    void createReceiveCode(codeSlot);
+  }, [walletSection, ownCode, codeSlot, codePurpose, session.identity?.handle, session.independentKey?.keyFingerprint, receiveCodeReady, contextKey, busy, submissionPending, createReceiveCode]);
   function changeCode(value: string) {
     setCode(value);
     setVerifiedRecipient(null);
@@ -1729,14 +1699,14 @@ export function ShieldedInheritancePanel({
         if (cancelled || !mounted.current || generation !== getShieldedAssetWorkerGeneration()) return;
         if (result.purpose !== (action === "fund" ? "fund" : "receive")) {
           setVerifiedRecipient(null);
-          setCodeError(t(action === "fund" ? "shielded.fundReceiveCredentialRequired" : "shielded.receiveCodeRequired"));
+          setCodeError(latestTranslations.current.t(action === "fund" ? "shielded.fundReceiveCredentialRequired" : "shielded.receiveCodeRequired"));
           return;
         }
         setVerifiedRecipient(result);
       })
       .catch((cause: unknown) => {
         if (!cancelled && mounted.current && generation === getShieldedAssetWorkerGeneration())
-          setCodeError(cause instanceof Error ? cause.message : tr("failed"));
+          setCodeError(cause instanceof Error ? cause.message : latestTranslations.current.tr("failed"));
       });
     return () => {
       cancelled = true;
@@ -1787,13 +1757,13 @@ export function ShieldedInheritancePanel({
   }
   function startNewPayment() {
     if (!completedPayment || busy || submissionPending || activeOperation.current) return;
-    clearTransactionFeedback();
+    clearFeedback();
     setCompletedSpendSteps([]);
     setCompletedMergeHashes([]);
     setProgress(null);
     setExecutingReview(null);
     setStage("");
-    setError("");
+    setErrorState(null);
     focusDestination.current = "task";
   }
   function completePayment(id: string, hash: string) {
@@ -1847,7 +1817,7 @@ export function ShieldedInheritancePanel({
     }
     // The approval is confirmed independently of any subsequent deposit error.
     assertCurrent();
-    clearTransactionFeedback();
+    clearFeedback();
     const allowance = await modules.token.allowance(account, modules.poolAddress);
     assertCurrent();
     if (getBigInt(allowance) < value) throw new ShieldedUiMessageError(tr("approveFirst"));
@@ -1862,7 +1832,7 @@ export function ShieldedInheritancePanel({
       requested = actionRequestKey,
       generation = getShieldedAssetWorkerGeneration();
     await run(async (current) => {
-      clearTransactionFeedback();
+      clearFeedback();
       setProgress({ kind: "action", stage: "preparing" });
       setCompletedSpendSteps([]);
       setCompletedMergeHashes([]);
@@ -2458,7 +2428,7 @@ export function ShieldedInheritancePanel({
             changeCode("");
             recipientForm.current?.clearSecretInputs();
           }
-          setError("");
+          setErrorState(null);
         }}
         rootVersion={rootVersion}
         onRootVersionChange={(value) => {
@@ -2491,7 +2461,7 @@ export function ShieldedInheritancePanel({
             );
           changeCode("");
           recipientForm.current?.clearSecretInputs();
-          setError("");
+          setErrorState(null);
         }}
         amount={amount}
         onAmountChange={setAmount}
@@ -2939,6 +2909,7 @@ export function ShieldedInheritancePanel({
                 className="w-full"
                 busy={busy}
                 disabled={busy}
+                aria-label={busy ? tr("unlocking") : t("shielded.unlock", { symbol })}
                 onClick={() => void unlock()}
               >
                 {busy ? null : <LockOpen className="h-[18px] w-[18px]" aria-hidden="true" />}

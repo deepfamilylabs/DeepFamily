@@ -48,6 +48,10 @@ by the production artifacts, rather than every historical build-info file. Missi
 stale source contents, zero analysis, incomplete production-source coverage and analyzer
 failures reject the check.
 
+`check:fast` also runs the same source-snapshot validation with `--baseline-only`, without
+starting Python or compiling contracts. A change to reviewed source therefore expires its
+review at the commit hook as well as in the complete analyzer job.
+
 The driver fixes the Python hash seed and sorts Slither's cached Solidity-call query by source
 position before detection. This preserves every queried operation and all detector rules while
 making the selected `incorrect-return` path reproducible. The report records this policy, and
@@ -57,7 +61,7 @@ For a local run, install the requirements in a Python 3.14.4 environment, run th
 `npm run build -- --force`, then invoke the script with that environment's Python executable
 in `SOLIDITY_SECURITY_PYTHON` (the default is `python3`).
 
-The full report is written to `artifacts/security/slither.json`. Dependency and test-contract
+The full report is written to `test-results/security/slither.json`, outside Hardhat's compiler-managed `artifacts/` directory so builds and `hardhat clean` preserve it. Dependency and test-contract
 findings are filtered from the report; production contracts retain all detector categories.
 Unreviewed High and Medium findings fail the check. Lower-severity findings remain visible
 in the report. Any reviewed High/Medium exception must identify one exact finding and explain
@@ -78,3 +82,12 @@ The initial reviewed baseline contains 76 High/Medium findings:
 
 Each exception remains attached to its exact finding and related sources in the baseline;
 these explanations do not suppress a detector for future code.
+
+The generated-verifier snapshots were re-reviewed after the existing development key rotations
+in `19171824` and `a1e1dc1c`. All eleven stale snapshots matched their original sources in
+`c3dc65a5`. Comparing those sources with the current files, masking only the named verification-key
+coordinate constants, left the remaining source byte-for-byte identical: field bounds, public
+input lengths, control flow and the intentional ABI-false returns did not change. The current
+analyzer report retained all 76 exact reviewed finding IDs and introduced no new High/Medium
+exceptions. Only those eleven source hashes were refreshed. Future source or key changes still
+expire these reviews; this comparison is not an automatic baseline-update policy or a circuit audit.

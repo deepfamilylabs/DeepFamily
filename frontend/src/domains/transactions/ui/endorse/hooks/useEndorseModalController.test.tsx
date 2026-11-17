@@ -79,7 +79,7 @@ function fixture(proxy = oldProxy, tokenAddress = oldToken) {
   mocks.tokens.set(tokenAddress, token);
   return { contract, token, receipt, send };
 }
-function controller() {
+function useController() {
   const [isOpen, setIsOpen] = useState(true);
   const result = useEndorseModalController({
     isOpen,
@@ -143,7 +143,7 @@ describe("endorsement cancellation and public receipt settlement", () => {
     const f = fixture();
     const gate = defer<bigint>();
     f.send.estimateGas.mockReturnValue(gate.promise);
-    const h = renderHook(controller, { wrapper });
+    const h = renderHook(useController, { wrapper });
     await vi.waitFor(() => expect(h.result.current.footer.isTargetValidOnChain).toBe(true));
     act(() => h.result.current.footer.onEndorse());
     await vi.waitFor(() => expect(f.send.estimateGas).toHaveBeenCalledTimes(1));
@@ -158,7 +158,7 @@ describe("endorsement cancellation and public receipt settlement", () => {
     const f = fixture();
     const gate = defer<bigint>();
     f.token.allowance.mockReturnValue(gate.promise);
-    const h = renderHook(controller, { wrapper });
+    const h = renderHook(useController, { wrapper });
     await vi.waitFor(() => expect(h.result.current.footer.isTargetValidOnChain).toBe(true));
     act(() => h.result.current.footer.onEndorse());
     await vi.waitFor(() => expect(f.token.allowance).toHaveBeenCalledTimes(1));
@@ -175,9 +175,9 @@ describe("endorsement cancellation and public receipt settlement", () => {
     const gate = defer<any>();
     const waitForReceipt = vi.fn(() => gate.promise);
     f.send.mockResolvedValue({ replaceableTransaction() { return this; }, hash: f.receipt.hash, wait: waitForReceipt });
-    let latest!: ReturnType<typeof controller>;
+    let latest!: ReturnType<typeof useController>;
     function Modal() {
-      latest = controller();
+      latest = useController();
       return null;
     }
     function Records() {
@@ -211,7 +211,7 @@ describe("endorsement cancellation and public receipt settlement", () => {
     const gate = defer<any>();
     const waitForReceipt = vi.fn(() => gate.promise);
     f.send.mockResolvedValue({ replaceableTransaction() { return this; }, hash: f.receipt.hash, wait: waitForReceipt });
-    const h = renderHook(controller, { wrapper });
+    const h = renderHook(useController, { wrapper });
     await vi.waitFor(() => expect(h.result.current.footer.isTargetValidOnChain).toBe(true));
     act(() => h.result.current.footer.onEndorse());
     await vi.waitFor(() => expect(waitForReceipt).toHaveBeenCalledOnce());
@@ -238,7 +238,7 @@ describe("endorsement cancellation and public receipt settlement", () => {
     const nextEstimate = defer<bigint>();
     const waitForReceipt = vi.fn(() => oldReceipt.promise);
     f.send.mockResolvedValue({ replaceableTransaction() { return this; }, hash: f.receipt.hash, wait: waitForReceipt });
-    const h = renderHook(controller, { wrapper });
+    const h = renderHook(useController, { wrapper });
     await vi.waitFor(() => expect(h.result.current.footer.isTargetValidOnChain).toBe(true));
     act(() => h.result.current.footer.onEndorse());
     await vi.waitFor(() => expect(waitForReceipt).toHaveBeenCalledOnce());
@@ -276,7 +276,7 @@ describe("endorsement cancellation and public receipt settlement", () => {
     const f = fixture();
     const gate = defer<bigint>();
     f.send.estimateGas.mockReturnValue(gate.promise);
-    const h = renderHook(controller, { wrapper });
+    const h = renderHook(useController, { wrapper });
     await vi.waitFor(() => expect(h.result.current.footer.isTargetValidOnChain).toBe(true));
     act(() => h.result.current.footer.onEndorse());
     await vi.waitFor(() => expect(f.send.estimateGas).toHaveBeenCalledTimes(1));

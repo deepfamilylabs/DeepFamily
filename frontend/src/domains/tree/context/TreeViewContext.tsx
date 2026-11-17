@@ -108,6 +108,9 @@ export function TreeViewProvider({ children }: { children: React.ReactNode }) {
       runtime.contractAddress,
       runtime.provider,
       runtime.storageNS,
+      runtime.storyRevalidateRef,
+      nodesDataRef,
+      setNodesData,
     ],
   );
 

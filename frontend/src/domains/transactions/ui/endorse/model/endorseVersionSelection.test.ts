@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { PersonVersionLookup } from "../../../hooks/usePersonVersionOptions";
+import type { PersonVersionLookup } from "../../../../../shared/model/personVersionTypes";
 import { reconcileEndorseVersionSelection } from "./endorseVersionSelection";
 
 const HASH = `0x${"a".repeat(64)}`;

@@ -13,6 +13,30 @@ env:
   VITE_ZK_ASSET_BASE_URL: ${{ vars.VITE_ZK_ASSET_BASE_URL }}
 
 jobs:
+  fast-checks:
+    name: Architecture, types and source checks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22.23.2
+          package-manager-cache: false
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Fast checks
+        run: npm run check:fast
+      - name: Keep fast-check evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: fast-check-evidence
+          path: test-results/checks/fast.json
+          if-no-files-found: warn
+          retention-days: 7
+
   circuit-constraints:
     name: Shielded circuit constraints
     runs-on: ubuntu-latest
@@ -37,9 +61,15 @@ jobs:
         run: npm run test:circuits
 
   build-test:
+    needs: fast-checks
+    # Preserve the existing required check as a failure when its prerequisite fails.
+    if: always()
     runs-on: ubuntu-latest
 
     steps:
+      - name: Require successful fast checks
+        run: test '${{ needs.fast-checks.result }}' = 'success'
+
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -61,9 +91,6 @@ jobs:
       - name: Install dependencies
         run: npm ci --no-audit --no-fund
 
-      - name: Check receive encryption vectors and security properties
-        run: npm run test:receive-security --workspace @deepfamily/protocol-core
-
       - name: Install Circom compiler
         run: npm run zk:fetch
 
@@ -73,28 +100,23 @@ jobs:
       - name: Fetch pinned browser proving files
         run: npm run zk:assets:fetch
 
-      - name: Check ZK artifacts and proofs
-        run: npm run zk:check
+      - name: Integration checks, real proofs and browser acceptance
+        run: npm run check:integration
 
-      - name: Contract checks
-        run: npm run contracts:check
-
-      - name: Frontend checks
-        run: npm run frontend:check
-
-      # Builds its own copy (frontend/.csp-scan) with proving files on the preview origin, serves it
-      # under the production headers, visits every route and runs all three workers on the golden
-      # vector and a controlled RPC fixture, including real receive presentation/link proofs.
-      # Fails on any CSP violation or broken worker flow. The runner image ships Google Chrome.
-      - name: Frontend CSP scan
-        run: npm run csp:scan --workspace deepfamily-frontend
-        env:
-          CSP_SCAN_FAIL_ON_REPORT: "1"
-
-      - name: Check committed frontend ABIs
-        run: git diff --exit-code -- frontend/src/abi
+      - name: Keep check and browser evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: integration-evidence
+          path: |
+            test-results/checks/
+            test-results/browser-acceptance/
+            frontend/.csp-scan/evidence/
+          if-no-files-found: warn
+          retention-days: 7
 
   zk-native-platforms:
+    needs: fast-checks
     name: ZK native (${{ matrix.name }})
     strategy:
       fail-fast: false

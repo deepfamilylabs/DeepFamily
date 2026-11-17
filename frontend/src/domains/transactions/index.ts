@@ -21,3 +21,7 @@ export {
 export { default as TransactionCenterChip } from "./ui/TransactionCenterChip";
 export { useTransactionCenterEntry } from "./ui/shared/useTransactionCenterEntry";
 export { resolveTransactionPhase, type TransactionPhase } from "./ui/shared/transactionPhase";
+
+export type { ShieldedSubmissionContext } from "./context/TransactionCenterContext";
+
+export { usePersonVersionOptions } from "./hooks/usePersonVersionOptions";

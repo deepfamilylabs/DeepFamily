@@ -100,6 +100,7 @@ export interface TreeGraphStateResult {
 }
 
 export function useTreeGraphState(options: UseTreeGraphStateOptions): TreeGraphStateResult {
+  const { push, t } = options;
   const storageScopeRef = useRef({ storageNS: options.storageNS, generation: 0 });
   if (storageScopeRef.current.storageNS !== options.storageNS) {
     storageScopeRef.current = {
@@ -285,7 +286,7 @@ export function useTreeGraphState(options: UseTreeGraphStateOptions): TreeGraphS
       setProgress(undefined);
       setSettled(true);
       if (typeof options.rootHash === "string" && options.rootHash) {
-        setContractMessage(options.t("familyTree.status.rootNotFound"));
+        setContractMessage(t("familyTree.status.rootNotFound"));
       }
       return;
     }
@@ -371,18 +372,18 @@ export function useTreeGraphState(options: UseTreeGraphStateOptions): TreeGraphS
       if (!startup.ok) {
         if (!cancelled) {
           if (startup.status === "rateLimited") {
-            setContractMessage(options.t("familyTree.status.rateLimited"));
+            setContractMessage(t("familyTree.status.rateLimited"));
           } else if (startup.status === "rootNotFound") {
-            setContractMessage(options.t("familyTree.status.rootNotFound"));
+            setContractMessage(t("familyTree.status.rootNotFound"));
           } else if (startup.status === "networkError") {
-            setContractMessage(options.t("familyTree.status.networkError"));
+            setContractMessage(t("familyTree.status.networkError"));
           } else {
-            setContractMessage(options.t("familyTree.status.contractModeRootNotFound"));
+            setContractMessage(t("familyTree.status.contractModeRootNotFound"));
           }
           if (startup.isRootInvalid) setRootExists(false);
           if (startup.stage === "root" && !stageLoggedRef.current.has("root_check")) {
             stageLoggedRef.current.add("root_check");
-            options.push(startup.error as any, { stage: "root_check" });
+            push(startup.error as any, { stage: "root_check" });
           }
           setTrustedFilterActive(false);
         }
@@ -427,7 +428,7 @@ export function useTreeGraphState(options: UseTreeGraphStateOptions): TreeGraphS
           setReachableNodeIds([]);
           setProgress({ created: 0, visited: 0, depth: 0 });
           setContractMessage(
-            options.t(
+            t(
               "familyTree.status.rootNotTrustedEndorsed",
               "The current root version is not endorsed by any recommended source.",
             ),
@@ -502,7 +503,7 @@ export function useTreeGraphState(options: UseTreeGraphStateOptions): TreeGraphS
       if (!cancelled) setSettled(true);
     })().catch((error: any) => {
       if (!cancelled && error?.name !== "AbortError") {
-        options.push(error, { stage: "build_session" });
+        push(error, { stage: "build_session" });
       }
       if (!cancelled) {
         setLoading(false);
@@ -521,13 +522,13 @@ export function useTreeGraphState(options: UseTreeGraphStateOptions): TreeGraphS
     options.contract,
     options.edgeTtlMs,
     options.provider,
-    options.push,
+    push,
     options.refreshTick,
     options.rootHash,
     options.rootId,
     options.rootVersionIndex,
     options.strictIncludeUnversionedChildren,
-    options.t,
+    t,
     options.totalVersionsTtlMs,
     options.traversal,
     options.trustedSourceFilterEnabled,
@@ -643,14 +644,14 @@ export function useTreeGraphState(options: UseTreeGraphStateOptions): TreeGraphS
             !stageLoggedRef.current.has("nft_details_batch")
           ) {
             stageLoggedRef.current.add("nft_details_batch");
-            options.push((nftErrors[0]?.error ?? new Error("nft_details_batch")) as any, {
+            push((nftErrors[0]?.error ?? new Error("nft_details_batch")) as any, {
               stage: "nft_details_batch",
             });
           }
         } catch (error) {
           if (isCurrentScope() && !stageLoggedRef.current.has("counts_batch")) {
             stageLoggedRef.current.add("counts_batch");
-            options.push(error as any, { stage: "counts_batch" });
+            push(error as any, { stage: "counts_batch" });
           }
         }
       }
@@ -666,7 +667,7 @@ export function useTreeGraphState(options: UseTreeGraphStateOptions): TreeGraphS
     options.api,
     options.contract,
     options.nftDetailsTtlMs,
-    options.push,
+    push,
     options.queryCacheRef,
     options.storageNS,
     options.versionDetailsTtlMs,
@@ -752,7 +753,7 @@ export function useTreeGraphState(options: UseTreeGraphStateOptions): TreeGraphS
       reportError: (error, stage) => {
         if (!stageLoggedRef.current.has(stage)) {
           stageLoggedRef.current.add(stage);
-          options.push(error as any, { stage });
+          push(error as any, { stage });
         }
       },
       isCancelled: () => cancelled,
@@ -769,7 +770,7 @@ export function useTreeGraphState(options: UseTreeGraphStateOptions): TreeGraphS
     options.contract,
     options.childrenPageLimit,
     options.nftDetailsTtlMs,
-    options.push,
+    push,
     options.versionDetailsTtlMs,
   ]);
 

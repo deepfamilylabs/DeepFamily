@@ -1,6 +1,6 @@
 import { TransactionStatusView } from "../../shared/TransactionStatusView";
 import type { TransactionPhase } from "../../shared/transactionPhase";
-import type { TimelineStep } from "../../shared/TransactionTimeline";
+import type { TimelineStep } from "../../../../../shared/ui/TransactionTimeline";
 import { AddVersionSuccessResult } from "../AddVersionSuccessResult";
 import type {
   AddVersionErrorResultView,

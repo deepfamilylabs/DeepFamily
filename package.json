@@ -44,8 +44,8 @@
     "frontend:source-rules": "npm run source-rules:check --workspace deepfamily-frontend",
     "frontend:typecheck": "tsc --noEmit -p frontend/tsconfig.json",
     "frontend:test": "npm run test --workspace deepfamily-frontend",
-    "frontend:check": "npm run frontend:lint && npm run frontend:source-rules && npm run frontend:typecheck && npm run locales:check --workspace deepfamily-frontend && npm run security:xss-scan && npm run frontend:build && npm run frontend:test",
-    "check": "npm run test:circuits && npm run contracts:check && npm run frontend:check",
+    "frontend:check": "node scripts/check.mjs frontend",
+    "check": "node scripts/check.mjs all",
     "security:audit": "node scripts/check-npm-audit.mjs",
     "security:receive:timing": "node scripts/receive-encryption-timing.mjs",
     "security:xss-scan": "node scripts/check-xss-sinks.mjs",
@@ -66,7 +66,12 @@
     "zk:build": "node scripts/zk-build.mjs",
     "zk:setup:dev": "node scripts/zk-setup.mjs --informal",
     "zk:setup": "node scripts/zk-setup.mjs",
-    "zk:check": "node scripts/zk-check.mjs"
+    "zk:check": "node scripts/zk-check.mjs",
+    "frontend:static": "node scripts/check.mjs frontend-static",
+    "check:fast": "node scripts/check.mjs fast",
+    "check:integration": "node scripts/check.mjs integration",
+    "security:solidity": "node scripts/check.mjs solidity",
+    "test:guards": "node --test frontend/scripts/test/*.test.mjs scripts/test/*.test.mjs"
   },
   "keywords": [
     "blockchain",

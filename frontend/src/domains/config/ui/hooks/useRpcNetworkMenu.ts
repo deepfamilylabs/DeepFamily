@@ -68,7 +68,7 @@ export function useRpcNetworkMenu() {
         name: t(n.nameKey, n.defaultName) || n.defaultName,
         rpcUrl: n.rpcUrl,
       })),
-    [isConfigured, rpcUrl, t, i18n.language],
+    [isConfigured, rpcUrl, t],
   );
 
   const allNetworks = useMemo<NetworkOption[]>(

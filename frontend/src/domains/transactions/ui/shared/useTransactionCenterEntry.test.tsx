@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import React, { useLayoutEffect } from "react";
+import React, { useLayoutEffect, useRef } from "react";
 import { act, cleanup, render, renderHook, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import {
@@ -105,14 +105,17 @@ describe("captured transaction settlement", () => {
   it("keeps a captured settlement alive after the modal unmounts", () => {
     let settle!: (outcome: TransactionSettlement) => void;
     function Modal() {
+      const captured = useRef(false);
       const entry = useTransactionCenterEntry({
         kind: "addVersion",
         label: "Add Version",
         phase: "busy",
       });
       useLayoutEffect(() => {
+        if (captured.current) return;
+        captured.current = true;
         settle = entry.captureSettlement();
-      }, []);
+      }, [entry]);
       return null;
     }
     function Records() {

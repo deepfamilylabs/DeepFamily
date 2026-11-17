@@ -6,6 +6,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { verificationPaths } from "./lib/verificationPaths.mjs";
 
 export const SLITHER_VERSION = "0.11.6";
 const ROOT = fileURLToPath(new URL("..", import.meta.url));
@@ -219,7 +220,7 @@ export function evaluateSlitherReport(report, baseline) {
 export function main() {
   const executable = process.env.SOLIDITY_SECURITY_PYTHON || "python3";
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), "deepfamily-slither-"));
-  const reportDirectory = path.join(ROOT, "artifacts/security");
+  const reportDirectory = verificationPaths(ROOT).security;
   const reportPath = path.join(reportDirectory, "slither.json");
   try {
     const selected = prepareCurrentBuildInfo(ROOT, directory);
@@ -268,7 +269,12 @@ export function main() {
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   try {
-    main();
+    if (process.argv[2] === "--baseline-only") {
+      assertBaselineSources(json(path.join(ROOT, "security/slither-baseline.json")), ROOT);
+      console.log("[solidity-security] reviewed source snapshots match current sources");
+    } else {
+      main();
+    }
   } catch (error) {
     console.error(`[solidity-security] ${error.message}`);
     process.exitCode = 1;

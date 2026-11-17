@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useMemo, useState, useEffect } from "react";
+import React, { createContext, useContext, useMemo, useState, useEffect, useCallback } from "react";
 import { NETWORK_PRESETS } from "../../../shared/config";
 import {
   getDefaultRootHash,
@@ -155,12 +155,12 @@ export function ConfigProvider({ children }: { children: React.ReactNode }) {
     }
   });
 
-  // Persist computed initial history (including default root) once on mount
+  // Persist both the initial root and subsequent history changes.
   useEffect(() => {
     try {
       localStorage.setItem(ROOT_HISTORY_KEY, JSON.stringify(rootHistory));
     } catch {}
-  }, []);
+  }, [rootHistory]);
 
   useEffect(() => {
     const rpcUrl = state.rpcUrl.trim();
@@ -226,13 +226,7 @@ export function ConfigProvider({ children }: { children: React.ReactNode }) {
     };
   }, [state.rpcUrl, state.chainId, state.readerAddress]);
 
-  const saveRootHistory = (list: string[]) => {
-    try {
-      localStorage.setItem(ROOT_HISTORY_KEY, JSON.stringify(list));
-    } catch {}
-  };
-
-  const addRootToHistory = (hash: string) => {
+  const addRootToHistory = useCallback((hash: string) => {
     const normalized = (hash || "").trim();
     if (!/^0x[a-fA-F0-9]{64}$/.test(normalized)) return;
     setRootHistory((prev) => {
@@ -240,69 +234,69 @@ export function ConfigProvider({ children }: { children: React.ReactNode }) {
         normalized,
         ...prev.filter((v) => v.toLowerCase() !== normalized.toLowerCase()),
       ].slice(0, 20);
-      saveRootHistory(next);
       return next;
     });
-  };
+  }, []);
 
-  const removeRootFromHistory = (hash: string) => {
+  const removeRootFromHistory = useCallback((hash: string) => {
     setRootHistory((prev) => {
       const next = prev.filter((v) => v.toLowerCase() !== (hash || "").toLowerCase());
-      saveRootHistory(next);
       return next;
     });
-  };
+  }, []);
 
-  const clearRootHistory = () => {
+  const clearRootHistory = useCallback(() => {
     setRootHistory([]);
-    saveRootHistory([]);
-  };
+  }, []);
 
-  const update = (partial: ConfigUpdates) => {
-    if (partial.readerAddress != null) setModuleResolutionError(null);
-    setState((prev) => {
-      const next = { ...prev, ...partial, stateReadMode: defaults.stateReadMode };
-      if (
-        partial.readerAddress != null &&
-        !sameAddress(partial.readerAddress, prev.readerAddress)
-      ) {
-        next.contractAddress = "";
-        next.tokenAddress = "";
-      }
-      try {
-        persistConfig(next);
-        if (partial.rootHash && /^0x[a-fA-F0-9]{64}$/.test(partial.rootHash.trim())) {
-          // also record root history globally
-          const normalized = partial.rootHash.trim();
-          const currentRaw = localStorage.getItem(ROOT_HISTORY_KEY);
-          let current: string[] = [];
-          try {
-            current = currentRaw ? (JSON.parse(currentRaw) as string[]) : [];
-          } catch {
-            current = [];
-          }
-          const nextList = [
-            normalized,
-            ...current.filter((v) => v.toLowerCase() !== normalized.toLowerCase()),
-          ].slice(0, 20);
-          try {
-            localStorage.setItem(ROOT_HISTORY_KEY, JSON.stringify(nextList));
-          } catch {}
-          // reflect in state
-          setRootHistory(nextList);
+  const update = useCallback(
+    (partial: ConfigUpdates) => {
+      if (partial.readerAddress != null) setModuleResolutionError(null);
+      setState((prev) => {
+        const next = { ...prev, ...partial, stateReadMode: defaults.stateReadMode };
+        if (
+          partial.readerAddress != null &&
+          !sameAddress(partial.readerAddress, prev.readerAddress)
+        ) {
+          next.contractAddress = "";
+          next.tokenAddress = "";
         }
-      } catch {}
-      return next;
-    });
-  };
+        try {
+          persistConfig(next);
+          if (partial.rootHash && /^0x[a-fA-F0-9]{64}$/.test(partial.rootHash.trim())) {
+            // also record root history globally
+            const normalized = partial.rootHash.trim();
+            const currentRaw = localStorage.getItem(ROOT_HISTORY_KEY);
+            let current: string[] = [];
+            try {
+              current = currentRaw ? (JSON.parse(currentRaw) as string[]) : [];
+            } catch {
+              current = [];
+            }
+            const nextList = [
+              normalized,
+              ...current.filter((v) => v.toLowerCase() !== normalized.toLowerCase()),
+            ].slice(0, 20);
+            try {
+              localStorage.setItem(ROOT_HISTORY_KEY, JSON.stringify(nextList));
+            } catch {}
+            // reflect in state
+            setRootHistory(nextList);
+          }
+        } catch {}
+        return next;
+      });
+    },
+    [defaults.stateReadMode],
+  );
 
-  const reset = () => {
+  const reset = useCallback(() => {
     try {
       localStorage.removeItem(STORAGE_KEY);
     } catch {}
     setState(getEnvDefaults());
     setModuleResolutionError(null);
-  };
+  }, []);
 
   const value = useMemo<AppConfig>(
     () => ({
@@ -316,7 +310,17 @@ export function ConfigProvider({ children }: { children: React.ReactNode }) {
       removeRootFromHistory,
       clearRootHistory,
     }),
-    [state, defaults, moduleResolutionError, rootHistory],
+    [
+      state,
+      defaults,
+      moduleResolutionError,
+      rootHistory,
+      update,
+      reset,
+      addRootToHistory,
+      removeRootFromHistory,
+      clearRootHistory,
+    ],
   );
 
   return <ConfigContext.Provider value={value}>{children}</ConfigContext.Provider>;
