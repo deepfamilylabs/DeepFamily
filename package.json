@@ -106,7 +106,7 @@
     "@zk-kit/binary-merkle-root.circom": "2.0.0",
     "chai": "^5.1.2",
     "circomlib": "^2.0.5",
-    "concurrently": "^9.2.4",
+    "concurrently": "^9.2.5",
     "cross-env": "^7.0.3",
     "ethers": "^6.17.0",
     "ffjavascript": "0.3.1",
@@ -114,7 +114,7 @@
     "husky": "^9.0.0",
     "keccak256-circom": "git+https://github.com/vocdoni/keccak256-circom.git",
     "lint-staged": "^15.0.0",
-    "mocha": "^11.0.0",
+    "mocha": "^11.8.0",
     "prettier": "^3.0.0",
     "prettier-plugin-solidity": "^1.1.0",
     "snarkjs": "^0.7.4",
@@ -139,9 +139,13 @@
   "overrides": {
     "bfj": "9.1.3",
     "bn.js": "5.2.3",
+    "brace-expansion": "2.1.8",
     "diff": "8.0.3",
     "elliptic": "6.6.1",
-    "serialize-javascript": "7.0.5",
+    "minimatch@^10": {
+      "brace-expansion": "5.0.13"
+    },
+    "serialize-javascript": "7.1.4",
     "underscore": "1.13.8"
   },
   "dependencies": {
