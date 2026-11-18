@@ -3,14 +3,16 @@ import test from "node:test";
 import { checkPlan, runCheckProfile } from "../check.mjs";
 
 test("fast checks do not need downloaded proving artifacts or the Solidity analyzer", () => {
-  assert.deepEqual(checkPlan("fast")[0], [process.execPath, "scripts/check-snarkjs-runtime.mjs"]);
-  const fast = checkPlan("fast")
-    .map((command) => command.join(" "))
-    .join("\n");
+  const commands = checkPlan("fast");
+  assert.deepEqual(commands[0], [process.execPath, "scripts/check-snarkjs-runtime.mjs"]);
+  assert.deepEqual(
+    commands.find((command) => command[1] === "--test"),
+    [process.execPath, "--test", "frontend/scripts/test/*.test.mjs", "scripts/test/*.test.mjs"],
+  );
+  const fast = commands.map((command) => command.join(" ")).join("\n");
   assert.match(fast, /frontend:typecheck/);
   assert.match(fast, /check-chain-client-boundaries/);
   assert.match(fast, /generate-shielded-signal-layout.mjs --check/);
-  assert.match(fast, /test:guards/);
   assert.match(fast, /check-solidity-security.mjs --baseline-only/);
   assert.doesNotMatch(fast, /zk:check|contracts:check|browser:check/);
 });

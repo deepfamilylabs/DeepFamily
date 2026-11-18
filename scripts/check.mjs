@@ -26,7 +26,7 @@ export const CHECK_PROFILES = {
     "frontend-static",
     node("scripts/check-chain-client-boundaries.mjs"),
     node("scripts/generate-shielded-signal-layout.mjs", "--check"),
-    npm("test:guards"),
+    node("--test", "frontend/scripts/test/*.test.mjs", "scripts/test/*.test.mjs"),
   ],
   frontend: ["frontend-static", npm("frontend:build"), npm("frontend:test")],
   integration: [

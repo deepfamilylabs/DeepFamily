@@ -46,6 +46,9 @@
     "frontend:test": "npm run test --workspace deepfamily-frontend",
     "frontend:check": "node scripts/check.mjs frontend",
     "check": "node scripts/check.mjs all",
+    "check:fast": "node scripts/check.mjs fast",
+    "check:integration": "node scripts/check.mjs integration",
+    "security:solidity": "node scripts/check.mjs solidity",
     "security:audit": "node scripts/check-npm-audit.mjs",
     "security:receive:timing": "node scripts/receive-encryption-timing.mjs",
     "security:xss-scan": "node scripts/check-xss-sinks.mjs",
@@ -66,12 +69,7 @@
     "zk:build": "node scripts/zk-build.mjs",
     "zk:setup:dev": "node scripts/zk-setup.mjs --informal",
     "zk:setup": "node scripts/zk-setup.mjs",
-    "zk:check": "node scripts/zk-check.mjs",
-    "frontend:static": "node scripts/check.mjs frontend-static",
-    "check:fast": "node scripts/check.mjs fast",
-    "check:integration": "node scripts/check.mjs integration",
-    "security:solidity": "node scripts/check.mjs solidity",
-    "test:guards": "node --test frontend/scripts/test/*.test.mjs scripts/test/*.test.mjs"
+    "zk:check": "node scripts/zk-check.mjs"
   },
   "keywords": [
     "blockchain",
