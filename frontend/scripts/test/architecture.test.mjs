@@ -10,6 +10,20 @@ async function messages(code, filePath = "src/domains/inheritance/services/probe
   return result.messages;
 }
 
+test("new browser writes must not import or re-export the raw transaction executor", async () => {
+  for (const code of [
+    'import { executeChainTransaction as send } from "@deepfamily/chain-client";',
+    'export { executeChainTransaction as send } from "@deepfamily/chain-client";',
+    'export * from "@deepfamily/chain-client";', 'import * as chain from "@deepfamily/chain-client";',
+    'const chain = await import("@deepfamily/chain-client");',
+  ]) assert((await messages(code)).some(({ ruleId }) => ruleId === "project/wallet-submission"), code);
+  for (const code of [
+    'import { runChainRead } from "@deepfamily/chain-client";',
+    'import type * as Chain from "@deepfamily/chain-client";',
+    'import { captureWalletDraft } from "../../../shared/clients/walletDraft";',
+  ]) assert.deepEqual(await messages(code), []);
+});
+
 test("Hooks checks reject conditional calls and stale effect dependencies", async () => {
   const result = await messages(
     `

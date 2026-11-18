@@ -55,6 +55,16 @@ export default [
     },
   },
   {
+    files: srcFiles,
+    ignores: [
+      "src/**/*.test.{ts,tsx}", "src/shared/clients/walletDraft.ts",
+      "src/domains/person/services/trustedEndorserService.ts", "src/domains/transactions/api/erc20Gateway.ts",
+      "src/domains/transactions/services/addStoryRecordService.ts", "src/domains/transactions/services/mintBiographyTransaction.ts",
+      "src/domains/transactions/services/sealStoryService.ts", "src/domains/transactions/ui/endorse/hooks/useEndorseFlow.ts",
+    ],
+    rules: { "project/wallet-submission": "error" },
+  },
+  {
     files: ["src/pages/**/*.{ts,tsx}"],
     ignores: ["src/**/*.test.{ts,tsx}"],
     rules: {

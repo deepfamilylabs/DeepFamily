@@ -33,6 +33,20 @@ test("wallet scope rejects the wrong chain or account before any send", async ()
     assert.equal(sends, 0);
   }
 });
+
+test("a browser write requires the selected account, not just a cached or authorized signer", async () => {
+  const { input, signer } = fixture();
+  let accounts = [account, other];
+  signer.provider.send = async method => method === "eth_accounts" ? accounts : "0x7a69";
+  const check = () => assertChainWalletScope({ ...input, requireSelectedAccount: true });
+  await check();
+  accounts = [other, account];
+  await assert.rejects(check, { code: "CHAIN_WALLET_SCOPE_CHANGED" });
+  accounts = [];
+  await assert.rejects(check, { code: 4100 });
+  delete signer.provider.send;
+  await assert.rejects(check, { code: "CHAIN_WALLET_UNAVAILABLE" });
+});
 test("a pre-send wallet RPC failure retains its read phase without submitting", async () => {
   const f = fixture();
   const unavailable = Object.assign(new Error("wallet RPC unavailable"), { code: "NETWORK_ERROR" });

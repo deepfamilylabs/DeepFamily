@@ -1,4 +1,5 @@
 import type { ContractReceipt } from "../../../shared/clients/transactionTypes";
+import type { WalletDraft } from "../../../shared/clients/walletDraft";
 import { ethers } from "ethers";
 import {
   computeVersionHash,
@@ -13,7 +14,7 @@ import {
   createArchiveInterface,
 } from "../../../shared/clients/contractFactory";
 import { parseReceiptEvents } from "../api/txGateway";
-import { executeChainTransaction, normalizeChainError, readConfirmedDetails, verifyConfirmedDetails } from "@deepfamily/chain-client";
+import { normalizeChainError, readConfirmedDetails, verifyConfirmedDetails } from "@deepfamily/chain-client";
 
 import {
   assertBlobRefMatches,
@@ -75,7 +76,7 @@ export type ExecuteAddVersionFlowParams = {
   submitContract: any;
   preflightContract: any;
   contractAddress?: string | null;
-  submitterAddress?: string | null;
+  draft: WalletDraft;
   proof: ProofEnvelope;
   publicSignals: AddVersionPublicSignals;
   fatherVersionIndex: number;
@@ -84,8 +85,7 @@ export type ExecuteAddVersionFlowParams = {
   isDev?: boolean;
   onTransactionSubmitted?: (txHash: string) => void;
   onTransactionConfirmed?: (txHash: string, receipt: ContractReceipt) => void;
-  expectedChainId?: number | bigint | null;
-  assertWalletScope?: () => Promise<void>;
+  onWalletRequest?: () => void;
   reconcileTransactionHash?: string | null;
   getTransactionReceipt?: (txHash: string) => Promise<ContractReceipt | null>;
   confirmTransactionPreview?: (preview: AddVersionTransactionPreview) => boolean | Promise<boolean>;
@@ -211,7 +211,7 @@ function assertReconciledAddVersion(input: {
   expectedPersonHash: string;
   expectedFatherHash: string;
   expectedMotherHash: string;
-  expectedSubmitter: string | null;
+  expectedSubmitter: string;
   fatherVersionIndex: number;
   motherVersionIndex: number;
   versionCommitment: bigint;
@@ -246,7 +246,7 @@ function assertReconciledAddVersion(input: {
     version.fatherVersionIndex === input.fatherVersionIndex &&
     version.motherVersionIndex === input.motherVersionIndex &&
     version.versionCommitment === input.versionCommitment.toString() &&
-    (input.expectedSubmitter === null || sameHex(version.addedBy, input.expectedSubmitter)) &&
+    sameHex(version.addedBy, input.expectedSubmitter) &&
     sameHex(metadata.personHash, input.expectedPersonHash) &&
     metadata.versionIndex === version.versionIndex &&
     sameHex(metadata.payloadHash, expectedPayloadHash) &&
@@ -266,7 +266,7 @@ export async function executeAddVersionFlow({
   submitContract,
   preflightContract,
   contractAddress,
-  submitterAddress,
+  draft,
   proof,
   publicSignals,
   fatherVersionIndex,
@@ -275,8 +275,7 @@ export async function executeAddVersionFlow({
   isDev = false,
   onTransactionSubmitted,
   onTransactionConfirmed,
-  expectedChainId,
-  assertWalletScope,
+  onWalletRequest,
   reconcileTransactionHash,
   getTransactionReceipt,
   confirmTransactionPreview,
@@ -306,11 +305,10 @@ export async function executeAddVersionFlow({
       ? ethers.ZeroHash
       : wrapIdentityCommitmentAsPersonHash(publicSignals.motherIdentityCommitment);
   const packedSubmitter = unpackSubmitterAndSelfSuiteId(publicSignals.submitterAndSelfSuiteId);
-  const expectedSubmitter = submitterAddress ? ethers.getAddress(submitterAddress) : null;
+  const expectedSubmitter = ethers.getAddress(draft.account);
   const envelopePrefix = parseEnvelopeCommonPrefix(metadataEnvelope);
 
   if (
-    expectedSubmitter !== null &&
     ethers.getAddress(packedSubmitter.submitter) !== expectedSubmitter
   ) {
     throw makeValidationError("CallerMismatch");
@@ -460,18 +458,16 @@ export async function executeAddVersionFlow({
 
   let finalTransaction: { receipt: ContractReceipt; transactionHash: string };
   try {
-    finalTransaction = await executeChainTransaction<ContractReceipt>({
+    finalTransaction = await draft.submit<ContractReceipt>({
       provider: submitContract.runner?.provider ?? submitContract.runner,
       send: async () => {
-        // Recheck the actual wallet after every awaited preparation and immediately before sending.
-        await assertWalletScope?.();
+        onWalletRequest?.();
         const transaction = await submitContract.addPersonVersion(
           ...addPersonArgs,
-          gasDetails.gasLimit ? { gasLimit: gasDetails.gasLimit } : {},
+          { chainId: draft.chainId, ...(gasDetails.gasLimit ? { gasLimit: gasDetails.gasLimit } : {}) },
         );
         if (
-          expectedChainId != null && transaction.chainId != null &&
-          BigInt(transaction.chainId) !== BigInt(expectedChainId)
+          transaction.chainId != null && BigInt(transaction.chainId) !== draft.chainId
         ) {
           throw Object.assign(
             makeReconciliationError(
@@ -484,7 +480,7 @@ export async function executeAddVersionFlow({
         }
         return transaction;
       },
-      expected: { chainId: expectedChainId, from: expectedSubmitter, to: contractAddress,
+      expected: { to: contractAddress,
         data: expectedTransactionData, value: 0n },
       onSubmitted: onTransactionSubmitted,
     });

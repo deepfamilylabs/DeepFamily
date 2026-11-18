@@ -3,6 +3,7 @@ import { useState, type ReactNode } from "react";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Interface, type Signer } from "ethers";
+import { passiveWalletRpc } from "../../../shared/clients/test-helpers/walletRpc";
 import type { ShieldedPageModules } from "../model/shieldedPageTypes";
 import type { ShieldFlowInput, ShieldedPoolFlowResult } from "../services/shieldedPoolFlows";
 import type {
@@ -156,6 +157,7 @@ const signer = {
   getAddress: vi.fn(async () => address),
   signMessage: vi.fn(async () => "signature"),
   provider: {
+    send: passiveWalletRpc(() => ({ account: address, chainId: modules.chainId })),
     getNetwork: vi.fn(async () => ({ chainId: 31337n })),
     getTransactionCount: vi.fn(async () => 0),
     getBlockNumber: vi.fn(async () => 30),

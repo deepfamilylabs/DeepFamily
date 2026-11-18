@@ -7,6 +7,7 @@ import { describe, expect, it, vi } from "vitest";
 import { TransactionCenterProvider, useTransactionCenter } from "../../transactions";
 import { useShieldedSubmissionCoordinator, type ShieldedTrackedSubmission } from "./useShieldedSubmissionCoordinator";
 import { submitShieldedApproval } from "../services/shieldedWalletSubmission";
+import { captureWalletDraft } from "../../../shared/clients/walletDraft";
 
 const wrapper = ({children}: {children: ReactNode}) => <TransactionCenterProvider>{children}</TransactionCenterProvider>;
 const provider = {} as Provider;
@@ -129,7 +130,7 @@ describe("shielded public submission coordination", () => {
     await act(async () => {
       try {
         await submitShieldedApproval({
-          signer, chainId: 31337n, account, token: token as Contract, spender: poolAddress, amount: 9n,
+          draft: captureWalletDraft({ signer, chainId: 31337n, account, isCurrent: f.input.isCurrent }), token: token as Contract, spender: poolAddress, amount: 9n,
           onSubmitting: tracked.onSubmitting, onBroadcast: tracked.onBroadcast,
         });
       } catch (error) {

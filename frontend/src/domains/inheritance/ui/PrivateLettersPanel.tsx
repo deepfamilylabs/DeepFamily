@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { keccak256, type Provider, type Signer } from "ethers";
 import { normalizeFriendlyError, type ChainFriendlyError } from "../../../shared/lib/errors";
+import { captureWalletDraft } from "../../../shared/clients/walletDraft";
 import type { ShieldedAssetWorkerCallMap, ShieldedWorkerContext } from "../../../shared/workers/shieldedAssetWorkerTypes";
 import { shieldedAssetWorkerCall, subscribeShieldedAssetWorkerLock } from "../../../shared/workers/shieldedAssetWorkerClient";
 import { getWalletConnectionGeneration, subscribeWalletConnectionChange } from "../../wallet";
@@ -24,7 +25,7 @@ function expectedRegistration(letter: ProvenPrivateLetter): ExpectedPrivateLette
 export function PrivateLettersPanel(props: {
   mode: PrivateLetterView;
   titleId?: string;
-  context: ShieldedWorkerContext; signer: Signer | null; provider?: Provider; disabled: boolean; recoveryReady: boolean;
+  context: ShieldedWorkerContext; signer: Signer | null; account: string; provider?: Provider; disabled: boolean; recoveryReady: boolean;
   sessionScope?: string;
   onBusyChange?: (busy: boolean) => void; beginWalletRequest?: () => () => void;
 }) {
@@ -46,9 +47,7 @@ export function PrivateLettersPanel(props: {
   const mounted = useRef(false);
   const activeOperation = useRef<"send" | "check" | "recover" | null>(null);
   const inboxScope = useRef<string | null>(null);
-  const currentSigner = useRef(props.signer);
-  currentSigner.current = props.signer;
-  const previousSigner = useRef(props.signer);
+  const previousWallet = useRef({ signer: props.signer, account: props.account });
   const busyChange = useRef(props.onBusyChange);
   busyChange.current = props.onBusyChange;
   const invalidateSending = useCallback(() => {
@@ -61,6 +60,8 @@ export function PrivateLettersPanel(props: {
   }, []);
   const contextKey = JSON.stringify([props.context, props.sessionScope]);
   const contentScope = JSON.stringify([{ ...props.context, stateReadMode: undefined }, props.sessionScope]);
+  const latest = useRef({ signer: props.signer, account: props.account, contentScope });
+  latest.current = { signer: props.signer, account: props.account, contentScope };
   const previousContextKey = useRef(contextKey);
   const previousContentScope = useRef(contentScope);
   useEffect(() => {
@@ -80,10 +81,10 @@ export function PrivateLettersPanel(props: {
   }), []);
   useEffect(() => subscribeWalletConnectionChange(invalidateSending), [invalidateSending]);
   useEffect(() => {
-    if (previousSigner.current === props.signer) return;
-    previousSigner.current = props.signer;
+    if (previousWallet.current.signer === props.signer && previousWallet.current.account === props.account) return;
+    previousWallet.current = { signer: props.signer, account: props.account };
     invalidateSending();
-  }, [props.signer, invalidateSending]);
+  }, [props.signer, props.account, invalidateSending]);
   useEffect(() => {
     if (previousContextKey.current === contextKey) return;
     previousContextKey.current = contextKey;
@@ -108,54 +109,67 @@ export function PrivateLettersPanel(props: {
   const busy = props.disabled || working;
   const reader = props.provider ?? props.signer?.provider;
   async function send() {
-    if (props.mode !== "write" || !props.signer || !props.context.lettersAddress || busy || unresolved(submission)) return;
-    const version = epoch.current;
+    if (props.mode !== "write" || !props.signer || !props.account || !props.context.lettersAddress || busy || activeOperation.current || unresolved(submission)) return;
+    const version = ++epoch.current;
     const walletGeneration = getWalletConnectionGeneration();
-    const current = () => mounted.current && version === epoch.current && currentSigner.current === props.signer && walletGeneration === getWalletConnectionGeneration();
+    const draft = captureWalletDraft({
+      signer: props.signer, account: props.account, chainId: props.context.chainId,
+      isCurrent: () => mounted.current && version === epoch.current && latest.current.signer === props.signer &&
+        latest.current.account === props.account && latest.current.contentScope === contentScope && walletGeneration === getWalletConnectionGeneration(),
+    });
     let letter: ProvenPrivateLetter | null = prepared.current;
     let broadcastHash = "";
     let walletRequested = false;
+    const record = (original: ExpectedPrivateLetterRegistration, result: LetterSubmission | null) => {
+      if (draft.isCurrent()) { setSubmission(result); return; }
+      if (!mounted.current || latest.current.contentScope !== contentScope) return;
+      const settle = (item: LetterSubmission | null) => item && unresolved(item) &&
+        item.messageId === original.messageId && item.ciphertextHash === original.ciphertextHash &&
+        item.recipientBinding === original.recipientBinding && item.deadline === original.deadline ? result : item;
+      setSubmission(settle);
+      setPreviousSubmissions(items => items.flatMap(item => settle(item) ?? []));
+    };
     activeOperation.current = "send";
     setWorking(true); setStage(letter ? "checking" : "preparing"); props.onBusyChange?.(true); setErrorState(null);
     try {
       letter ??= await shieldedAssetWorkerCall("prepareLetter", {
         context: props.context, code, body,
       }, { timeoutMs: 1_200_000 });
-      if (!current()) return;
+      if (!draft.isCurrent()) return;
       prepared.current = letter;
+      const original = expectedRegistration(letter);
       setStage("checking");
       const result = await submitPrivateLetter({
-        address: props.context.lettersAddress, signer: props.signer, chainId: props.context.chainId,
+        address: props.context.lettersAddress, draft,
         letter, onWalletRequest: () => {
           walletRequested = true;
-          if (current()) setStage("submitting");
+          record(original, { ...original, transactionHash: "", state: "pending" });
+          draft.commit(() => setStage("submitting"));
           return props.beginWalletRequest?.() ?? (() => undefined);
-        }, isCurrent: current,
-        onStage: next => { if (next === "submitting") walletRequested = true; if (current()) setStage(next); },
+        },
+        onStage: next => { if (next === "submitting") walletRequested = true; draft.commit(() => setStage(next)); },
         onBroadcast: (transactionHash) => {
           broadcastHash = transactionHash;
-          if (current() && letter) { setStage("confirming"); setSubmission({ ...expectedRegistration(letter), transactionHash, state: "pending" }); }
+          record(original, { ...original, transactionHash, state: draft.isCurrent() ? "pending" : "unknown" });
+          draft.commit(() => setStage("confirming"));
         },
       });
-      if (!current()) return;
-      setSubmission({ ...expectedRegistration(letter), transactionHash: result.transactionHash, state: "confirmed" });
-      setBody(""); setCode(""); prepared.current = null;
+      record(original, { ...original, transactionHash: result.transactionHash, state: "confirmed" });
+      draft.commit(() => { setBody(""); setCode(""); prepared.current = null; });
     } catch (cause) {
-      if (current()) {
-        const publicError = normalizeFriendlyError(cause, t);
-        if (cause instanceof PrivateLetterPreparationExpiredError) {
-          prepared.current = null; setSubmission(null); setError(tr("preparationExpired"), cause);
-        } else if (cause instanceof PrivateLetterTransactionFailedError && letter) {
-          setSubmission({ ...expectedRegistration(letter), transactionHash: cause.transactionHash, state: "failed" });
-          prepared.current = null;
-        } else if (letter && (publicError.transactionHash || broadcastHash || (walletRequested && ["unknown", "network", "verification"].includes(publicError.category)))) {
-          setSubmission({ ...expectedRegistration(letter), transactionHash: publicError.transactionHash ?? broadcastHash,
-            state: publicError.transactionConfirmed ? "verificationFailed" : "unknown" });
-        } else {
-          // Only explicit sending reaches the wallet. A rejected or unsubmitted
-          // request stays editable; its prepared material does not imply a broadcast.
-          setError(publicError.category === "cancelled" ? publicError.message : tr("sendFailed"), cause);
-        }
+      const publicError = normalizeFriendlyError(cause, t);
+      const original = letter && expectedRegistration(letter);
+      if (cause instanceof PrivateLetterPreparationExpiredError) {
+        draft.commit(() => { prepared.current = null; setSubmission(null); setError(tr("preparationExpired"), cause); });
+      } else if (cause instanceof PrivateLetterTransactionFailedError && original) {
+        record(original, { ...original, transactionHash: cause.transactionHash, state: "failed" });
+        draft.commit(() => { prepared.current = null; });
+      } else if (original && (publicError.transactionHash || broadcastHash || (walletRequested && ["unknown", "network", "verification"].includes(publicError.category)))) {
+        record(original, { ...original, transactionHash: publicError.transactionHash ?? broadcastHash,
+          state: publicError.transactionConfirmed ? "verificationFailed" : "unknown" });
+      } else {
+        if (original && walletRequested) record(original, null);
+        draft.commit(() => setError(publicError.category === "cancelled" ? publicError.message : tr("sendFailed"), cause));
       }
     }
     finally { if (mounted.current && version === epoch.current) { activeOperation.current = null; setWorking(false); busyChange.current?.(false); } }

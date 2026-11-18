@@ -35,6 +35,11 @@ Only fee replacements with identical chain, sender, destination, calldata,
 value and nonce are accepted. CREATE deployments and journalled release
 operations can explicitly use `replacementPolicy: "reject"`.
 
+Browser forms use `captureWalletDraft` in the frontend rather than the raw executor. Its
+`requireSelectedAccount` check passively reads `eth_accounts` and compares the first account
+to the reviewed sender, matching the UI's default injected signer. Node and release signers
+do not need an injected wallet or a mounted form.
+
 Durable callers persist the original response in `onTransactionSubmitted`
 before waiting, then use `waitForTransactionHashReceipt` to resume from the
 recorded hash. Domain event validation, private output/nonce reconciliation,

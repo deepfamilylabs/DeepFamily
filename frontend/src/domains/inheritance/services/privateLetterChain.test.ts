@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Contract, Interface, id, keccak256, type Signer } from "ethers";
 import { PRIVATE_LETTER_ABI } from "../../../shared/clients/privateLetterClient";
+import { captureWalletDraft } from "../../../shared/clients/walletDraft";
+import { passiveWalletRpc } from "../../../shared/clients/test-helpers/walletRpc";
 import { PrivateLetterPreparationExpiredError, readPrivateLetters, submitPrivateLetter } from "./privateLetterChain";
 const mocks = vi.hoisted(() => ({ readBlob: vi.fn(), contract: vi.fn(), validateCheckpoint: vi.fn(), wait: vi.fn() }));
 vi.mock("@deepfamily/protocol-core", async original => ({ ...await original<typeof import("@deepfamily/protocol-core")>(), readArchiveBlob: mocks.readBlob }));
@@ -50,7 +52,7 @@ describe("authenticated private letter recovery", () => {
   });
 });
 
-function submissionFixture() {
+function submissionFixture(isCurrent = () => true) {
   const address = "0x1111111111111111111111111111111111111111";
   const iface = new Interface(PRIVATE_LETTER_ABI);
   const letter = { delivery: { messageId: "7", checkpointId: "1", asOf: "900", deadline: "1200", recipientBinding: "9" }, ciphertext: "0x010203", proof: "0x1234" };
@@ -62,16 +64,18 @@ function submissionFixture() {
     queryFilter: vi.fn(async () => [{ transactionHash: "0xprior" }]),
     creationBlock: async () => 1, filters: { LetterRegistered: vi.fn() },
   };
-  const provider = { getNetwork: async () => ({ chainId: 31337n }), getBlockNumber: vi.fn(async () => 20), getBlock: vi.fn(async () => ({ timestamp: 1000 })) };
+  const provider = { send: passiveWalletRpc(() => ({ account: address, chainId: 31337n })), getNetwork: async () => ({ chainId: 31337n }), getBlockNumber: vi.fn(async () => 20), getBlock: vi.fn(async () => ({ timestamp: 1000 })) };
   const signer = { provider, getAddress: async () => address } as unknown as Signer;
   const registration = iface.encodeEventLog(iface.getEvent("LetterRegistered")!, [7, blob, 9, 1200, 1000]);
   mocks.contract.mockReturnValue(contract);
   mocks.wait.mockImplementation(async input => {
+    await input.beforeSend();
     input.assertActive?.();
     await input.send();
     return { transactionHash: "0xtx", receipt: { status: 1, hash: "0xtx", logs: [{ ...registration, address }] } };
   });
-  return { input: { address, signer, chainId: "31337", letter }, contract, provider, iface, blob };
+  const draft = captureWalletDraft({ signer, chainId: 31337n, account: address, isCurrent });
+  return { input: { address, draft, letter }, contract, provider, iface, blob };
 }
 
 describe("private letter retry and receipt confirmation", () => {
@@ -105,11 +109,11 @@ describe("private letter retry and receipt confirmation", () => {
     expect(f.contract.registerLetter).not.toHaveBeenCalled();
   });
   it("checks the wallet operation again after the asynchronous checkpoint validation", async () => {
-    const f = submissionFixture();
     let current = true;
+    const f = submissionFixture(() => current);
     mocks.validateCheckpoint.mockImplementation(async () => { current = false; });
     const onWalletRequest = vi.fn();
-    await expect(submitPrivateLetter({ ...f.input, isCurrent: () => current, onWalletRequest })).rejects.toThrow("wallet changed");
+    await expect(submitPrivateLetter({ ...f.input, onWalletRequest })).rejects.toThrow("draft is no longer active");
     expect(onWalletRequest).not.toHaveBeenCalled();
     expect(f.contract.registerLetter).not.toHaveBeenCalled();
   });

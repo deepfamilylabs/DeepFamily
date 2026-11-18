@@ -75,6 +75,7 @@ import {
   readShieldedSubmissionOutcome,
 } from "../services/shieldedSubmissionTracking";
 import { submitShieldedApproval, submitShieldedAuthorization } from "../services/shieldedWalletSubmission";
+import { captureWalletDraft, type WalletDraft } from "../../../shared/clients/walletDraft";
 import { useShieldedSubmissionCoordinator, type ShieldedTrackedSubmission } from "./useShieldedSubmissionCoordinator";
 import {
   assertShieldedDepositBalance,
@@ -999,8 +1000,6 @@ export function ShieldedInheritancePanel({
           keyFingerprint === latestSession.current.independentKey?.keyFingerprint
         ) {
           autoRecoveryScope.current = "";
-          setWallet(null);
-          setCandidates([]);
         }
       } catch {
         // A transient RPC failure leaves the submission blocked and retries.
@@ -1540,7 +1539,7 @@ export function ShieldedInheritancePanel({
    * every verified factory pool to find the unlocked wallets' assets.
    */
   async function recover(allPools = false, automatic = false) {
-    const refreshingReadMode = readModeRefreshScope.current === contextKey;
+    const preserveSelection = automatic || readModeRefreshScope.current === contextKey;
     try {
       await run(async (current) => {
         setBalancesRefreshing(true);
@@ -1551,7 +1550,7 @@ export function ShieldedInheritancePanel({
           setBalancesRefreshing(false);
           if (result.sessionState) latestSession.current.update(result.sessionState);
           setWallet(result);
-          setCandidates((previous) => refreshingReadMode
+          setCandidates((previous) => preserveSelection
             ? previous.filter((commitment) => result.notes.some((note) => note.kind === "value" && note.commitment === commitment))
             : []);
           if (!taskChosen && session.identity) {
@@ -1609,7 +1608,7 @@ export function ShieldedInheritancePanel({
     if (autoRecoveryScope.current === scope) return;
     autoRecoveryScope.current = scope;
     void recoverAutomatically(false, true);
-  }, [session.identity?.handle, session.independentKey?.keyFingerprint, independentKeyReady, contextKey, walletScreen, busy, recoverAutomatically]);
+  }, [session.identity?.handle, session.independentKey?.keyFingerprint, independentKeyReady, contextKey, walletScreen, busy, submissionPending, recoverAutomatically]);
   async function createCode(receivingSlot: ShieldedKeySlot = codeSlot) {
     await run(async (current) => {
       if (!Number.isFinite(new Date(codeExpiry).getTime()) || new Date(codeExpiry).getTime() <= Date.now()) throw new ShieldedUiMessageError(t("shielded.privateLetters.expiryFuture"));
@@ -1625,6 +1624,7 @@ export function ShieldedInheritancePanel({
     await run(async (current) => {
       if (!signer) throw new ShieldedUiMessageError(t("shielded.walletNotReady"));
       const chosen = signer;
+      const draft = captureWalletDraft({ signer: chosen, account, chainId: modules.chainId, isCurrent: current });
       clearFeedback();
       const result = await shieldedAssetWorkerCall("authorizeIdentityCounter", { context }, { timeoutMs: 1_200_000 });
       if (!current()) return;
@@ -1638,14 +1638,10 @@ export function ShieldedInheritancePanel({
       }, chosen.provider!);
       try {
         const confirmed = await submitShieldedAuthorization({
-          signer: chosen, chainId: modules.chainId, account,
+          draft,
           address: result.address, args: result.args,
-          assertCurrent: () => {
-            if (!current() || walletRef.current.signer !== chosen)
-              throw new ShieldedUiMessageError(t("shielded.walletChanged"));
-          },
           onSubmitting: tracking.onSubmitting,
-          onBroadcast: (hash) => { tracking.onBroadcast(hash); if (current()) setStage(t("shielded.stages.confirming")); },
+          onBroadcast: (hash) => { tracking.onBroadcast(hash); draft.commit(() => setStage(t("shielded.stages.confirming"))); },
           onWalletRequest: () => {
             if (!current()) throw new ShieldedUiMessageError(t("shielded.walletChanged"));
             setStage(t("shielded.stages.submitting"));
@@ -1655,7 +1651,7 @@ export function ShieldedInheritancePanel({
         tracking.onReceipt(confirmed.transactionHash, confirmed.receipt.status);
         if (confirmed.receipt.status !== 1)
           throw new ShieldedUiMessageError(t("shielded.transactionFailed", { hash: confirmed.transactionHash }));
-        if (current()) { setOwnCode(""); receiveCodeScope.current = ""; }
+        draft.commit(() => { setOwnCode(""); receiveCodeScope.current = ""; });
       } catch (error) {
         tracking.onError(error);
         throw error;
@@ -1785,26 +1781,25 @@ export function ShieldedInheritancePanel({
     if (tracked.actionStep !== "merge" || !hash || tracked.feedbackScope !== latestFeedbackScope.current) return;
     setCompletedMergeHashes((hashes) => hashes.includes(hash) ? hashes : [...hashes, hash]);
   }
-  async function approveDeposit(current: () => boolean, chosen: Signer, value: bigint, assertCurrent: () => void) {
+  async function approveDeposit(draft: WalletDraft, value: bigint, assertCurrent: () => void) {
     if (!modules.token) throw new ShieldedUiMessageError(t("shielded.walletNotReady"));
     assertCurrent();
     setProgress({ kind: "approval", stage: "submitting" });
     const tracking = submissionCoordinator.capture({
       id: `shielded:approval:${modules.chainId}:${account}:${Date.now()}`,
       label: `${modules.assetSymbol} · ${tr("approve")}`, kind: "approval",
-    }, chosen.provider!);
+    }, draft.signer.provider!);
     try {
       const confirmed = await submitShieldedApproval({
-        signer: chosen, chainId: modules.chainId, account,
+        draft,
         token: modules.token, spender: modules.poolAddress, amount: value,
-        assertCurrent,
         onSubmitting: tracking.onSubmitting,
         onBroadcast: (hash) => {
           tracking.onBroadcast(hash);
-          if (current()) {
+          draft.commit(() => {
             setStage(t("shielded.stages.confirming"));
             setProgress({ kind: "approval", stage: "confirming" });
-          }
+          });
         },
         onWalletRequest: () => { assertCurrent(); return latestSession.current.beginWalletRequest(); },
       });
@@ -1839,6 +1834,9 @@ export function ShieldedInheritancePanel({
       stopSpendPlan.current = false;
       setSpendPlanStopped(false);
       if (!chosen) throw new ShieldedUiMessageError(t("shielded.walletNotReady"));
+      const draft = captureWalletDraft({ signer: chosen, account, chainId: modules.chainId,
+        isCurrent: () => current() && completionRequestKey === currentCompletionRequestKey.current,
+      });
       if (needsCode && !recipientReady) throw new ShieldedUiMessageError(action === "fund" ? t("shielded.fundReceiveCredentialRequired") : tr("confirmRecipient"));
       const assertCurrent = () => {
         if (requested !== currentRequestKey.current) throw new ShieldedUiMessageError(tr("reviewAgain"));
@@ -1867,7 +1865,7 @@ export function ShieldedInheritancePanel({
         assertCurrent();
         setAllowanceSnapshot({ scope: allowanceScope, amount: freshAllowance });
         if (freshAllowance < BigInt(amountValue!)) {
-          await approveDeposit(current, chosen, BigInt(amountValue!), assertCurrent);
+          await approveDeposit(draft, BigInt(amountValue!), assertCurrent);
           await assertShieldedDepositBalance(modules.token, account, amountValue!);
           assertCurrent();
         }
@@ -1965,16 +1963,15 @@ export function ShieldedInheritancePanel({
           };
           const common = {
             pool: modules.pool,
-            signer: chosen,
-            expectedChainId: modules.chainId,
+            draft,
             data: result.data,
             preparedProof: result.proof,
             onStage: (next: "checkingGas" | "submitting" | "confirming") => {
               if (next !== "confirming") assertCurrent();
-              if (current()) {
+              draft.commit(() => {
                 setStage(t(`shielded.stages.${next}`));
                 setProgress({ kind: "action", stage: next });
-              }
+              });
             },
             onBroadcast: (hash: string) => {
               tracking.onBroadcast(hash);
@@ -2016,17 +2013,16 @@ export function ShieldedInheritancePanel({
           }
           sent = true;
           tracking.onReceipt(submitted.transactionHash, submitted.receipt.status);
-          if (current()) {
-            setTransactionHash(submitted.transactionHash);
-            setTransactionLabel(label);
-            setTransactionPending(false);
-            setTransactionResult(submitted.receipt.status !== 1 ? "failed" : planned.steps.length > 1 ? "partial" : "done");
-          }
+          if (!draft.isCurrent()) return;
+          setTransactionHash(submitted.transactionHash);
+          setTransactionLabel(label);
+          setTransactionPending(false);
+          setTransactionResult(submitted.receipt.status !== 1 ? "failed" : planned.steps.length > 1 ? "partial" : "done");
           if (submitted.receipt.status !== 1)
             throw new ShieldedUiMessageError(t("shielded.transactionFailed", { hash: submitted.transactionHash }));
           if (planned.steps.length <= 1) {
-            if (current()) completePayment(txId, submitted.transactionHash);
-            if (current()) setSpendPlanStopped(false);
+            completePayment(txId, submitted.transactionHash);
+            setSpendPlanStopped(false);
             break;
           }
           if (current()) {
@@ -2067,8 +2063,7 @@ export function ShieldedInheritancePanel({
         if (current()) setPlanCount(0);
         if (sent && current()) {
           autoRecoveryScope.current = "";
-          setWallet(null);
-          setCandidates([]);
+          draft.commit(() => { setWallet(null); setCandidates([]); });
         }
       }
     }, tr("preparing"), "wallet");
@@ -2351,6 +2346,7 @@ export function ShieldedInheritancePanel({
           context={context}
           provider={modules.provider}
           signer={signer ?? null}
+          account={account}
           disabled={busy || submissionPending}
           recoveryReady={!!session.identity || !!session.independentKey}
           sessionScope={JSON.stringify([session.credentials?.handle, session.identity?.handle, session.independentKey?.keyFingerprint])}

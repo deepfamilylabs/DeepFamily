@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { passiveWalletRpc } from "../shared/clients/test-helpers/walletRpc";
 import React from "react";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -242,6 +243,7 @@ function replacedPoolCreation(outcome: "repriced" | "failed" | "cancelled") {
   let blockNumber = 1;
   let replacement: TransactionResponse;
   const rpc = {
+    send: passiveWalletRpc(() => ({ account: mocks.wallet.address, chainId: 31337n })),
     getNetwork: async () => ({ chainId: 31337n }),
     getBlockNumber: vi.fn(async () => blockNumber),
     getTransactionCount: async () => 1,
@@ -297,6 +299,7 @@ describe("InheritancePage private pool entry", () => {
     mocks.config.contractAddress = "0x0000000000000000000000000000000000000002";
     mocks.wallet.signer = {
       provider: {
+        send: passiveWalletRpc(() => ({ account: mocks.wallet.address, chainId: 31337n })),
         getNetwork: async () => ({ chainId: 31337n }),
         getBlockNumber: async () => 20,
       },
@@ -716,7 +719,7 @@ describe("InheritancePage private pool entry", () => {
     render(<InheritancePage />);
     fireEvent.click(await screen.findByRole("button", { name: "shielded.assets.create" }));
     await screen.findByTestId("shielded-panel");
-    expect(mocks.createPool).toHaveBeenCalledWith(mocks.config.tokenAddress);
+    expect(mocks.createPool).toHaveBeenCalledWith(mocks.config.tokenAddress, { chainId: 31337n });
     expect(mocks.resolveShieldedAssetPool).toHaveBeenCalledTimes(2);
     expect(screen.getByTestId("shielded-pool").textContent).toBe(mocks.poolAddress);
   });
@@ -727,7 +730,7 @@ describe("InheritancePage private pool entry", () => {
     const broadcast = deferred<ReturnType<typeof poolCreationTransaction>>();
     const confirmation = deferred<{ status: number }>();
     mocks.wallet.signer = {
-      provider: { getNetwork: () => network.promise, getBlockNumber: async () => 20 },
+      provider: { send: passiveWalletRpc(() => ({ account: mocks.wallet.address, chainId: 31337n })), getNetwork: () => network.promise, getBlockNumber: async () => 20 },
       getAddress: async () => mocks.wallet.address,
     };
     mocks.createPool.mockImplementation(() => broadcast.promise);

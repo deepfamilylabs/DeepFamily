@@ -8,6 +8,8 @@ import {
 import { wrapIdentityCommitmentAsPersonHash } from "../../../shared/zk/zk";
 import { executeAddVersionFlow, type AddVersionPublicSignals } from "./addVersionService";
 import { contractFeeReplacement } from "../test-helpers/contractReplacement";
+import { captureWalletDraft } from "../../../shared/clients/walletDraft";
+import { passiveWalletRpc } from "../../../shared/clients/test-helpers/walletRpc";
 
 const archiveMock = vi.hoisted(() => ({ metadataRef: vi.fn() }));
 
@@ -24,6 +26,15 @@ const CONTRACT = "0x0000000000000000000000000000000000000abc";
 const ARCHIVE = "0x0000000000000000000000000000000000000acd";
 const SUBMITTER = "0x00000000000000000000000000000000000000aa";
 const VERIFIER = "0x0000000000000000000000000000000000000def";
+
+function testDraft(chainId = 31337n, onReadAccounts?: () => void) {
+  const read = passiveWalletRpc(() => ({ account: SUBMITTER, chainId }));
+  const signer = { getAddress: async () => SUBMITTER, provider: { send: (method: string) => {
+    if (method === "eth_accounts") onReadAccounts?.();
+    return read(method);
+  } } } as unknown as ethers.Signer;
+  return captureWalletDraft({ signer, chainId, account: SUBMITTER, isCurrent: () => true });
+}
 
 const metadataEnvelope = (selfSuiteId = 1): Uint8Array => {
   const envelope = new Uint8Array(20);
@@ -148,9 +159,9 @@ describe("addVersionService fresh-v1 flow", () => {
         }},
         addPersonVersion: submit,
       },
-      preflightContract: preflightContract(), contractAddress: CONTRACT, submitterAddress: SUBMITTER,
+      preflightContract: preflightContract(), contractAddress: CONTRACT, draft: testDraft(),
       proof, publicSignals: signals, fatherVersionIndex: 0, motherVersionIndex: 0,
-      metadataEnvelope: envelope, expectedChainId: 31337n,
+      metadataEnvelope: envelope,
     });
     expect(tracked.wasScanned()).toBe(true);
     expect(result.transactionHash).toBe(tracked.transactionHash);
@@ -176,7 +187,7 @@ describe("addVersionService fresh-v1 flow", () => {
         },
         preflightContract: preflight,
         contractAddress: CONTRACT,
-        submitterAddress: SUBMITTER,
+        draft: testDraft(),
         proof,
         publicSignals: signals,
         fatherVersionIndex: 0,
@@ -216,7 +227,7 @@ describe("addVersionService fresh-v1 flow", () => {
           verifierRegistry: vi.fn(async () => ethers.ZeroAddress),
         }),
         contractAddress: CONTRACT,
-        submitterAddress: SUBMITTER,
+        draft: testDraft(),
         proof,
         publicSignals: rootSignals(),
         fatherVersionIndex: 0,
@@ -249,7 +260,7 @@ describe("addVersionService fresh-v1 flow", () => {
     await expect(
       executeAddVersionFlow({
         ...base,
-        submitterAddress: SUBMITTER,
+        draft: testDraft(),
         publicSignals: rootSignals("0x00000000000000000000000000000000000000BB"),
         metadataEnvelope: metadataEnvelope(),
       }),
@@ -258,7 +269,7 @@ describe("addVersionService fresh-v1 flow", () => {
     await expect(
       executeAddVersionFlow({
         ...base,
-        submitterAddress: SUBMITTER,
+        draft: testDraft(),
         publicSignals: rootSignals(SUBMITTER, 2),
         metadataEnvelope: metadataEnvelope(1),
       }),
@@ -281,7 +292,7 @@ describe("addVersionService fresh-v1 flow", () => {
         },
         preflightContract: preflightContract(),
         contractAddress: CONTRACT,
-        submitterAddress: SUBMITTER,
+        draft: testDraft(),
         proof,
         publicSignals: rootSignals(),
         fatherVersionIndex: 1,
@@ -305,7 +316,7 @@ describe("addVersionService fresh-v1 flow", () => {
         },
         preflightContract: preflightContract({ personVersionsCount: count }),
         contractAddress: CONTRACT,
-        submitterAddress: SUBMITTER,
+        draft: testDraft(),
         proof,
         publicSignals: parentedSignals(),
         fatherVersionIndex: 1,
@@ -380,7 +391,7 @@ describe("addVersionService fresh-v1 flow", () => {
         },
         preflightContract: preflight,
         contractAddress: CONTRACT,
-        submitterAddress: SUBMITTER,
+        draft: testDraft(),
         proof,
         publicSignals: signals,
         fatherVersionIndex: 0,
@@ -409,7 +420,7 @@ describe("addVersionService fresh-v1 flow", () => {
       },
       preflightContract: preflight,
       contractAddress: CONTRACT,
-      submitterAddress: SUBMITTER,
+      draft: testDraft(),
       proof,
       publicSignals: signals,
       fatherVersionIndex: 0,
@@ -454,7 +465,7 @@ describe("addVersionService fresh-v1 flow", () => {
         },
         preflightContract: preflightContract({ versionExists }),
         contractAddress: CONTRACT,
-        submitterAddress: SUBMITTER,
+        draft: testDraft(),
         proof,
         publicSignals: rootSignals(),
         fatherVersionIndex: 0,
@@ -488,7 +499,7 @@ describe("addVersionService fresh-v1 flow", () => {
         },
         preflightContract: preflightContract({ versionExists: vi.fn(async () => true) }),
         contractAddress: CONTRACT,
-        submitterAddress: SUBMITTER,
+        draft: testDraft(),
         proof,
         publicSignals: rootSignals(),
         fatherVersionIndex: 0,
@@ -529,7 +540,7 @@ describe("addVersionService fresh-v1 flow", () => {
         },
         preflightContract: preflightContract({ versionExists }),
         contractAddress: CONTRACT,
-        submitterAddress: SUBMITTER,
+        draft: testDraft(),
         proof,
         publicSignals: rootSignals(),
         fatherVersionIndex: 0,
@@ -570,7 +581,7 @@ describe("addVersionService fresh-v1 flow", () => {
         }),
       }),
       contractAddress: CONTRACT,
-      submitterAddress: SUBMITTER,
+      draft: testDraft(),
       proof,
       publicSignals: signals,
       fatherVersionIndex: 0,
@@ -579,6 +590,7 @@ describe("addVersionService fresh-v1 flow", () => {
     });
 
     expect(submit).toHaveBeenCalledWith(proof, signals, 0, 0, ethers.hexlify(envelope), {
+      chainId: 31337n,
       gasLimit: 1200n,
     });
     expect(result.transactionHash).toBe("0xtxhash");
@@ -627,14 +639,13 @@ describe("addVersionService fresh-v1 flow", () => {
       },
       preflightContract: preflightContract(),
       contractAddress: CONTRACT,
-      submitterAddress: SUBMITTER,
+      draft: testDraft(31337n, assertWalletScope),
       proof,
       publicSignals: rootSignals(),
       fatherVersionIndex: 0,
       motherVersionIndex: 0,
       metadataEnvelope: metadataEnvelope(),
       confirmTransactionPreview,
-      assertWalletScope,
     });
 
     expect(order).toEqual(["estimate", "confirm", "scope", "send"]);
@@ -662,13 +673,12 @@ describe("addVersionService fresh-v1 flow", () => {
         },
         preflightContract: preflightContract(),
         contractAddress: CONTRACT,
-        submitterAddress: SUBMITTER,
+        draft: testDraft(71n),
         proof,
         publicSignals: rootSignals(),
         fatherVersionIndex: 0,
         motherVersionIndex: 0,
         metadataEnvelope: metadataEnvelope(),
-        expectedChainId: 71,
         onTransactionSubmitted,
       }),
     ).rejects.toMatchObject({
@@ -740,13 +750,12 @@ describe("addVersionService fresh-v1 flow", () => {
       },
       preflightContract: preflightContract(),
       contractAddress: CONTRACT,
-      submitterAddress: SUBMITTER,
+      draft: testDraft(71n),
       proof,
       publicSignals: signals,
       fatherVersionIndex: 0,
       motherVersionIndex: 0,
       metadataEnvelope: envelope,
-      expectedChainId: 71,
       onTransactionSubmitted,
     });
 
@@ -776,13 +785,12 @@ describe("addVersionService fresh-v1 flow", () => {
     const base = {
       preflightContract: preflightContract(),
       contractAddress: CONTRACT,
-      submitterAddress: SUBMITTER,
+      draft: testDraft(71n),
       proof,
       publicSignals: signals,
       fatherVersionIndex: 0,
       motherVersionIndex: 0,
       metadataEnvelope: envelope,
-      expectedChainId: 71,
     };
 
     const cancelled = Object.assign(new Error("cancelled"), {
@@ -859,7 +867,7 @@ describe("addVersionService fresh-v1 flow", () => {
         submitContract: { addPersonVersion: submit },
         preflightContract: preflightContract(),
         contractAddress: CONTRACT,
-        submitterAddress: SUBMITTER,
+        draft: testDraft(),
         proof,
         publicSignals: rootSignals(),
         fatherVersionIndex: 0,
@@ -948,7 +956,7 @@ describe("addVersionService fresh-v1 flow", () => {
       },
       preflightContract: preflightContract(),
       contractAddress: CONTRACT,
-      submitterAddress: SUBMITTER,
+      draft: testDraft(),
       proof,
       publicSignals: signals,
       fatherVersionIndex: 1,
@@ -959,6 +967,7 @@ describe("addVersionService fresh-v1 flow", () => {
 
     expect(onTransactionSubmitted).toHaveBeenCalledWith("0xtxhash");
     expect(submit).toHaveBeenCalledWith(proof, signals, 1, 1, ethers.hexlify(envelope), {
+      chainId: 31337n,
       gasLimit: 1200n,
     });
     expect(result).toMatchObject({
@@ -1006,7 +1015,7 @@ describe("Add Version confirmation readback", () => {
         addPersonVersion: submit,
       },
       preflightContract: preflightContract(),
-      contractAddress: CONTRACT, submitterAddress: SUBMITTER,
+      contractAddress: CONTRACT, draft: testDraft(),
       proof, publicSignals: signals, fatherVersionIndex: 0, motherVersionIndex: 0, metadataEnvelope: envelope,
       ...(reconciled ? {reconcileTransactionHash: "0xtxhash", getTransactionReceipt: async () => receiptFor([proof, signals, 0, 0, envelope])} : {}),
     };

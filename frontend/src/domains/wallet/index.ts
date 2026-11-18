@@ -3,4 +3,4 @@ export * from "./ui";
 export {
   getWalletConnectionGeneration,
   subscribeWalletConnectionChange,
-} from "./services/walletConnectionGeneration";
+} from "../../shared/clients/walletConnectionGeneration";

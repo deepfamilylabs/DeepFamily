@@ -1,6 +1,7 @@
 import { readArchiveBlob } from "@deepfamily/protocol-core";
-import { type Contract, id, isError, keccak256, type Provider, type Signer, type ContractTransactionResponse, type TransactionReceipt } from "ethers";
-import { executeChainTransaction, runChainRead, normalizeChainError, withConfirmedTransaction } from "@deepfamily/chain-client";
+import { type Contract, id, isError, keccak256, type Provider, type ContractTransactionResponse, type TransactionReceipt } from "ethers";
+import { runChainRead, normalizeChainError, withConfirmedTransaction } from "@deepfamily/chain-client";
+import type { WalletDraft } from "../../../shared/clients/walletDraft";
 import { createPrivateLetterContract } from "../../../shared/clients/privateLetterClient";
 import { getEventScanConfig } from "../../../shared/config/env";
 import { createIdentityAuthorizationContract } from "./shieldedIdentityAuthorizationChain";
@@ -155,13 +156,13 @@ async function readPrivateLetterHistory(contract: Contract): Promise<PrivateLett
 }
 
 /** Wallet submission has no plaintext, credential, identity, recipient key or witness. */
-export async function submitPrivateLetter(input: { address: string; signer: Signer; chainId: string; letter: ProvenPrivateLetter; onWalletRequest?: () => () => void; onBroadcast?: (hash: string) => void; onStage?: (stage: "checking" | "submitting" | "confirming") => void; isCurrent?: () => boolean }) {
+export async function submitPrivateLetter(input: { address: string; draft: WalletDraft; letter: ProvenPrivateLetter; onWalletRequest?: () => () => void; onBroadcast?: (hash: string) => void; onStage?: (stage: "checking" | "submitting" | "confirming") => void }) {
   input.onStage?.("checking");
-  const provider = input.signer.provider;
-  if (!provider || (await provider.getNetwork()).chainId !== BigInt(input.chainId))
+  const { draft } = input;
+  const provider = draft.signer.provider;
+  if (!provider || (await provider.getNetwork()).chainId !== draft.chainId)
     throw normalizeChainError(new Error("Transaction wallet is connected to the wrong network"), { category: "wallet", operation: "submit" });
-  const submitterAddress = await input.signer.getAddress();
-  const contract = createPrivateLetterContract(input.address, input.signer);
+  const contract = createPrivateLetterContract(input.address, draft.signer);
   const { delivery, ciphertext, proof } = input.letter;
   const existing = await runChainRead({ read: () => contract.letterRecord(delivery.messageId) });
   if (BigInt(existing.registeredAt) !== 0n) {
@@ -188,27 +189,21 @@ export async function submitPrivateLetter(input: { address: string; signer: Sign
   const fromBlock = await provider.getBlockNumber();
   if (!Number.isSafeInteger(fromBlock) || fromBlock < 0)
     throw normalizeChainError(new Error("Letter submission block is unavailable"), { category: "validation", operation: "submit" });
-  const confirmed = await executeChainTransaction<TransactionReceipt, ContractTransactionResponse>({
+  const confirmed = await draft.submit<TransactionReceipt, ContractTransactionResponse>({
     fromBlock,
-    assertActive: () => {
-      if (input.isCurrent && !input.isCurrent())
-        throw normalizeChainError(new Error("The transaction wallet changed before letter submission"), { category: "cancelled", operation: "submit" });
-    },
     send: async () => {
       input.onStage?.("submitting");
       const finishWalletRequest = input.onWalletRequest?.();
       try {
-        return await contract.registerLetter(delivery, ciphertext, proof, { chainId: BigInt(input.chainId) });
+        return await contract.registerLetter(delivery, ciphertext, proof, { chainId: draft.chainId });
       } finally { finishWalletRequest?.(); }
     },
     expected: {
-      chainId: BigInt(input.chainId),
-      from: submitterAddress,
       to: input.address,
       data: contract.interface.encodeFunctionData("registerLetter", [delivery, ciphertext, proof]),
       value: 0n,
     },
-    onSubmitted: hash => { input.onStage?.("confirming"); input.onBroadcast?.(hash); },
+    onSubmitted: hash => { draft.commit(() => input.onStage?.("confirming")); input.onBroadcast?.(hash); },
     requireSuccess: false,
   });
   const receipt = confirmed.receipt;

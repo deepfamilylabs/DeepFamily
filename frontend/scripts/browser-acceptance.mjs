@@ -210,6 +210,53 @@ async function fillIdentity(scope, identity) {
   for (const input of await scope.locator('input[type="password"]').all())
     await input.fill(identity.passphrase);
 }
+
+async function verifyLateVersionReceipt(page, family, original) {
+  const dialog = page.getByRole("dialog");
+  const closeForm = async () => {
+    await click(dialog.getByRole("button", { name: "Close", exact: true }).first());
+    await dialog.waitFor({ state: "hidden" });
+  };
+  const openForm = () => click(page.getByRole("button", { name: /Start Adding Version/ }));
+  const retired = { ...original, fullName: "Browser Acceptance Retired Draft" };
+  const next = { ...original, fullName: "Browser Acceptance Unsent Draft" };
+  await closeForm();
+  await openForm();
+  await fillIdentity(dialog, retired);
+  for (const checkbox of await dialog.getByRole("checkbox").all()) await checkbox.check();
+  await click(dialog.getByRole("button", { name: "Add Version", exact: true }));
+  const approve = dialog.getByRole("button", { name: "Continue to Wallet", exact: true });
+  await approve.waitFor();
+  const before = report.transactions.length;
+  let originalTx;
+  await connection.provider.request({ method: "evm_setAutomine", params: [false] });
+  try {
+    await click(approve);
+    originalTx = await until(() => report.transactions[before], Boolean, "original draft broadcast");
+    assert.equal(await connection.ethers.provider.getTransactionReceipt(originalTx.hash), null);
+    await closeForm();
+    await openForm();
+    await fillIdentity(dialog, next);
+    await connection.provider.request({ method: "evm_mine" });
+  } finally {
+    await connection.provider.request({ method: "evm_setAutomine", params: [true] });
+  }
+  const centre = page.getByTitle("Transactions", { exact: true });
+  await until(() => centre.textContent(), text => /:\s*2\s*$/.test(text), "both transaction records settled");
+  assert.equal(await dialog.locator('input[name="fullName"]').first().inputValue(), next.fullName);
+  assert.equal(await dialog.getByRole("heading", { name: "Version Added Successfully" }).count(), 0);
+  assert.equal(report.transactions.length, before + 1);
+  assert.equal(await family.personVersionsCount(await seedHelpers.computePersonHash({ personData: retired })), 1n);
+  assert.equal(await family.personVersionsCount(await seedHelpers.computePersonHash({ personData: next })), 0n);
+  await capture(page, "new-draft-after-original-receipt");
+  await closeForm();
+  await click(centre);
+  const row = page.getByRole("dialog", { name: "Transactions" }).getByRole("listitem").filter({
+    hasText: `${originalTx.hash.slice(0, 10)}…${originalTx.hash.slice(-8)}`,
+  });
+  await row.getByText("Transaction successful", { exact: true }).waitFor();
+  report.checks.push({ label: "late-receipt-only-settles-original-draft", status: "passed", transactionHash: originalTx.hash });
+}
 async function unlock(page, identity) {
   await page.locator('input[name="fullName"]').waitFor();
   await fillIdentity(page, identity);
@@ -398,6 +445,7 @@ try {
     .getByRole("heading", { name: "Version Added Successfully", exact: true })
     .waitFor();
   assert.equal(await deployed.deepFamily.personVersionsCount(addedHash), 1n);
+  await verifyLateVersionReceipt(createPage, deployed.deepFamily, created);
   await createPage.evaluate((hash) => {
     const config = JSON.parse(localStorage.getItem("ft:config"));
     localStorage.setItem(

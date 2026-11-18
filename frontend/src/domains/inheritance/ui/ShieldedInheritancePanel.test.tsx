@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { passiveWalletRpc } from "../../../shared/clients/test-helpers/walletRpc";
 import { StrictMode } from "react";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -243,6 +244,7 @@ const signer = {
   getAddress: vi.fn(async () => address),
   signMessage: vi.fn(async () => "signature"),
   provider: {
+    send: passiveWalletRpc(() => ({ account: address, chainId: 31337n })),
     getNetwork: vi.fn(async () => ({ chainId: 31337n })),
     getBlockNumber: vi.fn(async () => 40),
     getTransactionCount: vi.fn(async () => 7),
@@ -776,7 +778,10 @@ describe("Worker-backed shielded wallet", () => {
       context: expect.objectContaining({ chainId: "31337", assetKind, lettersAddress: mocks.lettersAddress }),
       code: "valid-receive-code", body: "Letter without a deposit",
     }, expect.anything());
-    expect(mocks.submitLetter).toHaveBeenCalledWith(expect.objectContaining({ signer, letter: preparedLetter, address: mocks.lettersAddress }));
+    expect(mocks.submitLetter).toHaveBeenCalledWith(expect.objectContaining({
+      draft: expect.objectContaining({ signer, account: address, chainId: modules.chainId }),
+      letter: preparedLetter, address: mocks.lettersAddress,
+    }));
     expect(mocks.identity).toEqual(identity);
     expect(screen.queryByRole("button", { name: "shielded.unlock" })).toBeNull();
   });
@@ -3849,6 +3854,7 @@ describe("Worker-backed shielded wallet", () => {
     ["unshield", "panel unmount"],
     ["privateTransfer", "stop after broadcast"],
     ["unshield", "stop after broadcast"],
+    ["unshield", "amount edited after broadcast"],
     ["privateTransfer", "changed plan"],
     ["unshield", "changed plan"],
     ["privateTransfer", "failure after merge"],
@@ -3867,6 +3873,7 @@ describe("Worker-backed shielded wallet", () => {
       const finalResultUnknown = sessionChange.startsWith("final result unknown");
       const automaticSelection = sessionChange === "final result unknown with automatic selection";
       const changedPendingAmount = sessionChange === "final result unknown after amount edit";
+      let minedAfterEdit = false;
       const commitments = Array.from({ length: 9 }, (_, index) => String(index + 11));
       mocks.verify.mockResolvedValue({ purpose: "receive", personHash: identity.personHash, keyMode: 0, fingerprint: "recipient-fingerprint" });
       let previews = 0;
@@ -3874,7 +3881,7 @@ describe("Worker-backed shielded wallet", () => {
       mocks.call.mockImplementation(async (method, params) => {
         if (method === "recover") return {
           ...emptyWallet,
-          notes: finalResultUnknown && previews > 1
+          notes: minedAfterEdit || (finalResultUnknown && previews > 1)
             ? [
                 { commitment: "200", ownerCommitment: "1", slot: "identity", kind: "value", amount: "8000000000000000000" },
                 { commitment: commitments[8], ownerCommitment: "1", slot: "identity", kind: "value", amount: "1000000000000000000" },
@@ -3988,8 +3995,20 @@ describe("Worker-backed shielded wallet", () => {
         rendered.unmount();
       } else if (sessionChange === "stop after broadcast") {
         fireEvent.click(screen.getByRole("button", { name: "shielded.spendReview.stop" }));
+      } else if (sessionChange === "amount edited after broadcast") {
+        fireEvent.change(screen.getByLabelText(paymentAmountLabel), { target: { value: "9" } });
+        minedAfterEdit = true;
       }
       await act(async () => releaseFirst());
+      if (minedAfterEdit) {
+        await waitFor(() => expect(document.querySelector('input[value="200"]')).toBeTruthy());
+        expect(document.querySelector(`input[value="${commitments[0]}"]`)).toBeNull();
+        expect(document.querySelector<HTMLInputElement>(`input[value="${commitments[8]}"]`)?.checked).toBe(true);
+        expect((screen.getByLabelText(paymentAmountLabel) as HTMLInputElement).value).toBe("9");
+        expect(screen.queryByRole("status", { name: "transaction.success" })).toBeNull();
+        expect(mocks.submit).toHaveBeenCalledOnce();
+        return;
+      }
       if (sessionChange === "stop while rebuilding") {
         await waitFor(() => expect(releaseRebuild).toBeTypeOf("function"));
         const rebuildingPlan = screen.getByRole("region", { name: "shielded.spendReview.title" });

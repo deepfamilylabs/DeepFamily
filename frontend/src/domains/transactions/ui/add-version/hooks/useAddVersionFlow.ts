@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { useWallet } from "../../../../wallet";
 import { useConfig } from "../../../../config";
 import { createDeepFamilyContract } from "../../../../../shared/clients/contractFactory";
+import { captureWalletDraft } from "../../../../../shared/clients/walletDraft";
 import { getReadonlyProvider } from "../../../../../shared/clients/providerRegistry";
 import { isDevMode } from "../../../../../shared/config/env";
 import { getFriendlyError, type FriendlyError } from "../../../../../shared/lib/errors";
@@ -27,11 +28,11 @@ interface UseAddVersionFlowOptions {
 }
 
 export function useAddVersionFlow(options: UseAddVersionFlowOptions = {}) {
-  const { signer, ensureTransactionAuthorization } = useWallet();
+  const { signer, address: submitterAddress, ensureTransactionAuthorization } = useWallet();
   const { rpcUrl, chainId, contractAddress, readerAddress } = useConfig();
   const { t } = useTranslation();
-  const latestRuntimeScopeRef = useRef({ signer, chainId, contractAddress, readerAddress });
-  latestRuntimeScopeRef.current = { signer, chainId, contractAddress, readerAddress };
+  const latestRuntimeScopeRef = useRef({ signer, submitterAddress, chainId, contractAddress, readerAddress });
+  latestRuntimeScopeRef.current = { signer, submitterAddress, chainId, contractAddress, readerAddress };
   // Each immutable package retains its own hash across retries and resets.
   // A background completion or replacement must not overwrite a newer run's
   // reconciliation state; discarded packages can be garbage-collected.
@@ -46,21 +47,13 @@ export function useAddVersionFlow(options: UseAddVersionFlowOptions = {}) {
 
   const runner: TxFlowRunner<AddVersionResult, [AddVersionFlowArgs]> = useCallback(
     async (update, args) => {
-      if (!signer || !contractAddress) {
+      if (!signer || !submitterAddress || !contractAddress) {
         throw new Error(t("wallet.notConnected", "Please connect your wallet"));
       }
 
       update("validating", t("addVersion.validating", "Validating version..."));
 
       try {
-        const assertActiveRequest = () => {
-          if (!update.isCurrent()) {
-            throw Object.assign(new Error("Add Version request cancelled before wallet request"), {
-              code: "ADD_VERSION_PREVIEW_REJECTED",
-            });
-          }
-        };
-        const submitterAddress = await signer.getAddress();
         const transactionScope = createAddVersionTransactionScope({
           chainId,
           contractAddress,
@@ -78,9 +71,23 @@ export function useAddVersionFlow(options: UseAddVersionFlowOptions = {}) {
             signer: current.signer,
           });
         };
-        assertActiveRequest();
+        const draft = captureWalletDraft({
+          signer, account: submitterAddress, chainId,
+          isCurrent: () => {
+            const current = latestRuntimeScopeRef.current;
+            return update.isCurrent() && current.signer === signer && current.chainId === chainId &&
+              current.submitterAddress?.toLowerCase() === submitterAddress.toLowerCase() &&
+              current.contractAddress?.toLowerCase() === contractAddress.toLowerCase() &&
+              current.readerAddress?.toLowerCase() === readerAddress?.toLowerCase();
+          },
+          staleError: () => update.isCurrent() ? addVersionScopeChangedError() : Object.assign(
+            new Error("Add Version request cancelled before wallet request"), { code: "ADD_VERSION_PREVIEW_REJECTED" },
+          ),
+          walletChangedError: addVersionScopeChangedError,
+        });
+        draft.assertCurrent();
         await assertCurrentScope();
-        assertActiveRequest();
+        draft.assertCurrent();
         const submitContract = createDeepFamilyContract(contractAddress, signer);
 
         let preflightContract = submitContract;
@@ -100,37 +107,10 @@ export function useAddVersionFlow(options: UseAddVersionFlowOptions = {}) {
           throw addVersionScopeChangedError();
         }
         const reconcileTransactionHash = priorSubmission?.transactionHash;
-        const authorizeSubmitter = async () => {
-          assertActiveRequest();
-          // The permission prompt already completed before preparation. A
-          // final passive account read must never open a second prompt.
-          const provider = signer.provider;
-          if (!provider || typeof provider.send !== "function") {
-            throw Object.assign(new Error("Wallet provider is unavailable"), {
-              code: "CHAIN_WALLET_UNAVAILABLE",
-            });
-          }
-          const accounts: unknown = await provider.send("eth_accounts", []);
-          assertActiveRequest();
-          if (!Array.isArray(accounts) || accounts.length === 0) {
-            throw Object.assign(new Error("Wallet account authorization is required"), { code: 4100 });
-          }
-          if (!accounts.some((account) =>
-            typeof account === "string" && account.toLowerCase() === submitterAddress.toLowerCase(),
-          )) {
-            // Proofs and encrypted metadata are bound to this submitter. Never
-            // substitute another account returned by the permission prompt.
-            throw addVersionScopeChangedError();
-          }
-          await assertCurrentScope();
-          assertActiveRequest();
-        };
         // Receipt reconciliation needs no new account permission or wallet popup.
         if (!reconcileTransactionHash) {
-          await ensureTransactionAuthorization(submitterAddress, chainId, assertActiveRequest);
-          assertActiveRequest();
-          await assertCurrentScope();
-          await authorizeSubmitter();
+          await ensureTransactionAuthorization(submitterAddress, chainId, draft.assertCurrent);
+          await draft.assertWallet();
         }
         const getTransactionReceipt =
           typeof receiptProvider?.getTransactionReceipt === "function"
@@ -141,25 +121,16 @@ export function useAddVersionFlow(options: UseAddVersionFlowOptions = {}) {
           submitContract,
           preflightContract,
           contractAddress,
-          submitterAddress,
+          draft,
           proof: args.proof,
           publicSignals: args.publicSignals,
           fatherVersionIndex: args.fatherVersionIndex,
           motherVersionIndex: args.motherVersionIndex,
           metadataEnvelope: args.metadataEnvelope,
           isDev: isDevMode(),
-          expectedChainId: chainId,
           reconcileTransactionHash,
           getTransactionReceipt,
-          assertWalletScope: async () => {
-            assertActiveRequest();
-            await assertCurrentScope();
-            await authorizeSubmitter();
-            // Closing can supersede the request while the wallet's chain or
-            // account RPC is pending, immediately before the send boundary.
-            assertActiveRequest();
-            update("submitting", t("wallet.confirmTransaction", "Confirm the transaction in your wallet"));
-          },
+          onWalletRequest: () => update("submitting", t("wallet.confirmTransaction", "Confirm the transaction in your wallet")),
           onTransactionConfirmed: update.confirmed,
           onTransactionSubmitted: (transactionHash) => {
             update.submitted(transactionHash);
@@ -170,15 +141,13 @@ export function useAddVersionFlow(options: UseAddVersionFlowOptions = {}) {
               transactionHash,
               scope: transactionScope,
             });
-            if (update.isCurrent()) {
-              update("confirming", t("transaction.submitted", "Transaction submitted..."));
-            }
+            draft.commit(() => update("confirming", t("transaction.submitted", "Transaction submitted...")));
           },
           confirmTransactionPreview: confirmTransactionPreview
             ? async (preview) => {
-                if (!update.isCurrent()) return false;
+                if (!draft.isCurrent()) return false;
                 const approved = await confirmTransactionPreview(preview);
-                return update.isCurrent() && approved;
+                return draft.isCurrent() && approved;
               }
             : undefined,
         });
@@ -188,7 +157,9 @@ export function useAddVersionFlow(options: UseAddVersionFlowOptions = {}) {
         // foreground completion still enforces the current scope.
         if (update.isCurrent()) {
           try {
+            draft.assertCurrent();
             await assertCurrentScope();
+            if (update.isCurrent()) draft.assertCurrent();
           } catch (error) {
             if (update.isCurrent()) throw withConfirmedTransaction(error, result.transactionHash, "read");
           }
@@ -207,7 +178,7 @@ export function useAddVersionFlow(options: UseAddVersionFlowOptions = {}) {
         throw error;
       }
     },
-    [chainId, confirmTransactionPreview, contractAddress, readerAddress, rpcUrl, signer, t, ensureTransactionAuthorization],
+    [chainId, confirmTransactionPreview, contractAddress, readerAddress, rpcUrl, signer, submitterAddress, t, ensureTransactionAuthorization],
   );
 
   const flow = useTxFlow<AddVersionResult, [AddVersionFlowArgs], FriendlyError>(runner, {

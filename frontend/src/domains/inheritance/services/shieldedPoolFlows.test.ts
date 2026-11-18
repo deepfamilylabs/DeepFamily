@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { Interface, type Contract, type Signer } from "ethers";
+import { captureWalletDraft } from "../../../shared/clients/walletDraft";
+import { passiveWalletRpc } from "../../../shared/clients/test-helpers/walletRpc";
 import ShieldedPool from "../../../abi/ShieldedErc20Pool.json";
 import type { Groth16Proof } from "../../../shared/zk/zk";
 import {
@@ -81,6 +83,7 @@ function fixture(capacity = 2) {
     ReturnType<typeof vi.fn> & { estimateGas: typeof estimateGas }
   >;
   const provider = {
+    send: passiveWalletRpc(() => ({ chainId, account: WALLET_ADDRESS })),
     getNetwork: vi.fn(async () => ({ chainId })),
     getBalance: vi.fn(async () => gasBalance),
     getTransactionCount: vi.fn(async () => 9),
@@ -105,8 +108,7 @@ function fixture(capacity = 2) {
     assetKind: "erc20" as const,
     token,
     pool,
-    signer,
-    expectedChainId: 71n,
+    draft: captureWalletDraft({ signer, account: WALLET_ADDRESS, chainId: 71n, isCurrent: () => true }),
     data: actionData(capacity),
     preparedProof: { ...PROOF, protocol: "groth16", curve: "bn128" } as Groth16Proof,
   };
@@ -551,15 +553,18 @@ describe("shielded pool asset-worker proof submission", () => {
     expect(f.methods.privateTransfer).not.toHaveBeenCalled();
   });
 
-  it("binds a native deposit to the reviewed chain even if the wallet switches during nonce lookup", async () => {
+  it("does not open the wallet for a native deposit if the chain switches during nonce lookup", async () => {
     const f = fixture();
     f.provider.getTransactionCount.mockImplementationOnce(async () => {
       f.setChainId(72n);
       return 9;
     });
-    await submitShield({ ...f.common, assetKind: "native", amount: 100n, onSubmitting: vi.fn() });
-    const overrides = f.methods.shield.mock.calls[0][f.methods.shield.mock.calls[0].length - 1];
-    expect(overrides).toMatchObject({ chainId: 71n, nonce: 9, value: 100n });
+    const onSubmitting = vi.fn(), onWalletRequest = vi.fn();
+    await expect(submitShield({ ...f.common, assetKind: "native", amount: 100n, onSubmitting, onWalletRequest }))
+      .rejects.toMatchObject({ code: "CHAIN_WALLET_SCOPE_CHANGED" });
+    expect(onWalletRequest).not.toHaveBeenCalled();
+    expect(onSubmitting).not.toHaveBeenCalled();
+    expect(f.methods.shield).not.toHaveBeenCalled();
   });
 
   it("leaves nonce choice unchanged when submission tracking is not requested", async () => {
@@ -673,7 +678,7 @@ describe("shielded pool asset-worker proof submission", () => {
       expect.stringMatching(/^0x[0-9a-f]{512}$/),
       { chainId: 71n, gasLimit: 120_000n, maxFeePerGas: 1_000_000_000n, maxPriorityFeePerGas: 0n },
     );
-    expect(f.common.pool.connect).toHaveBeenCalledWith(f.common.signer);
+    expect(f.common.pool.connect).toHaveBeenCalledWith(f.common.draft.signer);
     expect(f.provider.getBalance).toHaveBeenCalledWith(WALLET_ADDRESS);
   });
 

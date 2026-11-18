@@ -10,6 +10,7 @@ export interface ChainWalletScopeInput {
   chainId: IntegerLike;
   account: string;
   assertActive?: () => void;
+  requireSelectedAccount?: boolean;
 }
 /** Validates the actual chain/account, including raw injected-wallet chain changes. */
 export function assertChainWalletScope(input: ChainWalletScopeInput): Promise<void>;

@@ -7,7 +7,7 @@ import { WalletProvider, useWallet } from "./WalletContext";
 import {
   getWalletConnectionGeneration,
   subscribeWalletConnectionChange,
-} from "../services/walletConnectionGeneration";
+} from "../../../shared/clients/walletConnectionGeneration";
 
 const mocks = vi.hoisted(() => ({
   toast: { success: vi.fn(), error: vi.fn(), warning: vi.fn(), info: vi.fn() },

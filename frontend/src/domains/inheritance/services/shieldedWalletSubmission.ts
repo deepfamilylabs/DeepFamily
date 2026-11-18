@@ -1,35 +1,20 @@
-import { type Contract, type Signer, type Provider, type ContractTransactionResponse, type TransactionReceipt } from "ethers";
-import { executeChainTransaction, runChainRead, normalizeChainError } from "@deepfamily/chain-client";
+import { type Contract, type Provider, type ContractTransactionResponse, type TransactionReceipt } from "ethers";
+import { runChainRead, normalizeChainError } from "@deepfamily/chain-client";
+import type { WalletDraft } from "../../../shared/clients/walletDraft";
 import { createIdentityAuthorizationContract } from "../../../shared/clients/shieldedIdentityAuthorizationChain";
 import { assertShieldedDepositBalance } from "./shieldedDepositBalance";
 
 /** Public transaction slot retained independently of the unlocked secret session. */
 export type ShieldedSubmissionAnchor = { nonce: number; fromBlock: number; signerAddress: string };
 export type ShieldedWalletSubmissionCallbacks = {
-  assertCurrent?: () => void;
   onSubmitting?: (anchor: ShieldedSubmissionAnchor) => void;
   onBroadcast?: (hash: string) => void;
   onWalletRequest?: () => () => void;
 };
 
 type WalletInput = ShieldedWalletSubmissionCallbacks & {
-  signer: Signer;
-  chainId: bigint;
-  account: string;
+  draft: WalletDraft;
 };
-
-/** Recheck the wallet and cancellation after every preparatory RPC read. */
-export async function readShieldedSubmissionAnchor(input: WalletInput): Promise<ShieldedSubmissionAnchor> {
-  const provider = input.signer.provider;
-  if (!provider) throw normalizeChainError(new Error("Transaction wallet has no provider"), { category: "wallet", operation: "submit" });
-  const [network, address] = await runChainRead({ read: () => Promise.all([provider.getNetwork(), input.signer.getAddress()]) });
-  input.assertCurrent?.();
-  if (network.chainId !== input.chainId || address.toLowerCase() !== input.account.toLowerCase())
-    throw normalizeChainError(new Error("The transaction wallet changed before submission"), { category: "wallet", operation: "submit" });
-  const anchor = await readPublicSubmissionAnchor(provider, address);
-  input.assertCurrent?.();
-  return anchor;
-}
 
 /** Shared nonce and scan boundary for every public wallet submission. */
 export async function readPublicSubmissionAnchor(provider: Provider, signerAddress: string): Promise<ShieldedSubmissionAnchor> {
@@ -49,22 +34,24 @@ async function submitWalletCall(
 ) {
   const address = await contract.getAddress();
   const calldata = contract.interface.encodeFunctionData(method, args);
-  const anchor = await readShieldedSubmissionAnchor(input);
-  input.assertCurrent?.();
-  return executeChainTransaction<TransactionReceipt, ContractTransactionResponse>({
+  const { draft } = input;
+  draft.assertCurrent();
+  const provider = draft.signer.provider;
+  if (!provider) throw normalizeChainError(new Error("Transaction wallet has no provider"), { category: "wallet", operation: "submit" });
+  const anchor = await readPublicSubmissionAnchor(provider, draft.account);
+  return draft.submit<TransactionReceipt, ContractTransactionResponse>({
     fromBlock: anchor.fromBlock,
-    assertActive: input.assertCurrent,
     send: async () => {
       const finishWalletRequest = input.onWalletRequest?.();
       try {
         input.onSubmitting?.(anchor);
-        return await contract[method](...args, { nonce: anchor.nonce, chainId: input.chainId });
+        return await contract[method](...args, { nonce: anchor.nonce, chainId: draft.chainId });
       } finally {
         finishWalletRequest?.();
       }
     },
     expected: {
-      chainId: input.chainId, from: anchor.signerAddress, to: address, data: calldata,
+      to: address, data: calldata,
       value: 0n, nonce: anchor.nonce,
     },
     onSubmitted: input.onBroadcast,
@@ -75,14 +62,14 @@ async function submitWalletCall(
 export async function submitShieldedApproval(input: WalletInput & {
   token: Contract; spender: string; amount: bigint;
 }) {
-  await assertShieldedDepositBalance(input.token, input.account, input.amount);
-  input.assertCurrent?.();
-  return submitWalletCall(input, input.token.connect(input.signer) as Contract, "approve", [input.spender, input.amount]);
+  await assertShieldedDepositBalance(input.token, input.draft.account, input.amount);
+  input.draft.assertCurrent();
+  return submitWalletCall(input, input.token.connect(input.draft.signer) as Contract, "approve", [input.spender, input.amount]);
 }
 
 export async function submitShieldedAuthorization(input: WalletInput & {
   address: string; args: readonly [string, string, string, string, string];
 }) {
-  const contract = createIdentityAuthorizationContract(input.address, input.signer);
+  const contract = createIdentityAuthorizationContract(input.address, input.draft.signer);
   return submitWalletCall(input, contract, "incrementCounter", [...input.args]);
 }

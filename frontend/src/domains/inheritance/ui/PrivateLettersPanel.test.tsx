@@ -30,7 +30,7 @@ const expectedRegistration = { messageId: "7", recipientBinding: "9", deadline: 
 const provider = {} as Provider;
 type InboxResult = { letters: { messageId: string; body: string; registeredAt: string }[]; unavailable: number };
 const tr = (key: string) => `shielded.privateLetters.${key}`;
-const props = () => ({ mode: "write" as const, context, provider, signer: {} as Signer, disabled: false, recoveryReady: true });
+const props = () => ({ mode: "write" as const, context, provider, signer: {} as Signer, account: "0x1111111111111111111111111111111111111111", disabled: false, recoveryReady: true });
 function fillLetter() {
   fireEvent.change(screen.getByLabelText(tr("recipientCode")), { target: { value: "receive-code" } });
   fireEvent.change(screen.getByLabelText(tr("body")), { target: { value: "Private letter text" } });
@@ -219,6 +219,27 @@ describe("private letter composer", () => {
   });
 });
 
+
+it("settles the original letter after a wallet switch without clearing or submitting the new draft", async () => {
+  let finish!: (result: { transactionHash: string }) => void;
+  let broadcast!: (hash: string) => void;
+  mocks.submit.mockImplementationOnce(async input => {
+    input.onWalletRequest()();
+    broadcast = input.onBroadcast;
+    return new Promise(resolve => { finish = resolve; });
+  });
+  render(<PrivateLettersPanel {...props()} />);
+  fillLetter();
+  fireEvent.click(screen.getByRole("button", { name: tr("send") }));
+  await waitFor(() => expect(finish).toBeTypeOf("function"));
+  act(() => { mocks.walletGeneration++; mocks.walletChange?.(); });
+  fireEvent.click(await screen.findByRole("button", { name: tr("newLetter") }));
+  fireEvent.change(screen.getByLabelText(tr("body")), { target: { value: "New unsent letter" } });
+  await act(async () => { broadcast("0xoriginal"); finish({ transactionHash: "0xoriginal" }); });
+  expect(await screen.findByText(/privateLetters.sent.*0xoriginal/)).toBeTruthy();
+  expect((screen.getByLabelText(tr("body")) as HTMLTextAreaElement).value).toBe("New unsent letter");
+  expect(mocks.submit).toHaveBeenCalledOnce();
+});
 
 it("shows the public hash while waiting and retains it after an uncertain receipt failure", async () => {
   let reject!: (reason: unknown) => void;

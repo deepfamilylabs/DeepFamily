@@ -18,7 +18,8 @@ import {
 } from "ethers";
 import type { Groth16Proof } from "../../../shared/zk/zk";
 import { createLineageIndexContract } from "../../../shared/clients/contractFactory";
-import { executeChainTransaction, runChainRead } from "@deepfamily/chain-client";
+import { runChainRead } from "@deepfamily/chain-client";
+import type { WalletDraft } from "../../../shared/clients/walletDraft";
 import { readPublicSubmissionAnchor, type ShieldedSubmissionAnchor } from "./shieldedWalletSubmission";
 export type { ShieldedSubmissionAnchor } from "./shieldedWalletSubmission";
 import { assertShieldedDepositBalance } from "./shieldedDepositBalance";
@@ -56,8 +57,7 @@ export type ShieldedGasReview = {
 
 type BaseFlowInput = {
   pool: Contract;
-  signer: Signer;
-  expectedChainId: bigint;
+  draft: WalletDraft;
   data: ShieldedPoolActionData;
   /** Already verified in the asset worker; the main thread receives no private witness. */
   preparedProof: Groth16Proof;
@@ -243,13 +243,13 @@ async function submitAction(
   transactionValue = 0n,
 ): Promise<ShieldedPoolFlowResult> {
   const { action, input } = submissionRequest;
-  const { pool, signer, expectedChainId, preparedProof, onStage } = input;
+  const { pool, draft, preparedProof, onStage } = input;
+  const { signer, chainId: expectedChainId, account: signerAddress } = draft;
   if ("witness" in input || !preparedProof)
     throw new Error("Shielded submission requires an asset-worker proof and accepts no witness");
   await assertSignerNetwork(signer, expectedChainId);
   const provider = signer.provider;
   if (!provider) throw new Error("Transaction wallet has no provider");
-  const signerAddress = await signer.getAddress();
   if ((await provider.getBalance(signerAddress)) === 0n) {
     throw new Error("Transaction wallet has no gas balance");
   }
@@ -320,11 +320,10 @@ async function submitAction(
   const fromBlock = submission?.fromBlock ?? await provider.getBlockNumber();
   if (!Number.isSafeInteger(fromBlock) || fromBlock < 0)
     throw new Error("Transaction submission block is unavailable");
-  const { transactionHash, receipt } = await executeChainTransaction<TransactionReceipt, ContractTransactionResponse>({
+  const { transactionHash, receipt } = await draft.submit<TransactionReceipt, ContractTransactionResponse>({
     fromBlock,
-    // The callback rechecks lock/context state after every preparatory RPC read.
-    assertActive: () => onStage?.("submitting"),
     send: async () => {
+      onStage?.("submitting");
       const endWalletRequest = input.onWalletRequest?.();
       try {
         if (submission) input.onSubmitting?.(submission);
@@ -340,11 +339,11 @@ async function submitAction(
       }
     },
     expected: {
-      chainId: expectedChainId, from: signerAddress, to: poolAddress,
+      to: poolAddress,
       data: calldata, value: transactionValue,
       ...(submission ? { nonce: submission.nonce } : {}),
     },
-    onSubmitted: (hash) => { input.onBroadcast?.(hash); onStage?.("confirming"); },
+    onSubmitted: (hash) => { input.onBroadcast?.(hash); draft.commit(() => onStage?.("confirming")); },
     requireSuccess: false,
   });
   return { transactionHash, receipt, gasEstimate, gasLimit };

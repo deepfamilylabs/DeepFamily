@@ -5,6 +5,7 @@ import { useAddVersionFlow } from "./useAddVersionFlow";
 
 const mocks = vi.hoisted(() => ({
   wallet: {
+    address: "0x00000000000000000000000000000000000000aa",
     ensureTransactionAuthorization: vi.fn(async () => {}),
     signer: {
       id: "signer",
@@ -15,7 +16,7 @@ const mocks = vi.hoisted(() => ({
         ),
       },
     },
-  } as { signer: any; ensureTransactionAuthorization: ReturnType<typeof vi.fn> },
+  } as { address: string; signer: any; ensureTransactionAuthorization: ReturnType<typeof vi.fn> },
   config: {
     rpcUrl: "https://rpc.example",
     chainId: 123,
@@ -135,7 +136,7 @@ describe("useAddVersionFlow", () => {
         submitContract: mocks.submitContract,
         preflightContract: mocks.preflightContract,
         contractAddress: mocks.config.contractAddress,
-        submitterAddress: "0x00000000000000000000000000000000000000aa",
+        draft: expect.objectContaining({ account: "0x00000000000000000000000000000000000000aa", chainId: 123n }),
         proof: flowArgs.proof,
         publicSignals: flowArgs.publicSignals,
         fatherVersionIndex: 0,
@@ -192,7 +193,7 @@ describe("useAddVersionFlow", () => {
       // MetaMask would otherwise reject the preparation or send with 4100,
       // even though getAddress() still returns the cached connected account.
       expect(authorized).toBe(true);
-      await params.assertWalletScope();
+      await params.draft.assertWallet();
       expect(authorized).toBe(true);
       sendTransaction();
       return { transactionHash: "0xtx" };
@@ -255,7 +256,7 @@ describe("useAddVersionFlow", () => {
       throw Object.assign(new Error("Unauthorized transaction"), { code: 4100 });
     });
     mocks.executeAddVersionFlow.mockImplementation(async (params) => {
-      await params.assertWalletScope();
+      await params.draft.assertWallet();
       return sendTransaction();
     });
     const { result } = renderHook(() => useAddVersionFlow());
@@ -277,7 +278,7 @@ describe("useAddVersionFlow", () => {
         : "0x00000000000000000000000000000000000000bb"];
     });
     mocks.executeAddVersionFlow.mockImplementation(async (params) => {
-      await params.assertWalletScope();
+      await params.draft.assertWallet();
       sendTransaction();
       return {};
     });
@@ -499,7 +500,7 @@ describe("useAddVersionFlow", () => {
             code: "ADD_VERSION_PREVIEW_REJECTED",
           });
         }
-        await params.assertWalletScope();
+        await params.draft.assertWallet();
         walletRequest();
         return {};
       });
@@ -538,7 +539,7 @@ describe("useAddVersionFlow", () => {
           code: "ADD_VERSION_PREVIEW_REJECTED",
         });
       }
-      await params.assertWalletScope();
+      await params.draft.assertWallet();
       walletRequest();
       return {};
     });
@@ -572,7 +573,7 @@ describe("useAddVersionFlow", () => {
     const walletRequest = vi.fn();
     mocks.executeAddVersionFlow.mockImplementation(async (params) => {
       submitting = true;
-      await params.assertWalletScope();
+      await params.draft.assertWallet();
       walletRequest();
       return {};
     });
@@ -613,7 +614,7 @@ describe("useAddVersionFlow", () => {
         },
       };
       mocks.executeAddVersionFlow.mockImplementation(async (params) => {
-        await params.assertWalletScope();
+        await params.draft.assertWallet();
         params.onTransactionSubmitted(transactionHash);
         return pendingReceipt;
       });

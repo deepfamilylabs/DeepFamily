@@ -1,5 +1,6 @@
 import { getAddress, type Signer, type ContractTransactionResponse, type TransactionReceipt } from "ethers";
-import { executeChainTransaction, runChainRead, normalizeChainError } from "@deepfamily/chain-client";
+import { runChainRead, normalizeChainError } from "@deepfamily/chain-client";
+import { captureWalletDraft } from "../../../shared/clients/walletDraft";
 import {
   createDeepFamilyContract,
   createLineageIndexContract,
@@ -92,6 +93,7 @@ export async function createShieldedAssetPool(input: {
   onWalletRequest?: () => void;
   onSubmitted?: (hash: string) => void;
 }) {
+  const draft = captureWalletDraft({ ...input, staleError: () => new ShieldedWalletChangedError(), walletChangedError: () => new ShieldedWalletChangedError() });
   const provider = input.signer.provider;
   if (!provider) throw new ShieldedWalletChangedError();
   const [network, account, fromBlock] = await runChainRead({ read: () => Promise.all([
@@ -102,14 +104,13 @@ export async function createShieldedAssetPool(input: {
   }
   if (!Number.isSafeInteger(fromBlock) || fromBlock < 0) throw new Error("Pool creation block is unavailable");
   const factory = createShieldedPoolFactoryContract(input.factoryAddress, input.signer);
-  return executeChainTransaction<TransactionReceipt, ContractTransactionResponse>({
+  return draft.submit<TransactionReceipt, ContractTransactionResponse>({
     fromBlock,
-    assertActive: () => { if (!input.isCurrent()) throw new ShieldedWalletChangedError(); },
     send: (): Promise<ContractTransactionResponse> => {
       input.onWalletRequest?.();
-      return factory.createPool(input.assetAddress);
+      return factory.createPool(input.assetAddress, { chainId: draft.chainId });
     },
-    expected: { chainId: input.chainId, from: account, to: input.factoryAddress, value: 0n },
+    expected: { to: input.factoryAddress, value: 0n },
     onSubmitted: input.onSubmitted,
     requireSuccess: false,
   });

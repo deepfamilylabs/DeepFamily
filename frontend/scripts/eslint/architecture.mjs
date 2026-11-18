@@ -62,4 +62,26 @@ export const architecture = {
   },
 };
 
-export default { rules: { architecture } };
+const walletSubmission = {
+  meta: { type: "problem", schema: [], messages: {
+    draft: "Submit a browser wallet write through a captured draft in shared/clients/walletDraft.ts.",
+  } },
+  create(context) {
+    const source = '[source.value="@deepfamily/chain-client"]';
+    const report = (node) => context.report({ node, messageId: "draft" });
+    return {
+      [`ImportDeclaration${source}, ExportNamedDeclaration${source}`](node) {
+        if (node.importKind === "type" || node.exportKind === "type") return;
+        for (const specifier of node.specifiers) {
+          if (specifier.importKind === "type" || specifier.exportKind === "type") continue;
+          const name = specifier.imported ?? specifier.local;
+          if (specifier.type === "ImportNamespaceSpecifier" || (name?.name ?? name?.value) === "executeChainTransaction") report(specifier);
+        }
+      },
+      [`ExportAllDeclaration${source}`](node) { if (node.exportKind !== "type") report(node); },
+      [`ImportExpression${source}`]: report,
+    };
+  },
+};
+
+export default { rules: { architecture, "wallet-submission": walletSubmission } };

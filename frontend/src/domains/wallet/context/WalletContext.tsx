@@ -10,7 +10,7 @@ import { createWalletAuthorization } from "../services/walletAuthorization";
 import {
   getWalletConnectionGeneration,
   invalidateWalletConnection,
-} from "../services/walletConnectionGeneration";
+} from "../../../shared/clients/walletConnectionGeneration";
 
 // localStorage key for persisting wallet type
 const WALLET_TYPE_STORAGE_KEY = "deepfamily_last_wallet_type";

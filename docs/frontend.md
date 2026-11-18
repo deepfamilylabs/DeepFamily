@@ -16,6 +16,12 @@ This document is the single source of truth for frontend architecture. [frontend
 
 ## Architecture
 
+### Submitting a wallet draft
+
+For a user-initiated write, capture `captureWalletDraft({ signer, account, chainId, isCurrent })` from `shared/clients/walletDraft.ts` before starting proof generation or gas review. The account and chain belong to the reviewed form; `isCurrent` must identify that particular form/run, not just a mounted component. Wallet lifecycle events also retire the draft, even if the same account reconnects. Add Version, inheritance (including approvals and pool creation) and private letters use this entry. ESLint rejects new frontend imports of the raw chain executor; existing unrelated callers are individually listed in the config.
+
+Use `draft.submit` for the wallet handoff. After preparation it passively checks the selected account and chain, rechecks the draft, and sends once. Opening a permission prompt is a separate, user-initiated step. Once handed to a wallet a request cannot be recalled: keep recording the original public hash/receipt (including exact fee replacements), and use `draft.commit` for form updates. Never put private draft contents into a transaction record. Checking a previously submitted hash is a read, not another submission.
+
 ### Layered source layout
 
 ```

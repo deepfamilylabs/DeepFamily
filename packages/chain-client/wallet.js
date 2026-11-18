@@ -6,22 +6,27 @@ import { runChainRead } from "./execution.js";
 export async function assertChainWalletScope(input) {
   input.assertActive?.();
   const provider = input.signer?.provider;
-  if (!provider) throw normalizeChainError(
+  if (!provider || (input.requireSelectedAccount && typeof provider.send !== "function")) throw normalizeChainError(
     Object.assign(new Error("Wallet provider is unavailable"), { code: "CHAIN_WALLET_UNAVAILABLE" }),
     { category: "wallet", operation: "submit" },
   );
   const expectedAccount = getAddress(input.account);
-  const [chainId, account] = await runChainRead({ read: () => Promise.all([
+  const [chainId, account, accounts] = await runChainRead({ read: () => Promise.all([
     typeof provider.send === "function"
       ? provider.send("eth_chainId", [])
       : provider.getNetwork().then((network) => network.chainId),
     input.signer.getAddress(),
+    input.requireSelectedAccount ? provider.send("eth_accounts", []) : undefined,
   ]) });
   input.assertActive?.();
+  if (input.requireSelectedAccount && Array.isArray(accounts) && accounts.length === 0)
+    throw normalizeChainError(Object.assign(new Error("Wallet account authorization is required"), { code: 4100 }),
+      { category: "wallet", operation: "submit" });
   let matches = false;
   try {
     matches = BigInt(input.chainId) > 0n && BigInt(chainId) === BigInt(input.chainId) &&
-      getAddress(account) === expectedAccount;
+      getAddress(account) === expectedAccount && (!input.requireSelectedAccount ||
+        (Array.isArray(accounts) && getAddress(accounts[0]) === expectedAccount));
   } catch { /* An invalid wallet response never authorizes a send. */ }
   if (!matches) throw normalizeChainError(
     Object.assign(new Error("Wallet network or account changed; review the transaction again"), { code: "CHAIN_WALLET_SCOPE_CHANGED" }),
