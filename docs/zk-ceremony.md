@@ -264,7 +264,9 @@ no separate shielded testnet report is required to start that command.
 
 Do not delete or downgrade a valid production manifest just because the committed dependency graph
 changed. First review and commit the dependency change, install exactly that clean commit, and
-record the three inputs printed by these read-only commands:
+record the three inputs printed by these read-only commands. Keep the dependency-only commit on
+the rotation branch: after `npm ci`, `check:fast` is expected to fail against the old pin until
+the reviewed rotation is complete. Do not update just the digest to make CI pass.
 
 ```bash
 node --input-type=module -e "import { readCanonicalJsonFile, sha256Text } from './scripts/lib/zkArtifactTrust.mjs'; const { raw } = readCanonicalJsonFile('circuits/zk-artifacts-manifest.json'); console.log(sha256Text(raw));"

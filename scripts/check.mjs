@@ -20,6 +20,7 @@ export const CHECK_PROFILES = {
     npm("security:xss-scan"),
   ],
   fast: [
+    node("scripts/check-snarkjs-runtime.mjs"),
     npm("lint"),
     node("scripts/check-solidity-security.mjs", "--baseline-only"),
     "frontend-static",

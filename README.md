@@ -165,6 +165,13 @@ npm run check:fast     # Run the same fast checks as the commit hook and first C
 npm run check          # Fast checks, circuit constraints, integration and Solidity analysis
 ```
 
+`check:fast` starts by comparing the installed snarkjs CLI and its full runtime dependency graph
+with the SHA-256 pins in `circuits/zk-artifacts-manifest.json`.
+It needs no Circom binary, proving keys or network access. On a mismatch, reinstall from the
+committed lockfile with `npm ci` and check dependency or override changes. The check never
+updates the pins; for an intentional production change, follow the
+[reviewed runtime rotation procedure](docs/zk-ceremony.md#rotate-after-a-reviewed-snarkjs-runtime-change).
+
 Real proof tests require the manifest-pinned artifacts; missing or mismatched files fail the
 check. Gas reports remain optional maintenance checks; see [ZK proofs](docs/zk-proofs.md#optional-gas-reports).
 

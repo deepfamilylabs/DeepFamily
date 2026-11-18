@@ -720,6 +720,17 @@ export const validateZkArtifactManifest = (
   return manifest;
 };
 
+export const inspectSnarkjsToolchain = (root, { snarkjsCliSha256, snarkjsRuntimeSha256 }) =>
+  Object.freeze({
+    snarkjs: assertFileHash(
+      root,
+      ZK_TOOLCHAIN_PATHS.snarkjsCli,
+      snarkjsCliSha256,
+      "Installed snarkjs CLI",
+    ),
+    snarkjsRuntime: assertSnarkjsRuntimeHash({ root, expectedSha256: snarkjsRuntimeSha256 }),
+  });
+
 export const inspectZkReleaseArtifacts = ({
   root = process.cwd(),
   requireProduction = false,
@@ -750,15 +761,9 @@ export const inspectZkReleaseArtifacts = ({
       manifest.toolchain.circomBinarySha256,
       "Pinned canonical Circom compiler",
     ),
-    snarkjs: assertFileHash(
-      resolvedRoot,
-      ZK_TOOLCHAIN_PATHS.snarkjsCli,
-      manifest.toolchain.snarkjsCliSha256,
-      "Installed snarkjs CLI",
-    ),
-    snarkjsRuntime: assertSnarkjsRuntimeHash({
-      root: resolvedRoot,
-      expectedSha256: expectedInstalledRuntimeSha256,
+    ...inspectSnarkjsToolchain(resolvedRoot, {
+      ...manifest.toolchain,
+      snarkjsRuntimeSha256: expectedInstalledRuntimeSha256,
     }),
     snarkjsRuntimeBinding: Object.freeze({
       source:

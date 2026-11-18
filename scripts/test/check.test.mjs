@@ -3,6 +3,7 @@ import test from "node:test";
 import { checkPlan, runCheckProfile } from "../check.mjs";
 
 test("fast checks do not need downloaded proving artifacts or the Solidity analyzer", () => {
+  assert.deepEqual(checkPlan("fast")[0], [process.execPath, "scripts/check-snarkjs-runtime.mjs"]);
   const fast = checkPlan("fast")
     .map((command) => command.join(" "))
     .join("\n");
