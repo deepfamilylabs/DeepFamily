@@ -54,7 +54,7 @@
     "dev:deploy": "node scripts/ensure-zk-artifacts.mjs && hardhat --config hardhat.config.mjs run scripts/deploy-integrated.mjs --network localhost",
     "dev:fund": "hardhat --config hardhat.config.mjs run --no-compile scripts/fund-wallet.mjs --network localhost",
     "dev:contract": "npm run dev:deploy && npm run dev:fund && npm run dev:seed",
-    "dev:all": "concurrently -k -n node,web -c blue,green \"npm run dev:node\" \"wait-on tcp:127.0.0.1:8545 && npm run dev:contract && npm run frontend:config && npm run frontend:dev -- --host 127.0.0.1 --port 5173\"",
+    "dev:all": "node scripts/dev-all.mjs",
     "dev:seed": "hardhat --config hardhat.config.mjs run scripts/seed-historical.mjs --network localhost",
     "seed:net": "hardhat --config hardhat.config.mjs run scripts/seed-historical.mjs --network $npm_config_net",
     "check:root": "hardhat --config hardhat.config.mjs run scripts/check-root.mjs --network $npm_config_net",
@@ -121,8 +121,7 @@
     "solhint": "^4.0.0",
     "ts-node": ">=8.0.0",
     "typechain": "^8.3.0",
-    "typescript": ">=4.5.0",
-    "wait-on": "^7.2.0"
+    "typescript": ">=4.5.0"
   },
   "lint-staged": {
     "contracts/**/*.sol": [
