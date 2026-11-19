@@ -2365,7 +2365,7 @@ export function ShieldedInheritancePanel({
     receipt = null;
   } else if (action === "fund") {
     const fundingVersion = selectedPolicy?.rootVersionIndex ?? rootVersion;
-    const heirs = listShieldedFundingHeirs(wallet, policyHandle, fundingVersion, localRecipientLabels);
+    const heirs = listShieldedFundingHeirs(wallet, fundingVersion, localRecipientLabels);
     const heirIndex = heirs.findIndex(
       (heir) => heir.personHash.toLowerCase() === personHash.toLowerCase(),
     );
@@ -2416,7 +2416,7 @@ export function ShieldedInheritancePanel({
         onPolicyChange={(handle) => {
           if (handle === policyHandle) return;
           const nextVersion = wallet?.policies.find(item => item.handle === handle)?.rootVersionIndex ?? rootVersion;
-          const sameChildAvailable = listShieldedFundingHeirs(wallet, handle, nextVersion)
+          const sameChildAvailable = listShieldedFundingHeirs(wallet, nextVersion)
             .some(heir => heir.personHash.toLowerCase() === personHash.toLowerCase());
           setPolicyHandle(handle);
           if (!sameChildAvailable) {
@@ -2429,7 +2429,7 @@ export function ShieldedInheritancePanel({
         rootVersion={rootVersion}
         onRootVersionChange={(value) => {
           if (value === rootVersion) return;
-          const sameChildAvailable = listShieldedFundingHeirs(wallet, policyHandle, value)
+          const sameChildAvailable = listShieldedFundingHeirs(wallet, value)
             .some(heir => heir.personHash.toLowerCase() === personHash.toLowerCase());
           setRootVersion(value);
           if (!sameChildAvailable) {
@@ -2534,10 +2534,10 @@ export function ShieldedInheritancePanel({
               !fundingPeriods ||
               !days ||
               !wallet ||
-              (wallet?.familyRecordsAvailable === false && !template) ||
+              wallet.familyRecordsAvailable === false ||
               (needsCode && !recipientReady) ||
               fundingDeficit !== undefined ||
-              !personHash ||
+              heirIndex < 0 ||
               (!selectedPolicy && !rootVersion)
             }
             onClick={() => void prepare()}

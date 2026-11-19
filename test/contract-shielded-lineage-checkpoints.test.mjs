@@ -107,18 +107,20 @@ describe("Shielded lineage checkpoint integration", function () {
     };
   }
 
-  async function prepare({ pool, lineageIndex }) {
+  async function prepare({ pool, lineageIndex }, fundMode = 0n, asOf) {
     const data = actionData({
+      fundMode,
       inputRoots: Array(2).fill((await pool.noteShard(0)).root),
       inputNullifiers: [401n, 402n],
       outputCommitments: [107n, 108n],
       relation0: await lineageIndex.root(0),
       relation1: await lineageIndex.root(1),
-      asOf: BigInt((await hre.ethers.provider.getBlock("latest")).timestamp),
+      asOf: asOf ?? BigInt((await hre.ethers.provider.getBlock("latest")).timestamp),
       lineageCheckpointId: await lineageIndex.currentCheckpointId(),
     });
     const claim = {
       ...data,
+      fundMode: 0n,
       inputShardIds: data.inputShardIds.slice(0, 1),
       inputRoots: data.inputRoots.slice(0, 1),
       inputNullifiers: data.inputNullifiers.slice(0, 1),
@@ -174,19 +176,38 @@ describe("Shielded lineage checkpoint integration", function () {
     expect(await pool.nullifierSpent(401n)).to.equal(false);
   });
 
-  it("expires revoked eligibility at the exact 15-minute boundary", async () => {
-    const context = await setup();
-    const { deepFamily, lineageIndex, claimant, childHash } = context;
-    const prepared = await prepare(context);
-    await deepFamily.connect(claimant).cancelEndorsement(childHash);
-    const checkpoint = await lineageIndex.getCheckpoint(prepared.data.lineageCheckpointId);
-    expect(checkpoint.retiredAt).to.be.greaterThan(0n);
-    expect(await deepFamily.endorsedVersionIndex(childHash, claimant.address)).to.equal(0n);
-    await hre.networkHelpers.time.increaseTo(Number(checkpoint.retiredAt + 899n));
-    await expectPreparedAccepted(context, prepared);
-    await hre.networkHelpers.time.increaseTo(Number(checkpoint.retiredAt + 900n));
-    await expectPreparedExpired(context, prepared);
-  });
+  for (const fundMode of [0n, 1n]) {
+    it(`accepts Fund mode ${fundMode} from the endorsement checkpoint's creation time`, async () => {
+      const context = await setup();
+      const { pool, lineageIndex, claimant, childHash } = context;
+      const { writtenAt } = await lineageIndex.getEndorsementMetadata(childHash, claimant.address);
+      const { createdAt } = await lineageIndex.getCheckpoint(
+        await lineageIndex.currentCheckpointId(),
+      );
+      expect(createdAt).to.equal(writtenAt);
+
+      const atCreation = await prepare(context, fundMode, createdAt);
+      await pool.fund.staticCall(atCreation.data, atCreation.fundProof);
+      const beforeCreation = await prepare(context, fundMode, createdAt - 1n);
+      await expect(
+        pool.fund.staticCall(beforeCreation.data, beforeCreation.fundProof),
+      ).to.be.revertedWithCustomError(pool, "UnknownLineageRoot");
+    });
+
+    it(`expires revoked eligibility for Fund mode ${fundMode} at the exact 15-minute boundary`, async () => {
+      const context = await setup();
+      const { deepFamily, lineageIndex, claimant, childHash } = context;
+      const prepared = await prepare(context, fundMode);
+      await deepFamily.connect(claimant).cancelEndorsement(childHash);
+      const checkpoint = await lineageIndex.getCheckpoint(prepared.data.lineageCheckpointId);
+      expect(checkpoint.retiredAt).to.be.greaterThan(0n);
+      expect(await deepFamily.endorsedVersionIndex(childHash, claimant.address)).to.equal(0n);
+      await hre.networkHelpers.time.increaseTo(Number(checkpoint.retiredAt + 899n));
+      await expectPreparedAccepted(context, prepared);
+      await hre.networkHelpers.time.increaseTo(Number(checkpoint.retiredAt + 900n));
+      await expectPreparedExpired(context, prepared);
+    });
+  }
 
   it("does not refresh an old ID when the same roots recur or permit rebinding its proof", async () => {
     const context = await setup();

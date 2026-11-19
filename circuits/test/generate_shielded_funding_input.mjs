@@ -237,7 +237,7 @@ export function buildShieldedFundingFixtures({
   const continuation = {
     ...commonPublicInputs,
     ...commonWitness,
-    ...zeroFields(lineageFields),
+    ...lineageFields,
     ...oldFields,
     fundMode: "1",
     inputRoots: [donorNote, oldBudget].map(decimal),
@@ -245,9 +245,9 @@ export function buildShieldedFundingFixtures({
       donorSpend,
       poseidon4([scoped(1026n), policySalt, oldBudget, budgetUseNonce]),
     ].map(decimal),
-    endorsementRoot: "0",
-    trustedRoot: "0",
-    asOf: "0",
+    endorsementRoot: heir.witness.endorsementRoot,
+    trustedRoot: heir.witness.trustedRoot,
+    asOf: decimal(eligibleFrom),
     allocationKey: "0",
   };
   Object.assign(initial, fixtureFundReceive(initial));

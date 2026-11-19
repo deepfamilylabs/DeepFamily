@@ -325,6 +325,7 @@ async function fixture(periodDays = 30n, keyMode: 0 | 1 = 0) {
     viewingKey: hexlify(await deriveShieldedViewPublicKey(childKeys.hpkeIkm)),
   } as VerifiedShieldedRecipient;
   const common = {
+    lineage,
     pool,
     wallet: donor,
     keyMaterial: donorKeys,

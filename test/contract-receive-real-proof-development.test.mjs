@@ -344,14 +344,10 @@ describe("Receive presentation real-proof canonical pool and letter integration"
             ],
             outputCommitments: [budget.commitment, change.commitment],
             outputCiphertexts: [budget.ciphertext, change.ciphertext],
-            ...(iteration === 0
-              ? {
-                  relation0: BigInt(fixture.initial.endorsementRoot),
-                  relation1: BigInt(fixture.initial.trustedRoot),
-                  asOf,
-                  lineageCheckpointId: await lineage.currentCheckpointId(),
-                }
-              : {}),
+            relation0: BigInt(fixture.initial.endorsementRoot),
+            relation1: BigInt(fixture.initial.trustedRoot),
+            asOf: iteration === 0 ? asOf : await now(),
+            lineageCheckpointId: await lineage.currentCheckpointId(),
           };
           const base = iteration === 0 ? fixture.initial : fixture.continuation;
           const templatePath = template
@@ -911,7 +907,7 @@ describe("Receive presentation real-proof canonical pool and letter integration"
           ciphertext: hre.ethers.getBytes(renewedCiphertext),
         });
         // A letter proved one minute before the code expires still lands within its own
-        // deadline. Once the code has expired no new proof can be prepared, while every
+        // deadline. The client rejects an asOf at or after expiry, while every
         // previously authenticated immutable blob still recovers below.
         const lastId = 801n;
         const lastEnvelope = createShieldedLetterEnvelope({

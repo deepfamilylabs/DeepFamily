@@ -44,14 +44,14 @@
     },
     "fund": {
       "source": "shielded_fund",
-      "sourceSha256": "5c274b6b7b70dceb1cccd0902c134353aa4f4d2b9088c2cdbac1a2571ccfcedd",
-      "r1csSha256": "4e8e19294c8d6c86ea561e32ba284fc26abade0dbf0a1bdb0cc9dc6deefb3cc2",
-      "wasmSha256": "ef1274ea92f01e1631b1824f3a5719b66e9e60ce160b327bebbbf2c0ec55bfe1",
-      "zkeySha256": "b7c6c1ad10f117141893e84c543282dfe3bc7ca8c54bffd6491bc82caddeeef0",
-      "verificationKeySha256": "7108804077d0d0ab643ddbfc2cf068c5f3dc663d3e9f9ddb482a34fb984d0887",
+      "sourceSha256": "328ee98f942d9deb2bbcf4242e772f19bd35c9e9793ce8eb5824c317dd4160e8",
+      "r1csSha256": "7fe02c05a7cbd58a9b2231724f53971ccb942ad60163e65c7c09a7e3f2dcf18d",
+      "wasmSha256": "1ad44a390504915022b073e355cf239dfcec2d20e0e82b09cea54f30d360ce2d",
+      "zkeySha256": "9a3ecd403a738da5cc0bd8be24204724d0e54bb60d35397b78d4ff0d3385046c",
+      "verificationKeySha256": "fa0692c8bb6bfb0023232199128d65754ad34fc6d9a164383e01321544f94108",
       "verifierPath": "contracts/verifiers/ShieldedFundVerifier.sol",
       "verifierContractName": "ShieldedFundVerifier",
-      "solidityVerifierSha256": "4a9050a1a8f8d306d631b3118c732efebe75db40aa5f37723d0f746d9f2a87ab"
+      "solidityVerifierSha256": "e2021d2aa44a1a5afb8eaf579dbfb37a7244e901bc65d4af716f230f271b83cd"
     },
     "claim": {
       "source": "shielded_claim_64",

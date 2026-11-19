@@ -163,13 +163,24 @@ describe("ShieldedErc20Pool contract boundaries", function () {
     return authorization;
   }
 
+  async function currentFundingCheckpoint(lineage) {
+    await lineage.setRoots(700n, 800n);
+    return {
+      relation0: 700n,
+      relation1: 800n,
+      asOf: BigInt((await hre.ethers.provider.getBlock("latest")).timestamp),
+      lineageCheckpointId: await lineage.currentCheckpointId(),
+    };
+  }
+
   it("authenticates every private Fund, including top-ups, before atomically spending notes", async () => {
-    const { pool } = await setup();
+    const { pool, lineage } = await setup();
     const deposit = actionData();
     await pool.shield(100n, deposit, await proofFor(pool, 0, deposit, 100n));
     const root = (await pool.noteShard(0)).root;
     const funding = actionData({
       fundMode: 1n,
+      ...(await currentFundingCheckpoint(lineage)),
       inputRoots: [root, root],
       inputNullifiers: [901n, 902n],
       outputCommitments: [903n, 904n],
@@ -242,12 +253,13 @@ describe("ShieldedErc20Pool contract boundaries", function () {
   });
 
   it("rejects receive authorizations at the exact deadline and retired shared counter checkpoints", async () => {
-    const { pool, authorizationState } = await setup();
+    const { pool, lineage, authorizationState } = await setup();
     const deposit = actionData();
     await pool.shield(100n, deposit, await proofFor(pool, 0, deposit, 100n));
     const root = (await pool.noteShard(0)).root;
     const funding = actionData({
       fundMode: 1n,
+      ...(await currentFundingCheckpoint(lineage)),
       inputRoots: [root, root],
       inputNullifiers: [941n, 942n],
       outputCommitments: [943n, 944n],
@@ -669,16 +681,17 @@ describe("ShieldedErc20Pool contract boundaries", function () {
     const toppedRoot = (await pool.noteShard(0)).root;
     const additionalFunding = actionData({
       fundMode: 1n,
+      ...(await currentFundingCheckpoint(lineage)),
       inputRoots: [toppedRoot, toppedRoot],
       inputNullifiers: [703n, 704n],
       outputCommitments: [113n, 114n],
       outputCiphertexts: [ciphertext("0d"), ciphertext("0e")],
     });
-    const lineageAdditionalFunding = { ...additionalFunding, relation0: 700n, relation1: 800n };
+    const refillProof = await proofFor(pool, 1, additionalFunding);
     await expect(
-      pool.fund(lineageAdditionalFunding, await proofFor(pool, 1, additionalFunding)),
-    ).to.be.revertedWithCustomError(pool, "InvalidActionData");
-    await pool.fund(additionalFunding, await proofFor(pool, 1, additionalFunding));
+      pool.fund({ ...additionalFunding, lineageCheckpointId: 0n }, refillProof),
+    ).to.be.revertedWithCustomError(pool, "UnknownLineageRoot");
+    await pool.fund(additionalFunding, refillProof);
     expect(await pool.nullifierSpent(704n)).to.equal(true);
     const forbiddenMode = actionData({ fundMode: 1n, outputCommitments: [115n, 116n] });
     await expect(pool.shield(100n, forbiddenMode, "0x")).to.be.revertedWithCustomError(
@@ -687,7 +700,7 @@ describe("ShieldedErc20Pool contract boundaries", function () {
     );
   });
 
-  it("requires checkpoint ID zero on Shield, additional Fund, Transfer and Unshield", async () => {
+  it("requires checkpoint ID zero on Shield, Transfer and Unshield", async () => {
     const { pool, lineage, recipient } = await setup();
     await lineage.setRoot(0, 700n);
     await lineage.setRoot(1, 800n);
@@ -699,15 +712,6 @@ describe("ShieldedErc20Pool contract boundaries", function () {
     ).to.be.revertedWithCustomError(pool, "InvalidActionData");
     await pool.shield(100n, deposit, depositProof);
     const root = (await pool.noteShard(0)).root;
-    const funding = actionData({
-      inputRoots: [root, root],
-      inputNullifiers: [701n, 702n],
-      outputCommitments: [111n, 112n],
-      fundMode: 1n,
-    });
-    await expect(
-      pool.fund({ ...funding, lineageCheckpointId }, await proofFor(pool, 1, funding)),
-    ).to.be.revertedWithCustomError(pool, "InvalidActionData");
     const transfer = valueActionData({
       inputRoots: [root, root],
       inputNullifiers: [801n, 802n],

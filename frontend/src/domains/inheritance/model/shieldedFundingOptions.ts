@@ -16,26 +16,20 @@ export const SHIELDED_FUNDING_ENTRY_KEYS: Record<
 
 export type ShieldedFundingHeir = { personHash: string; label?: string };
 
-/** Eligible children of the chosen parent version, plus every heir already on the arrangement. */
+/** Initial funding and refills require a current direct-child endorsement trusted by the selected parent version. */
 export function listShieldedFundingHeirs(
   wallet: ShieldedWalletSummary | null,
-  policyHandle: string,
   fundingVersion: string,
   labels?: ReadonlyMap<string, string>,
 ): ShieldedFundingHeir[] {
-  return Array.from(
-    new Map(
-      [
-        ...(wallet?.children.filter(
-          (child) => child.eligible && String(child.rootVersionIndex) === fundingVersion,
-        ) ?? []),
-        ...(wallet?.templates.filter((item) => item.policyHandle === policyHandle) ?? []),
-      ].map((heir) => [
-        heir.personHash.toLowerCase(),
-        { personHash: heir.personHash, label: labels?.get(heir.personHash.toLowerCase()) },
-      ]),
-    ).values(),
-  );
+  const children =
+    wallet?.children.filter(
+      (child) => child.eligible && String(child.rootVersionIndex) === fundingVersion,
+    ) ?? [];
+  return children.map(({ personHash }) => ({
+    personHash,
+    label: labels?.get(personHash.toLowerCase()),
+  }));
 }
 
 export function shieldedFundingEntryLabelKey(entry: ShieldedFundingEntry): string {

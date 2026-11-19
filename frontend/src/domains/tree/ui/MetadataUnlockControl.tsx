@@ -1145,8 +1145,8 @@ export function MetadataUnlockControl({
               </label>
               <span className="min-w-0 truncate text-[11px] text-ink-subtle">
                 {t(
-                  "metadataUnlock.sharedPassphraseHint",
-                  "Selected versions must share one passphrase",
+                  "metadataUnlock.batchPassphraseHint",
+                  "The entered passphrase will be tried on each selected version.",
                 )}
               </span>
             </div>

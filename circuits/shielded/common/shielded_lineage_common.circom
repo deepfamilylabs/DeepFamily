@@ -7,10 +7,9 @@ include "shielded_merkle_common.circom";
 
 // Proves that the heir's currently endorsed version names the
 // private policy root as a direct parent, and the endorser is recommended by
-// that root version. Both roots are checked against current chain state by
-// the asset pool before this proof is accepted.
+// that root version. The pool requires both roots in one checkpoint created by
+// asOf, so every endorsement in that checkpoint was already written by asOf.
 template ShieldedDirectChildCurrent() {
-    signal input enabled;
     signal input heirIdentityCommitment;
     signal input rootIdentityCommitment;
     signal input rootVersionIndex;
@@ -28,13 +27,11 @@ template ShieldedDirectChildCurrent() {
     signal input trustedSiblings[64];
     signal input endorsementRoot;
     signal input trustedRoot;
-    signal input asOf;
 
-    enabled * (1 - enabled) === 0;
     rootIsMother * (1 - rootIsMother) === 0;
     signal selectedParent <== fatherIdentityCommitment + rootIsMother *
         (motherIdentityCommitment - fatherIdentityCommitment);
-    enabled * (rootIdentityCommitment - selectedParent) === 0;
+    rootIdentityCommitment === selectedParent;
     component heirNotZero = IsZero();
     heirNotZero.in <== heirIdentityCommitment;
     heirNotZero.out === 0;
@@ -42,12 +39,6 @@ template ShieldedDirectChildCurrent() {
     endorserBits.in <== endorser;
     component writtenAtBits = Num2Bits(64);
     writtenAtBits.in <== writtenAt;
-    component asOfBits = Num2Bits(64);
-    asOfBits.in <== asOf;
-    component alreadyEndorsed = LessEqThan(64);
-    alreadyEndorsed.in[0] <== writtenAt;
-    alreadyEndorsed.in[1] <== asOf;
-    enabled * (1 - alreadyEndorsed.out) === 0;
 
     component parents = Poseidon(3);
     parents.inputs[0] <== 1009;
@@ -71,11 +62,11 @@ template ShieldedDirectChildCurrent() {
     endorsementMerkle.depth <== endorsementDepth;
     endorsementMerkle.index <== endorsementIndex;
     endorsementMerkle.siblings <== endorsementSiblings;
-    enabled * (endorsementMerkle.out - endorsementRoot) === 0;
+    endorsementMerkle.out === endorsementRoot;
     component trustedMerkle = ShieldedMerkleRoot(64);
     trustedMerkle.leaf <== trustedLeaf.out;
     trustedMerkle.depth <== trustedDepth;
     trustedMerkle.index <== trustedIndex;
     trustedMerkle.siblings <== trustedSiblings;
-    enabled * (trustedMerkle.out - trustedRoot) === 0;
+    trustedMerkle.out === trustedRoot;
 }

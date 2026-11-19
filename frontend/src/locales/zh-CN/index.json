@@ -51,7 +51,7 @@
       },
       "saltedUnlinkability": {
         "title": "去链接性",
-        "description": "可选口令加盐哈希阻断身份推理与污染攻击，共享口令协作构建，独享口令形成隔离空间"
+        "description": "个人口令增加了仅凭公开生平信息猜出身份承诺的难度。"
       },
       "dualTreeModels": {
         "title": "多版本共识治理",
@@ -78,7 +78,7 @@
         "description": "通过父子哈希连接构建全球家谱图谱。零知识证明确保提交过程完全私密，明文不会上链。",
         "feature1": "明文不上链",
         "feature2": "口令加盐阻断身份推理与污染攻击",
-        "feature3": "共享口令私密协作，独享强口令完全隔离"
+        "feature3": "用于领取预算的身份口令请由本人保管。"
       },
       "layer2": {
         "title": "价值与公开记录",
@@ -140,8 +140,8 @@
         "description": "将生平写入可验证、不可篡改的链上记录，封存档案后不再接受新记录。"
       },
       "versionNotarization": {
-        "title": "协作与私有模式",
-        "description": "默认无口令进入公开空间，共享口令共建协作树，独享强口令构建隔离私有树。"
+        "title": "个人身份口令",
+        "description": "为接收资金的身份设置只有本人知道的强口令。"
       }
     },
     "tokenomics": {
@@ -271,7 +271,7 @@
       "birthMonthLabel": "月",
       "birthDayLabel": "日",
       "passphrase": "身份口令",
-      "passphrasePlaceholder": "可输入任意字符的家训或暗号，推荐 15+ 字符并混合不同符号",
+      "passphrasePlaceholder": "输入本人的口令，建议至少 15 个字符",
       "passphraseDisallowed": "此口令不符合当前凭据的要求，请重新输入相关文本。",
       "identityInputRule": "全名和身份口令使用单行输入框，只移除首尾空白，内部空格及其余已输入字符均按原文保留。",
       "multilinePasteRejected": "此单行输入框无法保留换行。已取消粘贴并保留原有内容。",
@@ -283,7 +283,7 @@
         "privacy": "隐私保护",
         "privacyDesc": "为您的身份哈希添加额外保护层，防止他人通过姓名和生日推测您的身份。",
         "optional": "完全可选",
-        "optionalDesc": "可留空；系统支持任意字符——如家训、暗号等。族人可共享同一身份口令协作管理；为增强隐私，推荐使用 15+ 字符并妥善保密。",
+        "optionalDesc": "登记族谱时可留空。用于接收资金的身份，请设置强口令并自行保管。",
         "remember": "请牢记",
         "rememberDesc": "身份口令无法找回。它同时是本版本传记与标签的加密密钥——一旦遗忘，这些内容将永久无法解密。",
         "privacyNoteTitle": "本地计算",
@@ -725,7 +725,7 @@
     "selectedCount": "已选 {{count}} 个版本",
     "checking": "正在读取并校验加密资料…",
     "passphraseLabel": "身份口令",
-    "sharedPassphraseHint": "所选版本需使用同一口令",
+    "batchPassphraseHint": "将用本次输入的口令逐个尝试解锁所选版本。",
     "passphrasePlaceholder": "输入身份口令",
     "passphrasePlaceholderIdle": "请先选择要解锁的版本",
     "passphraseVisibility": {

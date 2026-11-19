@@ -169,7 +169,7 @@ test("shard routing is validated without changing a business proof statement", (
   }
 });
 
-test("fund includes its mode before the roots and keeps lineage only for the initial enrollment", () => {
+test("fund includes its mode before the roots and binds lineage and time in both modes", () => {
   assert.deepEqual(
     buildShieldedPoolPublicSignals({
       ...base,
@@ -207,6 +207,9 @@ test("fund includes its mode before the roots and keeps lineage only for the ini
       ...base,
       action: SHIELDED_POOL_ACTION.Fund,
       fundMode: 1,
+      relation0: 29,
+      relation1: 30,
+      asOf: 40,
     }),
     [
       1030n,
@@ -222,9 +225,9 @@ test("fund includes its mode before the roots and keeps lineage only for the ini
       28n,
       hashA,
       hashB,
-      0n,
-      0n,
-      0n,
+      29n,
+      30n,
+      40n,
       0n,
       0n,
     ],
@@ -283,10 +286,6 @@ test("data an action does not use must be zero, as the pool requires", () => {
       (error) => error.code === "INVALID_SHIELDED_ACTION_DATA",
       label,
     );
-  rejects(
-    { ...base, action: SHIELDED_POOL_ACTION.Fund, fundMode: 1, relation0: 1 },
-    "continuation lineage root",
-  );
   rejects({ ...valueBase, action: SHIELDED_POOL_ACTION.PrivateTransfer, asOf: 1 }, "transfer asOf");
   rejects(
     { ...valueBase, action: SHIELDED_POOL_ACTION.PrivateTransfer, amount: 1 },

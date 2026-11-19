@@ -70,7 +70,7 @@ abstract contract ShieldedPoolCore is ReentrancyGuardTransient {
     uint256[3] periodNullifiers;
     uint256[2] outputCommitments;
     bytes[2] outputCiphertexts;
-    // Initial Fund/Claim: endorsement/trusted roots from one accepted checkpoint.
+    // Fund/Claim: endorsement/trusted roots from one accepted checkpoint.
     uint256 relation0;
     uint256 relation1;
     uint256 asOf;
@@ -331,7 +331,7 @@ abstract contract ShieldedPoolCore is ReentrancyGuardTransient {
         revert InvalidActionData();
       }
     }
-    if (isClaim || isInitialFund) {
+    if (isClaim || action == Action.Fund) {
       _requireNonzeroField(data.relation0);
       _requireNonzeroField(data.relation1);
       if (data.asOf > block.timestamp || block.timestamp - data.asOf >= ACTION_PROOF_LIFETIME) {

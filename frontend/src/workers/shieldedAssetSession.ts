@@ -1220,6 +1220,24 @@ export class ShieldedAssetSession {
           "Refilling cannot replace the original budget owner or viewing key.",
         );
       }
+      const root = {
+        rootIdentityCommitment: policy.rootIdentityCommitment,
+        rootVersionIndex: Number(policy.rootVersionIndex),
+      };
+      const knownHeir = verified?.identityCommitment ??
+        (template ? getBigInt(template.note.heirIdentityCommitment) : undefined);
+      const lineage = normalizeShieldedStateReadMode(ctx.stateReadMode) === "chain"
+        ? await loadTargetedLineageSnapshot(env.lineageIndex, env.family, {
+            eligibility: [{
+              ...root,
+              heirIdentityCommitment: knownHeir ?? await env.lineageIndex.identityCommitmentOf(request.publicRecipient),
+            }],
+          })
+        : await loadLineageSnapshot(env.lineageIndex, env.family, {
+            selection: knownHeir !== undefined
+              ? { eligibility: [{ ...root, heirIdentityCommitment: knownHeir }] }
+              : { publicEligibility: [{ ...root, heirPersonHash: request.publicRecipient }] },
+          });
       const common = {
         pool: env.pool,
         wallet,
@@ -1229,28 +1247,12 @@ export class ShieldedAssetSession {
         budgetKind: kind,
         publicRecipientPersonHash: request.publicRecipient,
         lineageIndex: env.lineageIndex,
+        lineage,
         budgetPeriods: periods,
       };
       fundArgs = template
         ? { ...common, fundMode: 1, budget: template }
-        : {
-            ...common,
-            fundMode: 0,
-            policy,
-            lineageIndex: env.lineageIndex,
-            lineage: normalizeShieldedStateReadMode(ctx.stateReadMode) === "chain"
-              ? await loadTargetedLineageSnapshot(env.lineageIndex, env.family, {
-                  eligibility: [{ heirIdentityCommitment: verified?.identityCommitment ?? await env.lineageIndex.identityCommitmentOf(request.publicRecipient),
-                    rootIdentityCommitment: policy!.rootIdentityCommitment,
-                    rootVersionIndex: Number(policy!.rootVersionIndex) }],
-                })
-              : await loadLineageSnapshot(env.lineageIndex, env.family, { selection: verified
-                  ? { eligibility: [{ heirIdentityCommitment: verified.identityCommitment!,
-                      rootIdentityCommitment: policy!.rootIdentityCommitment, rootVersionIndex: Number(policy!.rootVersionIndex) }] }
-                  : { publicEligibility: [{ heirPersonHash: request.publicRecipient!,
-                      rootIdentityCommitment: policy!.rootIdentityCommitment, rootVersionIndex: Number(policy!.rootVersionIndex) }] },
-                }),
-          };
+        : { ...common, fundMode: 0, policy };
       recipient = request.publicRecipient;
     }
     if (request.action === "shield") {
@@ -1499,10 +1501,7 @@ export class ShieldedAssetSession {
         );
       }
     }
-    if (
-      pending.preview.action === "claim" ||
-      (pending.preview.action === "fund" && Number(pending.prepared.data.fundMode) === 0)
-    ) {
+    if (pending.preview.action === "claim" || pending.preview.action === "fund") {
       const latest = await env.provider.getBlock(toBlock);
       requireValue(
         latest?.hash === history.blockHash &&

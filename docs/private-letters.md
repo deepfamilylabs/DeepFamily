@@ -24,11 +24,11 @@ The replacement development keys and fixed verifier match the six-signal circuit
 Incrementing the counter invalidates earlier credentials on this chain
 within the checkpoint retirement window of 15 minutes. Credential expiry stays private in
 on-chain presentations:
-the presentation proves the credential is unexpired at its `asOf`, and the only public
-time is `deadline = asOf + 15 minutes`, which the consumer checks against the execution
-block. A payment or letter started before expiry may therefore land up to 15 minutes
-after it; nothing can be started once the credential has expired. Incrementing the counter does
-not change spending or decryption keys, existing balances, budgets or old letters.
+the presentation proves that the credential was valid at `asOf`. The payment or letter
+must execute before the public `deadline = asOf + 15 minutes`. This window can extend
+past the credential’s expiry. The proof makes no claim about when it was generated.
+Incrementing the counter does not change spending or decryption keys, existing balances,
+budgets or old letters.
 
 Authorization reads and receive presentations still support complete 64-level
 paths. Owner authorization is independent of tree depth. Distinct aliases with

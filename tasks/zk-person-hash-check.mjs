@@ -136,6 +136,7 @@ function validatePersonCommitmentInput(raw) {
     }),
   };
 
+  if (input.derivedSecretField === 0n) throw new Error("derivedSecretField must be nonzero");
   if (input.selfSuiteId === 0n) throw new Error("selfSuiteId must be nonzero");
   for (const role of ["father", "mother"]) {
     const present = input[`has${role[0].toUpperCase()}${role.slice(1)}`] === 1n;

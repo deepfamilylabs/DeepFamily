@@ -164,27 +164,7 @@ template ShieldedFund() {
     (1 - budgetKind) * ownerNotZero.out === 0;
     budgetKind * heirOwnerCommitment === 0;
 
-    // Canonical inactive witnesses prevent continuation from accidentally
-    // depending on current lineage or on the allocator's private key.
-    fundMode * endorsementRoot === 0;
-    fundMode * trustedRoot === 0;
-    fundMode * asOf === 0;
-    fundMode * heirVersionIndex === 0;
-    fundMode * fatherIdentityCommitment === 0;
-    fundMode * motherIdentityCommitment === 0;
-    fundMode * rootIsMother === 0;
-    fundMode * endorser === 0;
-    fundMode * writtenAt === 0;
-    fundMode * endorsementDepth === 0;
-    fundMode * endorsementIndex === 0;
-    fundMode * trustedDepth === 0;
-    fundMode * trustedIndex === 0;
-    for (var i = 0; i < 64; i++) {
-        fundMode * endorsementSiblings[i] === 0;
-        fundMode * trustedSiblings[i] === 0;
-    }
     component directChild = ShieldedDirectChildCurrent();
-    directChild.enabled <== initial;
     directChild.heirIdentityCommitment <== heirIdentityCommitment;
     directChild.rootIdentityCommitment <== rootIdentityCommitment;
     directChild.rootVersionIndex <== rootVersionIndex;
@@ -202,7 +182,6 @@ template ShieldedFund() {
     directChild.trustedSiblings <== trustedSiblings;
     directChild.endorsementRoot <== endorsementRoot;
     directChild.trustedRoot <== trustedRoot;
-    directChild.asOf <== asOf;
     initial * (eligibleFrom - asOf - 7200) === 0;
 
     component enrollment = ShieldedPrivateEnrollment();

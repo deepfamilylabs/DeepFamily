@@ -308,7 +308,7 @@ async function submitAction(
   if (input.onSubmitting) {
     submission = await readPublicSubmissionAnchor(provider, signerAddress);
   }
-  if (action === "claim" || (action === "fund" && data.fundMode === 0n)) {
+  if (action === "claim" || action === "fund") {
     await assertTimeBoundActionCurrent(pool, provider, data);
   }
   const activeReceipts = data.receiveAuthorizations.filter((item) => item.recipientBinding !== 0n);

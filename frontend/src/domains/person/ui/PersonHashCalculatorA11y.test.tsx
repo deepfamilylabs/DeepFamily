@@ -288,9 +288,7 @@ describe("PersonHashCalculator accessibility", () => {
     );
 
     fireEvent.change(
-      screen.getByPlaceholderText(
-        "Enter any characters—family mottos or secret phrases. 15+ characters with mixed symbols recommended",
-      ),
+      screen.getByPlaceholderText("Enter a personal passphrase, preferably 15 or more characters"),
       { target: { value: "\u00a0\u3000" } },
     );
 
@@ -339,7 +337,7 @@ describe("PersonHashCalculator accessibility", () => {
       </ToastProvider>,
     );
     const first = screen.getByPlaceholderText(
-      "Enter any characters—family mottos or secret phrases. 15+ characters with mixed symbols recommended",
+      "Enter a personal passphrase, preferably 15 or more characters",
     );
     const second = screen.getByPlaceholderText("Repeat the identity passphrase (empty is allowed)");
 

@@ -24,7 +24,6 @@ const field = (value) => ((value % SNARK_SCALAR_FIELD) + SNARK_SCALAR_FIELD) % S
 
 function lineageWitness(overrides = {}, leafEndorsers = {}) {
   const fields = {
-    enabled: 1n,
     heirIdentityCommitment: 131n,
     fatherIdentityCommitment: 101n,
     motherIdentityCommitment: 103n,
@@ -33,7 +32,6 @@ function lineageWitness(overrides = {}, leafEndorsers = {}) {
     heirVersionIndex: 5n,
     endorser: BigInt("0x1111111111111111111111111111111111111111"),
     writtenAt: 900n,
-    asOf: 1000n,
     ...overrides,
   };
   fields.rootIdentityCommitment ??=
@@ -128,29 +126,23 @@ component main = ShieldedDirectChildCurrent();
         await invalid(lineageWitness({ rootIdentityCommitment: 107n }));
       },
     );
-    await t.test("accepts an endorsement exactly at asOf and rejects the next second", async () => {
-      const atBoundary = lineageWitness({ writtenAt: 1000n });
-      const afterBoundary = lineageWitness({ writtenAt: 1001n });
-      assert.notEqual(atBoundary.endorsementRoot, afterBoundary.endorsementRoot);
-      await valid(atBoundary);
-      await invalid(afterBoundary);
+    await t.test("binds the exact write time in the endorsement leaf", async () => {
+      const witness = lineageWitness({ writtenAt: 1000n });
+      await valid(witness);
+      await invalid({ ...witness, writtenAt: "1001" });
     });
-    await t.test("accepts the uint64 time boundaries and uint160 endorser maximum", async () => {
-      await valid(lineageWitness({ writtenAt: 0n, asOf: 0n }));
-      await valid(
-        lineageWitness({ writtenAt: MAX_UINT64, asOf: MAX_UINT64, endorser: MAX_UINT160 }),
-      );
-    });
+    await t.test(
+      "accepts the uint64 write-time boundaries and uint160 endorser maximum",
+      async () => {
+        await valid(lineageWitness({ writtenAt: 0n }));
+        await valid(lineageWitness({ writtenAt: MAX_UINT64, endorser: MAX_UINT160 }));
+      },
+    );
     for (const [label, overrides] of [
       ["endorser above uint160", { endorser: MAX_UINT160 + 1n }],
       ["negative endorser", { endorser: -1n }],
-      ["asOf above uint64", { asOf: MAX_UINT64 + 1n }],
-      ["negative asOf with membership disabled", { enabled: 0n, asOf: -1n }],
-      [
-        "writtenAt above uint64 with membership disabled",
-        { enabled: 0n, writtenAt: MAX_UINT64 + 1n },
-      ],
-      ["negative writtenAt with membership disabled", { enabled: 0n, writtenAt: -1n }],
+      ["writtenAt above uint64", { writtenAt: MAX_UINT64 + 1n }],
+      ["negative writtenAt", { writtenAt: -1n }],
     ]) {
       await t.test(`rejects ${label} with recomputed leaves and paths`, async () => {
         await invalid(lineageWitness(overrides));
@@ -161,30 +153,15 @@ component main = ShieldedDirectChildCurrent();
         await invalid(lineageWitness({}, { [side]: 12345n }));
       });
     }
-    await t.test("requires Boolean enable and parent selection plus a nonzero heir", async () => {
-      await invalid(lineageWitness({ enabled: 2n }));
+    await t.test("requires a Boolean parent selection plus a nonzero heir", async () => {
       // Match the linear parent expression so only its Boolean selector rejects this case.
       await invalid(lineageWitness({ rootIsMother: 2n, rootIdentityCommitment: 105n }));
       await invalid(lineageWitness({ heirIdentityCommitment: 0n }));
     });
-    await t.test("disables relationship, time ordering and root equality only", async () => {
-      const witness = lineageWitness({
-        enabled: 0n,
-        rootIdentityCommitment: 107n,
-        writtenAt: 1001n,
-      });
-      witness.endorsementRoot = "0";
-      witness.trustedRoot = "0";
-      await valid(witness);
-      await invalid({ ...witness, enabled: "1" });
-    });
     for (const tree of ["endorsement", "trusted"]) {
-      await t.test(`keeps ${tree} Merkle bounds when membership is disabled`, async () => {
-        const witness = lineageWitness({ enabled: 0n });
-        witness[`${tree}Root`] = "0";
-        await valid(witness);
-        // The bare library returns root zero beyond its depth limit; matching it
-        // must not let the disabled branch bypass the enclosing range checks.
+      await t.test(`enforces ${tree} Merkle bounds and root membership`, async () => {
+        const witness = lineageWitness();
+        await invalid({ ...witness, [`${tree}Root`]: "0" });
         await invalid({ ...witness, [`${tree}Depth`]: "65" });
         await invalid({ ...witness, [`${tree}Index`]: String(1n << 64n) });
       });

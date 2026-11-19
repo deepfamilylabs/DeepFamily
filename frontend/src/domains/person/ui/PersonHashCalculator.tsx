@@ -865,7 +865,7 @@ export const PersonHashCalculator = forwardRef<
                             <div className="text-xs leading-relaxed">
                               {t(
                                 "search.hashCalculator.passphraseHelp.optionalDesc",
-                                "Can be left blank, but using longer family mottos, poems, or emoji combinations is recommended for enhanced privacy.",
+                                "Optional for genealogy records. For an identity that will receive funds, choose a strong passphrase and keep it private.",
                               )}
                             </div>
                           </div>
@@ -915,7 +915,7 @@ export const PersonHashCalculator = forwardRef<
                   showPassphraseGuidance
                     ? t(
                         "search.hashCalculator.passphrasePlaceholder",
-                        "Enter any characters—family mottos or secret phrases. 15+ characters with mixed symbols recommended",
+                        "Enter a personal passphrase, preferably 15 or more characters",
                       )
                     : t("search.hashCalculator.passphrase", "Identity passphrase")
                 }

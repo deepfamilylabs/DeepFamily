@@ -670,14 +670,10 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
           ],
           outputCommitments: [budget.commitment, change.commitment],
           outputCiphertexts: [budget.ciphertextHex, change.ciphertextHex],
-          ...(template
-            ? {}
-            : {
-                relation0: BigInt(claimant.witness.endorsementRoot),
-                relation1: BigInt(claimant.witness.trustedRoot),
-                asOf,
-                lineageCheckpointId: await lineage.currentCheckpointId(),
-              }),
+          relation0: BigInt(claimant.witness.endorsementRoot),
+          relation1: BigInt(claimant.witness.trustedRoot),
+          asOf: template ? BigInt((await hre.ethers.provider.getBlock("latest")).timestamp) : asOf,
+          lineageCheckpointId: await lineage.currentCheckpointId(),
         };
         const base = buildShieldedFundingFixtures({
           chainId,
@@ -909,7 +905,7 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
     });
   }
 
-  it("proves full 64-level initial Fund qualification and 32-level note paths in both modes", async function () {
+  it("proves full 64-level Fund qualification and 32-level note paths in both modes", async function () {
     const artifacts = checkedCurrentArtifacts(["fund"]);
     if (artifacts.missing) this.skip();
     const [signer] = await hre.ethers.getSigners();
@@ -947,10 +943,12 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
       ["endorsement", endorsement],
       ["trusted", trusted],
     ]) {
-      initial[`${name}Root`] = String(membership.root);
-      initial[`${name}Depth`] = membership.depth;
-      initial[`${name}Index`] = membership.index;
-      initial[`${name}Siblings`] = membership.siblings;
+      for (const witness of [initial, continuation]) {
+        witness[`${name}Root`] = String(membership.root);
+        witness[`${name}Depth`] = membership.depth;
+        witness[`${name}Index`] = membership.index;
+        witness[`${name}Siblings`] = membership.siblings;
+      }
     }
     const oldBudget = syntheticFullMerklePath(
       continuation.inputRoots[1],
@@ -1560,6 +1558,10 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
     const additionalFundingData = {
       ...zeroData(),
       fundMode: 1n,
+      relation0: endorsementRoot,
+      relation1: trustedRoot,
+      asOf: BigInt((await hre.ethers.provider.getBlock("latest")).timestamp),
+      lineageCheckpointId: await lineage.currentCheckpointId(),
       inputRoots: [preAdditionalFundingRoot, preAdditionalFundingRoot],
       inputNullifiers: [
         computeShieldedSpendNullifier(
@@ -1897,6 +1899,10 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
     const continuedData = {
       ...zeroData(),
       fundMode: 1n,
+      relation0: endorsementRoot,
+      relation1: trustedRoot,
+      asOf: BigInt((await hre.ethers.provider.getBlock("latest")).timestamp),
+      lineageCheckpointId: await lineage.currentCheckpointId(),
       inputRoots: [continuingRoot, continuingRoot],
       inputNullifiers: [
         computeShieldedSpendNullifier(

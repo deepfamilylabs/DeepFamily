@@ -101,6 +101,10 @@ template PersonRelation() {
     (1 - hasMother) * motherGender === 0;
     (1 - hasMother) * motherSuiteId === 0;
 
+    component selfSecretZero = IsZero();
+    selfSecretZero.in <== derivedSecretField;
+    selfSecretZero.out === 0;
+
     component selfCore = IdentityCommitmentCore();
     selfCore.nameField <== nameField;
     selfCore.derivedSecretField <== derivedSecretField;

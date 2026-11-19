@@ -2555,14 +2555,21 @@ describe("Worker-backed shielded wallet", () => {
     ["privateConvenient", 0, 0, "convenientEntry"],
     ["privateIndependent", 0, 1, "independentEntry"],
   ] as const)("keeps an existing %s template fixed for further funding", async (entry, bindingKind, keyMode, entryLabel) => {
+    const revokedChild = "0x" + "05".repeat(32);
     mocks.verify.mockResolvedValue({ purpose: "fund", personHash: identity.personHash, keyMode, fingerprint: "child-fingerprint" });
     mocks.call.mockImplementation(async (method, params) => method === "recover" ? {
       ...emptyWallet,
-      familyRecordsAvailable: false,
-      familyRecordsError: "unavailable",
-      parentVersions: [],
-      policies: [{ handle: "policy:existing", rootVersionIndex: "0", amountPerPeriod: "1000000000000000000", periodDays: "30" }],
-      templates: [{ handle: "template:existing", policyHandle: "policy:existing", personHash: identity.personHash, bindingKind, keyMode }],
+      familyRecordsAvailable: true,
+      parentVersions: [1],
+      children: [
+        { personHash: identity.personHash, rootVersionIndex: 1, eligible: true },
+        { personHash: revokedChild, rootVersionIndex: 1, eligible: false },
+      ],
+      policies: [{ handle: "policy:existing", rootVersionIndex: "1", amountPerPeriod: "1000000000000000000", periodDays: "30" }],
+      templates: [
+        { handle: "template:existing", policyHandle: "policy:existing", personHash: identity.personHash, bindingKind, keyMode },
+        { handle: "template:revoked", policyHandle: "policy:existing", personHash: revokedChild, bindingKind, keyMode },
+      ],
       notes: [{ commitment: "11", ownerCommitment: "1", slot: "identity", kind: "value", amount: "100000000000000000000" }],
     } : method === "prove" ? stopAfterPreview() : {
       handle: "fund:existing", action: "fund", amount: "1000000000000000000", slot: params.slot,
@@ -2571,6 +2578,7 @@ describe("Worker-backed shielded wallet", () => {
     await renderUnlockedPanel();
     chooseAction("fund");
     chooseOption("shielded.fields.fundingRule", "shielded.policyOption:1");
+    expect(heirOptions()).toEqual([identity.personHash]);
     chooseHeir(identity.personHash);
     expect((screen.getByRole("radio", { name: label(entryLabel) }) as HTMLInputElement).checked).toBe(true);
     for (const key of ["publicEntry", "convenientEntry", "independentEntry"]) {

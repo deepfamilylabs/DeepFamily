@@ -51,7 +51,7 @@
       },
       "saltedUnlinkability": {
         "title": "Unlinkability",
-        "description": "Optional passphrases are Poseidon-salted to block identity inference and pollution; share a passphrase for collaboration or keep one private to isolate"
+        "description": "A personal passphrase makes the identity commitment harder to guess from public biographical details."
       },
       "dualTreeModels": {
         "title": "Multi-Version Governance",
@@ -78,7 +78,7 @@
         "description": "Build a global family tree graph through parent-child hash connections. Zero-knowledge proofs keep the entire submission process private.",
         "feature1": "No plaintext on-chain",
         "feature2": "Salted passphrases block identity inference and pollution",
-        "feature3": "Shared passphrases enable private collaboration; strong solo passphrases fully isolate trees"
+        "feature3": "Keep the identity passphrase for your budget under your control."
       },
       "layer2": {
         "title": "Value & Public Records",
@@ -140,8 +140,8 @@
         "description": "Append life stories as verifiable, immutable on-chain records, then seal the story to prevent further records."
       },
       "versionNotarization": {
-        "title": "Collaboration & Private Modes",
-        "description": "Default no-passphrase joins the public space; shared passphrases enable joint trees, while strong solo passphrases create isolated private zones."
+        "title": "Personal identity passphrase",
+        "description": "Choose a strong passphrase that only you know for an identity that will receive funds."
       }
     },
     "tokenomics": {
@@ -271,7 +271,7 @@
       "birthMonthLabel": "Month",
       "birthDayLabel": "Day",
       "passphrase": "Identity passphrase",
-      "passphrasePlaceholder": "Enter any characters—family mottos or secret phrases. 15+ characters with mixed symbols recommended",
+      "passphrasePlaceholder": "Enter a personal passphrase, preferably 15 or more characters",
       "passphraseDisallowed": "This passphrase is invalid for these credentials. Re-enter the affected text.",
       "identityInputRule": "Names and identity passphrases use single-line fields. Only leading and trailing whitespace is removed; internal spaces and other entered characters are preserved exactly.",
       "multilinePasteRejected": "This single-line field cannot preserve line breaks. The paste was cancelled and the previous value was kept.",
@@ -283,7 +283,7 @@
         "privacy": "Privacy Protection",
         "privacyDesc": "Adds an extra protection layer to your identity hash, preventing others from guessing your identity through name and birth date.",
         "optional": "Completely Optional",
-        "optionalDesc": "Optional; accepts any characters such as mottos or secret codes. Relatives can share one identity passphrase to collaborate—use 15+ characters and keep it safe for better privacy.",
+        "optionalDesc": "Optional for genealogy records. For an identity that will receive funds, choose a strong passphrase and keep it private.",
         "remember": "Please Remember",
         "rememberDesc": "Identity passphrase cannot be recovered. It is also the encryption key for this version's biography and label—if forgotten, that content can never be decrypted again.",
         "privacyNoteTitle": "Local Only",
@@ -725,7 +725,7 @@
     "selectedCount": "{{count}} selected",
     "checking": "Checking encrypted data…",
     "passphraseLabel": "Identity passphrase",
-    "sharedPassphraseHint": "Selected versions must share one passphrase",
+    "batchPassphraseHint": "The entered passphrase will be tried on each selected version.",
     "passphrasePlaceholder": "Enter identity passphrase",
     "passphrasePlaceholderIdle": "Select versions above first",
     "passphraseVisibility": {

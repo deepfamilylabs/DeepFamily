@@ -21,7 +21,7 @@ describe("zk-person-hash-check helpers", function () {
     it("normalizes current person-commitment input shape", function () {
       const raw = {
         nameField: "123",
-        derivedSecretField: 0,
+        derivedSecretField: 7,
         isBirthBC: 0,
         birthYear: "1990",
         birthMonth: 5,
@@ -36,7 +36,10 @@ describe("zk-person-hash-check helpers", function () {
       };
       const validated = validatePersonCommitmentInput(raw);
       expect(validated.nameField).to.equal(123n);
-      expect(validated.derivedSecretField).to.equal(0n);
+      expect(validated.derivedSecretField).to.equal(7n);
+      expect(() => validatePersonCommitmentInput({ ...raw, derivedSecretField: 0 })).to.throw(
+        "derivedSecretField must be nonzero",
+      );
       expect(validated.birthYear).to.equal(1990n);
       expect(validated.birthMonth).to.equal(5n);
       expect(validated.birthDay).to.equal(15n);
@@ -53,7 +56,7 @@ describe("zk-person-hash-check helpers", function () {
       expect(() =>
         validatePersonCommitmentInput({
           nameField: 1,
-          derivedSecretField: 0,
+          derivedSecretField: 7,
           isBirthBC: 0,
           birthYear: 1,
           birthMonth: 1,
@@ -75,7 +78,7 @@ describe("zk-person-hash-check helpers", function () {
       const built = buildPersonRelationInput(
         {
           fullName: "Child Example",
-          derivedSecretField: 0n,
+          derivedSecretField: 7n,
           isBirthBC: false,
           birthYear: 2000,
           birthMonth: 1,

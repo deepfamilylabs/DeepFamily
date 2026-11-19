@@ -69,7 +69,8 @@ type CommonFundingInput = {
   recipient?: VerifiedShieldedRecipient;
   budgetKind?: 0 | 1;
   publicRecipientPersonHash?: string;
-  lineageIndex?: Contract;
+  lineageIndex: Contract;
+  lineage: LineageSnapshot;
 };
 
 export type PreparedFundingOutput<T> = {
@@ -94,8 +95,6 @@ export type PrepareShieldedFundInput = CommonFundingInput &
     | {
         fundMode: 0;
         policy: ShieldedPolicyDescriptor;
-        lineageIndex: Contract;
-        lineage: LineageSnapshot;
         budgetPeriods: BigNumberish;
       }
     | {
@@ -157,22 +156,6 @@ const ZERO_TEMPLATE_WITNESS: ShieldedWitness = {
   oldBudgetSiblings: Array<string>(32).fill("0"),
   budgetUseNonce: "0",
 };
-const ZERO_LINEAGE_WITNESS: ShieldedWitness = {
-  allocationKey: "0",
-  heirVersionIndex: "0",
-  fatherIdentityCommitment: "0",
-  motherIdentityCommitment: "0",
-  rootIsMother: "0",
-  endorser: "0",
-  writtenAt: "0",
-  endorsementDepth: 0,
-  endorsementIndex: "0",
-  endorsementSiblings: Array<string>(64).fill("0"),
-  trustedDepth: 0,
-  trustedIndex: "0",
-  trustedSiblings: Array<string>(64).fill("0"),
-};
-
 export function prepareShieldedFund(
   input: PrepareShieldedFundInput,
 ): Promise<PreparedShieldedFunding> {
@@ -273,32 +256,19 @@ async function currentContext(input: PrepareShieldedFundInput) {
     keyMode: bigint;
   };
   if (input.budgetKind === 1) {
-    if (!input.lineageIndex || !input.publicRecipientPersonHash)
+    if (!input.publicRecipientPersonHash)
       throw new Error("Public funding requires a selected family identity");
+    const versions = input.lineage.versions.get(input.publicRecipientPersonHash.toLowerCase());
+    if (!versions?.length) throw new Error("Recipient identity is unknown");
+    const identityCommitment = getBigInt(versions[0].identityCommitment);
     if (
-      getAddress(await input.pool.LINEAGE_INDEX()) !==
-      getAddress(await input.lineageIndex.getAddress())
-    )
-      throw new Error("Lineage index does not belong to this shielded pool");
-    // The verified public replay already contains the identity opening. A
-    // person-specific RPC here would reveal the selected child in rebuild mode.
-    // Refills use the original note, which templatePath authenticates below.
-    let identityCommitment: bigint;
-    if (input.fundMode === 0) {
-      const versions = input.lineage.versions.get(input.publicRecipientPersonHash.toLowerCase());
-      if (!versions?.length) throw new Error("Recipient identity is unknown");
-      identityCommitment = getBigInt(versions[0].identityCommitment);
-      if (
-        versions.some(
-          (version) =>
-            version.personHash.toLowerCase() !== input.publicRecipientPersonHash!.toLowerCase() ||
-            getBigInt(version.identityCommitment) !== identityCommitment,
-        )
+      versions.some(
+        (version) =>
+          version.personHash.toLowerCase() !== input.publicRecipientPersonHash!.toLowerCase() ||
+          getBigInt(version.identityCommitment) !== identityCommitment,
       )
-        throw new Error("Recipient identity does not match the lineage snapshot");
-    } else {
-      identityCommitment = getBigInt(input.budget.note.heirIdentityCommitment);
-    }
+    )
+      throw new Error("Recipient identity does not match the lineage snapshot");
     if (identityCommitment === 0n) throw new Error("Recipient identity is unknown");
     heir = {
       personHash: input.publicRecipientPersonHash,
@@ -498,10 +468,10 @@ function actionData(input: {
     PreparedFundingOutput<ShieldedBudgetNotePayload>,
     PreparedFundingOutput<ShieldedValueNotePayload>,
   ];
-  relation0?: bigint;
-  relation1?: bigint;
-  asOf?: bigint;
-  lineageCheckpointId?: bigint;
+  relation0: bigint;
+  relation1: bigint;
+  asOf: bigint;
+  lineageCheckpointId: bigint;
 }): ShieldedPoolActionData {
   return {
     fundMode: BigInt(input.fundMode),
@@ -512,10 +482,10 @@ function actionData(input: {
     periodNullifiers: [...ZERO_PERIODS],
     outputCommitments: [input.outputs[0].commitment, input.outputs[1].commitment],
     outputCiphertexts: [input.outputs[0].ciphertext, input.outputs[1].ciphertext],
-    relation0: input.relation0 ?? 0n,
-    relation1: input.relation1 ?? 0n,
-    asOf: input.asOf ?? 0n,
-    lineageCheckpointId: input.lineageCheckpointId ?? 0n,
+    relation0: input.relation0,
+    relation1: input.relation1,
+    asOf: input.asOf,
+    lineageCheckpointId: input.lineageCheckpointId,
   };
 }
 
@@ -555,31 +525,16 @@ function assertFundingParent(wallet: LocalShieldedWalletSnapshot, rootIdentity: 
   }
 }
 
-async function initialFundingDestination(input: InitialFundingInput) {
-  assertFundingParent(input.wallet, input.policy.rootIdentityCommitment);
-  const ctx = await currentContext(input);
+async function fundingLineage(
+  input: CommonFundingInput,
+  ctx: Awaited<ReturnType<typeof currentContext>>,
+  policy: Pick<ShieldedBudgetNotePayload, "rootIdentityCommitment" | "rootVersionIndex">,
+) {
+  const { heir } = ctx;
   const expectedIndex = getAddress(await input.pool.LINEAGE_INDEX());
   if (expectedIndex.toLowerCase() !== (await input.lineageIndex.getAddress()).toLowerCase()) {
     throw new Error("Lineage index does not belong to this shielded pool");
   }
-  const policy = input.policy;
-  const allocationKeyCommitment = computeShieldedAllocationKeyCommitment(policy.allocationKey, ctx);
-  const policyCommitment = shieldedPolicyCommitment(policy, ctx);
-  const { periods, amount } = fundingAmount(
-    uint128(policy.amountPerPeriod, "rate"),
-    input.budgetPeriods,
-  );
-  const heir = ctx.heir;
-  const enrollmentNullifier = computeShieldedEnrollmentNullifier(
-    {
-      allocationKey: policy.allocationKey,
-      policyCommitment,
-      heirIdentityCommitment: heir.identityCommitment,
-    },
-    ctx,
-  );
-  if (input.wallet.spentNullifiers.has(enrollmentNullifier))
-    throw new Error("This child is already enrolled under this policy");
   const latestBlock = ctx.latestBlock;
   if (input.lineage.blockNumber > latestBlock.number)
     throw new Error("Lineage snapshot is ahead of the chain");
@@ -611,7 +566,6 @@ async function initialFundingDestination(input: InitialFundingInput) {
     BigInt(latestBlock.timestamp) - asOf >= PROOF_LIFETIME
   )
     throw new Error("Family eligibility snapshot expired. Refresh and prepare a new funding plan.");
-  const eligibleFrom = uint64(asOf + PROOF_LIFETIME, "eligibleFrom");
   const rootPersonHash = wrapIdentityCommitmentAsPersonHash(policy.rootIdentityCommitment);
   const rootVersion = input.lineage.versions
     .get(rootPersonHash.toLowerCase())
@@ -654,6 +608,58 @@ async function initialFundingDestination(input: InitialFundingInput) {
   )
     throw new Error("Lineage proof does not match active endorsement and trust leaves");
   return {
+    data: {
+      relation0: BigInt(endorsementRoot),
+      relation1: BigInt(trustedRoot),
+      asOf,
+      lineageCheckpointId,
+    },
+    witness: {
+      heirVersionIndex: String(legitimacy.versionIndex),
+      fatherIdentityCommitment: String(legitimacy.fatherIdentityCommitment),
+      motherIdentityCommitment: String(legitimacy.motherIdentityCommitment),
+      rootIsMother: legitimacy.rootIsMother ? "1" : "0",
+      endorser: String(BigInt(legitimacy.endorser)),
+      writtenAt: String(legitimacy.writtenAt),
+      endorsementDepth: endorsementProof.siblings.length,
+      endorsementIndex: String(endorsementProof.index),
+      endorsementSiblings: decimal([
+        ...endorsementProof.siblings,
+        ...Array<bigint>(64 - endorsementProof.siblings.length).fill(0n),
+      ]),
+      trustedDepth: trustedProof.siblings.length,
+      trustedIndex: String(trustedProof.index),
+      trustedSiblings: decimal([
+        ...trustedProof.siblings,
+        ...Array<bigint>(64 - trustedProof.siblings.length).fill(0n),
+      ]),
+    },
+  };
+}
+
+async function initialFundingDestination(input: InitialFundingInput) {
+  assertFundingParent(input.wallet, input.policy.rootIdentityCommitment);
+  const ctx = await currentContext(input);
+  const policy = input.policy;
+  const allocationKeyCommitment = computeShieldedAllocationKeyCommitment(policy.allocationKey, ctx);
+  const policyCommitment = shieldedPolicyCommitment(policy, ctx);
+  const { periods, amount } = fundingAmount(
+    uint128(policy.amountPerPeriod, "rate"),
+    input.budgetPeriods,
+  );
+  const heir = ctx.heir;
+  const enrollmentNullifier = computeShieldedEnrollmentNullifier(
+    {
+      allocationKey: policy.allocationKey,
+      policyCommitment,
+      heirIdentityCommitment: heir.identityCommitment,
+    },
+    ctx,
+  );
+  if (input.wallet.spentNullifiers.has(enrollmentNullifier))
+    throw new Error("This child is already enrolled under this policy");
+  const lineage = await fundingLineage(input, ctx, policy);
+  return {
     ctx,
     policy,
     allocationKeyCommitment,
@@ -662,14 +668,8 @@ async function initialFundingDestination(input: InitialFundingInput) {
     amount,
     heir,
     enrollmentNullifier,
-    endorsementRoot,
-    trustedRoot,
-    asOf,
-    lineageCheckpointId,
-    eligibleFrom,
-    legitimacy,
-    endorsementProof,
-    trustedProof,
+    lineage,
+    eligibleFrom: uint64(lineage.data.asOf + PROOF_LIFETIME, "eligibleFrom"),
   };
 }
 
@@ -684,14 +684,8 @@ async function prepareInitialFunding(input: InitialFundingInput): Promise<Prepar
     amount,
     heir,
     enrollmentNullifier,
-    endorsementRoot,
-    trustedRoot,
-    asOf,
-    lineageCheckpointId,
+    lineage,
     eligibleFrom,
-    legitimacy,
-    endorsementProof,
-    trustedProof,
   } = await initialFundingDestination(input);
   const donor = donorInput(input, ctx.keys.ownerSecret);
   if (donor.note.amount < amount)
@@ -762,10 +756,7 @@ async function prepareInitialFunding(input: InitialFundingInput): Promise<Prepar
     donor,
     useNullifier: enrollmentNullifier,
     outputs,
-    relation0: BigInt(endorsementRoot),
-    relation1: BigInt(trustedRoot),
-    asOf,
-    lineageCheckpointId,
+    ...lineage.data,
   });
   const witness: ShieldedWitness = {
     ...publicInputs(SHIELDED_POOL_ACTION.Fund, ctx.chainId, ctx.poolAddress, data),
@@ -796,24 +787,7 @@ async function prepareInitialFunding(input: InitialFundingInput): Promise<Prepar
     heirViewKeyHi: heir.viewingKey
       ? String(splitShieldedViewPublicKey(heir.viewingKey).viewKeyHi)
       : "0",
-    heirVersionIndex: String(legitimacy.versionIndex),
-    fatherIdentityCommitment: String(legitimacy.fatherIdentityCommitment),
-    motherIdentityCommitment: String(legitimacy.motherIdentityCommitment),
-    rootIsMother: legitimacy.rootIsMother ? "1" : "0",
-    endorser: String(BigInt(legitimacy.endorser)),
-    writtenAt: String(legitimacy.writtenAt),
-    endorsementDepth: endorsementProof.siblings.length,
-    endorsementIndex: String(endorsementProof.index),
-    endorsementSiblings: decimal([
-      ...endorsementProof.siblings,
-      ...Array<bigint>(64 - endorsementProof.siblings.length).fill(0n),
-    ]),
-    trustedDepth: trustedProof.siblings.length,
-    trustedIndex: String(trustedProof.index),
-    trustedSiblings: decimal([
-      ...trustedProof.siblings,
-      ...Array<bigint>(64 - trustedProof.siblings.length).fill(0n),
-    ]),
+    ...lineage.witness,
     eligibleFrom: String(eligibleFrom),
     enrollmentSalt: String(enrollmentSalt),
     budgetPeriods: String(periods),
@@ -869,9 +843,11 @@ async function continuationFundingDestination(input: ContinuationFundingInput) {
       enrollmentCommitment
   )
     throw new Error("Funding rule opening does not match this budget");
+  const lineage = await fundingLineage(input, ctx, old);
   return {
     input,
     ctx,
+    lineage,
     template,
     old,
     heir,
@@ -893,6 +869,7 @@ async function prepareContinuationFunding(
   const {
     input,
     ctx,
+    lineage,
     template,
     old,
     heir,
@@ -960,13 +937,15 @@ async function prepareContinuationFunding(
     template,
     useNullifier,
     outputs,
+    ...lineage.data,
   });
   const witness: ShieldedWitness = {
     ...publicInputs(SHIELDED_POOL_ACTION.Fund, ctx.chainId, ctx.poolAddress, data),
     receiveBindings: ["0", "0"],
     receiveAuthorizationAlias: "0",
     receiveSalt: "0",
-    ...ZERO_LINEAGE_WITNESS,
+    ...lineage.witness,
+    allocationKey: "0",
     donorOwnerSecret: String(ctx.keys.ownerSecret),
     donorAmount: String(donor.note.amount),
     donorNonce: String(donor.note.nonce),

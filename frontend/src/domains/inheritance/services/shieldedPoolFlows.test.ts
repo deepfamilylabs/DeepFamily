@@ -242,17 +242,25 @@ describe("shielded pool asset-worker proof submission", () => {
     });
   });
 
-  it("does not query lineage or time for VALUE actions or budget refills", async () => {
+  it("rejects a refill with an expired family checkpoint before the wallet request", async () => {
+    const f = fixture();
+    f.knownCheckpoint.mockResolvedValue(false);
+    await expect(
+      submitFund({ ...f.common, data: { ...f.common.data, fundMode: 1n } }),
+    ).rejects.toThrow("Family eligibility snapshot expired before submission");
+    expect(f.methods.fund).not.toHaveBeenCalled();
+  });
+
+  it("does not query lineage or time for VALUE actions", async () => {
     const f = fixture();
     await submitShield({ ...f.common, amount: 10n });
     await submitPrivateTransfer({ ...f.common, data: actionData(4) });
     await submitUnshield({ ...f.common, data: actionData(4), amount: 10n, recipient: RECIPIENT });
-    await submitFund({ ...f.common, data: { ...f.common.data, fundMode: 1n } });
     expect(f.lineageIndex).not.toHaveBeenCalled();
     expect(f.proofLifetime).not.toHaveBeenCalled();
     expect(f.lineageRoot).not.toHaveBeenCalled();
     expect(f.provider.getBlock).not.toHaveBeenCalled();
-    expect(f.provider.getBlockNumber).toHaveBeenCalledTimes(4);
+    expect(f.provider.getBlockNumber).toHaveBeenCalledTimes(3);
   });
 
   it.each([1, 0])("returns a repriced transaction's hash and receipt status %i", async (status) => {

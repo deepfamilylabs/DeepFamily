@@ -631,7 +631,7 @@ test("shielded initial Fund and continuation Fund constraints", async (t) => {
       await valid("fund", initial);
     });
     await t.test(
-      "continuation Fund verifies a full-depth historical template with inactive lineage",
+      "continuation Fund verifies a full-depth historical template and current lineage",
       async () => {
         const { continuation, oldBudget } = buildShieldedFundingFixtures();
         const proof = fullSyntheticPath(oldBudget, 32, (1n << 31n) | 5n, 1300);
@@ -640,6 +640,9 @@ test("shielded initial Fund and continuation Fund constraints", async (t) => {
         continuation.oldBudgetSiblings = proof.siblings;
         continuation.inputRoots[1] = proof.root.toString();
         await valid("fund", continuation);
+        for (const root of ["endorsementRoot", "trustedRoot"]) {
+          await invalid("fund", { ...continuation, [root]: "0" });
+        }
         await invalid(
           "fund",
           mutate(continuation, (w) => {
@@ -824,6 +827,15 @@ test("shielded initial Fund and continuation Fund constraints", async (t) => {
         }),
       );
     });
+    await t.test("continuation Fund binds asOf across the uint64 range", async () => {
+      const maximum = (1n << 64n) - 1n;
+      for (const asOf of [0n, maximum]) {
+        await valid("fund", { ...fixture.continuation, asOf: String(asOf) });
+      }
+      for (const asOf of [-1n, maximum + 1n]) {
+        await invalid("fund", { ...fixture.continuation, asOf: String(asOf) });
+      }
+    });
     await t.test(
       "continuation Fund cannot count old budget value as new funding with matching outputs",
       async () => {
@@ -866,12 +878,6 @@ test("shielded initial Fund and continuation Fund constraints", async (t) => {
         "fund",
         mutate(fixture.continuation, (w) => {
           w.allocationKey = "1";
-        }),
-      );
-      await invalid(
-        "fund",
-        mutate(fixture.continuation, (w) => {
-          w.asOf = "1";
         }),
       );
       await invalid(

@@ -1,5 +1,6 @@
 import "../hardhat-test-setup.mjs";
 import fs from "node:fs";
+import assert from "node:assert/strict";
 import { fileURLToPath } from "node:url";
 import { expect } from "chai";
 import hre from "hardhat";
@@ -35,27 +36,39 @@ function sequentialProtocolRandom(start = 0) {
 describe("Real person commitment proof", function () {
   this.timeout(120_000);
 
-  it("accepts derivedSecretField=0 but rejects an unkeyed version signal", async () => {
+  it("rejects a zero self secret and binds a nonzero self secret to the version", async () => {
     const { deepFamily, groth16VerifierAdapter } =
       await hre.networkHelpers.loadFixture(deployIntegratedFixture);
     const [signer] = await hre.ethers.getSigners();
     const signerAddress = await signer.getAddress();
     const person = {
       fullName: "Custom Gender 255",
-      derivedSecretField: 0n,
+      derivedSecretField: 7n,
       isBirthBC: false,
       birthYear: 1990,
       birthMonth: 5,
       birthDay: 15,
       gender: 255,
     };
+    await assert.rejects(
+      generatePersonRelationProof(
+        { ...person, derivedSecretField: 0n },
+        null,
+        null,
+        signerAddress,
+        {
+          contentDigest: hre.ethers.id("zero-self-secret"),
+        },
+      ),
+      /Assert Failed|constraint|Error in template/i,
+    );
     const generated = await generatePersonRelationProof(person, null, null, signerAddress, {
       contentDigest: hre.ethers.id("real-person-gender-255"),
     });
 
     // The circuit deliberately cannot prove that this witness came from Argon2id. It must still
-    // require the version signal to be keyed by the exact same (even invalid) identity witness.
-    expect(generated.input.derivedSecretField).to.equal("0");
+    // require the version signal to be keyed by the same identity witness.
+    expect(generated.input.derivedSecretField).to.equal("7");
     expect(generated.versionCommitment).not.to.equal(generated.contentDigestLo);
     expect(
       await groth16VerifierAdapter.verifyProof(

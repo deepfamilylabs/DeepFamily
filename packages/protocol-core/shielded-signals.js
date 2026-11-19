@@ -117,14 +117,6 @@ export function buildShieldedPoolPublicInputs(input) {
       "Initial fund second root",
     );
   }
-  if (action === SHIELDED_POOL_ACTION.Fund && available.fundMode[0] === 1n) {
-    unused(
-      [...available.endorsementRoot, ...available.trustedRoot, ...available.asOf].every(
-        (value) => value === 0n,
-      ),
-      "Continuation fund lineage/time",
-    );
-  }
   if (!uses.has("inputRoots")) {
     unused(
       [...inputShardIds, ...inputRoots, ...inputNullifiers].every((value) => value === 0n),

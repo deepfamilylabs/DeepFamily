@@ -228,6 +228,8 @@ async function setup(periodDays = 30n) {
     ),
   } as unknown as Contract;
   const common = {
+    lineage,
+    lineageIndex,
     pool,
     wallet,
     keyMaterial: donorKeys,
@@ -400,6 +402,15 @@ describe("funding destination validation before consolidation", () => {
       await expect(validateShieldedFundingDestination(input)).resolves.toBeUndefined();
       expect(fixture.lineageIndex.identityCommitmentOf).not.toHaveBeenCalled();
       await expect(
+        validateShieldedFundingDestination({
+          ...input,
+          lineageIndex: {
+            ...lineageIndex,
+            isKnownCheckpoint: async () => false,
+          } as unknown as Contract,
+        }),
+      ).rejects.toThrow("Family eligibility snapshot expired");
+      await expect(
         validateShieldedFundingDestination({ ...input, budgetKind: budgetKind === 1 ? 0 : 1 }),
       ).rejects.toThrow("cannot change budget binding");
       if (budgetKind === 0) {
@@ -415,7 +426,7 @@ describe("funding destination validation before consolidation", () => {
             ...input,
             publicRecipientPersonHash: wrapIdentityCommitmentAsPersonHash(999n),
           }),
-        ).rejects.toThrow("Recipient identity does not match its person hash");
+        ).rejects.toThrow("Recipient identity is unknown");
         await expect(
           validateShieldedFundingDestination({
             ...input,
@@ -697,16 +708,20 @@ describe("local unified funding preparation", () => {
       },
       budgetPeriods: 3n,
     });
-    // Continuation funding keeps the original enrollment and uses canonical zero lineage inputs.
-    expect(additionalFunding.witness.endorsementRoot).toBe("0");
-    expect(additionalFunding.witness.asOf).toBe("0");
+    // A refill rechecks the same child without changing the enrollment clock.
+    expect(additionalFunding.witness.endorsementRoot).toBe(
+      String(fixture.lineage.endorsementTree.root),
+    );
+    expect(additionalFunding.witness.asOf).toBe(String(fixture.lineage.timestamp));
     expect(additionalFunding.data.inputRoots).toEqual([
       fixture.noteTree.root,
       fixture.noteTree.root,
     ]);
     expect(additionalFunding.witness.oldBudgetRemainingPeriods).toBe("5");
     expect(additionalFunding.witness.allocationKey).toBe("0");
-    expect(additionalFunding.witness.endorsementSiblings).toEqual(Array(64).fill("0"));
+    expect(additionalFunding.witness.endorsementSiblings).toEqual(
+      initialFunding.witness.endorsementSiblings,
+    );
     expect(additionalFunding.witness.fundMode).toBe("1");
     expect(additionalFunding.witness.budgetPeriods).toBe("3");
     expect(additionalFunding.witness.heirIdentityCommitment).toBe(String(heirIdentity));

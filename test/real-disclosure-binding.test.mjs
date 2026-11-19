@@ -16,7 +16,7 @@ describe("Real disclosure binding proof", function () {
     const signerAddress = await signer.getAddress();
     const person = {
       fullName: "Real Disclosure Gender 255",
-      derivedSecretField: 0n,
+      derivedSecretField: 7n,
       isBirthBC: false,
       birthYear: 1990,
       birthMonth: 5,

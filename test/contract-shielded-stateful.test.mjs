@@ -239,12 +239,10 @@ async function runSequence(fixture, seed, steps) {
       if (!template) data.inputRoots[1] = data.inputRoots[0];
       data.inputNullifiers = [donor.nullifier, fresh()];
       data.fundMode = template ? 1n : 0n;
-      if (!template) {
-        data.relation0 = 700n;
-        data.relation1 = 800n;
-        data.asOf = policy.eligibleFrom - 7200n;
-        data.lineageCheckpointId = await lineage.currentCheckpointId();
-      }
+      data.relation0 = 700n;
+      data.relation1 = 800n;
+      data.asOf = template ? await now() : policy.eligibleFrom - 7200n;
+      data.lineageCheckpointId = await lineage.currentCheckpointId();
       plan.bindings[0] = fresh();
     } else if (action === 2) {
       const timestamp = await now();
