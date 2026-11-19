@@ -266,6 +266,7 @@ export async function prepareShieldedClaim(
       ? computeShieldedPeriodNullifier(
           {
             derivedSecretField: material.derivedSecretField,
+            heirIdentityCommitment: material.identityCommitment,
             policyCommitment,
             periodIndex: batch.periodIndices[slot],
           },

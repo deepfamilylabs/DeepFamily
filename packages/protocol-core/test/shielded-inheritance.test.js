@@ -126,10 +126,10 @@ test("shielded commitments and nullifiers match pinned protocol vectors", () => 
   );
   assert.equal(
     computeShieldedPeriodNullifier(
-      { derivedSecretField: 13n, policyCommitment, periodIndex: 4n },
+      { derivedSecretField: 13n, heirIdentityCommitment: 19n, policyCommitment, periodIndex: 4n },
       scope,
     ),
-    12560014951606227083010766328180301499225236889841161126345577472494393432211n,
+    7108816327626965600550408325386395120885237353543387773561304555562665750891n,
   );
   assert.equal(
     computeShieldedDummyPeriodNullifier(
@@ -196,6 +196,7 @@ test("ciphertext bytes, note nonce, and owner secret bind outputs independently"
     computeShieldedPeriodNullifier(
       {
         derivedSecretField: 13n,
+        heirIdentityCommitment: 19n,
         policyCommitment: computeShieldedPolicyCommitment(policyInput, scope),
         periodIndex: 4n,
       },
@@ -204,6 +205,7 @@ test("ciphertext bytes, note nonce, and owner secret bind outputs independently"
     computeShieldedPeriodNullifier(
       {
         derivedSecretField: 13n,
+        heirIdentityCommitment: 19n,
         policyCommitment: computeShieldedPolicyCommitment(policyInput, scope),
         periodIndex: 5n,
       },
@@ -339,6 +341,7 @@ test("each explicit day interval binds the policy and the per-heir period nullif
       computeShieldedPeriodNullifier(
         {
           derivedSecretField: 13n,
+          heirIdentityCommitment: 19n,
           policyCommitment,
           periodIndex: 0n,
         },

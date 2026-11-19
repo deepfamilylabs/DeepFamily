@@ -51,6 +51,7 @@ import {
   encodeGroth16AbcProofData,
   normalizeGroth16Proof,
 } from "@deepfamily/protocol-core";
+import { buildLineageFixture } from "../circuits/test/generate_lineage_fixture.mjs";
 import { buildShieldedClaimFixture } from "../circuits/test/generate_shielded_claim_input.mjs";
 import { buildShieldedFundingFixtures } from "../circuits/test/generate_shielded_funding_input.mjs";
 import { SHIELDED_CIRCUITS, shieldedCircuitSource } from "../scripts/lib/zkCircuitSelection.mjs";
@@ -462,7 +463,7 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
   this.timeout(1_200_000);
 
   for (const assetKind of ["erc20", "native"]) {
-    it(`funds identity budgets through VALUE and claims one note with cross-note replay protection (${assetKind})`, async function () {
+    it(`pays both heirs for the same period and rejects a second claim after refill (${assetKind})`, async function () {
       const actions = ["shield", "fund", "claim", "unshield"];
       const artifacts = checkedCurrentArtifacts(actions);
       if (artifacts.missing) this.skip();
@@ -490,18 +491,23 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
       await pool.waitForDeployment();
       const poolAddress = await pool.getAddress();
       const chainId = (await hre.ethers.provider.getNetwork()).chainId;
+      const heirNames = ["First Heir", "Second Heir"];
+      const [claimant, sibling] = heirNames.map((_, heirIndex) =>
+        buildShieldedClaimFixture({
+          lineage: buildLineageFixture({ heirNames, heirIndex }).witness,
+          chainId,
+          poolAddress,
+          periodDays: PERIOD_DAYS,
+          budgetKind: 1,
+          claimCount: 1,
+        }),
+      );
       const fixture = buildShieldedFundingFixtures({
+        lineage: claimant.witness,
         chainId,
         poolAddress,
         periodDays: PERIOD_DAYS,
         budgetKind: 1,
-      });
-      const claimant = buildShieldedClaimFixture({
-        chainId,
-        poolAddress,
-        periodDays: PERIOD_DAYS,
-        budgetKind: 1,
-        claimCount: 1,
       });
       const donorSecret = BigInt(fixture.initial.donorOwnerSecret);
       const donorIkm = hre.ethers.getBytes(hre.ethers.zeroPadValue("0x9876", 32));
@@ -557,7 +563,6 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
       const common = {
         rootIdentityCommitment: BigInt(fixture.initial.rootIdentityCommitment),
         rootVersionIndex: BigInt(fixture.initial.rootVersionIndex),
-        heirIdentityCommitment: claimant.heirIdentityCommitment,
         amountPerPeriod: 100n,
         periodDays: PERIOD_DAYS,
         eligibleFrom,
@@ -568,32 +573,28 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
         enrollmentSalt: BigInt(fixture.initial.enrollmentSalt),
       };
       const policyCommitment = fixture.policy;
-      const enrollmentCommitment = computeShieldedEnrollmentCommitment(
-        {
-          ...common,
-          ...opening,
-          policyCommitment,
-        },
-        { chainId, poolAddress, viewingKey: heirView },
-      );
       const spend = (secret, note) =>
         computeShieldedSpendNullifier(
           { ownerSecret: secret, noteCommitment: note.commitment },
           { chainId, poolAddress, viewingKey: heirView },
         );
-      const makeBudget = async (kind, remaining, nonce, clear = false, budgetOrigin = "fund") => {
+      const makeBudget = async (heir, kind, remaining, nonce, clear = false, budgetOrigin = "fund") => {
+        const terms = { ...common, heirIdentityCommitment: heir.heirIdentityCommitment };
         const note =
           kind === 1
             ? {
-                ...common,
+                ...terms,
                 binding: "identity",
                 policyCommitment,
-                enrollmentCommitment,
+                enrollmentCommitment: computeShieldedEnrollmentCommitment(
+                  { ...terms, ...opening, policyCommitment },
+                  heirContext,
+                ),
                 remaining,
                 nonce,
               }
             : {
-                ...common,
+                ...terms,
                 ...opening,
                 heirOwnerCommitment: keys.ownerCommitment,
                 budgetOrigin,
@@ -635,11 +636,11 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
           },
           { chainId, poolAddress, viewingKey: heirView },
         );
-        return { kind, note, ...encoded, commitment };
+        return { heir, kind, note, ...encoded, commitment };
       };
       let donorLeaf = 0;
-      const fund = async (kind, periods, nonce, template) => {
-        const budget = await makeBudget(kind, BigInt(periods) * 100n, nonce, kind === 1);
+      const fund = async (heir, kind, periods, nonce, template) => {
+        const budget = await makeBudget(heir, kind, BigInt(periods) * 100n, nonce, kind === 1);
         const change = await encryptValueNote({
           ...donorContext,
           amount: donor.amount - BigInt(periods) * 100n,
@@ -650,6 +651,16 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
         const templatePath = template
           ? compactMembership(await pool.getNoteMerkleProof(0, template.leaf))
           : null;
+        const base = buildShieldedFundingFixtures({
+          lineage: heir.witness,
+          chainId,
+          poolAddress,
+          periodDays: PERIOD_DAYS,
+          budgetKind: kind,
+          oldBudgetKind: template?.kind ?? kind,
+          viewingKey: heirView,
+          oldBudgetOrigin: template?.note.budgetOrigin ?? "fund",
+        });
         const data = {
           ...zeroData(),
           fundMode: template ? 1n : 0n,
@@ -666,24 +677,15 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
                   },
                   { chainId, poolAddress, viewingKey: heirView },
                 )
-              : BigInt(fixture.initial.inputNullifiers[1]),
+              : BigInt(base.initial.inputNullifiers[1]),
           ],
           outputCommitments: [budget.commitment, change.commitment],
           outputCiphertexts: [budget.ciphertextHex, change.ciphertextHex],
-          relation0: BigInt(claimant.witness.endorsementRoot),
-          relation1: BigInt(claimant.witness.trustedRoot),
+          relation0: BigInt(heir.witness.endorsementRoot),
+          relation1: BigInt(heir.witness.trustedRoot),
           asOf: template ? BigInt((await hre.ethers.provider.getBlock("latest")).timestamp) : asOf,
           lineageCheckpointId: await lineage.currentCheckpointId(),
         };
-        const base = buildShieldedFundingFixtures({
-          chainId,
-          poolAddress,
-          periodDays: PERIOD_DAYS,
-          budgetKind: kind,
-          oldBudgetKind: template?.kind ?? kind,
-          viewingKey: heirView,
-          oldBudgetOrigin: template?.note.budgetOrigin ?? "fund",
-        });
         const receive = await prepareFundReceive(
           pool,
           data,
@@ -731,11 +733,14 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
         ).to.equal(1000n);
         return { ...budget, leaf };
       };
-      const initial = await fund(1, 4, 107n);
-      const secondPublic = await fund(1, 1, 117n, initial);
+      const initial = await fund(claimant, 1, 4, 107n);
+      const secondPublic = await fund(claimant, 1, 1, 117n, initial);
+      const siblingBudget = await fund(sibling, 1, 1, 127n);
       const makeClaim = async (first, nonce) => {
+        const { heir } = first;
         const remainderKind = first.kind;
         const remainder = await makeBudget(
+          heir,
           remainderKind,
           first.note.remaining - 100n,
           nonce,
@@ -754,7 +759,8 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
             slot === 0
               ? computeShieldedPeriodNullifier(
                   {
-                    derivedSecretField: claimant.witness.derivedSecretField,
+                    derivedSecretField: heir.witness.derivedSecretField,
+                    heirIdentityCommitment: heir.heirIdentityCommitment,
                     policyCommitment,
                     periodIndex: 0,
                   },
@@ -771,14 +777,15 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
           ),
           outputCommitments: [remainder.commitment, payout.commitment],
           outputCiphertexts: [remainder.ciphertextHex, payout.ciphertextHex],
-          relation0: BigInt(claimant.witness.endorsementRoot),
-          relation1: BigInt(claimant.witness.trustedRoot),
+          relation0: BigInt(heir.witness.endorsementRoot),
+          relation1: BigInt(heir.witness.trustedRoot),
           asOf: eligibleFrom + PERIOD,
           lineageCheckpointId: await lineage.currentCheckpointId(),
         };
         const inputs = buildShieldedPoolPublicInputs({ action: 2, chainId, poolAddress, ...data });
         assert.equal(inputs.signals.length, 14);
         const base = buildShieldedClaimFixture({
+          lineage: heir.witness,
           chainId,
           poolAddress,
           periodDays: PERIOD_DAYS,
@@ -792,7 +799,9 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
           ...base.witness,
           ...inputs.witness,
           policyCommitmentInput: String(policyCommitment),
-          enrollmentCommitmentInput: String(enrollmentCommitment),
+          enrollmentCommitmentInput: String(
+            getShieldedBudgetCommitments(first.note, heirContext).enrollmentCommitment,
+          ),
           eligibleFrom: String(eligibleFrom),
           budgetNonce: String(first.note.nonce),
           budgetCiphertextHash: String(first.ciphertextHashField),
@@ -889,6 +898,16 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
         : await token.balanceOf(recipient.address);
       expect(recipientAfter - recipientBefore).to.equal(100n);
       expect(await pool.totalShielded()).to.equal(900n);
+
+      const siblingClaim = await makeClaim(siblingBudget, 227n);
+      assert.equal(sibling.witness.derivedSecretField, claimant.witness.derivedSecretField);
+      assert.notEqual(sibling.heirIdentityCommitment, claimant.heirIdentityCommitment);
+      assert.equal(siblingClaim.witness.policyCommitmentInput, pure.witness.policyCommitmentInput);
+      assert.equal(siblingClaim.witness.periodIndices[0], pure.witness.periodIndices[0]);
+      assert.notEqual(siblingClaim.data.periodNullifiers[0], pure.data.periodNullifiers[0]);
+      const siblingProof = await prove("claim", siblingClaim.witness, siblingClaim.inputs.signals);
+      await pool.claim(siblingClaim.data, siblingProof);
+      expect(await pool.nullifierSpent(siblingClaim.data.periodNullifiers[0])).to.equal(true);
       await snapshot.restore();
       // A second budget input is rejected even if both notes are otherwise compatible.
       const secondInput = {
@@ -1748,6 +1767,7 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
           ? computeShieldedPeriodNullifier(
               {
                 derivedSecretField: claimFixture.witness.derivedSecretField,
+                heirIdentityCommitment: claimFixture.heirIdentityCommitment,
                 policyCommitment,
                 periodIndex: slot,
               },

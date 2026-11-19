@@ -19,32 +19,36 @@ const HEIR_VERSION_INDEX = 2n;
 const ENDORSER = "0x1111111111111111111111111111111111111111";
 const WRITTEN_AT = 1760000000n;
 
-export function buildLineageFixture() {
-  const heirIdentity = {
-    fullName: "First Heir",
+export function buildLineageFixture({ heirNames = ["First Heir"], heirIndex = 0 } = {}) {
+  const identityFields = {
     gender: 2,
     birthYear: 1960,
     birthMonth: 5,
     birthDay: 17,
     isBirthBC: false,
   };
-  const heir = computeIdentityFromDerivedSecret({
-    identity: heirIdentity,
-    identitySuiteId: 1,
-    derivedSecretField: 333333n,
-  });
+  const heirs = heirNames.map((fullName) =>
+    computeIdentityFromDerivedSecret({
+      identity: { ...identityFields, fullName },
+      identitySuiteId: 1,
+      derivedSecretField: 333333n,
+    }),
+  );
+  const heir = heirs[heirIndex];
   const parentsDigest = computeLineageParentsDigest({
     fatherIdentityCommitment: ROOT_IDENTITY_COMMITMENT,
     motherIdentityCommitment: SPOUSE_IDENTITY_COMMITMENT,
   });
-  const endorsementLeaf = computeLineageEndorsementLeaf({
-    identityCommitment: heir.identityCommitment,
-    parentsDigest,
-    versionIndex: HEIR_VERSION_INDEX,
-    endorser: ENDORSER,
-    writtenAt: WRITTEN_AT,
-  });
-  const endorsementTree = createLineageTree([101n, endorsementLeaf, 303n, 0n, 505n]);
+  const leaves = heirs.map(({ identityCommitment }) =>
+    computeLineageEndorsementLeaf({
+      identityCommitment,
+      parentsDigest,
+      versionIndex: HEIR_VERSION_INDEX,
+      endorser: ENDORSER,
+      writtenAt: WRITTEN_AT,
+    }),
+  );
+  const endorsementTree = createLineageTree([101n, ...leaves, 303n, 0n, 505n]);
   const trustedTree = createLineageTree([
     computeLineageTrustedLeaf({
       rootIdentityCommitment: SPOUSE_IDENTITY_COMMITMENT,
@@ -58,7 +62,7 @@ export function buildLineageFixture() {
     }),
     707n,
   ]);
-  const endorsementProof = buildLineageMerkleProof(endorsementTree, 1);
+  const endorsementProof = buildLineageMerkleProof(endorsementTree, 1 + heirIndex);
   const trustedProof = buildLineageMerkleProof(trustedTree, 1);
   return {
     witness: {
@@ -67,10 +71,10 @@ export function buildLineageFixture() {
       nameField: decimal(heir.nameField),
       derivedSecretField: decimal(heir.derivedSecretField),
       isBirthBC: "0",
-      birthYear: decimal(heirIdentity.birthYear),
-      birthMonth: decimal(heirIdentity.birthMonth),
-      birthDay: decimal(heirIdentity.birthDay),
-      gender: decimal(heirIdentity.gender),
+      birthYear: decimal(identityFields.birthYear),
+      birthMonth: decimal(identityFields.birthMonth),
+      birthDay: decimal(identityFields.birthDay),
+      gender: decimal(identityFields.gender),
       suiteId: "1",
       versionIndex: decimal(HEIR_VERSION_INDEX),
       fatherIdentityCommitment: decimal(ROOT_IDENTITY_COMMITMENT),

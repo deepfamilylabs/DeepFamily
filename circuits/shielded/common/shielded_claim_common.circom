@@ -321,11 +321,12 @@ template ShieldedClaim(LINEAGE_DEPTH) {
             ascending[i - 1].in[1] <== periodIndices[i];
             active[i].out * (1 - ascending[i - 1].out) === 0;
         }
-        realPeriod[i] = Poseidon(4);
+        realPeriod[i] = Poseidon(5);
         realPeriod[i].inputs[0] <== periodTag.tag;
         realPeriod[i].inputs[1] <== derivedSecretField;
-        realPeriod[i].inputs[2] <== policyCommitmentInput;
-        realPeriod[i].inputs[3] <== periodIndices[i];
+        realPeriod[i].inputs[2] <== heir.identityCommitment;
+        realPeriod[i].inputs[3] <== policyCommitmentInput;
+        realPeriod[i].inputs[4] <== periodIndices[i];
         dummyPeriod[i] = Poseidon(4);
         dummyPeriod[i].inputs[0] <== dummyPeriodTag.tag;
         dummyPeriod[i].inputs[1] <== ownerSecret;

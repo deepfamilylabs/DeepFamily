@@ -39,8 +39,8 @@ const BUDGET_OUTPUT_ACTIONS = new Set<ShieldedAction>([
 /**
  * Check a narrow public-data inference, not a general anonymity guarantee.
  * The circuits make output slot 0 a budget note for the actions above. A
- * successful Claim publicly exposes both input shard slots, which may differ.
- * If every budget-shaped note ever appended to those shards before this claim is
+ * Claim has one budget input and repeats its shard ID in both event fields.
+ * If every budget-shaped note ever appended to that shard before this claim is
  * known to belong to the same child as initial funding, an observer can
  * identify the child even when additional funding creates another possible budget input.
  *

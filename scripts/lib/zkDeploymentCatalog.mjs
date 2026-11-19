@@ -109,6 +109,14 @@ export const INTEGRATED_DEPLOYMENT_RECORDS = Object.freeze(
   ),
 );
 
+export const RELEASE_ARTIFACT_NAMES = Object.freeze([
+  ...new Set([
+    "GovernanceTimelock",
+    "UUPSProxy",
+    ...INTEGRATED_DEPLOYMENT_RECORDS.map(({ contractName }) => contractName),
+  ]),
+]);
+
 export const integratedDeploymentContract = (deployed, property) =>
   property.split(".").reduce((value, key) => value?.[key], deployed);
 

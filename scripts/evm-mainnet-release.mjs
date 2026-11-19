@@ -15,9 +15,10 @@ import { formatEther } from "ethers";
 
 import hre from "hardhat";
 
-import { deployIntegratedSystem } from "../hardhat/integratedDeployment.mjs";
+import { prepareMainnetDeployment } from "../hardhat/integratedDeployment.mjs";
 import {
   INTEGRATED_DEPLOYMENT_RECORDS,
+  RELEASE_ARTIFACT_NAMES,
   SHIELDED_DEPLOYMENT_CIRCUITS,
   RECEIVE_DEPLOYMENT_CONTRACTS,
   receiveDeploymentConstructorArgs, receiveDeploymentLibraries,
@@ -61,7 +62,6 @@ import {
   assertCanonicalSafeProfile,
 } from "./lib/safeGovernance.mjs";
 import { ESPACE_CHAIN_PROFILE, getChainProfile } from "./lib/chainProfiles.mjs";
-import { resolveProductionPtauPath } from "./lib/productionPtau.mjs";
 import { inspectZkReleaseArtifacts } from "./lib/zkArtifactTrust.mjs";
 import { inspectProtocolReleaseManifest } from "./lib/protocolReleaseManifest.mjs";
 import {
@@ -70,9 +70,7 @@ import {
   deriveMainnetPlannedAddresses,
 } from "./lib/protocolDeploymentProjection.mjs";
 import { validateTestnetReleaseEvidence } from "./lib/testnetReleaseEvidence.mjs";
-import { verifyAllProductionCeremonies } from "./zk-ceremony-verify.mjs";
 import { assertReleaseCheckBoundary } from "./lib/releaseCheckBoundary.mjs";
-import { checkShieldedReleaseEvidence } from "./zk-shielded-release-check.mjs";
 import { assertShieldedDeploymentBindings } from "./lib/shieldedDeploymentEvidence.mjs";
 
 const TX_TIMEOUT_MS = 10 * 60 * 1000;
@@ -120,13 +118,6 @@ const CORE_DEPLOYMENT_FILES = [
   "GovernanceTimelock.json",
   ...INTEGRATED_DEPLOYMENT_RECORDS.map((record) => `${record.deploymentName}.json`),
 ];
-const RELEASE_ARTIFACT_NAMES = Object.freeze([
-  ...new Set([
-    "GovernanceTimelock",
-    "UUPSProxy",
-    ...INTEGRATED_DEPLOYMENT_RECORDS.map((record) => record.contractName),
-  ]),
-]);
 
 const nowIso = () => new Date().toISOString();
 const sameAddress = (left, right) =>
@@ -924,17 +915,8 @@ export const main = async (chainProfile) => {
     throw new Error("Mainnet release command mode does not match its approval input");
   }
 
-  const shieldedReleaseEvidence = await checkShieldedReleaseEvidence({ root: process.cwd() });
-  const zkCeremonyVerification = await verifyAllProductionCeremonies({
-    root: process.cwd(),
-    ptauPath: resolveProductionPtauPath(),
-  });
-  if (
-    zkCeremonyVerification.shielded.manifestSha256 !== shieldedReleaseEvidence.manifestSha256 ||
-    zkCeremonyVerification.shielded.circuitCount !== shieldedReleaseEvidence.circuitCount
-  ) {
-    throw new Error("Verified shielded ceremony does not match the approved release evidence");
-  }
+  const mainnetDeployment = await prepareMainnetDeployment();
+  const zkCeremonyVerification = mainnetDeployment.verification;
 
   const connection = await hre.network.create();
   const { ethers } = connection;
@@ -1451,7 +1433,7 @@ export const main = async (chainProfile) => {
 
     checkpoint.phase = "protocol-deployment";
     await saveCheckpoint();
-    const deployed = await deployIntegratedSystem(connection, {
+    const deployed = await mainnetDeployment.deploy(connection, {
       writeDeployments: true,
       signer: deployer,
       artifacts: hre.artifacts,

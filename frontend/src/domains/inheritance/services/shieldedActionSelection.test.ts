@@ -72,6 +72,7 @@ function spentPeriod(
   return computeShieldedPeriodNullifier(
     {
       derivedSecretField: secret,
+      heirIdentityCommitment: note.heirIdentityCommitment,
       policyCommitment: getShieldedBudgetCommitments(note, scope).policyCommitment,
       periodIndex,
     },

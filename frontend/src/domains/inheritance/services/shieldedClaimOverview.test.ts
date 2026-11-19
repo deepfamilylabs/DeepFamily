@@ -56,6 +56,7 @@ function spent(
   return computeShieldedPeriodNullifier(
     {
       derivedSecretField: secret,
+      heirIdentityCommitment: note.heirIdentityCommitment,
       policyCommitment: getShieldedBudgetCommitments(note, scope).policyCommitment,
       periodIndex: index,
     },
@@ -64,6 +65,16 @@ function spent(
 }
 
 describe("shielded claim overview", () => {
+  it("keeps each heir's allowance when two identities share a derived secret and policy", () => {
+    const first = budget(1n);
+    const second = budget(2n, { heirIdentityCommitment: 445n });
+    const wallet = { ...scope, spentNullifiers: new Set([spent(first.note, 0n)]) };
+    const overview = getShieldedClaimOverview([first, second], wallet, secret, start + period);
+    expect(overview.claim?.budget).toBe(second);
+    expect(overview.claim?.periodIndices).toEqual([0n]);
+    expect(overview.duePeriods).toBe(1n);
+  });
+
   it.each([1n, 7n, 365n])(
     "uses a %s-day note for due periods and the next funded date",
     (periodDays) => {

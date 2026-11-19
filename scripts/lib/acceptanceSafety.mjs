@@ -4,6 +4,7 @@ import { ethers } from "ethers";
 import { ESPACE_CHAIN_PROFILE, ETHEREUM_CHAIN_PROFILE } from "./chainProfiles.mjs";
 import { MAINNET_MIN_DELAY_FLOOR_SECONDS } from "./mainnetReleaseSafety.mjs";
 import { contractSource } from "../../lib/contractSources.js";
+import { POSEIDON_LIBRARY_SOURCES } from "./hardhatConfig.mjs";
 
 export const ESPACE_TESTNET_NAME = ESPACE_CHAIN_PROFILE.acceptance.networkName;
 export const ESPACE_TESTNET_CHAIN_ID = ESPACE_CHAIN_PROFILE.acceptance.chainId;
@@ -267,10 +268,11 @@ export const summarizeProductionBuildInfo = (records) => {
     ) {
       throw new Error(`Malformed Hardhat build-info record at index ${index}`);
     }
+    const librarySource = sourceNames[0]
+      .replace(/^npm\/poseidon-solidity@0\.0\.5\//u, "poseidon-solidity/")
+      .replace(/^(?:project\/)?node_modules\//u, "");
     const poseidonOverride =
-      sourceNames.length === 1 &&
-      (sourceNames[0] === "npm/poseidon-solidity@0.0.5/PoseidonT5.sol" ||
-        sourceNames[0].endsWith("/poseidon-solidity/PoseidonT5.sol"));
+      sourceNames.length === 1 && POSEIDON_LIBRARY_SOURCES.includes(librarySource);
     const projectBuild = sourceNames.includes(`project/${contractSource("DeepFamily")}`);
     const optimizer = {
       enabled: settings.optimizer?.enabled === true,

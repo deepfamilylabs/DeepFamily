@@ -1,5 +1,12 @@
 export const SOLIDITY_EVM_VERSION = "cancun";
 
+export const POSEIDON_LIBRARY_SOURCES = Object.freeze([
+  "poseidon-solidity/PoseidonT3.sol",
+  "poseidon-solidity/PoseidonT4.sol",
+  "poseidon-solidity/PoseidonT5.sol",
+  "poseidon-solidity/PoseidonT6.sol",
+]);
+
 export const DEFAULT_CONFLUX_RPC_URLS = Object.freeze({
   conflux: "https://evm.confluxrpc.com",
   confluxTestnet: "https://evmtestnet.confluxrpc.com",

@@ -449,6 +449,7 @@ describe("local shielded claim preparation", () => {
       computeShieldedPeriodNullifier(
         {
           derivedSecretField,
+          heirIdentityCommitment: input.identity.identityCommitment,
           policyCommitment: input.policyCommitment,
           periodIndex: 0n,
         },
@@ -459,6 +460,7 @@ describe("local shielded claim preparation", () => {
       computeShieldedPeriodNullifier(
         {
           derivedSecretField,
+          heirIdentityCommitment: input.identity.identityCommitment,
           policyCommitment: input.policyCommitment,
           periodIndex: 2n,
         },
@@ -548,6 +550,7 @@ describe("local shielded claim preparation", () => {
       computeShieldedPeriodNullifier(
         {
           derivedSecretField,
+          heirIdentityCommitment: input.identity.identityCommitment,
           policyCommitment: input.policyCommitment,
           periodIndex: 0n,
         },

@@ -798,6 +798,7 @@ export function computeShieldedSpendNullifier(
 export function computeShieldedPeriodNullifier(
   input: {
     derivedSecretField: BigNumberish;
+    heirIdentityCommitment: BigNumberish;
     policyCommitment: BigNumberish;
     periodIndex: BigNumberish;
   },

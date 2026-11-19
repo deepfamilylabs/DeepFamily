@@ -1079,6 +1079,7 @@ export async function runShieldedAcceptanceSmoke({
         computeShieldedPeriodNullifier(
           {
             derivedSecretField: childMaterial.derivedSecretField,
+            heirIdentityCommitment: childMaterial.identityCommitment,
             policyCommitment,
             periodIndex,
           },
@@ -1156,6 +1157,7 @@ export async function runShieldedAcceptanceSmoke({
         computeShieldedPeriodNullifier(
           {
             derivedSecretField: childMaterial.derivedSecretField,
+            heirIdentityCommitment: childMaterial.identityCommitment,
             policyCommitment: publicPolicyCommitment,
             periodIndex: BigInt(index),
           },

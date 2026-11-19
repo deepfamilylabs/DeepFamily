@@ -7,6 +7,7 @@ import hardhatVerify from "@nomicfoundation/hardhat-verify";
 import "dotenv/config";
 
 import {
+  POSEIDON_LIBRARY_SOURCES,
   resolveConfluxRpcUrls,
   resolveEthereumRpcUrls,
   SOLIDITY_EVM_VERSION,
@@ -49,13 +50,6 @@ const EXPLORER_API_KEY = explorerApiKeyForNetwork(
 );
 const CONFLUX_RPC_URLS = resolveConfluxRpcUrls();
 const ETHEREUM_RPC_URLS = resolveEthereumRpcUrls();
-
-const POSEIDON_LIBRARY_SOURCES = [
-  "poseidon-solidity/PoseidonT3.sol",
-  "poseidon-solidity/PoseidonT4.sol",
-  "poseidon-solidity/PoseidonT5.sol",
-  "poseidon-solidity/PoseidonT6.sol",
-];
 
 const solidityProfile = () => ({
   // Keep deployment and verification compiler inputs identical across Hardhat build profiles.

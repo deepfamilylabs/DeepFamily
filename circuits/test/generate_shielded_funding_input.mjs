@@ -31,12 +31,13 @@ export function buildShieldedFundingFixtures({
   oldKeyMode = keyMode,
   oldBudgetKind = budgetKind,
   oldBudgetRemainingPeriods = 3n,
+  lineage,
 } = {}) {
   chainId = BigInt(chainId);
   pool = BigInt(poolAddress ?? pool);
   const scoped = (purpose) => shieldedFixtureTag(purpose, chainId, pool);
   periodDays = BigInt(periodDays);
-  const heir = buildShieldedClaimFixture({ periodDays, chainId, pool, keyMode, viewingKey });
+  const heir = buildShieldedClaimFixture({ periodDays, chainId, pool, keyMode, viewingKey, lineage });
   const { viewKeyLo, viewKeyHi } = shieldedFixtureViewLimbs(viewingKey, budgetKind);
   const oldView = shieldedFixtureViewLimbs(oldViewingKey, oldBudgetKind);
   const donorOwnerSecret = 424242n;

@@ -105,7 +105,7 @@ test("every pool-local commitment and nullifier separates identical preimages ac
       computeShieldedSpendNullifier({ ownerSecret: keys.ownerSecret, noteCommitment: 61n }, ctx),
     (ctx) =>
       computeShieldedPeriodNullifier(
-        { derivedSecretField: 13n, policyCommitment: 31n, periodIndex: 2n },
+        { derivedSecretField: 13n, heirIdentityCommitment: 23n, policyCommitment: 31n, periodIndex: 2n },
         ctx,
       ),
     (ctx) =>

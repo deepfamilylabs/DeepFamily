@@ -56,13 +56,13 @@
     "claim": {
       "source": "shielded_claim_64",
       "sourceSha256": "60ef9b6189aa784e374ccaf9396da1d9a606a2cdc89555304f9cbf3ab3156b45",
-      "r1csSha256": "fd5d46fb611e4112021aa2a3eb89bdaef3ea908c084bbe770116c05dea5c31c2",
-      "wasmSha256": "96b4609af9dd8e828d75b47e4d7c6ba911fcbc57541c6e3ab4dc089b1c1cd68b",
-      "zkeySha256": "e72ae7e2f57bcb4b9cabdf9e2540443998d527b558ef686b41cef62ffe778a61",
-      "verificationKeySha256": "7cf994f9a6f21c98cff1b3aa49c6da169583f97c770e9c518d6a91cd823bdf6d",
+      "r1csSha256": "73864ce203d69cf8a6dc210923e25ca141219933597a81666c08decf20be5392",
+      "wasmSha256": "194c2429ba53eee30a36832327f968170f60d3c306b0a941315506226c05c65e",
+      "zkeySha256": "00e1f27b14c5ef940c0a94a38b862a3ec9f4294235e89b46c8fd5f8fdc163f09",
+      "verificationKeySha256": "85594e52bc80fd4671eb96080e4442ca6421c124370913c24a1713df606e8c97",
       "verifierPath": "contracts/verifiers/ShieldedClaim64Verifier.sol",
       "verifierContractName": "ShieldedClaim64Verifier",
-      "solidityVerifierSha256": "1855dfc7bff56a125c64f36e5c20d614bdbb8d848fd7643284426062b61effd6"
+      "solidityVerifierSha256": "7e83fa4263ced723e883d38b0002ef65154f2adbed66376f1a34280e55388abb"
     },
     "privateTransfer": {
       "source": "shielded_private_transfer",
@@ -105,13 +105,13 @@
     "claim32": {
       "source": "shielded_claim_32",
       "sourceSha256": "4d6cd3bc37fd5d09c5ab8c5a68c50d16b84f1c6d805b8f2975bd8abd1176a57f",
-      "r1csSha256": "b3b05e0b4ae8ae8aeeb31422e43a89393184fdb269da833727534c6e45f0f249",
-      "wasmSha256": "823861683f5b40e8aa2b144a85d8be3719f1b40768f0b5aa4d20e62fdb89086c",
-      "zkeySha256": "64ad5e8cd6244156a89085e322f97128a137a461bd2264a86396b3c759473573",
-      "verificationKeySha256": "245140721947b2dd5e40c8e30cecf8fc53da9c7323e4606f2b7e9cd1649b5702",
+      "r1csSha256": "1dd79234d5615f9e6d77a207ffb9ac8e73480f729118564cebf24a4c17003d9f",
+      "wasmSha256": "b195d357abd8a854e72b52e32b56d93f1cb3f4a24b31278219575330b91ede99",
+      "zkeySha256": "cce0595106c54b632eb4c84e98304b76fedf23554250d223b2d884d3d0ea18e6",
+      "verificationKeySha256": "f9f5101a9b8419c14ffddec4339a93a1a23eb25fe15ea3604602c999cacb4bd6",
       "verifierPath": "contracts/verifiers/ShieldedClaim32Verifier.sol",
       "verifierContractName": "ShieldedClaim32Verifier",
-      "solidityVerifierSha256": "d10b0210d05bc5207db6ed7261efa919874ad7ab125182f7832c6481ab93c44c"
+      "solidityVerifierSha256": "a5b2e2d71e4cb348111e6a7834b051b884c299c99093ab51bfd4834ef612e791"
     },
     "privateTransfer4": {
       "source": "shielded_private_transfer_4",

@@ -201,7 +201,7 @@ test("shielded claim constraints", async (t) => {
         const periodDays = (1n << 32n) - 1n;
         const periodIndex = (1n << 64n) - 1n;
         for (const budgetKind of [0, 1]) {
-          const { witness, policy } = buildShieldedClaimFixture({
+          const { witness, policy, heirIdentityCommitment } = buildShieldedClaimFixture({
             claimCount: 1,
             periodDays,
             budgetKind,
@@ -210,9 +210,10 @@ test("shielded claim constraints", async (t) => {
           assert.ok(maturity > (1n << 64n) - 1n);
           assert.ok(maturity < 1n << 113n);
           witness.periodIndices[0] = periodIndex.toString();
-          witness.periodNullifiers[0] = poseidon4([
+          witness.periodNullifiers[0] = poseidon5([
             shieldedFixtureTag(1017n, 1030n, 0x1111111111111111111111111111111111111111n),
             BigInt(witness.derivedSecretField),
+            heirIdentityCommitment,
             policy,
             periodIndex,
           ]).toString();
@@ -413,6 +414,7 @@ test("shielded claim constraints", async (t) => {
         computeShieldedPeriodNullifier(
           {
             derivedSecretField: witness.derivedSecretField,
+            heirIdentityCommitment,
             policyCommitment: policy,
             periodIndex: witness.periodIndices[0],
           },
@@ -581,7 +583,7 @@ test("shielded claim constraints", async (t) => {
       await valid(witness);
     });
 
-    const base = buildShieldedClaimFixture().witness;
+    const { witness: base, heirIdentityCommitment } = buildShieldedClaimFixture();
     await t.test("rejects four periods", async () => {
       await invalid(
         mutate(base, (w) => {
@@ -615,6 +617,7 @@ test("shielded claim constraints", async (t) => {
           w.periodNullifiers[0] = computeShieldedPeriodNullifier(
             {
               derivedSecretField: w.derivedSecretField,
+              heirIdentityCommitment,
               policyCommitment: policy,
               periodIndex: 2n,
             },
@@ -623,6 +626,7 @@ test("shielded claim constraints", async (t) => {
           w.periodNullifiers[1] = computeShieldedPeriodNullifier(
             {
               derivedSecretField: w.derivedSecretField,
+              heirIdentityCommitment,
               policyCommitment: policy,
               periodIndex: 3n,
             },

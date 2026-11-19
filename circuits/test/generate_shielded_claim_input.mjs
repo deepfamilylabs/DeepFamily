@@ -29,6 +29,7 @@ export function buildShieldedClaimFixture({
   budgetOrigin = "fund",
   ownerSecret: suppliedOwnerSecret,
   remainingPeriods = 3,
+  lineage = buildLineageFixture().witness,
 } = {}) {
   if (!Number.isInteger(claimCount) || claimCount < 1 || claimCount > 3) {
     throw new RangeError("claimCount fixture must be 1..3");
@@ -37,7 +38,6 @@ export function buildShieldedClaimFixture({
   pool = BigInt(poolAddress ?? pool);
   const scoped = (purpose) => shieldedFixtureTag(purpose, chainId, pool);
   periodDays = BigInt(periodDays);
-  const lineage = buildLineageFixture().witness;
   const derivedSecret = BigInt(lineage.derivedSecretField);
   const ownerSecret =
     suppliedOwnerSecret === undefined
@@ -116,7 +116,7 @@ export function buildShieldedClaimFixture({
   const asOf = eligibleFrom + claimCountBigInt * periodDays * SECONDS_PER_DAY;
   const periodNullifiers = periodIndices.map((index, slot) =>
     slot < claimCount
-      ? poseidon4([scoped(1017n), derivedSecret, policy, index])
+      ? poseidon5([scoped(1017n), derivedSecret, heirIdentityCommitment, policy, index])
       : poseidon4([scoped(1019n), ownerSecret, inputBudget, BigInt(slot)]),
   );
   const payout = rate * claimCountBigInt;

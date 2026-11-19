@@ -247,23 +247,30 @@ describe("eSpace acceptance safety helpers", function () {
         viaIR: true,
         sources: ["project/contracts/family/DeepFamily.sol"],
       });
-    const poseidonRecord = () =>
+    const poseidonRecord = (name = "PoseidonT5") =>
       record({
-        file: "artifacts/build-info/poseidon.json",
+        file: `artifacts/build-info/${name}.json`,
         viaIR: false,
-        sources: ["npm/poseidon-solidity@0.0.5/PoseidonT5.sol"],
+        sources: [`npm/poseidon-solidity@0.0.5/${name}.sol`],
       });
 
     it("derives the production compiler policy from actual project and override jobs", function () {
-      const summary = summarizeProductionBuildInfo([projectRecord(), poseidonRecord()]);
-      expect(summary.buildInfoFileCount).to.equal(2);
+      const overrides = ["PoseidonT3", "PoseidonT4", "PoseidonT5", "PoseidonT6"].map(
+        poseidonRecord,
+      );
+      const summary = summarizeProductionBuildInfo([projectRecord(), ...overrides]);
+      expect(summary.buildInfoFileCount).to.equal(5);
       expect(summary.hasProjectCompilerJob).to.equal(true);
       expect(summary.hasPoseidonOverrideCompilerJob).to.equal(true);
       expect(summary.productionSettingsMatched).to.equal(true);
-      expect(summary.compilerJobs.map((job) => job.viaIR)).to.deep.equal([true, false]);
+      expect(summary.compilerJobs.map((job) => job.viaIR)).to.deep.equal([
+        true, false, false, false, false,
+      ]);
     });
 
     it("fails closed for missing or compiler-divergent build-info jobs", function () {
+      const unknownLibrary = summarizeProductionBuildInfo([projectRecord(), poseidonRecord("PoseidonT7")]);
+      expect(unknownLibrary.productionSettingsMatched).to.equal(false);
       expect(summarizeProductionBuildInfo([projectRecord()]).productionSettingsMatched).to.equal(
         false,
       );

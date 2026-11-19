@@ -3,6 +3,7 @@ import { executeChainTransaction, instrumentChainContract, readConfirmedDetails,
 import path from "node:path";
 import {
   INTEGRATED_DEPLOYMENT_RECORDS,
+  RELEASE_ARTIFACT_NAMES,
   SHIELDED_DEPLOYMENT_CIRCUITS,
   SHIELDED_ACTIONS,
   RECEIVE_DEPLOYMENT_CONTRACTS,
@@ -10,6 +11,11 @@ import {
   integratedDeploymentContract,
 } from "../scripts/lib/zkDeploymentCatalog.mjs";
 import { assertImplementationMatchesArtifact } from "../tasks/lib/timelockUpgrade.mjs";
+import { checkShieldedReleaseEvidence } from "../scripts/zk-shielded-release-check.mjs";
+import { verifyAllProductionCeremonies } from "../scripts/zk-ceremony-verify.mjs";
+import { resolveProductionPtauPath } from "../scripts/lib/productionPtau.mjs";
+import { inspectZkReleaseArtifacts } from "../scripts/lib/zkArtifactTrust.mjs";
+import { readProductionBuildInfoState } from "../scripts/lib/releaseEvidence.mjs";
 import {
   assertGovernanceMultisigWithProfile,
   isLocalDevelopmentConnection,
@@ -570,12 +576,65 @@ const deployUUPSProxy = async (ethers, deployer, factory, initArgs, deployContra
   return { implAddress, proxyAddress };
 };
 
-export const deployIntegratedSystem = async (
-  hreOrConnection,
+/** Verify the ceremony once, then bind the deployable bytecode to those same artifacts at broadcast. */
+export const prepareMainnetDeployment = async () => {
+  const root = process.cwd();
+  const ptauPath = resolveProductionPtauPath({ root });
+  const evidence = await checkShieldedReleaseEvidence({ root, ptauPath });
+  const verification = await verifyAllProductionCeremonies({ root, ptauPath });
+  if (
+    verification.shielded.manifestSha256 !== evidence.manifestSha256 ||
+    verification.shielded.circuitCount !== evidence.circuitCount
+  ) {
+    throw new Error("Verified shielded ceremony does not match the approved release evidence");
+  }
+  return {
+    verification,
+    async deploy(connection, options) {
+      const core = inspectZkReleaseArtifacts({
+        root,
+        requireProduction: true,
+        requireBuiltR1cs: true,
+      });
+      const shielded = await checkShieldedReleaseEvidence({ root, ptauPath });
+      if (
+        core.manifestSha256 !== verification.core.manifestSha256 ||
+        core.transcriptSha256 !== verification.core.transcriptSha256 ||
+        shielded.manifestSha256 !== verification.shielded.manifestSha256
+      ) {
+        throw new Error("Production artifacts changed after ceremony verification");
+      }
+      const build = await readProductionBuildInfoState(connection.ethers, {
+        root,
+        artifacts: options.artifacts,
+        releaseArtifactNames: RELEASE_ARTIFACT_NAMES,
+      });
+      if (!build.productionSettingsMatched || !build.artifactProvenanceMatched) {
+        throw new Error(
+          "Rebuild the verified sources with the production Hardhat profile before deployment",
+        );
+      }
+      return deployIntegratedContracts(connection, options, false);
+    },
+  };
+};
+
+export const deployIntegratedSystem = async (hreOrConnection, options = {}) => {
+  const connection = await resolveConnection(hreOrConnection);
+  const params = { ...options, artifacts: options.artifacts ?? hreOrConnection?.artifacts };
+  if (await isProductionTimelockNetwork({ connection, provider: connection.ethers.provider })) {
+    const mainnet = await prepareMainnetDeployment();
+    return mainnet.deploy(connection, params);
+  }
+  return deployIntegratedContracts(connection, params, isLocalDevNetwork(connection));
+};
+
+const deployIntegratedContracts = async (
+  connection,
   {
     writeDeployments = false,
     signer,
-    artifacts: artifactReader,
+    artifacts: currentArtifacts,
     transactionConfirmations = 1,
     transactionTimeoutMs = 0,
     transactionExecutor,
@@ -585,11 +644,10 @@ export const deployIntegratedSystem = async (
     governanceOwner: configuredGovernanceOwner,
     governanceMultisig = process.env.GOVERNANCE_SAFE_ADDRESS,
     governanceMultisigProfile = process.env.GOVERNANCE_SAFE_PROFILE,
-  } = {},
+  },
+  isLocalDev,
 ) => {
-  const connection = await resolveConnection(hreOrConnection);
   const { ethers } = connection;
-  const currentArtifacts = artifactReader ?? hreOrConnection?.artifacts ?? null;
   const [defaultSigner] = await ethers.getSigners();
   const deployer = signer ?? defaultSigner;
   const deployerAddress = await deployer.getAddress();
@@ -657,9 +715,6 @@ export const deployIntegratedSystem = async (
   // Validate the GovernanceTimelock up front so a misconfigured live deployment fails before any
   // contracts are created, rather than leaving orphaned modules after a late-stage throw. Local
   // dev networks (edr-simulated / non-Mainnet localhost) keep the deployer as owner.
-  const isLocalDev =
-    isLocalDevNetwork(connection) &&
-    !(await isProductionTimelockNetwork({ connection, provider: ethers.provider }));
   const governanceOwner = configuredGovernanceOwner ?? process.env.GOVERNANCE_TIMELOCK_ADDRESS;
   const hasGovernanceOwner =
     Boolean(governanceOwner) &&

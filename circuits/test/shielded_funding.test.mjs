@@ -403,7 +403,13 @@ test("shielded initial Fund and continuation Fund constraints", async (t) => {
             BigInt(continuation.eligibleFrom) + 2n * BigInt(continuation.periodDays) * 86400n,
           );
           continuation.periodNullifiers[0] = String(
-            poseidon4([scoped(1017n), BigInt(continuation.derivedSecretField), second.policy, 1n]),
+            poseidon5([
+              scoped(1017n),
+              BigInt(continuation.derivedSecretField),
+              second.heirIdentityCommitment,
+              second.policy,
+              1n,
+            ]),
           );
           // Give each produced note a fresh nonce throughout this sequential chain.
           continuation.newBudgetNonce = "100000";

@@ -14,6 +14,7 @@ import {
   checkShieldedRelease,
   checkShieldedReleaseEvidence,
 } from "../scripts/zk-shielded-release-check.mjs";
+import { deployIntegratedSystem, ensureIntegratedSystem } from "../hardhat/integratedDeployment.mjs";
 
 const criteria = {
   fundMaxGas: 3_000_000,
@@ -292,19 +293,44 @@ describe("shielded release evidence and ceremony composition", function () {
     expect(result.stderr).to.match(/Usage: node scripts\/zk-shielded-release-check\.mjs/u);
   });
 
-  it("verifies the complete mainnet catalog once before opening the RPC", function () {
+  it("prepares the verified mainnet deployment once before opening the RPC", function () {
     const source = fs.readFileSync("scripts/evm-mainnet-release.mjs", "utf8");
     const main = source.slice(source.indexOf("export const main = async"));
-    const evidenceCheck = main.indexOf("await checkShieldedReleaseEvidence(");
-    const ceremonyCheck = main.indexOf("await verifyAllProductionCeremonies(");
+    const preparation = main.indexOf("await prepareMainnetDeployment(");
     const rpcConnection = main.indexOf("await hre.network.create(");
-    expect(evidenceCheck).to.be.greaterThan(-1);
-    expect(ceremonyCheck).to.be.greaterThan(evidenceCheck);
-    expect(rpcConnection).to.be.greaterThan(ceremonyCheck);
-    expect(main.match(/await verifyAllProductionCeremonies\(/gu)).to.have.length(1);
-    expect(main.slice(ceremonyCheck, rpcConnection)).to.include(
-      "zkCeremonyVerification.shielded.manifestSha256 !== shieldedReleaseEvidence.manifestSha256",
-    );
+    expect(preparation).to.be.greaterThan(-1);
+    expect(rpcConnection).to.be.greaterThan(preparation);
+    expect(main.match(/await prepareMainnetDeployment\(/gu)).to.have.length(1);
+    expect(main.indexOf("await mainnetDeployment.deploy(")).to.be.greaterThan(rpcConnection);
+  });
+
+  it("refuses development keys before a fresh or forced deployment on either mainnet", async function () {
+    fs.rmSync(path.join(root, "circuits/shielded-production-manifest.json"));
+    write("circuits/shielded-development-manifest.json", '{"developmentOnly":true}\n');
+    const previousDirectory = process.cwd();
+    process.chdir(root);
+    try {
+      for (const chainId of [1n, 1030n]) {
+        const connection = {
+          networkName: "localhost",
+          networkConfig: { type: "http", chainId: 31337 },
+          ethers: {
+            provider: { getNetwork: async () => ({ chainId }) },
+            getSigners: async () => [{}],
+          },
+        };
+        const options = {
+          writeDeployments: true,
+          artifacts: { readArtifact: () => assert.fail("unexpected artifact read") },
+          allowNewDeployment: true,
+        };
+        const developmentKeys = /development-only shielded keys/u;
+        await assert.rejects(deployIntegratedSystem(connection, options), developmentKeys);
+        await assert.rejects(ensureIntegratedSystem(connection, options), developmentKeys);
+      }
+    } finally {
+      process.chdir(previousDirectory);
+    }
   });
 });
 

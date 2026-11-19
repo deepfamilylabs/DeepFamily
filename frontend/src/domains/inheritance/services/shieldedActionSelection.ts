@@ -75,6 +75,7 @@ function findClaimPeriods(
     const nullifier = computeShieldedPeriodNullifier(
       {
         derivedSecretField,
+        heirIdentityCommitment: budget.heirIdentityCommitment,
         policyCommitment,
         periodIndex: index,
       },

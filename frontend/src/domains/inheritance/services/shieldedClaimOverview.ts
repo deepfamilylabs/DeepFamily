@@ -48,6 +48,7 @@ const MAX_UINT128 = (1n << 128n) - 1n;
 export const SHIELDED_CLAIM_OVERVIEW_SCAN_LIMIT = 100_000n;
 
 type PolicyFunding = {
+  heirIdentityCommitment: bigint;
   policyCommitment: bigint;
   eligibleFrom: bigint;
   periodDays: bigint;
@@ -141,6 +142,7 @@ function futureFundedPeriod(
     const nullifier = computeShieldedPeriodNullifier(
       {
         derivedSecretField,
+        heirIdentityCommitment: funding.heirIdentityCommitment,
         policyCommitment: funding.policyCommitment,
         periodIndex: index,
       },
@@ -165,7 +167,7 @@ function futureFundedPeriod(
 /**
  * Summarize already recovered, unspent budget notes after the caller filters
  * current lineage eligibility. No secrets or plaintext are persisted or sent
- * anywhere. Multiple budgets for one policy share one enrollment and period
+ * anywhere. Budgets for the same heir and policy share one enrollment and period
  * nullifier sequence, so their future funding is evaluated together.
  */
 export function getShieldedClaimOverview(
@@ -195,12 +197,15 @@ export function getShieldedClaimOverview(
         amount: automatic.budget.note.amountPerPeriod * BigInt(automatic.periodIndices.length),
       }
     : undefined;
-  const policies = new Map<bigint, PolicyFunding>();
+  const policies = new Map<string, PolicyFunding>();
   for (const budget of budgets) {
     if (budget.note.remaining === 0n) continue;
     const policyCommitment = getShieldedBudgetCommitments(budget.note, wallet).policyCommitment;
-    const previous = policies.get(policyCommitment);
-    policies.set(policyCommitment, {
+    const { heirIdentityCommitment } = budget.note;
+    const key = `${heirIdentityCommitment}:${policyCommitment}`;
+    const previous = policies.get(key);
+    policies.set(key, {
+      heirIdentityCommitment,
       policyCommitment,
       eligibleFrom: previous?.eligibleFrom ?? budget.note.eligibleFrom,
       periodDays: budget.note.periodDays,
@@ -217,9 +222,8 @@ export function getShieldedClaimOverview(
   let scanLimited = false;
   let duePeriods = 0n;
   for (const funding of policies.values()) {
-    // Distinct initial enrollments under one policy can start on different
-    // dates while sharing the period-nullifier sequence. A single date would
-    // claim more certainty than the wallet snapshot provides.
+    // Refills for this heir and policy share the initial start. Conflicting
+    // recovered dates leave the due schedule unknown.
     if (funding.mixedStartTimes) {
       scanLimited = true;
       continue;

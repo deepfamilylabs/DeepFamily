@@ -376,9 +376,10 @@ export function computeShieldedSpendNullifier(input, scope) {
  * and heir. Additional funding carries that enrollment, so the tag cannot reset after refill.
  */
 export function computeShieldedPeriodNullifier(input, scope) {
-  return poseidon4([
+  return poseidon5([
     computeShieldedScopedPurpose(SHIELDED_INHERITANCE_DOMAINS.periodNullifier, scope),
     nonzeroField(input.derivedSecretField, "derivedSecretField"),
+    nonzeroField(input.heirIdentityCommitment, "heirIdentityCommitment"),
     nonzeroField(input.policyCommitment, "policyCommitment"),
     uint64(input.periodIndex, "periodIndex"),
   ]);
