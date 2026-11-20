@@ -218,7 +218,12 @@ export function PrivateLettersPanel(props: {
     try {
       const result = await shieldedAssetWorkerCall("recoverLetters", { context: props.context }, { timeoutMs: 1_200_000 });
       if (mounted.current && version === epoch.current) setInbox(result);
-    } catch (cause) { if (mounted.current && version === epoch.current) setError(tr("recoverFailed"), cause); }
+    } catch (cause) {
+      if (mounted.current && version === epoch.current) {
+        setInbox(null);
+        setError(tr("recoverFailed"), cause);
+      }
+    }
     finally { if (mounted.current && version === epoch.current) { activeOperation.current = null; setWorking(false); busyChange.current?.(false); } }
   }
   // Entering the inbox reads once for this key/context. Busy state changes and

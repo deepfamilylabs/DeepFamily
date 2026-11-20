@@ -214,7 +214,7 @@ describe("Global current-state snapshot pagination", function () {
           await lineageIndex.identityCommitmentOf(row.personHash),
         );
         assert.deepEqual(
-          [row.fatherIdentityCommitment, row.motherIdentityCommitment],
+          [row.fatherIdentityCommitment, row.motherIdentityCommitment, row.identitySuiteId],
           [...(await lineageIndex.versionParents(row.personHash, row.versionIndex))],
         );
       }

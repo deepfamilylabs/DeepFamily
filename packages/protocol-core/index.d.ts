@@ -254,6 +254,7 @@ export function parseCanonicalPersonVersion(bytes: Uint8Array): PersonVersionMet
 
 export function normalizeIdentityFields(input: IdentityFields): CanonicalIdentityFields;
 export function packBirthGenderField(input: IdentityFields): bigint;
+export function isIdentitySuiteSupported(identitySuiteId: number | bigint | undefined): boolean;
 export function assertIdentitySuiteSupported(identitySuiteId: BigNumberish): number;
 export function assertFileKdfSuiteSupported(kdfSuite: BigNumberish): number;
 export function normalizePassphrase(rawPassphrase: string): string;

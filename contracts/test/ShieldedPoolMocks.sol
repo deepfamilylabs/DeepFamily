@@ -12,6 +12,10 @@ import {ShieldedErc20Pool} from "../shielded/ShieldedErc20Pool.sol";
  *      public signals that the pool builds.
  */
 contract ShieldedPoolVerifierMock is IProofVerifierAdapter {
+  function supportsPurpose(uint8 purpose) external pure returns (bool) {
+    return purpose >= 2 && purpose <= 6;
+  }
+
   function verifyProof(
     uint8 purpose,
     uint8 proofEncodingId,

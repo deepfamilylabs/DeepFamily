@@ -36,7 +36,7 @@ export function buildEndorseSuccessResultView({
     personHash,
     versionIndex,
     endorsementFee: result.feeFormatted,
-    feeRecipient,
+    feeRecipient: result.event?.recipient ?? feeRecipient,
     transactionHash: result.transactionHash,
     blockNumber: result.blockNumber,
     events: {

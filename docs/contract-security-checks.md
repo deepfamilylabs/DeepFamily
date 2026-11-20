@@ -68,13 +68,13 @@ in the report. Any reviewed High/Medium exception must identify one exact findin
 its code-specific rationale in `security/slither-baseline.json`. Reviews are bound to SHA-256
 snapshots of their related source files; changed sources and obsolete exceptions fail the check.
 
-The initial reviewed baseline contains 76 High/Medium findings:
+The reviewed baseline contains 72 High/Medium findings.
 
 | Detector | Count | Review basis |
 | --- | ---: | --- |
-| `incorrect-return` | 47 | Generated verifiers intentionally return ABI `false`; public Poseidon library returns exit their own call frame. |
+| `incorrect-return` | 45 | Generated verifiers intentionally return ABI `false`. Public Poseidon library returns exit their own call frame. |
 | `arbitrary-send-eth` | 1 | Withdrawals prove the recipient and amount, consume state before payment and use the shared reentrancy guard. |
-| `uninitialized-local` | 18 | Default-zero values are intentional, or arrays/locals are assigned before use. |
+| `uninitialized-local` | 16 | Default-zero values are intentional, or arrays/locals are assigned before use. |
 | `divide-before-multiply` | 4 | Calendar conversion requires integer quotients and remainder subtraction. |
 | `incorrect-equality` | 2 | Dictionary absence and unchanged-root rejection require exact equality. |
 | `unused-return` | 3 | Calls intentionally check existence or perform storage side effects; the reader's tuple results are assigned. |
@@ -86,8 +86,10 @@ these explanations do not suppress a detector for future code.
 The generated-verifier snapshots were re-reviewed after the existing development key rotations
 in `19171824` and `a1e1dc1c`. All eleven stale snapshots matched their original sources in
 `c3dc65a5`. Comparing those sources with the current files, masking only the named verification-key
-coordinate constants, left the remaining source byte-for-byte identical: field bounds, public
-input lengths, control flow and the intentional ABI-false returns did not change. The current
-analyzer report retained all 76 exact reviewed finding IDs and introduced no new High/Medium
-exceptions. Only those eleven source hashes were refreshed. Future source or key changes still
-expire these reviews; this comparison is not an automatic baseline-update policy or a circuit audit.
+coordinate constants, left the remaining source byte-for-byte identical. That review covered all
+76 findings present at the time.
+
+The shared LeanIMT path removed two duplicate call paths and two local-cursor findings. The
+remaining Poseidon call paths include the shared library in their reviewed sources. The family
+archive write still reverts on failure and deliberately ignores the returned blob reference.
+The updated person verifier differs from its predecessor only in verification-key coordinates.

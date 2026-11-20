@@ -59,6 +59,12 @@ async function expectRejected(label, input) {
 
 async function testParentExistence() {
   const both = await calculateWitnessIsolated(baseInput);
+  for (const role of ["father", "mother"]) {
+    await expectRejected(`present ${role} requires a registrable identity secret`, {
+      ...baseInput,
+      [`${role}DerivedSecretField`]: "0",
+    });
+  }
   const noFatherInput = zeroRole(baseInput, "father");
   const noMotherInput = zeroRole(baseInput, "mother");
   const orphanInput = zeroRole(noFatherInput, "mother");

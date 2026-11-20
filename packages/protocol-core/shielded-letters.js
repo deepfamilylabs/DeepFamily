@@ -11,7 +11,7 @@ import {
   wipeBytes,
   writeUint32BE,
 } from "./bytes.js";
-import { MAX_UINT64, SNARK_SCALAR_FIELD } from "./constants.js";
+import { MAX_UINT64, MAX_UINT128, SNARK_SCALAR_FIELD } from "./constants.js";
 import { ProtocolError, protocolAssert } from "./errors.js";
 import { assertAddress } from "./identity.js";
 import {
@@ -221,7 +221,8 @@ export function decodeShieldedLetterEnvelope(value) {
 /** AAD authenticates this message number, chain and exact letter contract. */
 export function buildShieldedLetterHpkeAad(input) {
   const scope = normalizeShieldedLetterScope(input);
-  const messageId = field(input.messageId, "messageId", true);
+  const messageId = bigintFrom(input.messageId, "messageId", MAX_UINT128);
+  protocolAssert(messageId > 0n, "INVALID_SHIELDED_LETTER_FIELD", "messageId must be nonzero");
   return getBytes(
     solidityPacked(
       ["bytes32", "uint64", "address", "uint256"],

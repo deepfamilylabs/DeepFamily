@@ -1,3 +1,4 @@
+import { isIdentitySuiteSupported } from "@deepfamily/protocol-core";
 import type {
   ShieldedFundingEntry,
   ShieldedWalletSummary,
@@ -20,11 +21,15 @@ export type ShieldedFundingHeir = { personHash: string; label?: string };
 export function listShieldedFundingHeirs(
   wallet: ShieldedWalletSummary | null,
   fundingVersion: string,
+  entry: ShieldedFundingEntry,
   labels?: ReadonlyMap<string, string>,
 ): ShieldedFundingHeir[] {
   const children =
     wallet?.children.filter(
-      (child) => child.eligible && String(child.rootVersionIndex) === fundingVersion,
+      (child) =>
+        child.eligible &&
+        String(child.rootVersionIndex) === fundingVersion &&
+        (entry !== "public" || isIdentitySuiteSupported(child.identitySuiteId)),
     ) ?? [];
   return children.map(({ personHash }) => ({
     personHash,

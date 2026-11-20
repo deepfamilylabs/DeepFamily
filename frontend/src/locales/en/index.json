@@ -1416,6 +1416,7 @@
       "OwnableUnauthorizedAccount": "Current wallet is not authorized for this owner-only action.",
       "ReentrancyGuardReentrantCall": "Contract rejected a reentrant call.",
       "InvalidTokenId": "Token ID is invalid.",
+      "EndorsementFeeChanged": "The endorsement fee changed. Refresh the quote and confirm again.",
       "EndorsementFeeTransferFailed": "Endorsement fee transfer failed.",
       "ProtocolFeeTooHigh": "Protocol fee exceeds allowed limit.",
       "AlreadyEndorsed": "You have already endorsed this version.",

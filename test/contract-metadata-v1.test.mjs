@@ -1,4 +1,5 @@
 import "../hardhat-test-setup.mjs";
+import assert from "node:assert/strict";
 import fs from "node:fs";
 import { fileURLToPath } from "node:url";
 import { expect } from "chai";
@@ -20,6 +21,7 @@ import {
   wipePreparedPersonVersionContent,
 } from "../packages/protocol-core/index.js";
 import { deployLineageIndex } from "./helpers/testHelper.mjs";
+import { checkVerifierRoute } from "../scripts/lib/verifierRouteProbe.mjs";
 
 const PERSON_RELATION = 0;
 const DISCLOSURE_BINDING = 1;
@@ -561,6 +563,24 @@ describe("DeepFamily encrypted metadata v1", function () {
   });
 
   describe("version commitment, routes, and Reader", () => {
+    it("keeps immutable v1 indexes writable through their original hook", async () => {
+      const { deepFamily, owner } = await deployCore({ configureLineageIndex: false });
+      const index = await hre.ethers.deployContract("LegacyLineageIndexMock", [
+        await deepFamily.getAddress(),
+      ]);
+      await deepFamily.setLineageIndex(await index.getAddress());
+      const { tx, publicSignals } = await addVersion(deepFamily, owner, { suiteId: 2 });
+      await expect(tx)
+        .to.emit(index, "VersionIndexed")
+        .withArgs(
+          personHashOf(publicSignals.identityCommitment),
+          1n,
+          publicSignals.identityCommitment,
+          0n,
+          0n,
+        );
+    });
+
     it("deduplicates only the context-scoped versionCommitment, not envelope bytes", async () => {
       const { deepFamily, owner } = await deployCore();
       const signerAddress = await owner.getAddress();
@@ -576,6 +596,35 @@ describe("DeepFamily encrypted metadata v1", function () {
       await deepFamily.addPersonVersion(makeProof(), second, 0, 0, differentEnvelope);
       expect(await deepFamily.personVersionsCount(personHashOf(first.identityCommitment))).to.equal(
         2n,
+      );
+    });
+
+    it("leaves the circuit ID available when the candidate disables its requested purpose", async () => {
+      const { deepFamily } = await deployCore({ registerRoutes: false });
+      const { adapter, disclosureVerifier } = await deployAdapter();
+      const disabled = await hre.ethers.deployContract("Groth16VerifierAdapter", [
+        hre.ethers.ZeroAddress,
+        await disclosureVerifier.getAddress(),
+        Array(8).fill(hre.ethers.ZeroAddress),
+      ]);
+      await expect(
+        deepFamily.setCircuitVerifier(PERSON_RELATION, 55, await disabled.getAddress()),
+      ).to.be.revertedWithCustomError(deepFamily, "InvalidVerifierAddress");
+      expect(await deepFamily.verifierRegistry(PERSON_RELATION, 55)).to.equal(
+        hre.ethers.ZeroAddress,
+      );
+      await deepFamily.setCircuitVerifier(PERSON_RELATION, 55, await adapter.getAddress());
+      expect(await deepFamily.verifierRegistry(PERSON_RELATION, 55)).to.equal(
+        await adapter.getAddress(),
+      );
+    });
+
+    it("stops the governance preflight when an enabled route rejects the reference proof", async () => {
+      const { adapter } = await deployAdapter({ personShouldVerify: false });
+      expect(await adapter.supportsPurpose(PERSON_RELATION)).to.equal(true);
+      await assert.rejects(
+        checkVerifierRoute(adapter, PERSON_RELATION, 55),
+        /Verifier rejected the reference proof for purpose 0, circuit 55/,
       );
     });
 

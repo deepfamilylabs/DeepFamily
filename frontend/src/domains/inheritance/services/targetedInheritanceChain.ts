@@ -1,3 +1,4 @@
+import { archivedIdentitySuite, lineageReaderAt } from "./lineageIdentitySuite";
 import {
   SNARK_SCALAR_FIELD,
   buildLineageMerkleProofFromPath,
@@ -137,6 +138,7 @@ export async function loadTargetedLineageSnapshot(
   if (blockNumber > head) fail("Lineage snapshot is ahead of the chain");
   const anchor = await provider.getBlock(blockNumber);
   if (!anchor?.hash) fail("Lineage snapshot block is unavailable");
+  lineageIndex = await lineageReaderAt(lineageIndex, blockNumber);
   const overrides = { blockTag: blockNumber };
   const recordLimit = boundedInteger(request.limits?.records ?? 2000, 100_000, "record limit", 1);
   if (
@@ -240,7 +242,11 @@ export async function loadTargetedLineageSnapshot(
       identity === 0n
     )
       fail("Family version metadata is inconsistent");
-    let parentOpening: { fatherIdentityCommitment: bigint; motherIdentityCommitment: bigint };
+    let parentOpening: {
+      fatherIdentityCommitment: bigint;
+      motherIdentityCommitment: bigint;
+      identitySuiteId?: bigint;
+    };
     try {
       parentOpening = await lineageIndex.versionParents(key, versionIndex, overrides);
     } catch (cause) {
@@ -276,6 +282,10 @@ export async function loadTargetedLineageSnapshot(
       personHash: key,
       versionIndex,
       identityCommitment: identity,
+      identitySuiteId:
+        parentOpening.identitySuiteId === undefined
+          ? await archivedIdentitySuite(deepFamily, key, versionIndex, blockNumber)
+          : boundedInteger(parentOpening.identitySuiteId, 0xffffffff, "identity suite", 1),
       fatherIdentityCommitment: father,
       motherIdentityCommitment: mother,
     };

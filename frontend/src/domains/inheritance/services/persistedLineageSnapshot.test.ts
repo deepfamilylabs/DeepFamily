@@ -28,7 +28,7 @@ const ROOT = hash(ROOT_IC), HEIR = hash(HEIR_IC);
 const blockHash = (block: number) => `0x${block.toString(16).padStart(64, "0")}`;
 const iface = new Interface([
   "event LeafWritten(uint8 indexed treeId,uint256 indexed leafIndex,uint256 leaf,uint256 root)",
-  "event VersionIndexed(bytes32 indexed personHash,uint256 indexed versionIndex,uint256 identityCommitment,uint256 fatherIdentityCommitment,uint256 motherIdentityCommitment)",
+  "event VersionIndexed(bytes32 indexed personHash,uint256 indexed versionIndex,uint256 identityCommitment,uint256 fatherIdentityCommitment,uint256 motherIdentityCommitment,uint32 identitySuiteId)",
 ]);
 const eligibility = [{ heirIdentityCommitment: HEIR_IC, rootIdentityCommitment: ROOT_IC, rootVersionIndex: 1 }];
 const request: TargetedLineageRequest = { parentIdentityCommitments: [ROOT_IC], eligibility };
@@ -61,9 +61,9 @@ function log(name: string, args: unknown[], block: number, index: number): TestL
     blockNumber: block, blockHash: blockHash(block), index, removed: false };
 }
 function fixture(size = 3) {
-  const root: IndexedVersion = { personHash: ROOT, versionIndex: 1, identityCommitment: ROOT_IC,
+  const root: IndexedVersion = { personHash: ROOT, versionIndex: 1, identitySuiteId: 1, identityCommitment: ROOT_IC,
     fatherIdentityCommitment: 0n, motherIdentityCommitment: 0n };
-  const heir: IndexedVersion = { personHash: HEIR, versionIndex: 1, identityCommitment: HEIR_IC,
+  const heir: IndexedVersion = { personHash: HEIR, versionIndex: 1, identitySuiteId: 1, identityCommitment: HEIR_IC,
     fatherIdentityCommitment: ROOT_IC, motherIdentityCommitment: 0n };
   const endorsements: Endorsement[] = Array.from({ length: size }, (_, index) => ({
     personHash: index === 0 ? HEIR : hash(5000n + BigInt(index)), endorser: ACCOUNT,
@@ -143,7 +143,7 @@ function fixture(size = 3) {
     nextTrees[0].update(0n, nextLeaf);
     states.set(11, { ...initial, trees: nextTrees, versions: [...initial.versions, nextRecord],
       endorsements: nextEndorsements, checkpointId: 8n, createdAt: 1100n });
-    logs.push(log("VersionIndexed", [HEIR, 2, HEIR_IC, ROOT_IC, 0n], 11, 0),
+    logs.push(log("VersionIndexed", [HEIR, 2, HEIR_IC, ROOT_IC, 0n, 1], 11, 0),
       log("LeafWritten", [0, 0, nextLeaf, nextTrees[0].root], 11, 1));
     head = 11;
     return nextTrees;

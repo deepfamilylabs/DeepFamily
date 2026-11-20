@@ -17,7 +17,7 @@ const mocks = vi.hoisted(() => ({
   tx: { replaceableTransaction() { return this; }, hash: "0xendorse", wait: vi.fn() },
   receipt: { status: 1, transactionHash: "0xendorse", blockNumber: 20 },
   contract: {
-    endorseVersion: vi.fn(),
+    endorseVersionAtFee: vi.fn(),
   },
   createDeepFamilyContract: vi.fn(),
   receiptWait: vi.fn(),
@@ -58,34 +58,34 @@ describe("useEndorseFlow", () => {
     mocks.wallet.signer = { id: "signer", getAddress: async () => "0x00000000000000000000000000000000000000aa", provider: { getBlockNumber: async () => 12, getNetwork: async () => ({ chainId: 31337n }) } };
     mocks.wallet.address = "0x00000000000000000000000000000000000000aa";
     mocks.config.contractAddress = "0x0000000000000000000000000000000000000abc";
-    mocks.contract.endorseVersion.mockReset();
+    mocks.contract.endorseVersionAtFee.mockReset();
     mocks.createDeepFamilyContract.mockReset();
     mocks.receiptWait.mockReset();
     mocks.executeEndorseFlow.mockReset();
     mocks.tx.wait = mocks.receiptWait;
-    mocks.contract.endorseVersion.mockResolvedValue(mocks.tx);
+    mocks.contract.endorseVersionAtFee.mockResolvedValue(mocks.tx);
     mocks.createDeepFamilyContract.mockReturnValue(mocks.contract);
     mocks.receiptWait.mockResolvedValue(mocks.receipt);
   });
 
   it("discovers a fee replacement through the real ethers contract response", async () => {
     const personHash = `0x${"11".repeat(32)}`;
-    const eventInterface = new Interface(["function endorseVersion(bytes32,uint256)"]);
+    const eventInterface = new Interface(["function endorseVersionAtFee(bytes32,uint256,uint256)"]);
     const tracked = contractFeeReplacement({
       eventInterface, receipt: { status: 1 }, from: mocks.wallet.address!,
       to: mocks.config.contractAddress,
-      data: eventInterface.encodeFunctionData("endorseVersion", [personHash, 2]),
+      data: eventInterface.encodeFunctionData("endorseVersionAtFee", [personHash, 2, 10n]),
     });
     mocks.createDeepFamilyContract.mockReturnValue({ ...mocks.contract, interface: eventInterface });
-    mocks.contract.endorseVersion.mockResolvedValue(tracked.transaction);
+    mocks.contract.endorseVersionAtFee.mockResolvedValue(tracked.transaction);
     mocks.executeEndorseFlow.mockImplementation(async (params) => {
-      const receipt = await params.endorseVersion(personHash, 2);
+      const receipt = await params.endorseVersion(personHash, 2, 10n);
       return { alreadyEndorsed: false, receipt, transactionHash: tracked.transactionHash };
     });
     const { result } = renderHook(() => useEndorseFlow());
     await act(async () => { await result.current.runOrThrow({ ...flowArgs, personHash }); });
     expect(tracked.wasScanned()).toBe(true);
-    expect(mocks.contract.endorseVersion).toHaveBeenCalledExactlyOnceWith(personHash, 2);
+    expect(mocks.contract.endorseVersionAtFee).toHaveBeenCalledExactlyOnceWith(personHash, 2, 10n);
     expect(result.current.tracking).toMatchObject({
       state: "confirmed", transactionHash: tracked.transactionHash,
     });
@@ -111,7 +111,7 @@ describe("useEndorseFlow", () => {
       params.onStageChange("checking");
       params.onStageChange("approving");
       params.onStageChange("submitting");
-      const receipt = await params.endorseVersion(flowArgs.personHash, flowArgs.versionIndex, {
+      const receipt = await params.endorseVersion(flowArgs.personHash, flowArgs.versionIndex, 10n, {
         gasLimit: 123n,
       });
       expect(receipt).toBe(mocks.receipt);
@@ -136,7 +136,7 @@ describe("useEndorseFlow", () => {
       mocks.config.contractAddress,
       mocks.wallet.signer,
     );
-    expect(mocks.contract.endorseVersion).toHaveBeenCalledWith(flowArgs.personHash, 2, {
+    expect(mocks.contract.endorseVersionAtFee).toHaveBeenCalledWith(flowArgs.personHash, 2, 10n, {
       gasLimit: 123n,
     });
     expect(mocks.receiptWait).toHaveBeenCalledOnce();
@@ -158,7 +158,7 @@ describe("useEndorseFlow", () => {
 
   it("calls endorseVersion without overrides when no gas overrides are provided", async () => {
     mocks.executeEndorseFlow.mockImplementation(async (params) => {
-      await params.endorseVersion(flowArgs.personHash, flowArgs.versionIndex);
+      await params.endorseVersion(flowArgs.personHash, flowArgs.versionIndex, 10n);
       return { alreadyEndorsed: true };
     });
 
@@ -168,7 +168,7 @@ describe("useEndorseFlow", () => {
       await result.current.runOrThrow(flowArgs);
     });
 
-    expect(mocks.contract.endorseVersion).toHaveBeenCalledWith(flowArgs.personHash, 2);
+    expect(mocks.contract.endorseVersionAtFee).toHaveBeenCalledWith(flowArgs.personHash, 2, 10n);
     expect(result.current.status).toBe("success");
     expect(result.current.result).toEqual({ alreadyEndorsed: true });
   });
@@ -220,7 +220,7 @@ describe("useEndorseFlow", () => {
     mocks.executeEndorseFlow.mockImplementation(async (params) => {
       params.onStageChange("submitting");
       await estimate;
-      return params.endorseVersion(flowArgs.personHash, flowArgs.versionIndex);
+      return params.endorseVersion(flowArgs.personHash, flowArgs.versionIndex, 10n);
     });
     const hook = renderHook(() => useEndorseFlow());
     let pending!: Promise<any>;
@@ -233,7 +233,7 @@ describe("useEndorseFlow", () => {
       finishEstimate();
       await rejected;
     });
-    expect(mocks.contract.endorseVersion).not.toHaveBeenCalled();
+    expect(mocks.contract.endorseVersionAtFee).not.toHaveBeenCalled();
   });
 
   it("returns a confirmed result to the original caller after reset without updating the new form", async () => {
@@ -245,7 +245,7 @@ describe("useEndorseFlow", () => {
     );
     const confirmed = { alreadyEndorsed: false, transactionHash: "0xendorse" };
     mocks.executeEndorseFlow.mockImplementation(async (params) => {
-      await params.endorseVersion(flowArgs.personHash, flowArgs.versionIndex);
+      await params.endorseVersion(flowArgs.personHash, flowArgs.versionIndex, 10n);
       return confirmed;
     });
     const hook = renderHook(() => useEndorseFlow());
@@ -280,6 +280,6 @@ describe("useEndorseFlow", () => {
     expect(hook.result.current.tracking).toEqual({
       state: "confirmed", transactionHash: approvalReceipt.hash, receipt: approvalReceipt,
     });
-    expect(mocks.contract.endorseVersion).not.toHaveBeenCalled();
+    expect(mocks.contract.endorseVersionAtFee).not.toHaveBeenCalled();
   });
 });

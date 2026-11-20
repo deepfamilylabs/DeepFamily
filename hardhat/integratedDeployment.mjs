@@ -16,6 +16,7 @@ import { verifyAllProductionCeremonies } from "../scripts/zk-ceremony-verify.mjs
 import { resolveProductionPtauPath } from "../scripts/lib/productionPtau.mjs";
 import { inspectZkReleaseArtifacts } from "../scripts/lib/zkArtifactTrust.mjs";
 import { readProductionBuildInfoState } from "../scripts/lib/releaseEvidence.mjs";
+import { checkVerifierRoute } from "../scripts/lib/verifierRouteProbe.mjs";
 import {
   assertGovernanceMultisigWithProfile,
   isLocalDevelopmentConnection,
@@ -193,7 +194,7 @@ const writeDeployment = async (
 // timelock was configured with a real governance window. A multisig should hold the timelock's
 // proposer/canceller/executor roles rather than own the protocol directly, so live deployments
 // intentionally have no non-timelock bypass.
-const assertGovernanceOwnerInvariants = async ({
+export const assertGovernanceOwnerInvariants = async ({
   connection,
   ethers,
   artifacts,
@@ -874,6 +875,7 @@ const deployIntegratedContracts = async (
         `${label} route already points at ${current}, expected ${groth16VerifierAdapterAddress}`,
       );
     }
+    await checkVerifierRoute(groth16VerifierAdapter, purpose, circuitId);
     await executeTransaction(
       label,
       await deepFamily.setCircuitVerifier.populateTransaction(

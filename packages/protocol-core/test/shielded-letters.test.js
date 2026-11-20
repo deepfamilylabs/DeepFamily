@@ -316,6 +316,12 @@ test("scope and message number reject absent, zero, or noncanonical values", () 
     () => buildShieldedLetterHpkeAad({ ...context, lettersAddress: "0x" + "0".repeat(40) }),
     isCode("INVALID_SHIELDED_LETTER_ADDRESS"),
   );
+  for (const messageId of [1n, (1n << 128n) - 1n])
+    assert.ok(buildShieldedLetterHpkeAad({ ...context, messageId }).length > 0);
+  assert.throws(
+    () => buildShieldedLetterHpkeAad({ ...context, messageId: 1n << 128n }),
+    isCode("INTEGER_OUT_OF_RANGE"),
+  );
   assert.throws(
     () => buildShieldedLetterHpkeAad({ ...context, messageId: 0n }),
     isCode("INVALID_SHIELDED_LETTER_FIELD"),

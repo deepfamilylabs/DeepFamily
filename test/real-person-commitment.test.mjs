@@ -36,6 +36,62 @@ function sequentialProtocolRandom(start = 0) {
 describe("Real person commitment proof", function () {
   this.timeout(120_000);
 
+  it("supports registering either declared parent later with the same identity", async () => {
+    const { deepFamily, lineageIndex } =
+      await hre.networkHelpers.loadFixture(deployIntegratedFixture);
+    const [signer] = await hre.ethers.getSigners();
+    const person = {
+      fullName: "Child",
+      derivedSecretField: 11n,
+      isBirthBC: false,
+      birthYear: 1990,
+      birthMonth: 1,
+      birthDay: 1,
+      gender: 1,
+    };
+    const father = { ...person, fullName: "Father", derivedSecretField: 21n, birthYear: 1960 };
+    const mother = { ...person, fullName: "Mother", derivedSecretField: 31n, birthYear: 1962 };
+    const options = { contentDigest: hre.ethers.id("register parents later") };
+    for (const parents of [
+      [{ ...father, derivedSecretField: 0n }, null],
+      [null, { ...mother, derivedSecretField: 0n }],
+    ]) {
+      await assert.rejects(
+        generatePersonRelationProof(person, ...parents, signer.address, options),
+        /Assert Failed|constraint|Error in template/i,
+      );
+    }
+    const child = await generatePersonRelationProof(
+      person,
+      father,
+      mother,
+      signer.address,
+      options,
+    );
+    await deepFamily.addPersonVersion(
+      child.proofEnvelope,
+      child.publicSignalsStruct,
+      0,
+      0,
+      makeMetadataEnvelope(hre.ethers, 1),
+    );
+    for (const [parent, commitment] of [
+      [father, child.publicSignalsStruct.fatherIdentityCommitment],
+      [mother, child.publicSignalsStruct.motherIdentityCommitment],
+    ]) {
+      const proof = await generatePersonRelationProof(parent, null, null, signer.address, options);
+      expect(proof.publicSignalsStruct.identityCommitment).to.equal(commitment);
+      await deepFamily.addPersonVersion(
+        proof.proofEnvelope,
+        proof.publicSignalsStruct,
+        0,
+        0,
+        makeMetadataEnvelope(hre.ethers, 1),
+      );
+      expect(await lineageIndex.identityCommitmentOf(proof.person.personHash)).to.equal(commitment);
+    }
+  });
+
   it("rejects a zero self secret and binds a nonzero self secret to the version", async () => {
     const { deepFamily, groth16VerifierAdapter } =
       await hre.networkHelpers.loadFixture(deployIntegratedFixture);
@@ -203,6 +259,14 @@ describe("Real person commitment proof", function () {
       .to.emit(deepFamily, "PersonHashZKVerified")
       .withArgs(generated.person.personHash, signerAddress);
 
+    const index = await hre.ethers.getContractAt(
+      "DeepFamilyLineageIndex",
+      await deepFamily.lineageIndex(),
+    );
+    expect((await index.getVersionPage(0, 1))[0].identitySuiteId).to.equal(2n);
+    expect((await index.versionParents(generated.person.personHash, 1)).identitySuiteId).to.equal(
+      2n,
+    );
     expect(await deepFamily.personVersionsCount(generated.person.personHash)).to.equal(1n);
     const stored = await deepFamily.personVersionAt(generated.person.personHash, 0);
     expect(stored.fatherHash).to.equal(generated.father.personHash);

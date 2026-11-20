@@ -74,6 +74,31 @@ describe("DeepFamily lineage index", function () {
     return { ...deployed, signers };
   }
 
+  it("keeps compact reference paths for 1, 3 and 5 leaves, including a real zero sibling", async () => {
+    const {
+      deepFamily,
+      lineageIndex,
+      signers: [manager],
+    } = await setup();
+    for (let size = 1; size <= 5; size++) {
+      const personHash = await addPerson(hre.ethers, deepFamily, manager, undefined, {
+        person: makeTestPerson(`Path vector ${size}`),
+        tag: `path-${size}`,
+      });
+      if (size === 2) await deepFamily.removeTrustedEndorser(personHash, 1, manager.address);
+      if (size % 2 === 1) {
+        expect(await lineageIndex.size(TRUSTED_TREE)).to.equal(BigInt(size));
+        await expectTreesMirrored(lineageIndex);
+      }
+      if (size === 3) {
+        const left = await lineageIndex.getMerkleProof(TRUSTED_TREE, 0);
+        const right = await lineageIndex.getMerkleProof(TRUSTED_TREE, 2);
+        expect(left.siblings[0]).to.equal(0n);
+        expect(right.proofDepth).to.equal(1n);
+      }
+    }
+  });
+
   async function addFamily({ deepFamily, token, signers }) {
     const [manager, second, third] = signers;
     const root = makeTestPerson("Lineage Root", { derivedSecretField: 1001n, birthYear: 1930 });
@@ -138,6 +163,7 @@ describe("DeepFamily lineage index", function () {
     expect(await lineageIndex.versionParents(family.childHash, 1)).to.deep.equal([
       rootIdentity.identityCommitment,
       spouseIdentity.identityCommitment,
+      1n,
     ]);
     const [indexed] = await lineageIndex.queryFilter(
       lineageIndex.filters.VersionIndexed(family.childHash, 1),
@@ -199,10 +225,12 @@ describe("DeepFamily lineage index", function () {
     expect(await lineageIndex.versionParents(family.childHash, 2)).to.deep.equal([
       rootIdentity.identityCommitment,
       0n,
+      1n,
     ]);
     expect(await lineageIndex.versionParents(family.childHash, 1)).to.deep.equal([
       rootIdentity.identityCommitment,
       spouseIdentity.identityCommitment,
+      1n,
     ]);
     const switched = await (
       await deepFamily.connect(second).endorseVersion(family.childHash, 2)
@@ -416,7 +444,7 @@ describe("DeepFamily lineage index", function () {
     const { lineageIndex, signers } = await setup();
     const personHash = hre.ethers.ZeroHash;
     await expect(
-      lineageIndex.connect(signers[0]).onVersionAdded(personHash, 1, 1, 0, 0),
+      lineageIndex.connect(signers[0]).onVersionAdded(personHash, 1, 1, 0, 0, 1),
     ).to.be.revertedWithCustomError(lineageIndex, "UnauthorizedCaller");
     await expect(
       lineageIndex.onTrustedEndorserSet(personHash, 1, signers[0].address, true),
@@ -435,7 +463,7 @@ describe("DeepFamily lineage index", function () {
     expect(await deepFamily.lineageIndex()).to.equal(await lineageIndex.getAddress());
     expect(await lineageIndex.DEEP_FAMILY()).to.equal(await deepFamily.getAddress());
     expect(await lineageIndex.indexKind()).to.equal(hre.ethers.id("deepfamily.lineage-index.v1"));
-    expect(await lineageIndex.apiVersion()).to.equal(1n);
+    expect(await lineageIndex.apiVersion()).to.equal(2n);
 
     await expect(
       deepFamily.connect(owner).setLineageIndex(await lineageIndex.getAddress()),

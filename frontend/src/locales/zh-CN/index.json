@@ -1416,6 +1416,7 @@
       "OwnableUnauthorizedAccount": "当前钱包无权执行该所有者操作。",
       "ReentrancyGuardReentrantCall": "合约拒绝了重入调用。",
       "InvalidTokenId": "Token ID 无效。",
+      "EndorsementFeeChanged": "背书费用已变化。请刷新报价后重新确认。",
       "EndorsementFeeTransferFailed": "背书费用转账失败。",
       "ProtocolFeeTooHigh": "协议费率过高。",
       "AlreadyEndorsed": "已背书该版本。",

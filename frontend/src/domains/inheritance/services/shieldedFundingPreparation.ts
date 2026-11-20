@@ -1,5 +1,6 @@
 import {
   SHIELDED_POOL_ACTION,
+  assertIdentitySuiteSupported,
   buildShieldedPoolPublicInputs,
   computeLineageEndorsementLeaf,
   computeLineageParentsDigest,
@@ -260,11 +261,15 @@ async function currentContext(input: PrepareShieldedFundInput) {
       throw new Error("Public funding requires a selected family identity");
     const versions = input.lineage.versions.get(input.publicRecipientPersonHash.toLowerCase());
     if (!versions?.length) throw new Error("Recipient identity is unknown");
+    const suite = versions[0].identitySuiteId;
+    if (suite === undefined) throw new Error("The recipient identity suite is unavailable");
+    assertIdentitySuiteSupported(suite);
     const identityCommitment = getBigInt(versions[0].identityCommitment);
     if (
       versions.some(
         (version) =>
           version.personHash.toLowerCase() !== input.publicRecipientPersonHash!.toLowerCase() ||
+          version.identitySuiteId !== suite ||
           getBigInt(version.identityCommitment) !== identityCommitment,
       )
     )

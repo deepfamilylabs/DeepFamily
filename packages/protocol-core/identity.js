@@ -58,10 +58,17 @@ export function packBirthGenderField(input) {
   );
 }
 
+export function isIdentitySuiteSupported(identitySuiteId) {
+  return (
+    identitySuiteId === IDENTITY_SUITE_CANDIDATE_1 ||
+    identitySuiteId === BigInt(IDENTITY_SUITE_CANDIDATE_1)
+  );
+}
+
 export function assertIdentitySuiteSupported(identitySuiteId) {
   const suite = bigintFrom(identitySuiteId, "identitySuiteId", MAX_UINT32);
   protocolAssert(suite !== 0n, "ZERO_IDENTITY_SUITE", "identitySuiteId must be nonzero");
-  if (suite !== BigInt(IDENTITY_SUITE_CANDIDATE_1)) {
+  if (!isIdentitySuiteSupported(suite)) {
     throw new UnsupportedProtocolError(
       "UNSUPPORTED_IDENTITY_SUITE",
       `Unsupported identity suite ${suite.toString()}`,

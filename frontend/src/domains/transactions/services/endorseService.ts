@@ -33,6 +33,7 @@ export type EndorseFeeQuote = {
 export type EndorseVersionFn = (
   personHash: string,
   versionIndex: number,
+  expectedFee: bigint,
   overrides?: Record<string, unknown>,
 ) => Promise<ContractReceipt>;
 
@@ -191,25 +192,32 @@ export async function executeEndorseFlow({
 
   onStageChange?.("submitting");
   const gasLimit = await estimateGasWithFallback({
-    contractMethod: (contract as any).endorseVersion,
-    args: [personHash, versionIndex] as const,
+    contractMethod: contract.endorseVersionAtFee,
+    args: [personHash, versionIndex, fee] as const,
     decodeContract: contract,
     fallbackGas,
-    label: "endorseVersion",
+    label: "endorseVersionAtFee",
   });
 
   await assertWalletScope();
   const receipt = await endorseVersion(
     personHash,
     versionIndex,
+    fee,
     gasLimit ? { gasLimit } : undefined,
   );
 
   const contractAddress = spender;
   const eventInterface = createDeepFamilyInterface();
   const endorsementEvent = parseReceiptEvents(receipt, eventInterface, contractAddress).find(
-    (event) => event.name === "PersonVersionEndorsed",
+    (event) =>
+      event.name === "PersonVersionEndorsed" &&
+      event.args.personHash.toLowerCase() === personHash.toLowerCase() &&
+      event.args.endorser.toLowerCase() === address.toLowerCase() &&
+      BigInt(event.args.versionIndex) === BigInt(versionIndex),
   );
+
+  const paidFee = endorsementEvent ? BigInt(endorsementEvent.args.endorsementFee) : fee;
 
   return {
     alreadyEndorsed: false,
@@ -218,8 +226,8 @@ export async function executeEndorseFlow({
     blockNumber: Number(receipt?.blockNumber || 0),
     approvalTxHash,
     deepTokenAddress: tokenAddress,
-    fee,
-    feeFormatted,
+    fee: paidFee,
+    feeFormatted: ethers.formatUnits(paidFee, decimals),
     balanceBefore,
     balanceFormatted: ethers.formatUnits(balanceBefore, decimals),
     decimals,

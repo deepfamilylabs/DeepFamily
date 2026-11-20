@@ -14,6 +14,8 @@
  * List every option with:
  *   npx hardhat --config hardhat.config.mjs governance-schedule --help
  */
+import { instrumentChainContract } from "@deepfamily/chain-client";
+import { checkVerifierRoute } from "../scripts/lib/verifierRouteProbe.mjs";
 import { task } from "hardhat/config";
 import { ArgumentType } from "hardhat/types/arguments";
 import { sendOrPrint } from "./lib/timelockUpgrade.mjs";
@@ -52,6 +54,13 @@ export const action = async (args, hre) => {
     );
   }
 
+  if (signature === "setCircuitVerifier(uint8,uint32,address)") {
+    const [purpose, circuitId, candidate] = callArgs;
+    const adapter = instrumentChainContract(
+      await ethers.getContractAt("IProofVerifierAdapter", candidate),
+    );
+    await checkVerifierRoute(adapter, purpose, circuitId, args.proofSample);
+  }
   if (!args.skipSimulation) {
     await simulateGovernanceCall({
       ethers,
@@ -102,6 +111,12 @@ export const action = async (args, hre) => {
 };
 
 export default task("governance-schedule", "Schedule a DeepFamily owner call through the timelock")
+  .addOption({
+    name: "proofSample",
+    description: "Reference proof JSON for a candidate verifier using different keys or encoding",
+    type: ArgumentType.STRING,
+    defaultValue: "",
+  })
   .addOption({
     name: "target",
     description: "Governed contract to call: main",

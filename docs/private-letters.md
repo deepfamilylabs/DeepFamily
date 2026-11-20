@@ -245,6 +245,8 @@ the complete diversified ciphertext adds 197 bytes to the UTF-8 body. Neither al
 nor salt is exposed outside the authenticated ciphertext. This receiving check
 uses no current counter or code expiry, so historical letters remain readable.
 
+The archive assigns each successful registration one count in `letterCount`. Recovery compares the number of distinct authenticated registrations with this count at its snapshot block. A mismatch reports an incomplete inbox and can be retried. For older immutable archives, recovery reads the block receipts to account for every registration. Letter IDs range from 1 through 2¹²⁸ − 1.
+
 ## Browser artifacts
 
 All proving uses Circom WASM and snarkjs in the existing Worker. There is no Go

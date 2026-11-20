@@ -148,6 +148,34 @@ describe("Endorse Tests", function () {
     expect(endorsementCount).to.equal(1n);
   });
 
+  it("binds the accepted fee even when the reward halves before inclusion", async () => {
+    const { deepFamily, token, signers, personHash } = await createChildWithParents();
+    const [signer] = signers;
+    const quotedFee = await token.recentReward();
+    await token.approve(await deepFamily.getAddress(), quotedFee);
+    const child = makeTestPerson("Second rewarded child");
+    const father = makeTestPerson("Second father");
+    const mother = makeTestPerson("Second mother");
+    await addPerson(hre.ethers, deepFamily, signer, commitmentOf(child), {
+      person: child,
+      fatherPerson: father,
+      motherPerson: mother,
+      fatherIdentityCommitment: commitmentOf(father),
+      motherIdentityCommitment: commitmentOf(mother),
+    });
+    const actualFee = await token.recentReward();
+    expect(actualFee).to.equal(quotedFee / 2n);
+    await expect(deepFamily.endorseVersionAtFee(personHash, 1, quotedFee))
+      .to.be.revertedWithCustomError(deepFamily, "EndorsementFeeChanged")
+      .withArgs(quotedFee, actualFee);
+    expect(await deepFamily.endorsedVersionIndex(personHash, signer.address)).to.equal(0n);
+    expect(await token.allowance(signer.address, await deepFamily.getAddress())).to.equal(
+      quotedFee,
+    );
+    const receipt = await (await deepFamily.endorseVersionAtFee(personHash, 1, actualFee)).wait();
+    expect(getEndorsementEventArgs(receipt, deepFamily).endorsementFee).to.equal(actualFee);
+  });
+
   it("second endorsement of same version by the same account reverts", async () => {
     const { deepFamily, signers, personHash } = await createBasicPerson();
     await endorseVersion(deepFamily, signers[0], personHash, 1);

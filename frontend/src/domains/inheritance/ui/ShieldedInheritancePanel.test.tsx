@@ -1522,7 +1522,7 @@ describe("Worker-backed shielded wallet", () => {
       mocks.verify.mockResolvedValue({ purpose: action === "fund" ? "fund" : "receive", personHash: identity.personHash, keyMode: 1, fingerprint: "recipient-key" });
       mocks.call.mockImplementation(async (method, params) => method === "recover" ? {
         ...emptyWallet,
-        children: [{ personHash: identity.personHash, rootVersionIndex: 0, eligible: true }],
+        children: [{ personHash: identity.personHash, rootVersionIndex: 0, identitySuiteId: 1, eligible: true }],
         notes: [
           { commitment: "101", ownerCommitment: "1", slot: "identity", kind: "value", amount: "10000000000000000000" },
           { commitment: "102", ownerCommitment: "2", slot: "independent", kind: "value", amount: "20000000000000000000" },
@@ -2212,9 +2212,9 @@ describe("Worker-backed shielded wallet", () => {
       familyRecordsAvailable: true,
       parentVersions: [2, 1],
       children: [
-        { personHash: identity.personHash, rootVersionIndex: 2, eligible: true },
-        { personHash: earlierChild, rootVersionIndex: 1, eligible: true },
-        { personHash: ineligibleChild, rootVersionIndex: 2, eligible: false },
+        { personHash: identity.personHash, rootVersionIndex: 2, identitySuiteId: 1, eligible: true },
+        { personHash: earlierChild, rootVersionIndex: 1, identitySuiteId: 1, eligible: true },
+        { personHash: ineligibleChild, rootVersionIndex: 2, identitySuiteId: 1, eligible: false },
       ],
     } : defaultCall?.(method, params));
     mocks.verify.mockResolvedValue({ purpose: "fund", personHash: identity.personHash, keyMode: 1, fingerprint: "child-fingerprint" });
@@ -2316,7 +2316,7 @@ describe("Worker-backed shielded wallet", () => {
       familyRecordsError: familyRecordsAvailable ? undefined : "incompatible",
       parentVersions: familyRecordsAvailable ? [1] : [],
       children: familyRecordsAvailable
-        ? [{ personHash: identity.personHash, rootVersionIndex: 1, eligible: true }]
+        ? [{ personHash: identity.personHash, rootVersionIndex: 1, identitySuiteId: 1, eligible: true }]
         : [],
       notes: [{ commitment: "11", ownerCommitment: "1", slot: "identity", kind: "value", amount: "100000000000000000000" }],
     } : defaultCall?.(method, params));
@@ -2397,7 +2397,7 @@ describe("Worker-backed shielded wallet", () => {
     mocks.verify.mockResolvedValue({ purpose: "fund", personHash: identity.personHash, keyMode: 1, fingerprint: "child-fingerprint" });
     mocks.call.mockResolvedValue({
       ...emptyWallet,
-      children: [{ personHash: identity.personHash, rootVersionIndex: 0, eligible: true }],
+      children: [{ personHash: identity.personHash, rootVersionIndex: 0, identitySuiteId: 1, eligible: true }],
     });
     await renderUnlockedPanel();
     chooseAction("fund");
@@ -2448,7 +2448,7 @@ describe("Worker-backed shielded wallet", () => {
     mocks.call.mockImplementation(async (method, params) => {
       if (method === "recover") return {
         ...emptyWallet,
-        children: [{ personHash: identity.personHash, rootVersionIndex: 0, eligible: true }],
+        children: [{ personHash: identity.personHash, rootVersionIndex: 0, identitySuiteId: 1, eligible: true }],
         notes: [{ commitment: "11", ownerCommitment: identity.identityCommitment, slot: "identity", kind: "value", amount: "100000000000000000000" }],
       };
       if (method === "prove") return { action: "fund", amount: "1000000000000000000", data: { budgetKind: 0, outputCommitments: [31n, 32n] }, proof: {} };
@@ -2478,7 +2478,7 @@ describe("Worker-backed shielded wallet", () => {
     mocks.call.mockImplementation(async (method, ...args) => method === "recover" ? {
       ...emptyWallet,
       parentVersions: [0, 1],
-      children: [0, 1].map(rootVersionIndex => ({ personHash: identity.personHash, rootVersionIndex, eligible: true })),
+      children: [0, 1].map(rootVersionIndex => ({ personHash: identity.personHash, rootVersionIndex, identitySuiteId: 1, eligible: true })),
       policies: [0, 1].map((version, index) => ({ handle: `policy:${index}`, rootVersionIndex: String(version), amountPerPeriod: "1000000000000000000", periodDays: "30" })),
     } : originalCall(method, ...args));
     await renderUnlockedPanel();
@@ -2525,7 +2525,7 @@ describe("Worker-backed shielded wallet", () => {
     mocks.verify.mockResolvedValue({ purpose: "fund", personHash: identity.personHash, keyMode, fingerprint: "child-fingerprint" });
     mocks.call.mockImplementation(async (method, params) => method === "recover" ? {
       ...emptyWallet,
-      children: [{ personHash: identity.personHash, rootVersionIndex: 0, eligible: true }],
+      children: [{ personHash: identity.personHash, rootVersionIndex: 0, identitySuiteId: 1, eligible: true }],
       notes: [{ commitment: "11", ownerCommitment: source === "independent" ? independentKey.ownerCommitment : identity.identityCommitment, slot: source, kind: "value", amount: "100000000000000000000" }],
     } : method === "prove" ? stopAfterPreview() : {
       handle: "fund:1", action: "fund", amount: params.amount, slot: params.slot,
@@ -2562,8 +2562,8 @@ describe("Worker-backed shielded wallet", () => {
       familyRecordsAvailable: true,
       parentVersions: [1],
       children: [
-        { personHash: identity.personHash, rootVersionIndex: 1, eligible: true },
-        { personHash: revokedChild, rootVersionIndex: 1, eligible: false },
+        { personHash: identity.personHash, rootVersionIndex: 1, identitySuiteId: 1, eligible: true },
+        { personHash: revokedChild, rootVersionIndex: 1, identitySuiteId: 1, eligible: false },
       ],
       policies: [{ handle: "policy:existing", rootVersionIndex: "1", amountPerPeriod: "1000000000000000000", periodDays: "30" }],
       templates: [
@@ -4146,7 +4146,7 @@ describe("Worker-backed shielded wallet", () => {
       if (method === "recover") return {
         ...emptyWallet,
         parentVersions: [0],
-        children: [{ personHash: identity.personHash, rootVersionIndex: 0, eligible: true }],
+        children: [{ personHash: identity.personHash, rootVersionIndex: 0, identitySuiteId: 1, eligible: true }],
         notes: [
           { commitment: "11", ownerCommitment: "1", slot: "identity", kind: "value", amount: "1000000000000000000" },
           { commitment: "12", ownerCommitment: "1", slot: "identity", kind: "value", amount: "1000000000000000000" },
@@ -4210,7 +4210,7 @@ describe("Worker-backed shielded wallet", () => {
       if (method === "recover") return {
         ...emptyWallet,
         parentVersions: [0],
-        children: [{ personHash: identity.personHash, rootVersionIndex: 0, eligible: true }],
+        children: [{ personHash: identity.personHash, rootVersionIndex: 0, identitySuiteId: 1, eligible: true }],
         notes: [{ commitment: "11", ownerCommitment: "1", slot: "identity", kind: "value", amount: "1000000000000000000" }],
       };
       if (method === "preview") return {
@@ -4677,7 +4677,7 @@ describe("Worker-backed shielded wallet", () => {
         policies: rule === "fixed rule" ? [{
           handle: "policy:existing", rootVersionIndex: "0", amountPerPeriod: "1000000000000000000", periodDays: "30",
         }] : [],
-        children: [{ personHash: identity.personHash, rootVersionIndex: 0, eligible: true }],
+        children: [{ personHash: identity.personHash, rootVersionIndex: 0, identitySuiteId: 1, eligible: true }],
         notes: [{ commitment: "11", ownerCommitment: "1", slot: "identity", kind: "value", amount: "100000000000000000000" }],
       } : method === "prove" ? {
         action: "fund", amount: "2000000000000000000",
@@ -5646,7 +5646,7 @@ describe("Worker-backed shielded wallet", () => {
     const defaultCall = mocks.call.getMockImplementation();
     mocks.call.mockImplementation(async (method, params) => method === "recover" ? {
       ...emptyWallet,
-      children: [{ personHash: identity.personHash, rootVersionIndex: 0, eligible: true }],
+      children: [{ personHash: identity.personHash, rootVersionIndex: 0, identitySuiteId: 1, eligible: true }],
       notes: [{ commitment: "11", ownerCommitment: "1", slot: "identity", kind: "value", amount: "10000000000000000000" }],
     } : defaultCall?.(method, params));
     await renderUnlockedPanel();

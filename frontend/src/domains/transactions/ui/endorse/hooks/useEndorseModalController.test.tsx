@@ -61,7 +61,7 @@ function fixture(proxy = oldProxy, tokenAddress = oldToken) {
   );
   const contract = {
     runner: mocks.wallet.signer,
-    endorseVersion: send,
+    endorseVersionAtFee: send,
     DEEP_FAMILY_TOKEN_CONTRACT: vi.fn(async () => tokenAddress),
     getAddress: vi.fn(async () => proxy),
     endorsedVersionIndex: vi.fn(async () => 0),

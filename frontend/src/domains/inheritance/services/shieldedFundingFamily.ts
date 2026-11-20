@@ -151,6 +151,7 @@ export function listShieldedFundingChildren({
     if (!scopedParents.length) continue;
     candidates.push({
       personHash,
+      identitySuiteId: versions[0]?.identitySuiteId,
       eligible: scopedParents.some((parent) =>
         parent.versions.some(
           (version) => version.eligible && version.versionIndex === rootVersionIndex,

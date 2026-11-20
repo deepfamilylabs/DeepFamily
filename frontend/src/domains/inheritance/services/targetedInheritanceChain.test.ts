@@ -136,6 +136,7 @@ function fixture() {
         person === ROOT ? ROOT_IC : person === HEIR ? HEIR_IC : 0n,
     ),
     versionParents: vi.fn(async (person: string, _version?: number, _options?: unknown) => ({
+      identitySuiteId: 1n,
       fatherIdentityCommitment: person === HEIR ? ROOT_IC : 0n,
       motherIdentityCommitment: 0n,
     })),
@@ -189,7 +190,7 @@ describe("targeted on-chain lineage paths", () => {
         rootVersionIndex: 1,
         asOf: 1000n,
       }),
-    ).toEqual([{ personHash: HEIR, eligible: true }]);
+    ).toEqual([{ personHash: HEIR, identitySuiteId: 1, eligible: true }]);
     const found = findHeirLegitimacy({
       snapshot,
       heir: { personHash: HEIR, identityCommitment: HEIR_IC },
@@ -468,7 +469,7 @@ describe("targeted on-chain lineage paths", () => {
         rootVersionIndex: 1,
         asOf: 1000n,
       }),
-    ).toEqual([{ personHash: HEIR, eligible: true }]);
+    ).toEqual([{ personHash: HEIR, identitySuiteId: 1, eligible: true }]);
   });
   it("does not restrict child qualification to the bucket's parent version", async () => {
     const f = fixture();
@@ -493,7 +494,7 @@ describe("targeted on-chain lineage paths", () => {
         rootVersionIndex: 2,
         asOf: 1000n,
       }),
-    ).toEqual([{ personHash: HEIR, eligible: true }]);
+    ).toEqual([{ personHash: HEIR, identitySuiteId: 1, eligible: true }]);
   });
   it("uses bounded paths when the global trees have over a trillion leaf slots", async () => {
     const f = fixture(),

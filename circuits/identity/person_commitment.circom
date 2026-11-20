@@ -104,6 +104,13 @@ template PersonRelation() {
     component selfSecretZero = IsZero();
     selfSecretZero.in <== derivedSecretField;
     selfSecretZero.out === 0;
+    // A declared parent must be registrable with the very same identity material.
+    component fatherSecretZero = IsZero();
+    fatherSecretZero.in <== fatherDerivedSecretField;
+    fatherSecretZero.out === 1 - hasFather;
+    component motherSecretZero = IsZero();
+    motherSecretZero.in <== motherDerivedSecretField;
+    motherSecretZero.out === 1 - hasMother;
 
     component selfCore = IdentityCommitmentCore();
     selfCore.nameField <== nameField;

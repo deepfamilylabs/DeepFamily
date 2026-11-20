@@ -216,6 +216,25 @@ describe("Shared identity authorization counter state", function () {
 describe("Authenticated private letter archive boundaries", function () {
   this.timeout(120_000);
 
+  it("counts successful registrations across the nonzero uint128 ID range", async () => {
+    const context = await hre.networkHelpers.loadFixture(fixture);
+    expect(await context.archive.letterCount()).to.equal(0n);
+    const zero = await delivery(context, { messageId: 0n });
+    await expect(
+      context.archive.registerLetter(zero, ciphertext, "0x"),
+    ).to.be.revertedWithCustomError(context.archive, "InvalidLetterField");
+    let count = 0n;
+    for (const messageId of [1n, (1n << 128n) - 1n]) {
+      const data = await delivery(context, { messageId });
+      const valid = await proof(context, data);
+      await context.archive.registerLetter(data, ciphertext, valid);
+      await expect(
+        context.archive.registerLetter(data, ciphertext, valid),
+      ).to.be.revertedWithCustomError(context.archive, "MessageAlreadyRegistered");
+      expect(await context.archive.letterCount()).to.equal(++count);
+    }
+  });
+
   it("binds ciphertext, message, recipient, deadline, chain and actual archive", async () => {
     const context = await hre.networkHelpers.loadFixture(fixture);
     const data = await delivery(context);

@@ -69,7 +69,7 @@ describe("endorseService executeEndorseFlow", () => {
       endorsedVersionIndex: vi.fn(async () => 0),
       DEEP_FAMILY_TOKEN_CONTRACT: vi.fn(async () => "0x0000000000000000000000000000000000000def"),
       getAddress: vi.fn(async () => contractAddress),
-      endorseVersion: endorseMethod,
+      endorseVersionAtFee: endorseMethod,
       runner: {
         provider: { getBlockNumber: async () => 12,
           getNetwork: vi.fn(async () => ({ chainId: 31337n })),
@@ -87,10 +87,10 @@ describe("endorseService executeEndorseFlow", () => {
       "0x00000000000000000000000000000000000000bb",
       2n,
       "0x00000000000000000000000000000000000000cc",
-      7n,
+      4n,
       "0x00000000000000000000000000000000000000dd",
-      3n,
-      10n,
+      1n,
+      5n,
       123n,
     ]);
 
@@ -98,6 +98,11 @@ describe("endorseService executeEndorseFlow", () => {
       hash: "0xtxhash",
       blockNumber: 55,
       logs: [
+        {
+          address: contractAddress,
+          topics: [encodedLog.topics[0], "0x" + "00".repeat(32), ...encodedLog.topics.slice(2)],
+          data: encodedLog.data,
+        },
         {
           address: contractAddress,
           topics: encodedLog.topics,
@@ -126,11 +131,15 @@ describe("endorseService executeEndorseFlow", () => {
     expect(endorseVersion).toHaveBeenCalledWith(
       "0x00000000000000000000000000000000000000000000000000000000000000aa",
       2,
+      10n,
       { gasLimit: 120n },
     );
     expect(result.approvalTxHash).toBe("0xapprove");
     expect(onApprovalConfirmed).toHaveBeenCalledWith("0xapprove", {status: 1, hash: "0xapprove"});
-    expect(result.event?.endorsementFee).toBe("10");
+    expect(result.fee).toBe(5n);
+    expect(result.feeFormatted).toBe("0.000000000000000005");
+    expect(result.event?.endorsementFee).toBe("5");
+    expect(result.event?.personHash).toBe("0x" + "00".repeat(31) + "aa");
     expect(result.event?.recipient).toBe("0x00000000000000000000000000000000000000cc");
     expect(result.transactionHash).toBe("0xtxhash");
   });
@@ -150,7 +159,7 @@ describe("endorseService executeEndorseFlow", () => {
       endorsedVersionIndex: vi.fn(async () => 0),
       DEEP_FAMILY_TOKEN_CONTRACT: vi.fn(async () => "0x0000000000000000000000000000000000000def"),
       getAddress: vi.fn(async () => "0x0000000000000000000000000000000000000abc"),
-      endorseVersion: Object.assign(vi.fn(), { estimateGas: vi.fn(async () => 100n) }),
+      endorseVersionAtFee: Object.assign(vi.fn(), { estimateGas: vi.fn(async () => 100n) }),
     } as any;
 
     const onFeeQuoteChange = vi.fn();
@@ -200,7 +209,7 @@ describe("endorseService executeEndorseFlow", () => {
       endorsedVersionIndex: vi.fn(async () => 0),
       DEEP_FAMILY_TOKEN_CONTRACT: vi.fn(async () => "0x0000000000000000000000000000000000000def"),
       getAddress: vi.fn(async () => contractAddress),
-      endorseVersion: Object.assign(vi.fn(), { estimateGas }),
+      endorseVersionAtFee: Object.assign(vi.fn(), { estimateGas }),
     } as any;
     const endorseVersion = vi.fn();
 
@@ -236,7 +245,7 @@ describe("endorseService executeEndorseFlow", () => {
       endorsedVersionIndex: vi.fn(async () => 0),
       DEEP_FAMILY_TOKEN_CONTRACT: vi.fn(async () => "0x0000000000000000000000000000000000000def"),
       getAddress: vi.fn(async () => "0x0000000000000000000000000000000000000abc"),
-      endorseVersion: Object.assign(vi.fn(), { estimateGas: vi.fn(async () => 100n) }),
+      endorseVersionAtFee: Object.assign(vi.fn(), { estimateGas: vi.fn(async () => 100n) }),
     } as any;
 
     const onFeeQuoteChange = vi.fn();

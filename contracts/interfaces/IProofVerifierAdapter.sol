@@ -24,6 +24,9 @@ pragma solidity ^0.8.20;
  *      business contract (e.g. DeepFamily.sol).
  */
 interface IProofVerifierAdapter {
+  /** @notice Whether this adapter is configured to verify the specified purpose. */
+  function supportsPurpose(uint8 purpose) external view returns (bool);
+
   /**
    * @notice Verify a proof envelope against its declared encoding and a backend verifier.
    * @param purpose          Verifier route defined by ProofConstants (identity, disclosure,

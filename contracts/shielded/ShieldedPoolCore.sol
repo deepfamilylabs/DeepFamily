@@ -2,7 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
-import {PoseidonT3} from "poseidon-solidity/PoseidonT3.sol";
+import {LeanMerklePath} from "../libraries/LeanMerklePath.sol";
 import {IDeepFamilyLineageIndex} from "../interfaces/IDeepFamilyLineageIndex.sol";
 import {IProofVerifierAdapter} from "../interfaces/IProofVerifierAdapter.sol";
 import {ProofConstants} from "../libraries/ProofConstants.sol";
@@ -233,35 +233,15 @@ abstract contract ShieldedPoolCore is ReentrancyGuardTransient {
     )
   {
     Shard storage shard = _shards[shardId];
-    uint256 levelSize = shard.size;
-    if (leafIndex >= levelSize) revert InvalidLeafIndex();
+    if (leafIndex >= shard.size) revert InvalidLeafIndex();
     leaf = shard.nodes[0][leafIndex];
     proofRoot = shard.root;
-    uint256 index = leafIndex;
-    uint256 treeDepth = shard.depth;
-
-    for (uint256 level = 0; level < treeDepth; ++level) {
-      if ((index & 1) == 1 || index + 1 < levelSize) ++proofDepth;
-      index >>= 1;
-      levelSize = (levelSize + 1) >> 1;
-    }
-
-    siblings = new uint256[](proofDepth);
-    index = leafIndex;
-    levelSize = shard.size;
-    uint256 siblingIndex;
-    for (uint256 level = 0; level < treeDepth; ++level) {
-      if ((index & 1) == 1) {
-        siblings[siblingIndex] = shard.nodes[level][index - 1];
-        proofIndex |= uint256(1) << siblingIndex;
-        ++siblingIndex;
-      } else if (index + 1 < levelSize) {
-        siblings[siblingIndex] = shard.nodes[level][index + 1];
-        ++siblingIndex;
-      }
-      index >>= 1;
-      levelSize = (levelSize + 1) >> 1;
-    }
+    (proofIndex, proofDepth, siblings) = LeanMerklePath.proof(
+      shard.nodes,
+      shard.size,
+      shard.depth,
+      leafIndex
+    );
   }
 
   function _privateAction(Action action, ActionData calldata data, bytes calldata proof) private {
@@ -599,31 +579,16 @@ abstract contract ShieldedPoolCore is ReentrancyGuardTransient {
       shard.depth = treeDepth;
     }
     shard.size = newSize;
-    uint256 newRoot = _writePath(shard, leafIndex, commitment, newSize, treeDepth);
+    uint256 newRoot = LeanMerklePath.writePath(
+      shard.nodes,
+      leafIndex,
+      commitment,
+      newSize,
+      treeDepth
+    );
     if (newRoot == 0) revert InvalidFieldElement();
     shard.root = newRoot;
     emit NoteAppended(shardId, leafIndex, commitment, newRoot, ciphertext);
-  }
-
-  function _writePath(
-    Shard storage shard,
-    uint256 index,
-    uint256 node,
-    uint256 levelSize,
-    uint256 treeDepth
-  ) private returns (uint256) {
-    for (uint256 level = 0; level < treeDepth; ++level) {
-      shard.nodes[level][index] = node;
-      if ((index & 1) == 1) {
-        node = PoseidonT3.hash([shard.nodes[level][index - 1], node]);
-      } else if (index + 1 < levelSize) {
-        node = PoseidonT3.hash([node, shard.nodes[level][index + 1]]);
-      }
-      index >>= 1;
-      levelSize = (levelSize + 1) >> 1;
-    }
-    shard.nodes[treeDepth][0] = node;
-    return node;
   }
 
   function _requireField(uint256 value) private pure {

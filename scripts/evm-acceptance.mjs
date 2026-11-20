@@ -1,3 +1,4 @@
+import { checkVerifierRoute } from "./lib/verifierRouteProbe.mjs";
 import { createChainContract, executeChainTransaction, getChainErrorDetails, instrumentChainContract, runChainRead, waitForTransactionHashReceipt } from "@deepfamily/chain-client";
 import { fileURLToPath } from "node:url";
 import {
@@ -1900,6 +1901,7 @@ export const main = async (chainProfile) => {
         addresses.disclosureBindingVerifier,
         Object.values(SHIELDED_DEPLOYMENT_CIRCUITS).map((spec) => addresses[spec.verifierLabel]),
       ]);
+      await checkVerifierRoute(governedVerifierCandidate, PERSON_RELATION_PURPOSE, GOVERNED_PERSON_RELATION_CIRCUIT_ID);
       addresses.governedVerifierCandidate = await governedVerifierCandidate.getAddress();
       assertCondition(
         (await governedVerifierCandidate.personVerifier()) === addresses.personCommitmentVerifier &&

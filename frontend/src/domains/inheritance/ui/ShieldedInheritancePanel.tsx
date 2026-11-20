@@ -2365,7 +2365,7 @@ export function ShieldedInheritancePanel({
     receipt = null;
   } else if (action === "fund") {
     const fundingVersion = selectedPolicy?.rootVersionIndex ?? rootVersion;
-    const heirs = listShieldedFundingHeirs(wallet, fundingVersion, localRecipientLabels);
+    const heirs = listShieldedFundingHeirs(wallet, fundingVersion, entry, localRecipientLabels);
     const heirIndex = heirs.findIndex(
       (heir) => heir.personHash.toLowerCase() === personHash.toLowerCase(),
     );
@@ -2407,6 +2407,7 @@ export function ShieldedInheritancePanel({
         onEntryChange={(next) => {
           // The child, version, rule and amounts stay; only receiving material differs.
           if (template || next === entry) return;
+          if (!listShieldedFundingHeirs(wallet, fundingVersion, next).some(heir => heir.personHash.toLowerCase() === personHash.toLowerCase())) setPersonHash("");
           setEntry(next);
           changeCode("");
           setRecipientInputMethod("receiveCode");
@@ -2416,7 +2417,7 @@ export function ShieldedInheritancePanel({
         onPolicyChange={(handle) => {
           if (handle === policyHandle) return;
           const nextVersion = wallet?.policies.find(item => item.handle === handle)?.rootVersionIndex ?? rootVersion;
-          const sameChildAvailable = listShieldedFundingHeirs(wallet, nextVersion)
+          const sameChildAvailable = listShieldedFundingHeirs(wallet, nextVersion, entry)
             .some(heir => heir.personHash.toLowerCase() === personHash.toLowerCase());
           setPolicyHandle(handle);
           if (!sameChildAvailable) {
@@ -2429,7 +2430,7 @@ export function ShieldedInheritancePanel({
         rootVersion={rootVersion}
         onRootVersionChange={(value) => {
           if (value === rootVersion) return;
-          const sameChildAvailable = listShieldedFundingHeirs(wallet, value)
+          const sameChildAvailable = listShieldedFundingHeirs(wallet, value, entry)
             .some(heir => heir.personHash.toLowerCase() === personHash.toLowerCase());
           setRootVersion(value);
           if (!sameChildAvailable) {

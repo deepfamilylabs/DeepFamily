@@ -7,7 +7,7 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "poseidon-solidity/PoseidonT5.sol";
 import {IDeepFamilyArchive} from "../interfaces/IDeepFamilyArchive.sol";
-import {IDeepFamilyLineageIndex} from "../interfaces/IDeepFamilyLineageIndex.sol";
+import {IDeepFamilyLineageIndex, ILineageVersionHookV1} from "../interfaces/IDeepFamilyLineageIndex.sol";
 import {ERC165Checker} from "@openzeppelin/contracts/utils/introspection/ERC165Checker.sol";
 import {IProofVerifierAdapter} from "../interfaces/IProofVerifierAdapter.sol";
 import {AdultAgeGate} from "./AdultAgeGate.sol";
@@ -85,6 +85,7 @@ contract DeepFamily is
   // Token-related errors
   error TokenContractNotSet();
   error EndorsementFeeTransferFailed();
+  error EndorsementFeeChanged(uint256 expectedFee, uint256 currentFee);
   error ProtocolFeeTooHigh();
   error AlreadyEndorsed();
   error NotEndorsed();
@@ -526,8 +527,17 @@ contract DeepFamily is
     if (verifierRegistry[uint8(purpose)][circuitId] != address(0)) {
       revert VerifierRouteAlreadySet();
     }
+    _requireVerifierPurpose(adapter, purpose);
     verifierRegistry[uint8(purpose)][circuitId] = adapter;
     emit CircuitVerifierSet(uint8(purpose), circuitId, adapter);
+  }
+
+  function _requireVerifierPurpose(address adapter, ProofPurpose purpose) private view {
+    try IProofVerifierAdapter(adapter).supportsPurpose(uint8(purpose)) returns (bool supported) {
+      if (!supported) revert InvalidVerifierAddress();
+    } catch {
+      revert InvalidVerifierAddress();
+    }
   }
 
   /** @notice Permanently bind the immutable archive for metadata and public stories. */
@@ -561,9 +571,6 @@ contract DeepFamily is
   function setLineageIndex(address candidate) external onlyProxy onlyOwner {
     if (lineageIndex != address(0)) revert LineageIndexAlreadySet();
     if (candidate == address(0) || candidate.code.length == 0) revert InvalidLineageIndex();
-    if (!ERC165Checker.supportsInterface(candidate, type(IDeepFamilyLineageIndex).interfaceId)) {
-      revert InvalidLineageIndex();
-    }
     IDeepFamilyLineageIndex target = IDeepFamilyLineageIndex(candidate);
     try target.DEEP_FAMILY() returns (address bound) {
       if (bound != address(this)) revert InvalidLineageIndex();
@@ -576,7 +583,13 @@ contract DeepFamily is
       revert InvalidLineageIndex();
     }
     try target.apiVersion() returns (uint256 version) {
-      if (version != 1) revert InvalidLineageIndex();
+      bytes4 expected = type(IDeepFamilyLineageIndex).interfaceId;
+      if (version == 1) {
+        expected ^=
+          IDeepFamilyLineageIndex.onVersionAdded.selector ^
+          ILineageVersionHookV1.onVersionAdded.selector;
+      } else if (version != 2) revert InvalidLineageIndex();
+      if (!ERC165Checker.supportsInterface(candidate, expected)) revert InvalidLineageIndex();
     } catch {
       revert InvalidLineageIndex();
     }
@@ -725,13 +738,25 @@ contract DeepFamily is
     );
 
     IDeepFamilyArchive(archive).storeMetadata(personHash, versionIndex, metadataEnvelope);
-    _lineage().onVersionAdded(
-      personHash,
-      versionIndex,
-      publicSignals.identityCommitment,
-      publicSignals.fatherIdentityCommitment,
-      publicSignals.motherIdentityCommitment
-    );
+    IDeepFamilyLineageIndex index = _lineage();
+    if (index.apiVersion() == 1) {
+      ILineageVersionHookV1(address(index)).onVersionAdded(
+        personHash,
+        versionIndex,
+        publicSignals.identityCommitment,
+        publicSignals.fatherIdentityCommitment,
+        publicSignals.motherIdentityCommitment
+      );
+    } else {
+      index.onVersionAdded(
+        personHash,
+        versionIndex,
+        publicSignals.identityCommitment,
+        publicSignals.fatherIdentityCommitment,
+        publicSignals.motherIdentityCommitment,
+        uint32(publicSignals.submitterAndSelfSuiteId >> 160)
+      );
+    }
 
     _addTrustedEndorserInternal(personHash, versionIndex, msg.sender);
     if (fatherHash != bytes32(0)) {
@@ -788,6 +813,12 @@ contract DeepFamily is
     _validateMetadataEnvelope(metadataEnvelope, publicSignals.submitterAndSelfSuiteId);
 
     address adapter = _getVerifier(proof.circuitId, ProofPurpose.PersonRelation);
+    // On an upgraded proxy, a pre-upgrade adapter still verifies the older parent statement.
+    if (
+      publicSignals.fatherIdentityCommitment != 0 || publicSignals.motherIdentityCommitment != 0
+    ) {
+      _requireVerifierPurpose(adapter, ProofPurpose.PersonRelation);
+    }
     uint256[] memory ps = new uint256[](ProofConstants.PERSON_RELATION_PUBLIC_SIGNALS_LEN);
     ps[0] = publicSignals.identityCommitment;
     ps[1] = publicSignals.fatherIdentityCommitment;
@@ -835,15 +866,31 @@ contract DeepFamily is
     );
   }
 
-  function endorseVersion(
+  function endorseVersion(bytes32 personHash, uint256 versionIndex) external nonReentrant {
+    _endorseVersion(personHash, versionIndex, false, 0);
+  }
+
+  /** @notice Endorse only at the fee accepted by the signer, including a quote of zero. */
+  function endorseVersionAtFee(
     bytes32 personHash,
-    uint256 versionIndex
-  ) external nonReentrant validPersonAndVersion(personHash, versionIndex) {
+    uint256 versionIndex,
+    uint256 expectedFee
+  ) external nonReentrant {
+    _endorseVersion(personHash, versionIndex, true, expectedFee);
+  }
+
+  function _endorseVersion(
+    bytes32 personHash,
+    uint256 versionIndex,
+    bool checkFee,
+    uint256 expectedFee
+  ) private validPersonAndVersion(personHash, versionIndex) {
     uint256 prev = endorsedVersionIndex[personHash][msg.sender];
     if (prev == versionIndex) revert AlreadyEndorsed();
 
     uint256 arrayIndex = versionIndex - 1;
     uint256 fee = IDeepFamilyToken(DEEP_FAMILY_TOKEN_CONTRACT).recentReward();
+    if (checkFee && fee != expectedFee) revert EndorsementFeeChanged(expectedFee, fee);
     address recipientAddress = address(0);
     address protocolRecipientAddress = address(0);
     uint256 recipientShareAmount = 0;

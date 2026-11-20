@@ -1,3 +1,4 @@
+import { archivedIdentitySuite, lineageReaderAt } from "./lineageIdentitySuite";
 import {
   SNARK_SCALAR_FIELD,
   buildLineageMerkleProofFromPath,
@@ -119,16 +120,18 @@ async function current(index: Contract, blockNumber: number, blockHash: string, 
     fail("Lineage checkpoint does not match the current state");
   return { blockNumber, blockHash, data: state as unknown as Record<string, unknown> };
 }
-function version(raw: Record<string, unknown>): IndexedVersion {
+function version(raw: Record<string, unknown>, archivedSuite?: number): IndexedVersion {
   const value = {
     personHash: lower(raw.personHash),
     versionIndex: uint(raw.versionIndex, "version index"),
     identityCommitment: field(raw.identityCommitment),
+    identitySuiteId: uint(raw.identitySuiteId ?? archivedSuite, "identity suite", 0xffffffff),
     fatherIdentityCommitment: field(raw.fatherIdentityCommitment),
     motherIdentityCommitment: field(raw.motherIdentityCommitment),
   };
   if (
     value.versionIndex === 0 ||
+    value.identitySuiteId === 0 ||
     value.identityCommitment === 0n ||
     person(value.identityCommitment) !== value.personHash
   )
@@ -250,9 +253,35 @@ async function fetchPage(
   return page;
 }
 
+async function versionPage(
+  index: Contract,
+  family: Contract,
+  start: number,
+  count: number,
+  block: number,
+) {
+  const rows = await fetchPage(index, "getVersionPage", start, count, block);
+  const versions: IndexedVersion[] = [];
+  for (const entry of rows) {
+    const row = entry as Record<string, unknown>;
+    const suite =
+      row.identitySuiteId === undefined
+        ? await archivedIdentitySuite(
+            family,
+            String(row.personHash),
+            Number(row.versionIndex),
+            block,
+          )
+        : undefined;
+    versions.push(version(row, suite));
+  }
+  return versions;
+}
+
 async function bootstrap(
   store: PublicStateStore,
   index: Contract,
+  family: Contract,
   target: number,
   validate: (head: PublicStateHead) => Promise<void>,
 ) {
@@ -289,7 +318,10 @@ async function bootstrap(
   for (const task of tasks) {
     for (let start = pending.cursors[task.key] ?? 0; start < task.total; ) {
       const count = Math.min(PAGE, task.total - start);
-      const page = await fetchPage(index, task.method, start, count, blockNumber, task.tree);
+      const page =
+        task.key === "versions"
+          ? await versionPage(index, family, start, count, blockNumber)
+          : await fetchPage(index, task.method, start, count, blockNumber, task.tree);
       const writes = page.flatMap((raw, offset): PublicStateWrite[] => {
         if (task.tree !== undefined)
           return [
@@ -561,6 +593,7 @@ async function readPath(
 async function catchup(
   store: PublicStateStore,
   index: Contract,
+  family: Contract,
   initial: PublicStateHead,
   target: number,
   validate: (head: PublicStateHead) => Promise<void>,
@@ -631,16 +664,20 @@ async function catchup(
     const versions: IndexedVersion[] = [];
     for (let offset = previous.versions; offset < next.versions; offset += PAGE) {
       const count = Math.min(PAGE, next.versions - offset);
-      const page = await fetchPage(index, "getVersionPage", offset, count, end);
-      versions.push(...page.map((entry) => version(entry as Record<string, unknown>)));
+      versions.push(...(await versionPage(index, family, offset, count, end)));
     }
     // Version events authenticate that the global metadata append wasn't skipped.
-    const indexed = logs.flatMap((log) => {
+    const indexed: IndexedVersion[] = [];
+    for (const log of logs) {
       const parsed = index.interface.parseLog(log);
-      return parsed?.name === "VersionIndexed"
-        ? [version(parsed.args as unknown as Record<string, unknown>)]
-        : [];
-    });
+      if (parsed?.name === "VersionIndexed")
+        indexed.push(
+          version(
+            parsed.args as unknown as Record<string, unknown>,
+            versions[indexed.length]?.identitySuiteId,
+          ),
+        );
+    }
     if (
       indexed.length !== versions.length ||
       indexed.some(
@@ -878,7 +915,8 @@ export async function loadPersistedLineageSnapshot(
   if (code === "0x") fail("Lineage snapshot contract is unavailable");
   // Code identity prevents a reset development chain or another deployment reusing a namespace.
   const { keccak256 } = await import("ethers");
-  const scope = `lineage:1:${network.chainId}:${genesis.hash}:${lower(indexAddress)}:${lower(familyAddress)}:${keccak256(code)}`;
+  const scope = `lineage:2:${network.chainId}:${genesis.hash}:${lower(indexAddress)}:${lower(familyAddress)}:${keccak256(code)}`;
+  index = await lineageReaderAt(index, target);
   const store = await openPublicStateStore(scope);
   const validate = async (head: PublicStateHead) => {
     const [block, finalNetwork, finalFamilyNetwork, finalIndex, finalFamily] = await Promise.all([
@@ -943,16 +981,16 @@ export async function loadPersistedLineageSnapshot(
         await validate({ ...head, ...targetAnchor });
         head = await store.commit(head, targetAnchor, []);
       } else if (changes > BigInt(Math.max(4096, targetState.sizes[0] + targetState.sizes[1])))
-        head = await bootstrap(store, index, target, validate);
+        head = await bootstrap(store, index, family, target, validate);
     }
-    if (!head) head = await bootstrap(store, index, target, validate);
+    if (!head) head = await bootstrap(store, index, family, target, validate);
     try {
-      head = await catchup(store, index, head, target, validate);
+      head = await catchup(store, index, family, head, target, validate);
     } catch (error) {
       if (!(error instanceof GlobalSnapshotRequired)) throw error;
       // This remains the same global reconstruction mode. It never asks the
       // RPC for the selected person, slot or path.
-      head = await bootstrap(store, index, target, validate);
+      head = await bootstrap(store, index, family, target, validate);
     }
     await validate(head);
     const block = await provider.getBlock(head.blockNumber);

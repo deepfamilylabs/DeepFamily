@@ -163,6 +163,12 @@
           "internalType": "uint256",
           "name": "motherIdentityCommitment",
           "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint32",
+          "name": "identitySuiteId",
+          "type": "uint32"
         }
       ],
       "name": "VersionIndexed",
@@ -581,6 +587,11 @@
               "internalType": "uint256",
               "name": "motherIdentityCommitment",
               "type": "uint256"
+            },
+            {
+              "internalType": "uint32",
+              "name": "identitySuiteId",
+              "type": "uint32"
             }
           ],
           "internalType": "struct IDeepFamilyLineageIndex.VersionSnapshot[]",
@@ -752,6 +763,11 @@
           "internalType": "uint256",
           "name": "motherIdentityCommitment",
           "type": "uint256"
+        },
+        {
+          "internalType": "uint32",
+          "name": "identitySuiteId",
+          "type": "uint32"
         }
       ],
       "name": "onVersionAdded",
@@ -911,6 +927,11 @@
           "internalType": "uint256",
           "name": "motherIdentityCommitment",
           "type": "uint256"
+        },
+        {
+          "internalType": "uint32",
+          "name": "identitySuiteId",
+          "type": "uint32"
         }
       ],
       "stateMutability": "view",

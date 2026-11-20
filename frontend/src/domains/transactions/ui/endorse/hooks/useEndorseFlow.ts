@@ -51,6 +51,7 @@ export function useEndorseFlow() {
       const endorseVersion = async (
         personHash: string,
         versionIndex: number,
+        expectedFee: bigint,
         overrides?: Record<string, unknown>,
       ) => {
         const { receipt } = await executeChainTransaction({
@@ -58,8 +59,8 @@ export function useEndorseFlow() {
           assertActive,
           beforeSend: assertWalletScope,
           send: () => overrides && Object.keys(overrides).length > 0
-            ? contract.endorseVersion(personHash, versionIndex, overrides)
-            : contract.endorseVersion(personHash, versionIndex),
+            ? contract.endorseVersionAtFee(personHash, versionIndex, expectedFee, overrides)
+            : contract.endorseVersionAtFee(personHash, versionIndex, expectedFee),
           onSubmitted: (hash) => {
             update.submitted(hash);
             if (update.isCurrent()) update("confirming", t("transaction.submitted", "Transaction submitted..."));
@@ -69,9 +70,10 @@ export function useEndorseFlow() {
             chainId,
             from: address,
             to: contractAddress,
-            data: contract.interface?.encodeFunctionData("endorseVersion", [
+            data: contract.interface?.encodeFunctionData("endorseVersionAtFee", [
               personHash,
               versionIndex,
+              expectedFee,
             ]),
             value: 0n,
           },

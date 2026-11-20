@@ -152,6 +152,12 @@ contract Groth16VerifierAdapter is IProofVerifierAdapter {
     revert UnsupportedPurpose();
   }
 
+  function supportsPurpose(uint8 purpose) external view override returns (bool) {
+    return
+      purpose <= ProofConstants.PROOF_PURPOSE_SHIELDED_UNSHIELD &&
+      verifierForPurpose(purpose) != address(0);
+  }
+
   /**
    * @inheritdoc IProofVerifierAdapter
    *

@@ -4,6 +4,7 @@ export type ShieldedRecipientOption = {
   personHash: string;
   label?: string;
   eligible: boolean;
+  identitySuiteId?: number;
 };
 
 export type ShieldedRecipientError = "loading" | "empty" | "invalidHash" | "notEligibleChild";

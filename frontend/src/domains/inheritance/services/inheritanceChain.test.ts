@@ -110,7 +110,7 @@ describe("loadLineageSnapshot", () => {
     leafWritten(0, 0, 5n, 2),
     leafWritten(1, 0, 9n, 4),
     leafWritten(0, 1, 6n, 3),
-    log(indexIface, INDEX, "VersionIndexed", [HEIR, 1, HEIR_IC, ROOT_IC, 0n], 1),
+    log(indexIface, INDEX, "VersionIndexed", [HEIR, 1, HEIR_IC, ROOT_IC, 0n, 1], 1),
     log(familyIface, FAMILY, "TrustedEndorserAdded", [ROOT, 1, A], 1),
     log(familyIface, FAMILY, "TrustedEndorserAdded", [ROOT, 1, B], 2),
     log(familyIface, FAMILY, "TrustedEndorserRemoved", [ROOT, 1, A], 6),
@@ -304,7 +304,7 @@ describe("verified lineage snapshot memory cache", () => {
 
   function fixture() {
     const logs = [
-      log(indexIface, INDEX, "VersionIndexed", [HEIR, 1, HEIR_IC, ROOT_IC, 0n], 1),
+      log(indexIface, INDEX, "VersionIndexed", [HEIR, 1, HEIR_IC, ROOT_IC, 0n, 1], 1),
       leafWritten(0, 0, firstEndorsement, 2),
       log(familyIface, FAMILY, "PersonVersionEndorsed", [HEIR, A, 1, A, 0n, A, 0n, 0n, 100n], 2, 1),
       leafWritten(1, 0, firstTrusted, 3),
@@ -344,7 +344,7 @@ describe("verified lineage snapshot memory cache", () => {
     f.provider.getLogs.mockClear();
     f.provider.getBlockNumber.mockResolvedValue(12);
     f.logs.push(
-      log(indexIface, INDEX, "VersionIndexed", [HEIR, 2, HEIR_IC, OTHER_IC, ROOT_IC], 11),
+      log(indexIface, INDEX, "VersionIndexed", [HEIR, 2, HEIR_IC, OTHER_IC, ROOT_IC, 1], 11),
       leafWritten(0, 0, endorsementLeaf(2, OTHER_IC, ROOT_IC, A, 200n), 11, 1),
       log(
         familyIface,

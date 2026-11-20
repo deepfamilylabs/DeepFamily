@@ -19,7 +19,7 @@ function fixture() {
   const event = iface.encodeEventLog(iface.getEvent("LetterRegistered")!, [7, blob, 9, 1200, 1000]);
   const provider = { getBlockNumber: async () => 20, getBlock: vi.fn(async () => ({ hash: "0xanchor" })), getCode: vi.fn(),
     getLogs: vi.fn(async (_filter: { topics: unknown[] }) => [{ ...event, blockNumber: 15, index: 0, transactionHash: "0xtransaction" }]) };
-  const contract = { runner: { provider }, interface: iface, creationBlock: async () => 10,
+  const contract = { runner: { provider }, interface: iface, creationBlock: async () => 10, letterCount: vi.fn(async () => 1n),
     getAddress: async () => "0x1111111111111111111111111111111111111111", letterRecord: vi.fn(async () => record) };
   mocks.readBlob.mockResolvedValue({ payloadHash: blob.payloadHash, payload: Uint8Array.of(1, 2, 3) });
   return { provider, contract, record };
@@ -39,6 +39,33 @@ describe("authenticated private letter recovery", () => {
     expect(letters).toMatchObject([{ messageId: "7", recipientBinding: "9", transactionHash: "0xtransaction", ciphertext: Uint8Array.of(1, 2, 3) }]);
     expect(f.provider.getLogs.mock.calls[0][0].topics).toHaveLength(1);
     expect(mocks.readBlob).toHaveBeenCalledWith(expect.objectContaining({ blockTag: 20, payloadHash: f.record.blob.payloadHash }));
+  });
+  it.each([false, true])("rejects an incomplete event response, including an empty range (%s)", async (empty) => {
+    const f = fixture();
+    f.contract.letterCount.mockResolvedValue(2n);
+    if (empty) f.provider.getLogs.mockResolvedValue([]);
+    await expect(readPrivateLetters(f.contract as unknown as Contract)).rejects.toThrow("history is incomplete");
+    expect(f.contract.letterCount).toHaveBeenCalledWith({ blockTag: 20 });
+  });
+  it("accepts a genuinely empty archive", async () => {
+    const f = fixture();
+    f.contract.letterCount.mockResolvedValue(0n);
+    f.provider.getLogs.mockResolvedValue([]);
+    await expect(readPrivateLetters(f.contract as unknown as Contract)).resolves.toEqual([]);
+  });
+  it("recovers from block receipts for a legacy archive without a counter", async () => {
+    const f = fixture();
+    f.contract.letterCount.mockRejectedValue(Object.assign(new Error("missing selector"), { code: "CALL_EXCEPTION", data: "0x" }));
+    const [event] = await f.provider.getLogs({ topics: [] });
+    f.provider.getLogs.mockClear();
+    const address = await f.contract.getAddress();
+    const provider = { ...f.provider,
+      getBlock: async (n: number) => ({ hash: "0xanchor", transactions: n === 15 ? ["0xtransaction"] : [] }),
+      getTransactionReceipt: async () => ({ blockHash: "0xanchor", hash: "0xtransaction", logs: [{ ...event, address }] }),
+    };
+    const contract = { ...f.contract, runner: { provider } } as unknown as Contract;
+    await expect(readPrivateLetters(contract)).resolves.toMatchObject([{ messageId: "7" }]);
+    expect(f.provider.getLogs).not.toHaveBeenCalled();
   });
   it("rejects an event whose authenticated record or archive pointer changed", async () => {
     const f = fixture(); f.record.recipientBinding = 99n;

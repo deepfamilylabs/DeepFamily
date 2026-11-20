@@ -118,7 +118,7 @@ export type ShieldedWalletSummary = {
   templates: ShieldedTemplateSummary[];
   claims: ShieldedClaimSummary[];
   parentVersions: number[];
-  children: { personHash: string; rootVersionIndex: number; eligible: boolean }[];
+  children: { personHash: string; rootVersionIndex: number; eligible: boolean; identitySuiteId?: number }[];
 };
 export type ShieldedFundingEntry = "public" | "privateConvenient" | "privateIndependent";
 export type ShieldedAssetActionRequest = {

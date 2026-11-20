@@ -43,6 +43,7 @@ contract PrivateLetterArchive is DeepFamilyArchive {
   uint256 public creationBlock;
   mapping(uint128 messageId => bool registered) public usedMessage;
   mapping(uint128 messageId => LetterRecord record) private _letters;
+  uint256 public letterCount;
 
   event LetterRegistered(
     uint128 indexed messageId,
@@ -93,6 +94,7 @@ contract PrivateLetterArchive is DeepFamilyArchive {
     bytes calldata ciphertext
   ) private view returns (uint256[11] memory inputs) {
     if (block.timestamp >= delivery.deadline) revert ExpiredReceiveCode();
+    if (delivery.messageId == 0) revert InvalidLetterField();
     if (usedMessage[delivery.messageId]) revert MessageAlreadyRegistered();
     if (
       delivery.recipientBinding == 0 ||
@@ -125,6 +127,7 @@ contract PrivateLetterArchive is DeepFamilyArchive {
     BlobRef memory blob = _storeBlob(ciphertext);
     uint64 timestamp = uint64(block.timestamp);
     usedMessage[delivery.messageId] = true;
+    ++letterCount;
     _letters[delivery.messageId] = LetterRecord({
       blob: blob,
       recipientBinding: delivery.recipientBinding,

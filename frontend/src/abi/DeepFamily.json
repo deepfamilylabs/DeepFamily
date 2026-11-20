@@ -200,6 +200,22 @@
       "type": "error"
     },
     {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "expectedFee",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "currentFee",
+          "type": "uint256"
+        }
+      ],
+      "name": "EndorsementFeeChanged",
+      "type": "error"
+    },
+    {
       "inputs": [],
       "name": "EndorsementFeeTransferFailed",
       "type": "error"
@@ -1296,6 +1312,29 @@
         }
       ],
       "name": "endorseVersion",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "personHash",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "uint256",
+          "name": "versionIndex",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "expectedFee",
+          "type": "uint256"
+        }
+      ],
+      "name": "endorseVersionAtFee",
       "outputs": [],
       "stateMutability": "nonpayable",
       "type": "function"

@@ -3,7 +3,7 @@ pragma solidity ^0.8.24;
 
 import {ERC165} from "@openzeppelin/contracts/utils/introspection/ERC165.sol";
 import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
-import {PoseidonT3} from "poseidon-solidity/PoseidonT3.sol";
+import {LeanMerklePath} from "../libraries/LeanMerklePath.sol";
 import {PoseidonT4} from "poseidon-solidity/PoseidonT4.sol";
 import {PoseidonT5} from "poseidon-solidity/PoseidonT5.sol";
 import {PoseidonT6} from "poseidon-solidity/PoseidonT6.sol";
@@ -60,6 +60,7 @@ contract DeepFamilyLineageIndex is ERC165, IDeepFamilyLineageIndex {
   struct VersionParents {
     uint256 fatherIdentityCommitment;
     uint256 motherIdentityCommitment;
+    uint32 identitySuiteId;
   }
   mapping(bytes32 personHash => mapping(uint256 versionIndex => VersionParents parents))
     private _versionParents;
@@ -109,7 +110,7 @@ contract DeepFamilyLineageIndex is ERC165, IDeepFamilyLineageIndex {
   }
 
   function apiVersion() external pure override returns (uint256) {
-    return 1;
+    return 2;
   }
 
   function supportsInterface(
@@ -127,7 +128,8 @@ contract DeepFamilyLineageIndex is ERC165, IDeepFamilyLineageIndex {
     uint256 versionIndex,
     uint256 identityCommitment,
     uint256 fatherIdentityCommitment,
-    uint256 motherIdentityCommitment
+    uint256 motherIdentityCommitment,
+    uint32 identitySuiteId
   ) external override onlyDeepFamily {
     if (keccak256(abi.encodePacked(bytes32(identityCommitment))) != personHash) {
       revert IdentityCommitmentMismatch();
@@ -135,7 +137,8 @@ contract DeepFamilyLineageIndex is ERC165, IDeepFamilyLineageIndex {
     _identityCommitments[personHash] = identityCommitment;
     _versionParents[personHash][versionIndex] = VersionParents(
       fatherIdentityCommitment,
-      motherIdentityCommitment
+      motherIdentityCommitment,
+      identitySuiteId
     );
     _versionRefs.push(VersionRef(personHash, versionIndex));
     _parentsDigests[personHash][versionIndex] = PoseidonT4.hash(
@@ -146,7 +149,8 @@ contract DeepFamilyLineageIndex is ERC165, IDeepFamilyLineageIndex {
       versionIndex,
       identityCommitment,
       fatherIdentityCommitment,
-      motherIdentityCommitment
+      motherIdentityCommitment,
+      identitySuiteId
     );
   }
 
@@ -252,7 +256,8 @@ contract DeepFamilyLineageIndex is ERC165, IDeepFamilyLineageIndex {
         ref.versionIndex,
         _identityCommitments[ref.personHash],
         parents.fatherIdentityCommitment,
-        parents.motherIdentityCommitment
+        parents.motherIdentityCommitment,
+        parents.identitySuiteId
       );
     }
   }
@@ -357,10 +362,18 @@ contract DeepFamilyLineageIndex is ERC165, IDeepFamilyLineageIndex {
     external
     view
     override
-    returns (uint256 fatherIdentityCommitment, uint256 motherIdentityCommitment)
+    returns (
+      uint256 fatherIdentityCommitment,
+      uint256 motherIdentityCommitment,
+      uint32 identitySuiteId
+    )
   {
     VersionParents storage parents = _versionParents[personHash][versionIndex];
-    return (parents.fatherIdentityCommitment, parents.motherIdentityCommitment);
+    return (
+      parents.fatherIdentityCommitment,
+      parents.motherIdentityCommitment,
+      parents.identitySuiteId
+    );
   }
 
   function endorsementLeafIndex(
@@ -404,37 +417,15 @@ contract DeepFamilyLineageIndex is ERC165, IDeepFamilyLineageIndex {
     )
   {
     Tree storage tree = _tree(treeId);
-    uint256 levelSize = tree.size;
-    if (leafIndex >= levelSize) revert InvalidLeafIndex();
-
+    if (leafIndex >= tree.size) revert InvalidLeafIndex();
     leaf = tree.nodes[0][leafIndex];
     proofRoot = tree.root;
-    uint256 index = leafIndex;
-    uint256 treeDepth = tree.depth;
-
-    // Count only existing siblings so the returned path has zk-kit LeanIMT's compact shape.
-    for (uint256 level = 0; level < treeDepth; ++level) {
-      if ((index & 1) == 1 || index + 1 < levelSize) ++proofDepth;
-      index >>= 1;
-      levelSize = (levelSize + 1) >> 1;
-    }
-
-    siblings = new uint256[](proofDepth);
-    index = leafIndex;
-    levelSize = tree.size;
-    uint256 siblingIndex;
-    for (uint256 level = 0; level < treeDepth; ++level) {
-      if ((index & 1) == 1) {
-        siblings[siblingIndex] = tree.nodes[level][index - 1];
-        proofIndex |= uint256(1) << siblingIndex;
-        ++siblingIndex;
-      } else if (index + 1 < levelSize) {
-        siblings[siblingIndex] = tree.nodes[level][index + 1];
-        ++siblingIndex;
-      }
-      index >>= 1;
-      levelSize = (levelSize + 1) >> 1;
-    }
+    (proofIndex, proofDepth, siblings) = LeanMerklePath.proof(
+      tree.nodes,
+      tree.size,
+      tree.depth,
+      leafIndex
+    );
   }
 
   // ========== Tree internals ==========
@@ -471,7 +462,13 @@ contract DeepFamilyLineageIndex is ERC165, IDeepFamilyLineageIndex {
       tree.depth = treeDepth;
     }
     tree.size = newSize;
-    _commit(treeId, tree, leafIndex, leaf, _writePath(tree, leafIndex, leaf, newSize, treeDepth));
+    _commit(
+      treeId,
+      tree,
+      leafIndex,
+      leaf,
+      LeanMerklePath.writePath(tree.nodes, leafIndex, leaf, newSize, treeDepth)
+    );
   }
 
   function _write(uint8 treeId, uint256 leafIndex, uint256 leaf) private {
@@ -481,29 +478,8 @@ contract DeepFamilyLineageIndex is ERC165, IDeepFamilyLineageIndex {
       tree,
       leafIndex,
       leaf,
-      _writePath(tree, leafIndex, leaf, tree.size, tree.depth)
+      LeanMerklePath.writePath(tree.nodes, leafIndex, leaf, tree.size, tree.depth)
     );
-  }
-
-  function _writePath(
-    Tree storage tree,
-    uint256 index,
-    uint256 node,
-    uint256 levelSize,
-    uint256 treeDepth
-  ) private returns (uint256) {
-    for (uint256 level = 0; level < treeDepth; ++level) {
-      tree.nodes[level][index] = node;
-      if (index & 1 == 1) {
-        node = PoseidonT3.hash([tree.nodes[level][index - 1], node]);
-      } else if (index + 1 < levelSize) {
-        node = PoseidonT3.hash([node, tree.nodes[level][index + 1]]);
-      }
-      index >>= 1;
-      levelSize = (levelSize + 1) >> 1;
-    }
-    tree.nodes[treeDepth][0] = node;
-    return node;
   }
 
   function _commit(

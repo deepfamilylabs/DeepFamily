@@ -1,3 +1,4 @@
+import { archivedIdentitySuite, lineageReaderAt } from "./lineageIdentitySuite";
 import {
   computeLineageEndorsementLeaf,
   computeLineageParentsDigest,
@@ -31,6 +32,7 @@ export type IndexedVersion = {
   personHash: string;
   versionIndex: number;
   identityCommitment: bigint;
+  identitySuiteId?: number;
   fatherIdentityCommitment: bigint;
   motherIdentityCommitment: bigint;
 };
@@ -147,15 +149,25 @@ const lower = (value: unknown) => String(value).toLowerCase();
 const trustedKey = (personHash: string, versionIndex: number) =>
   `${lower(personHash)}:${versionIndex}`;
 
-function collectVersions(events: ScannedEvent[], versions = new Map<string, IndexedVersion[]>()) {
+async function collectVersions(
+  events: ScannedEvent[],
+  family: ethers.Contract,
+  block: number,
+  versions = new Map<string, IndexedVersion[]>(),
+) {
   for (const event of events) {
     if (event.name !== "VersionIndexed") continue;
     const personHash = lower(event.args.personHash);
     const list = versions.get(personHash) ?? [];
+    const versionIndex = Number(event.args.versionIndex);
     list.push({
       personHash,
-      versionIndex: Number(event.args.versionIndex),
+      versionIndex,
       identityCommitment: BigInt(event.args.identityCommitment),
+      identitySuiteId:
+        event.args.identitySuiteId === undefined
+          ? await archivedIdentitySuite(family, personHash, versionIndex, block)
+          : Number(event.args.identitySuiteId),
       fatherIdentityCommitment: BigInt(event.args.fatherIdentityCommitment),
       motherIdentityCommitment: BigInt(event.args.motherIdentityCommitment),
     });
@@ -229,6 +241,7 @@ export async function loadLineageSnapshot(
   if (familyNetwork && familyNetwork.chainId !== network.chainId) {
     throw new InheritanceError("snapshotMismatch", "Family history provider uses another chain");
   }
+  lineageIndex = await lineageReaderAt(lineageIndex, blockNumber);
   const key = `${network.chainId}:${lower(indexAddress)}:${lower(familyAddress)}:${fromBlock}`;
   let families = snapshotCache.get(provider);
   if (!families) {
@@ -311,6 +324,7 @@ export async function loadLineageSnapshot(
       "Family eligibility snapshot does not match the replayed history",
     );
   }
+  const versions = await collectVersions(indexEvents, deepFamily, blockNumber, working?.versions);
   const finalAnchor = await provider.getBlock(blockNumber);
   if (finalAnchor?.hash !== anchor.hash)
     throw new InheritanceError("snapshotMismatch", "Lineage snapshot block was reorganized");
@@ -334,7 +348,7 @@ export async function loadLineageSnapshot(
     timestamp: BigInt(anchor.timestamp),
     checkpointId,
     checkpointCreatedAt: BigInt(checkpoint.createdAt),
-    versions: collectVersions(indexEvents, working?.versions),
+    versions,
     trustedEndorsers: collectTrustedEndorsers(familyEvents, working?.trustedEndorsers),
     endorsementTree,
     trustedTree,

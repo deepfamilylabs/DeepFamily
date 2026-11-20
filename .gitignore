@@ -13,6 +13,8 @@ zk-artifacts/
 frontend/public/zk/**/*.wasm
 frontend/public/zk/**/*.zkey
 frontend/public/zk/**/*.br
+!frontend/public/zk/identity/person_commitment.wasm.br
+!frontend/public/zk/identity/person_commitment_final.zkey.br
 /cache/
 coverage/
 coverage.json

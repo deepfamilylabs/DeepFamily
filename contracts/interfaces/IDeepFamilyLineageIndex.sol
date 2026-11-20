@@ -3,6 +3,17 @@ pragma solidity ^0.8.24;
 
 import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 
+/** @dev Existing immutable v1 indexes keep their original write hook after a family upgrade. */
+interface ILineageVersionHookV1 {
+  function onVersionAdded(
+    bytes32 personHash,
+    uint256 versionIndex,
+    uint256 identity,
+    uint256 father,
+    uint256 mother
+  ) external;
+}
+
 /**
  * @notice Poseidon LeanIMT mirror of DeepFamily's endorsement and trusted-endorser state, so a
  *         zero-knowledge proof can show membership in that state without naming the record.
@@ -21,6 +32,7 @@ interface IDeepFamilyLineageIndex is IERC165 {
     uint256 identityCommitment;
     uint256 fatherIdentityCommitment;
     uint256 motherIdentityCommitment;
+    uint32 identitySuiteId;
   }
 
   struct EndorsementSnapshot {
@@ -52,7 +64,8 @@ interface IDeepFamilyLineageIndex is IERC165 {
     uint256 indexed versionIndex,
     uint256 identityCommitment,
     uint256 fatherIdentityCommitment,
-    uint256 motherIdentityCommitment
+    uint256 motherIdentityCommitment,
+    uint32 identitySuiteId
   );
 
   function DEEP_FAMILY() external view returns (address);
@@ -64,7 +77,8 @@ interface IDeepFamilyLineageIndex is IERC165 {
     uint256 versionIndex,
     uint256 identityCommitment,
     uint256 fatherIdentityCommitment,
-    uint256 motherIdentityCommitment
+    uint256 motherIdentityCommitment,
+    uint32 identitySuiteId
   ) external;
   function onTrustedEndorserSet(
     bytes32 personHash,
@@ -125,7 +139,14 @@ interface IDeepFamilyLineageIndex is IERC165 {
   function versionParents(
     bytes32 personHash,
     uint256 versionIndex
-  ) external view returns (uint256 fatherIdentityCommitment, uint256 motherIdentityCommitment);
+  )
+    external
+    view
+    returns (
+      uint256 fatherIdentityCommitment,
+      uint256 motherIdentityCommitment,
+      uint32 identitySuiteId
+    );
   function endorsementLeafIndex(
     bytes32 personHash,
     address endorser

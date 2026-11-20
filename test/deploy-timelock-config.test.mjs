@@ -8,7 +8,7 @@ import {
   resolveTimelockDeploymentConfig,
 } from "../scripts/lib/timelockDeployment.mjs";
 import { CONFLUX_SAFE_1_3_0_2_OF_3_PROFILE } from "../scripts/lib/governanceSafety.mjs";
-import { deployIntegratedSystem } from "../hardhat/integratedDeployment.mjs";
+import { assertGovernanceOwnerInvariants } from "../hardhat/integratedDeployment.mjs";
 
 describe("Timelock deployment configuration", function () {
   const deployer = "0x0000000000000000000000000000000000000001";
@@ -151,7 +151,7 @@ describe("Timelock deployment configuration", function () {
     ).to.be.rejectedWith(/GovernanceTimelock minDelay must be at least 604800 seconds/i);
   });
 
-  it("checks the selected Timelock before broadcasting a new mainnet protocol deployment", async () => {
+  it("checks the selected Timelock's seven-day minimum on both mainnets without broadcasting", async () => {
     const [deployerSigner, firstOwner, secondOwner] = await hre.ethers.getSigners();
     const multisigContract = await hre.ethers.deployContract("TwoOfTwoMultisigMock", [
       firstOwner.address,
@@ -185,30 +185,21 @@ describe("Timelock deployment configuration", function () {
         networkConfig: { type: "http", chainId: 31337 },
         ethers: mainnetEthers,
       };
-      let broadcasts = 0;
-      const options = {
+      const preflight = {
+        connection,
+        ethers: mainnetEthers,
         artifacts: hre.artifacts,
         governanceMultisig: multisigAddress,
         governanceMultisigProfile: "",
-        transactionExecutor: async () => {
-          broadcasts += 1;
-          throw new Error("deployment preflight accepted; no broadcast");
-        },
+        enforceProductionDeploymentDelay: true,
       };
       await expect(
-        deployIntegratedSystem(connection, {
-          ...options,
-          governanceOwner: await shorter.getAddress(),
+        assertGovernanceOwnerInvariants({
+          ...preflight,
+          address: await shorter.getAddress(),
         }),
       ).to.be.rejectedWith(/at least 604800 seconds \(7 days\) on mainnet/i);
-      expect(broadcasts).to.equal(0);
-      await expect(
-        deployIntegratedSystem(connection, {
-          ...options,
-          governanceOwner: await accepted.getAddress(),
-        }),
-      ).to.be.rejectedWith("deployment preflight accepted; no broadcast");
-      expect(broadcasts).to.equal(1);
+      await assertGovernanceOwnerInvariants({ ...preflight, address: await accepted.getAddress() });
     }
     expect(await deployerSigner.getNonce()).to.equal(nonceBefore);
   });

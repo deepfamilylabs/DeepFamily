@@ -47,7 +47,7 @@ function fixture() {
     endorsedVersionIndex: vi.fn(async () => 0),
     DEEP_FAMILY_TOKEN_CONTRACT: async () => "0x0000000000000000000000000000000000000def",
     getAddress: async () => mocks.config.contractAddress,
-    endorseVersion: endorse,
+    endorseVersionAtFee: endorse,
   };
   mocks.token = {
     recentReward: async () => 10n,

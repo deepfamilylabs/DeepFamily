@@ -31,6 +31,8 @@ import {
   createShieldedPolicyDescriptor,
   validateShieldedFundingDestination,
 } from "./shieldedFundingPreparation";
+import { listShieldedFundingHeirs } from "../model/shieldedFundingOptions";
+import type { ShieldedWalletSummary } from "../../../shared/workers/shieldedAssetWorkerTypes";
 import { prepareShieldedShield } from "./shieldedNotePreparation";
 import type { LocalShieldedWalletSnapshot } from "./shieldedWalletRecovery";
 
@@ -168,6 +170,7 @@ async function setup(periodDays = 30n) {
             personHash: rootPersonHash,
             versionIndex: 0,
             identityCommitment: rootIdentity,
+            identitySuiteId: 1,
             fatherIdentityCommitment: 0n,
             motherIdentityCommitment: 0n,
           },
@@ -180,6 +183,7 @@ async function setup(periodDays = 30n) {
             personHash: heirPersonHash,
             versionIndex: 0,
             identityCommitment: heirIdentity,
+            identitySuiteId: 1,
             fatherIdentityCommitment: rootIdentity,
             motherIdentityCommitment: 555n,
           },
@@ -318,6 +322,34 @@ describe("funding destination validation before consolidation", () => {
       expect(fixture.lineageIndex.identityCommitmentOf).not.toHaveBeenCalled();
     },
   );
+
+  it("blocks a registered and eligible suite-2 recipient before public funding", async () => {
+    const f = await setup();
+    const personHash = f.recipient.personHash!;
+    f.lineage.versions.get(personHash)![0].identitySuiteId = 2;
+    const wallet = {
+      children: [
+        { personHash, eligible: true, rootVersionIndex: 1, identitySuiteId: 2 },
+        { personHash: "supported", eligible: true, rootVersionIndex: 1, identitySuiteId: 1 },
+      ],
+    } as ShieldedWalletSummary;
+    expect(
+      listShieldedFundingHeirs(wallet, "1", "public").map((child) => child.personHash),
+    ).toEqual(["supported"]);
+    const input = {
+      ...f.common,
+      fundMode: 0 as const,
+      budgetKind: 1 as const,
+      policy: f.policy,
+      publicRecipientPersonHash: personHash,
+      budgetPeriods: 1n,
+    };
+    await expect(validateShieldedFundingDestination(input)).rejects.toThrow(
+      "Unsupported identity suite 2",
+    );
+    await expect(prepareShieldedFund(input)).rejects.toThrow("Unsupported identity suite 2");
+    expect(f.lineageIndex.identityCommitmentOf).not.toHaveBeenCalled();
+  });
 
   it.each(["different identity", "different person", "inconsistent versions"] as const)(
     "rejects %s in local public recipient records",

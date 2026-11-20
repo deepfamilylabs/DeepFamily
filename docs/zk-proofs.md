@@ -12,9 +12,10 @@ DeepFamily has two frozen proof purposes:
 The purpose is fixed by the entrypoint; callers do not supply it. A caller supplies a `circuitId`
 inside `ProofEnvelope`, and the contract resolves exactly
 `verifierRegistry[purpose][circuitId]`. Routes are permanent once registered: the contract never
-marks one as active/current, and registering a new ID does not disable an old one. An existing
-person can keep adding versions with an older registered relation circuit that reproduces its
-commitment; `personHash` carries no route-recency marker.
+marks one as active/current. An older registered person route can still prove a parentless
+version with the same identity commitment. For a version declaring a parent, the upgraded family
+also requires adapter purpose support. A deployment using the original adapter must register the
+updated person verifier under a fresh ID for these submissions. The identity hash stays the same.
 
 The current development manifest assigns circuit ID `1` independently to both purposes. The same
 numeric ID may be used under different purposes because the full key is `(purpose,circuitId)`.
@@ -184,7 +185,8 @@ roleSuiteId
 The self role uses `selfSuiteId`; father and mother use `fatherSuiteId` and `motherSuiteId`.
 `contentDigestLo` and `contentDigestHi` are also private. Parent presence is controlled by private
 boolean `hasFather` / `hasMother`; all identity inputs and the suite ID of a null parent must be
-zero. A present parent's suite ID and resulting identity commitment must be nonzero.
+zero. A present parent's suite ID, derived secret and resulting identity commitment must be nonzero.
+Both parents can subsequently register using the same identity opening.
 The current person must supply a nonzero `derivedSecretField` to register.
 
 The circuit constrains:
@@ -345,7 +347,7 @@ The following historical experiment predates the switch back to the fixed librar
 
 The FFT domains were unchanged. These small historical samples showed reduced constraints and key sizes, but did not establish a consistent proving-time or memory improvement. A later isolated comparison, holding all other current circuitry constant, likewise did not detect a stable browser proving-time difference between the library and project-owned Merkle implementations. CLI process measurements do not establish browser or mobile performance. The library choice is based on reviewability and maintenance responsibility; the unconditional project bounds and full protocol regressions remain necessary.
 
-Public and private funding share `shield → donor VALUE → fund → child BUDGET → claim → child VALUE`. Initial/continuation `fundMode` is separate from budget kind and key mode. Both modes use the same `shielded_fund` circuit, proving key and verifier, with 27 public signals. The circuit retains both 64-level qualification paths and both 32-level note paths. The UI labels Public budget, Private (identity credentials) and Private (independent key) correspond to `(budgetKind, keyMode)` values `(1,0)`, `(0,0)` and `(0,1)`, respectively; the recovered summary's `bindingKind` matches `budgetKind`. Public initial funding needs only the child's `personHash`, publishes ten canonical recovery fields and implicitly fixes the identity-derived owner. Private initial funding and refills verify matching Fund credentials and on-chain receive presentations and publishes ten zeros. Each funding proves donor ownership, conservation and the child’s current trusted endorsement. Initial funding also proves a unique enrollment for the identity and policy. A continuation preserves binding, mode, private owner, P/E, period and start; cross-structure or mode conversion is rejected.
+Public and private funding share `shield → donor VALUE → fund → child BUDGET → claim → child VALUE`. Initial/continuation `fundMode` is separate from budget kind and key mode. Both modes use the same `shielded_fund` circuit, proving key and verifier, with 27 public signals. The circuit retains both 64-level qualification paths and both 32-level note paths. The UI labels Public budget, Private (identity credentials) and Private (independent key) correspond to `(budgetKind, keyMode)` values `(1,0)`, `(0,0)` and `(0,1)`, respectively; the recovered summary's `bindingKind` matches `budgetKind`. The wallet checks the registered child’s proof-bound identity suite before offering public funding. Public initial funding needs only the child's `personHash`, publishes ten canonical recovery fields and implicitly fixes the identity-derived owner. Private initial funding and refills verify matching Fund credentials and on-chain receive presentations and publishes ten zeros. Each funding proves donor ownership, conservation and the child’s current trusted endorsement. Initial funding also proves a unique enrollment for the identity and policy. A continuation preserves binding, mode, private owner, P/E, period and start; cross-structure or mode conversion is rejected.
 
 The two private entries use the same owner-bound BUDGET format and HPKE encryption. They differ in key derivation and authorization: identity credentials reconstruct mode-0 keys, while mode 1 uses separate Spend/View branches derived from the independent key root and requires their owner secret alongside the identity proof. The independent-key entry keeps the same identity and lineage requirements for claims.
 
@@ -385,7 +387,9 @@ struct ProofEnvelope {
 - The adapter validates encoding and public-signal length and calls the generated verifier. It must
   not interpret business fields or read DeepFamily state.
 - `setCircuitVerifier(purpose,circuitId,adapter)` rejects ID zero, zero/no-code adapters, and any
-  already populated route. There is no replace, clear, active, or latest operation.
+  already populated route. There is no replace, clear, active, or latest operation. The adapter
+  must report support for the requested purpose. Deployment and governance preflight also exercise
+  that route with a valid reference proof.
 - Within a deployed protocol generation, existing and new IDs under the same purpose may coexist
   indefinitely, provided each keeps that purpose's frozen public-signal ABI. Changing the signal
   count or order of a published deployment requires a new purpose/entrypoint and protocol

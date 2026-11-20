@@ -187,6 +187,7 @@ function endorseVersion(
 
 **Endorsement Mechanics**:
 
+- The wallet submits `endorseVersionAtFee(personHash, versionIndex, expectedFee)`. The contract compares the signed fee with the execution-time reward before changing endorsements or collecting payment. The receipt event supplies the settled fee and recipient.
 - Endorsers pay `recentReward` amount in DEEP utility points (ERC20)
 - `recentReward` is `0` before the first successful mining reward and tracks the most recently minted reward during mining; a subsequent `mint()` call that returns zero clears it to `0`
 - **Fee Distribution**: Majority flows to NFT holder (if minted) or original contributor, with a small protocol share (default 5%, max 20%) for sustainability
@@ -771,6 +772,16 @@ as live even if it uses chain ID 31337. Mainnet checks use the RPC's actual chai
 
 #### General owner operations
 
+The deployment and governance tools verify a reference proof before registering a permanent
+verifier route. The built-in sample uses the current proving artifacts. For a different circuit
+or encoding, pass `--proof-sample <file>` with JSON fields `purpose`, `circuitId`,
+`proofEncodingId`, `proofData` and `publicSignals`.
+
+The default person proof descriptor uses ID 1 for a fresh development deployment. If an
+existing proxy has already registered the earlier verifying key under that ID, register the
+updated verifier under a fresh person circuit ID and set the client proof descriptor for that
+deployment to the same ID. Existing person hashes and stored versions remain readable.
+
 Use `governance-schedule` and `governance-execute` for ordinary `onlyOwner` configuration. For
 example, `updateEndorsementFee(750)` sets the protocol fee to 750 basis points (7.5%):
 
@@ -1158,6 +1169,8 @@ version by `onVersionAdded`, which also checks `keccak256(bytes32(identityCommit
 personHash` and emits `VersionIndexed` with all three commitments, because DeepFamily itself keeps
 only their Keccak wraps. Changing an endorsement rewrites its leaf with a new `writtenAt`;
 cancelling it or removing a trusted endorser writes zero into the leaf. Leaves are never removed.
+
+Version 2 of the immutable index also records the proof-bound self identity suite in its version event, global pages and targeted parent openings. During a family proxy upgrade, the original v1 index keeps its original write hook. The wallet can recover the suite for v1 rows from the archived DFM1 header at the snapshot block. Public funding requires a suite supported by the receiving wallet.
 
 The trees follow zk-kit LeanIMT semantics: a node hash is `PoseidonT3(left, right)` and a node
 without a right sibling rises unchanged. Every node stays in storage, so a write recomputes its

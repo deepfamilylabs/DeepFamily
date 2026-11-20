@@ -137,6 +137,9 @@ export function prepareShieldedReceivePresentation(input) {
   const checkpointId = field(input.checkpointId, "checkpointId");
   const asOf = bigintFrom(input.asOf, "asOf", MAX_UINT64);
   const messageId = bigintFrom(input.messageId, "messageId", MAX_UINT128);
+  if (action === BigInt(SHIELDED_RECEIVE_PRESENTATION_ACTION.Letter)) {
+    check(messageId !== 0n, "Letter messageId must be nonzero");
+  }
   check(chainId > 0n && consumer > 0n && checkpointId > 0n, "Receive context must be nonzero");
   check(asOf < signals[2], "Receive credential has expired at the selected state time");
   const deadline = asOf + SHIELDED_RECEIVE_PROOF_LIFETIME;

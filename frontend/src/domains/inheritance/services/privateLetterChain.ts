@@ -121,6 +121,31 @@ export function readPrivateLetters(contract: Contract): Promise<PrivateLetterCha
   return runChainRead({ read: () => readPrivateLetterHistory(contract) });
 }
 
+// Older immutable archives have no counter. Read their block receipts to account for every
+// registration without asking the provider about a particular recipient or message.
+async function legacyLetterLogs(
+  provider: Provider,
+  address: string,
+  topic: string,
+  from: number,
+  to: number,
+) {
+  const logs: TransactionReceipt["logs"][number][] = [];
+  for (let number = from; number <= to; number++) {
+    const block = await provider.getBlock(number);
+    if (!block?.hash) throw new Error("Private letter archive block is unavailable");
+    for (const hash of block.transactions) {
+      const receipt = await provider.getTransactionReceipt(hash);
+      if (receipt?.blockHash !== block.hash || receipt.hash !== hash)
+        throw new Error("Private letter archive receipt is unavailable");
+      for (const log of receipt.logs) {
+        if (log.address.toLowerCase() === address && log.topics[0] === topic) logs.push(log);
+      }
+    }
+  }
+  return logs;
+}
+
 async function readPrivateLetterHistory(contract: Contract): Promise<PrivateLetterChainRecord[]> {
   const provider = contract.runner?.provider;
   if (!provider) throw new Error("Private letter archive has no provider");
@@ -130,11 +155,25 @@ async function readPrivateLetterHistory(contract: Contract): Promise<PrivateLett
   const event = contract.interface.getEvent("LetterRegistered");
   if (!event) throw new Error("Private letter archive ABI is incomplete");
   const fromBlock = Number(await contract.creationBlock({ blockTag: toBlock }));
+  const address = (await contract.getAddress()).toLowerCase();
+  let expectedCount: bigint | undefined;
+  try {
+    expectedCount = BigInt(await contract.letterCount({ blockTag: toBlock }));
+  } catch (error) {
+    const missingCounter =
+      (isError(error, "CALL_EXCEPTION") && (error.data === "0x" || error.data === null)) ||
+      (isError(error, "BAD_DATA") && error.value === "0x");
+    if (!missingCounter) throw error;
+  }
   const chunk = getEventScanConfig().blockChunk;
   const letters: PrivateLetterChainRecord[] = [];
   const seen = new Set<string>();
   for (let start = fromBlock; start <= toBlock; start += chunk) {
-    const logs = await provider.getLogs({ address: await contract.getAddress(), topics: [event.topicHash], fromBlock: start, toBlock: Math.min(toBlock, start + chunk - 1) });
+    const end = Math.min(toBlock, start + chunk - 1);
+    const logs =
+      expectedCount === undefined
+        ? await legacyLetterLogs(provider, address, event.topicHash, start, end)
+        : await provider.getLogs({ address, topics: [event.topicHash], fromBlock: start, toBlock: end });
     logs.sort((a, b) => a.blockNumber - b.blockNumber || a.index - b.index);
     for (const log of logs) {
       const parsed = contract.interface.parseLog(log)?.args;
@@ -152,6 +191,8 @@ async function readPrivateLetterHistory(contract: Contract): Promise<PrivateLett
     }
   }
   if ((await provider.getBlock(toBlock))?.hash !== anchor.hash) throw new Error("Private letter archive was reorganized");
+  if (expectedCount !== undefined && BigInt(seen.size) !== expectedCount)
+    throw new Error("Private letter history is incomplete. Refresh the inbox or try another RPC.");
   return letters;
 }
 
