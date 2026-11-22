@@ -4,6 +4,7 @@ import type { ShieldedAssetWorkerCallMap } from "./shieldedAssetWorkerTypes";
 
 const text = z.string();
 const count = z.number().int().nonnegative();
+const suiteId = z.number().int().min(1).max(0xffffffff);
 const slot = z.enum(["identity", "independent"]);
 const bit = z.union([z.literal(0), z.literal(1)]);
 const action = z.enum(["shield", "fund", "claim", "privateTransfer", "unshield"]);
@@ -91,7 +92,7 @@ const wallet = z.strictObject({
   ),
   parentVersions: z.array(count),
   children: z.array(
-    z.strictObject({ personHash: text, rootVersionIndex: count, eligible: z.boolean() }),
+    z.strictObject({ personHash: text, rootVersionIndex: count, eligible: z.boolean(), identitySuiteId: suiteId.optional() }),
   ),
 });
 const receiveAuthorization = z.strictObject({
@@ -111,6 +112,9 @@ const pair = z.tuple([z.union([text, z.bigint()]), z.union([text, z.bigint()])])
 // Strict objects reject unknown fields at every level. Secret exports have one
 // explicit method; no other result can carry recovery material or note openings.
 const results = {
+  findRegisteredIdentities: z.strictObject({
+    matches: z.array(z.strictObject({ identitySuiteId: suiteId, personHash: z.string().regex(/^0x[0-9a-f]{64}$/i) })),
+  }),
   unlockIdentity: session,
   createIndependentKey: session,
   restoreSignature: session,

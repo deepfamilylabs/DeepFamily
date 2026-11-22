@@ -142,6 +142,7 @@ const context: ShieldedWorkerContext = {
   assetKind: "native",
 };
 const identityParams = () => ({
+  identitySuiteId: 1,
   identity: {
     fullName: "Child Example",
     gender: 1,
@@ -797,16 +798,69 @@ describe("independent-key credentials and async installation boundary", () => {
     expect(session.state()).toEqual({ credentials: null, identity: null, independentKey: null });
   });
 
+  it("keeps lookup separate from unlock and wipes derived secrets before matching local public records", async () => {
+    const session = new ShieldedAssetSession();
+    const params = { ...identityParams(), context: { ...context, stateReadMode: "chain" as const } };
+    const record = { identitySuiteId: 1, identityCommitment: 31n, personHash: `0x${"00".repeat(31)}1f` };
+    mocks.loadLineage.mockResolvedValue({ versions: new Map([[record.personHash, [record]]]) });
+    const result = await session.call("findRegisteredIdentities", params);
+    expect(result.matches).toEqual([{ identitySuiteId: 1, personHash: record.personHash }]);
+    expect(mocks.loadTargetedLineage).not.toHaveBeenCalled();
+    expect(params.rawPassphrase).toBe("");
+    const material = await mocks.identity.mock.results[0].value;
+    expect(material.identitySalt.every((value: number) => value === 0)).toBe(true);
+    expect(material.derivedSecretBytes.every((value: number) => value === 0)).toBe(true);
+    expect(session.state()).toEqual({ credentials: null, identity: null, independentKey: null });
+  });
+
+  it("can find a registered suite-1 identity and unlock it with the actual identity KDF", async () => {
+    const { deriveIdentityMaterial, wipeBytes } = await vi.importActual<typeof import("@deepfamily/protocol-core")>("@deepfamily/protocol-core");
+    const params = identityParams();
+    params.identity.fullName = "  Child Example  ";
+    const session = new ShieldedAssetSession();
+    const registered = await deriveIdentityMaterial(params);
+    const record = { personHash: registered.personHash, identityCommitment: registered.identityCommitment, identitySuiteId: 1 };
+    wipeBytes(registered.derivedSecretBytes);
+    wipeBytes(registered.identitySalt);
+    mocks.loadLineage.mockResolvedValue({ versions: new Map([[record.personHash, [record]]]) });
+    mocks.identity.mockImplementation(deriveIdentityMaterial);
+    const { matches } = await session.call("findRegisteredIdentities", { ...params, context });
+    expect(matches).toEqual([{ personHash: record.personHash, identitySuiteId: 1 }]);
+    const state = await session.call("unlockIdentity", { ...params, expectedPersonHash: matches[0].personHash });
+    expect(state.identity).toMatchObject({
+      identitySuiteId: 1, identityCommitment: String(record.identityCommitment), personHash: record.personHash,
+    });
+    session.clear();
+  });
+
+  it("refuses to install credentials when the derived identity no longer matches the lookup choice", async () => {
+    const session = new ShieldedAssetSession();
+    await expect(session.call("unlockIdentity", { ...identityParams(), expectedPersonHash: "0x" + "ee".repeat(32) }))
+      .rejects.toThrow("no longer match");
+    expect(session.state()).toEqual({ credentials: null, identity: null, independentKey: null });
+  });
+
+  it("does not silently derive a default identity when an unlock request omits the suite", async () => {
+    const session = new ShieldedAssetSession();
+    const params = identityParams();
+    Reflect.deleteProperty(params, "identitySuiteId");
+    await expect(session.unlockIdentity(params)).rejects.toThrow("explicit identity suite");
+    expect(params.rawPassphrase).toBe("");
+    expect(mocks.identity).not.toHaveBeenCalled();
+    expect(mocks.independentKeyIdentity).not.toHaveBeenCalled();
+  });
+
   it("keeps independent-key credentials independent of unavailable identity proof material and passes original input", async () => {
     const session = new ShieldedAssetSession();
     const params = identityParams();
     params.identity.fullName = "  Ｃhild  Example  ";
-    const original = structuredClone(params);
+    const original = { identity: structuredClone(params.identity), rawPassphrase: params.rawPassphrase };
     mocks.identity.mockRejectedValueOnce(new Error("Unsupported identity suite"));
     const state = await session.call("unlockIdentity", { ...params, identitySuiteId: 999 });
     expect(state.credentials?.handle).toMatch(/^credentials:/);
     expect(state.identity).toBeNull();
     expect(mocks.independentKeyIdentity).toHaveBeenCalledWith(original);
+    expect(mocks.identity).toHaveBeenCalledWith(expect.objectContaining({ identitySuiteId: 999 }));
     expect(mocks.independentKeyIdentity.mock.invocationCallOrder[0]).toBeLessThan(
       mocks.identity.mock.invocationCallOrder[0],
     );

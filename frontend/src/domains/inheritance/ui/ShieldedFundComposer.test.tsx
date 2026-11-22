@@ -5,7 +5,8 @@ import { createRef } from "react";
 import { I18nextProvider } from "react-i18next";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import zh from "../../../locales/zh-CN/index.json";
-import { ShieldedFundComposer } from "./ShieldedFundComposer";
+import { listShieldedFundingHeirs } from "../model/shieldedFundingOptions";
+import { ShieldedFundComposer, type ShieldedFundComposerProps } from "./ShieldedFundComposer";
 import type { ShieldedRecipientCredentialsFormHandle } from "./ShieldedRecipientCredentialsForm";
 
 const i18n = createInstance();
@@ -18,7 +19,7 @@ beforeAll(async () => {
 });
 afterEach(cleanup);
 
-function renderDays(periodDays: string) {
+function renderDays(periodDays: string, overrides: Partial<ShieldedFundComposerProps> = {}) {
   render(
     <I18nextProvider i18n={i18n}>
       <ShieldedFundComposer
@@ -51,11 +52,24 @@ function renderDays(periodDays: string) {
         onRecipientInputMethodChange={vi.fn()}
         recipientFormRef={createRef<ShieldedRecipientCredentialsFormHandle>()}
         onGenerateRecipientCode={vi.fn()}
+        {...overrides}
       />
     </I18nextProvider>,
   );
   return screen.getByRole("textbox", { name: "自定义天数" });
 }
+
+describe("public funding", () => {
+  it("keeps an eligible child selectable when the payer uses a different suite", () => {
+    const child = { personHash: "0x" + "12".repeat(32), identitySuiteId: 2, rootVersionIndex: 1, eligible: true };
+    const wallet = {
+      notes: [], policies: [], templates: [], claims: [], parentVersions: [1], children: [child], toBlock: 1, blockHash: "hash",
+    };
+    const heirs = listShieldedFundingHeirs(wallet, "1", new Map([[child.personHash, "Child"]]));
+    renderDays("12", { personHash: child.personHash, heirs, rootVersion: "1", wallet });
+    expect((screen.getByRole("radio", { name: /Child/ }) as HTMLInputElement).checked).toBe(true);
+  });
+});
 
 describe("custom budget period validation", () => {
   it.each(["", "0", "1.5", "4294967296"])(

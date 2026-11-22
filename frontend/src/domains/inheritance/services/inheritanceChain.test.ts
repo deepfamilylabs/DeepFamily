@@ -102,6 +102,15 @@ const trustedLeaf = (account: string) =>
   computeLineageTrustedLeaf({ rootIdentityCommitment: ROOT_IC, rootVersionIndex: 1, account });
 
 describe("loadLineageSnapshot", () => {
+  it("does not report an identity missing after an incomplete registration replay", async () => {
+    const { contract } = chainStub([]);
+    const index = contract(INDEX, indexIface, { root: async () => 0n, versionMetadataCount: vi.fn(async () => 1n) });
+    const family = contract(FAMILY, familyIface);
+    await expect(loadLineageSnapshot(index as any, family as any, {
+      fromBlock: 0, selection: { versionPersonHashes: [HEIR] },
+    })).rejects.toThrow("Incomplete lineage identity registration history");
+    expect(index.versionMetadataCount).toHaveBeenCalledWith({ blockTag: 10 });
+  });
   const leafWritten = (treeId: number, leafIndex: number, leaf: bigint, block: number) =>
     log(indexIface, INDEX, "LeafWritten", [treeId, leafIndex, leaf, 0n], block);
   // Out of order and across chunk edges; the write at block 5 replaces leaf 0.

@@ -22,6 +22,7 @@ const independentKey: ShieldedPublicIndependentKey = {
   recoveryVerified: true,
 };
 const draft = {
+  identitySuiteId: 1,
   fullName: "Test Person",
   isBirthBC: false,
   birthYear: 2001,

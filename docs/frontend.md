@@ -304,11 +304,20 @@ The tree can hide person versions that aren't vouched for by a root-defined allo
 `/inheritance` discovers canonical pools through `ShieldedPoolFactory` and uses
 `ShieldedErc20Pool` or `ShieldedNativePool`. Its entry screen first unlocks a
 credentials session with the original person details and identity passphrase.
-There is no independent-key-only entry. The form previews the person hash as details
-are entered; this preview uses the identity suite's rules and is cancelled before
-unlocking. An unavailable preview does not block independent key recovery. The form passes
-raw fields to the Worker. All names and passphrases share the same trim-only text preparation;
-independent asset-key credentials additionally require a nonempty prepared passphrase. The Worker
+Identity and independent-key recovery both start from this form.
+With one supported suite, unlock derives the identity locally. The form previews the
+person hash as details are entered and cancels the preview when unlocking.
+With multiple supported suites, **Unlock** derives candidates locally and checks their person
+hashes against the current network's family records. A single match opens immediately. When
+several identities match, a dialog lists each suite and full person hash. Selecting a row
+unlocks that identity. If the search completes with no registration, local wallet access uses
+the retained suite or the default for new identities. A failed lookup can be retried.
+
+Identity lookup reads public family records and compares candidates on the device. After unlock,
+the wallet scans the selected pool. Claim verifies that the unlocked identity matches the
+budget's heir commitment. Independent-key recovery also works when the hash preview is unavailable.
+The form passes raw fields to the Worker. Names and passphrases share the same
+trim-only text preparation. Independent asset-key credentials require a nonempty prepared passphrase. The Worker
 derives its independent-key identity secret and reconstructs identity proof material separately.
 If only the proof path is
 unavailable, the credentials session still opens the workspace for independent-key

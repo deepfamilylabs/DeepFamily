@@ -14,6 +14,7 @@ import {
 import { SHIELDED_IDENTITY_IDLE_TIMEOUT_MS } from "./useShieldedIdentitySession";
 
 const mocks = vi.hoisted(() => ({
+  supportedSuites: null as number[] | null,
   call: vi.fn(),
   crypto: vi.fn<
     (
@@ -30,10 +31,21 @@ const mocks = vi.hoisted(() => ({
   form: null as PersonHashCalculatorHandle | null,
 }));
 
+vi.mock("@deepfamily/protocol-core", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@deepfamily/protocol-core")>();
+  return {
+    ...actual,
+    get SUPPORTED_IDENTITY_SUITE_IDS() {
+      return mocks.supportedSuites ?? actual.SUPPORTED_IDENTITY_SUITE_IDS;
+    },
+  };
+});
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({
-    t: (key: string, options?: string | Record<string, unknown>) =>
-      key === "shielded.submit" && typeof options === "object" ? `${key}:${options.action}` : key,
+    t: (key: string, options?: string | Record<string, unknown>) => {
+      if (key === "shielded.identitySuiteOption" && typeof options === "object") return `Suite ${options.suite}`;
+      return key === "shielded.submit" && typeof options === "object" ? `${key}:${options.action}` : key;
+    },
     i18n: { language: "en" },
   }),
 }));
@@ -241,6 +253,7 @@ function deferUnlock() {
 describe("Shielded identity form privacy with a real session and form", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.supportedSuites = null;
     mocks.crypto.mockImplementation(() => new Promise(() => {}));
     mocks.generation = 0;
     mocks.form = null;
@@ -265,6 +278,7 @@ describe("Shielded identity form privacy with a real session and form", () => {
   it("shows progress only in the unlock button without adding exit or cancellation controls", async () => {
     const complete = deferUnlock();
     render(panel());
+    expect(screen.queryByRole("button", { name: /shielded\.identitySuite/ })).toBeNull();
     enterIdentity();
     const unlockButton = screen.getByRole("button", { name: "shielded.unlock" });
     const content = unlockButton.parentElement!;
@@ -285,6 +299,150 @@ describe("Shielded identity form privacy with a real session and form", () => {
     expect(sessionState().identity?.handle).toBe(identity.handle);
     expect(screen.getByRole("button", { name: "shielded.lock" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "common.cancel" })).toBeNull();
+  });
+
+  const suite1 = { identitySuiteId: 1, personHash: identity.personHash };
+  const suite2 = { identitySuiteId: 2, personHash: "0x" + "23".repeat(32) };
+  const pressUnlock = () => fireEvent.click(screen.getByRole("button", { name: "shielded.unlock" }));
+  const unlockedCalls = () => mocks.call.mock.calls.filter(([method]) => method === "unlockIdentity");
+
+  it.each([suite1, suite2])("opens only the chooser and unlocks the selected suite $identitySuiteId in one click", async (chosen) => {
+    mocks.supportedSuites = [2, 1];
+    render(panel());
+    enterIdentity();
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(screen.queryByRole("button", { name: /findRegisteredIdentity|identitySuite|searchIdentities/ })).toBeNull();
+    expect(screen.getAllByRole("textbox")).toEqual([nameInput()]);
+    expect(mocks.call).not.toHaveBeenCalled();
+    expect(mocks.crypto).not.toHaveBeenCalled();
+
+    mocks.call.mockResolvedValueOnce({ matches: [suite2, suite1] });
+    pressUnlock();
+    const dialog = await screen.findByRole("dialog", { name: "shielded.registeredIdentities" });
+    expect(within(dialog).getByRole("button", { name: `Suite 2 ${suite2.personHash}` })).toBeTruthy();
+    expect(within(dialog).getByRole("button", { name: `Suite 1 ${suite1.personHash}` })).toBeTruthy();
+    expect(unlockedCalls()).toHaveLength(0);
+    expect(sessionState().identity).toBeNull();
+    mocks.call.mockResolvedValueOnce({ ...unlocked, identity: { ...identity, ...chosen } });
+    fireEvent.click(within(dialog).getByRole("button", { name: `Suite ${chosen.identitySuiteId} ${chosen.personHash}` }));
+    await waitFor(() => expect(sessionState().identity?.personHash).toBe(chosen.personHash));
+    expect(unlockedCalls()).toEqual([["unlockIdentity", expect.objectContaining({
+      identitySuiteId: chosen.identitySuiteId, expectedPersonHash: chosen.personHash,
+    })]]);
+    expect(sessionState().identityDraft.identitySuiteId).toBe(chosen.identitySuiteId);
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("opens the only registered identity on the first unlock, even when a newer suite is supported", async () => {
+    mocks.supportedSuites = [2, 1];
+    render(panel());
+    enterIdentity();
+    mocks.call.mockResolvedValueOnce({ matches: [suite1] });
+    pressUnlock();
+    await waitFor(() => expect(sessionState().identity?.personHash).toBe(suite1.personHash));
+    expect(mocks.call).toHaveBeenCalledWith("findRegisteredIdentities", {
+      context: expect.anything(),
+      identity: expect.objectContaining({ fullName: "Alice" }), rawPassphrase: "private-identity-passphrase",
+    });
+    expect(unlockedCalls()).toEqual([["unlockIdentity", expect.objectContaining({
+      identitySuiteId: 1, expectedPersonHash: suite1.personHash,
+    })]]);
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("closes the dialog on Escape, returns focus to Unlock, and discards the old matches", async () => {
+    mocks.supportedSuites = [1, 2];
+    render(panel());
+    enterIdentity();
+    const button = screen.getByRole("button", { name: "shielded.unlock" });
+    button.focus();
+    mocks.call.mockResolvedValueOnce({ matches: [suite1, suite2] });
+    pressUnlock();
+    const dialog = await screen.findByRole("dialog");
+    fireEvent.keyDown(dialog, { key: "Escape" });
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(document.activeElement).toBe(button);
+    expect(unlockedCalls()).toHaveLength(0);
+    mocks.call.mockResolvedValueOnce({ matches: [suite1] });
+    pressUnlock();
+    await waitFor(() => expect(sessionState().identity?.personHash).toBe(suite1.personHash));
+  });
+
+  it("keeps local wallet access when lookup confirms there is no registered version", async () => {
+    mocks.supportedSuites = [2, 1];
+    render(panel());
+    enterIdentity();
+    mocks.call.mockResolvedValueOnce({ matches: [] });
+    pressUnlock();
+    await waitFor(() => expect(sessionState().identity?.personHash).toBe(identity.personHash));
+    expect(unlockedCalls()[0][1].identitySuiteId).toBe(1);
+    expect(unlockedCalls()[0][1]).not.toHaveProperty("expectedPersonHash");
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("offers both registrations on re-unlock even when the previous identity used suite 2", async () => {
+    mocks.supportedSuites = [2, 1];
+    render(panel());
+    enterIdentity();
+    mocks.call.mockResolvedValueOnce({ matches: [suite2] })
+      .mockResolvedValueOnce({ ...unlocked, identity: { ...identity, ...suite2 } });
+    pressUnlock();
+    await waitFor(() => expect(sessionState().identity?.personHash).toBe(suite2.personHash));
+    applicationLock();
+    expect(sessionState().identityDraft.identitySuiteId).toBe(2);
+
+    enterPassphrase();
+    mocks.call.mockResolvedValueOnce({ matches: [suite2, suite1] });
+    pressUnlock();
+    const dialog = await screen.findByRole("dialog");
+    expect(unlockedCalls()).toHaveLength(1);
+    fireEvent.click(within(dialog).getByRole("button", { name: `Suite 1 ${suite1.personHash}` }));
+    await waitFor(() => expect(sessionState().identity?.personHash).toBe(suite1.personHash));
+    const attempts = unlockedCalls();
+    expect(attempts).toHaveLength(2);
+    expect(attempts[1][1]).toMatchObject({ identitySuiteId: 1, expectedPersonHash: suite1.personHash });
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("retries a failed registration lookup from the same Unlock button", async () => {
+    mocks.supportedSuites = [1, 2];
+    render(panel());
+    enterIdentity();
+    mocks.call.mockRejectedValueOnce(new Error("RPC unavailable"));
+    pressUnlock();
+    expect((await screen.findByRole("alert")).textContent).toBe("shielded.identityLookupFailed");
+    expect(unlockedCalls()).toHaveLength(0);
+    mocks.call.mockResolvedValueOnce({ matches: [suite1] });
+    pressUnlock();
+    await waitFor(() => expect(sessionState().identity?.personHash).toBe(suite1.personHash));
+  });
+
+  it.each([[suite1], [suite1, suite2], []].map(matches => ({ matches })))(
+    "discards an in-flight lookup after a passphrase edit", async (result) => {
+      mocks.supportedSuites = [1, 2];
+      render(panel());
+      enterIdentity();
+      let finish!: (value: unknown) => void;
+      mocks.call.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
+      pressUnlock();
+      fireEvent.change(screen.getByLabelText("search.hashCalculator.passphrase"), { target: { value: "other-password" } });
+      await act(async () => finish(result));
+      expect(unlockedCalls()).toHaveLength(0);
+      expect(screen.queryByRole("dialog")).toBeNull();
+    },
+  );
+
+  it("discards an open chooser when the wallet disconnects", async () => {
+    mocks.supportedSuites = [1, 2];
+    const mounted = render(panel());
+    enterIdentity();
+    mocks.call.mockResolvedValueOnce({ matches: [suite1, suite2] });
+    pressUnlock();
+    await screen.findByRole("dialog");
+    mounted.rerender(panel(false));
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(mocks.form?.hasPassphrase()).toBe(false);
+    expect(unlockedCalls()).toHaveLength(0);
   });
 
   it("returns to the unlock action after failure without leaving progress or exit controls", async () => {
@@ -466,6 +624,7 @@ describe("Shielded identity form privacy with a real session and form", () => {
     await waitFor(() =>
       expect(mocks.call).toHaveBeenCalledWith("unlockIdentity", {
         identity: expect.objectContaining({ fullName: rawName, birthYear: 65535 }),
+        identitySuiteId: 1,
         rawPassphrase,
       }),
     );
@@ -499,6 +658,7 @@ describe("Shielded identity form privacy with a real session and form", () => {
     await waitFor(() =>
       expect(mocks.call).toHaveBeenCalledWith("unlockIdentity", {
         identity: expect.objectContaining({ fullName: rawName }),
+        identitySuiteId: 1,
         rawPassphrase,
       }),
     );

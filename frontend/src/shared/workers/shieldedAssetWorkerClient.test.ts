@@ -118,6 +118,7 @@ describe("asset Worker secret lifetime", () => {
     const promise = shieldedAssetWorkerCall("unlockIdentity", {
       identity,
       rawPassphrase: "private-identity",
+      identitySuiteId: 1,
     });
     const worker = FakeWorker.instances[0];
     expect(worker.requests[0].params).toBeUndefined();
@@ -135,7 +136,7 @@ describe("asset Worker secret lifetime", () => {
   it("publishes sync progress without completing the secret request or changing its realm", async () => {
     const listener = vi.fn();
     unsubscribeProgress = subscribePublicStateSyncProgress(listener);
-    const promise = shieldedAssetWorkerCall("unlockIdentity", { identity, rawPassphrase: "private-progress-secret" });
+    const promise = shieldedAssetWorkerCall("unlockIdentity", { identity, rawPassphrase: "private-progress-secret", identitySuiteId: 1 });
     let settled = false;
     void promise.then(() => { settled = true; });
     const worker = FakeWorker.instances[0];
@@ -178,7 +179,7 @@ describe("asset Worker secret lifetime", () => {
   });
   it("does not clear or extend a secret request timeout when progress arrives", async () => {
     vi.useFakeTimers();
-    const promise = shieldedAssetWorkerCall("unlockIdentity", { identity, rawPassphrase: "timed-secret" }, { timeoutMs: 100 });
+    const promise = shieldedAssetWorkerCall("unlockIdentity", { identity, rawPassphrase: "timed-secret", identitySuiteId: 1 }, { timeoutMs: 100 });
     const rejected = expect(promise).rejects.toThrow("locked");
     const worker = FakeWorker.instances[0];
     vi.advanceTimersByTime(90);
@@ -259,7 +260,7 @@ describe("asset Worker secret lifetime", () => {
   it("rejects progress from a terminated realm before and after a replacement starts", async () => {
     const listener = vi.fn();
     unsubscribeProgress = subscribePublicStateSyncProgress(listener);
-    const promise = shieldedAssetWorkerCall("unlockIdentity", { identity, rawPassphrase: "old-secret" });
+    const promise = shieldedAssetWorkerCall("unlockIdentity", { identity, rawPassphrase: "old-secret", identitySuiteId: 1 });
     const old = FakeWorker.instances[0];
     const rejected = expect(promise).rejects.toThrow("locked");
     terminateShieldedAssetWorker();
@@ -280,6 +281,7 @@ describe("asset Worker secret lifetime", () => {
     const promise = shieldedAssetWorkerCall("unlockIdentity", {
       identity,
       rawPassphrase: "secret",
+      identitySuiteId: 1,
     });
     const old = FakeWorker.instances[0];
     const rejected = expect(promise).rejects.toThrow("locked");
@@ -303,7 +305,7 @@ describe("asset Worker secret lifetime", () => {
     const controller = new AbortController();
     const promise = shieldedAssetWorkerCall(
       "unlockIdentity",
-      { identity, rawPassphrase: "secret-abort" },
+      { identity, rawPassphrase: "secret-abort", identitySuiteId: 1 },
       { signal: controller.signal },
     );
     const rejected = expect(promise).rejects.toThrow("locked");
@@ -316,7 +318,7 @@ describe("asset Worker secret lifetime", () => {
       throw new Error("secret-clone");
     });
     await expect(
-      shieldedAssetWorkerCall("unlockIdentity", { identity, rawPassphrase: "secret-clone" }),
+      shieldedAssetWorkerCall("unlockIdentity", { identity, rawPassphrase: "secret-clone", identitySuiteId: 1 }),
     ).rejects.toThrow("locked");
     expect(FakeWorker.instances[0].requests).toHaveLength(0);
   });

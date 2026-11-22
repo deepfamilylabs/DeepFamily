@@ -14,7 +14,7 @@ export const SHIELDED_IDENTITY_IDLE_TIMEOUT_MS = 10 * 60 * 1000;
 export const SHIELDED_WALLET_REQUEST_TIMEOUT_MS = 2 * 60 * 1000;
 
 /** Public person details used to prefill a re-unlock. Never contains the passphrase. */
-export type ShieldedIdentityDraft = Omit<PublicHashForm, "hasPassphrase">;
+export type ShieldedIdentityDraft = Omit<PublicHashForm, "hasPassphrase"> & { identitySuiteId: number };
 
 interface IdentitySession {
   scope: string;
@@ -214,6 +214,7 @@ export function useShieldedIdentitySession({
       identityDraftRef.current = {
         scope,
         draft: {
+          identitySuiteId: draft.identitySuiteId,
           fullName: draft.fullName,
           isBirthBC: draft.isBirthBC,
           birthYear: draft.birthYear,

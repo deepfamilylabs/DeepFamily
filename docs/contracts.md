@@ -1170,7 +1170,7 @@ personHash` and emits `VersionIndexed` with all three commitments, because DeepF
 only their Keccak wraps. Changing an endorsement rewrites its leaf with a new `writtenAt`;
 cancelling it or removing a trusted endorser writes zero into the leaf. Leaves are never removed.
 
-Version 2 of the immutable index also records the proof-bound self identity suite in its version event, global pages and targeted parent openings. During a family proxy upgrade, the original v1 index keeps its original write hook. The wallet can recover the suite for v1 rows from the archived DFM1 header at the snapshot block. Public funding requires a suite supported by the receiving wallet.
+Version 2 of the immutable index also records the proof-bound self identity suite in its version event, global pages and targeted parent openings. During a family proxy upgrade, the original v1 index keeps its original write hook. The wallet can recover the suite for v1 rows from the archived DFM1 header at the snapshot block. Public funding binds the registered child's identity commitment, regardless of the payer's supported suites. The recipient claims with the suite used for that identity.
 
 The trees follow zk-kit LeanIMT semantics: a node hash is `PoseidonT3(left, right)` and a node
 without a right sibling rises unchanged. Every node stays in storage, so a write recomputes its

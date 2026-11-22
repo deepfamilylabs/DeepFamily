@@ -129,7 +129,7 @@ async function freshClient() {
   return client;
 }
 async function unlock(client: Client) {
-  const state = await client.shieldedAssetWorkerCall("unlockIdentity", credentials());
+  const state = await client.shieldedAssetWorkerCall("unlockIdentity", { ...credentials(), identitySuiteId: 1 });
   expect(state.credentials?.handle).toBeTruthy();
   return state.credentials!.handle;
 }

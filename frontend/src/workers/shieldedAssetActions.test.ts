@@ -315,6 +315,7 @@ async function unlocked() {
       isBirthBC: false,
     },
     rawPassphrase: "correct-identity-password",
+    identitySuiteId: 1,
   });
   return session;
 }

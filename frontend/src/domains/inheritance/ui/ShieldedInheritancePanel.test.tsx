@@ -1091,7 +1091,7 @@ describe("Worker-backed shielded wallet", () => {
     expect(screen.queryByText(label("discoveryPartial"))).toBeNull();
   });
   it("prefills public identity fields after an application lock and forgets them on exit", async () => {
-    const draft = { fullName: "Child", isBirthBC: false, birthYear: 2000, birthMonth: 1, birthDay: 1, gender: 1 };
+    const draft = { identitySuiteId: 1, fullName: "Child", isBirthBC: false, birthYear: 2000, birthMonth: 1, birthDay: 1, gender: 1 };
     mocks.identityDraft = draft;
     await renderPanel();
     expect(screen.getByLabelText("identity passphrase").getAttribute("data-prefill")).toBe("Child");

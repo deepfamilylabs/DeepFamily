@@ -3,6 +3,18 @@ import { publicShieldedAssetResult } from "./shieldedAssetResults";
 
 const state = { credentials: { handle: "credentials:1" }, identity: null, independentKey: null };
 describe("asset Worker public result boundary", () => {
+  it("returns only the public identities found and preserves a child's unfamiliar suite in recovery", () => {
+    const match = { identitySuiteId: 2, personHash: "0x" + "12".repeat(32) };
+    expect(publicShieldedAssetResult("findRegisteredIdentities", { matches: [match] })).toEqual({ matches: [match] });
+    expect(() => publicShieldedAssetResult("findRegisteredIdentities", {
+      matches: [{ ...match, derivedSecretField: "secret" }],
+    })).toThrow("invalid public result");
+    const wallet = {
+      toBlock: 1, blockHash: "hash", parentVersions: [], policies: [], templates: [], claims: [], notes: [],
+      children: [{ ...match, eligible: true, rootVersionIndex: 1 }],
+    };
+    expect(publicShieldedAssetResult("recover", wallet)).toEqual(wallet);
+  });
   it("retains public session handles while rejecting private fields at any depth", () => {
     expect(publicShieldedAssetResult("unlockIdentity", state)).toEqual(state);
     for (const value of [

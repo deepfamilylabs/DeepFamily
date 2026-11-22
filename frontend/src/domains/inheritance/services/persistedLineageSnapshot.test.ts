@@ -213,6 +213,17 @@ describe("persistent global current lineage synchronization", () => {
     assertNoTargetCalls(f);
   });
 
+  it("matches registration candidates in the local version index without loading relatives or probing the hashes", async () => {
+    const fixtureState = fixture();
+    const missing = wrapIdentityCommitmentAsPersonHash(98765n);
+    const snapshot = await load(fixtureState, { versionPersonHashes: [ROOT, HEIR, missing] });
+    expect(snapshot.versions.get(HEIR)?.[0].identitySuiteId).toBe(1);
+    expect(snapshot.versions.get(ROOT)?.[0].identityCommitment).toBe(ROOT_IC);
+    expect(snapshot.versions.get(missing)).toEqual([]);
+    expect(snapshot.endorsements.size).toBe(0);
+    expect(snapshot.trustedEndorsers.size).toBe(0);
+    assertNoTargetCalls(fixtureState);
+  });
   it("resolves a public funding recipient from browser-local person metadata without an identity query", async () => {
     const f = fixture();
     const snapshot = await load(f, { publicEligibility: [{ heirPersonHash: HEIR,

@@ -325,6 +325,14 @@ export async function loadLineageSnapshot(
     );
   }
   const versions = await collectVersions(indexEvents, deepFamily, blockNumber, working?.versions);
+  if (options.selection?.versionPersonHashes) {
+    let total = 0n;
+    for (const entries of versions.values()) total += BigInt(entries.length);
+    if (total !== BigInt(await lineageIndex.versionMetadataCount({ blockTag: blockNumber }))) {
+      if (cache.get(key) === previous) cache.delete(key);
+      throw new InheritanceError("snapshotMismatch", "Incomplete lineage identity registration history");
+    }
+  }
   const finalAnchor = await provider.getBlock(blockNumber);
   if (finalAnchor?.hash !== anchor.hash)
     throw new InheritanceError("snapshotMismatch", "Lineage snapshot block was reorganized");

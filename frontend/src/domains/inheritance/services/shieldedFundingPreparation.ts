@@ -1,6 +1,5 @@
 import {
   SHIELDED_POOL_ACTION,
-  assertIdentitySuiteSupported,
   buildShieldedPoolPublicInputs,
   computeLineageEndorsementLeaf,
   computeLineageParentsDigest,
@@ -262,8 +261,8 @@ async function currentContext(input: PrepareShieldedFundInput) {
     const versions = input.lineage.versions.get(input.publicRecipientPersonHash.toLowerCase());
     if (!versions?.length) throw new Error("Recipient identity is unknown");
     const suite = versions[0].identitySuiteId;
-    if (suite === undefined) throw new Error("The recipient identity suite is unavailable");
-    assertIdentitySuiteSupported(suite);
+    if (suite === undefined || !Number.isInteger(suite) || suite <= 0 || suite > 0xffffffff)
+      throw new Error("The recipient identity suite is unavailable");
     const identityCommitment = getBigInt(versions[0].identityCommitment);
     if (
       versions.some(

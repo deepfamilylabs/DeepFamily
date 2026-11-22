@@ -216,6 +216,7 @@ const runWorkerFlows = async (page) => {
       const check = await call(zk, 'verifyShieldedReceiveCode', { code: created.code })
       const assetState = await call(asset, 'unlockIdentity', {
         identity,
+        identitySuiteId: 1,
         rawPassphrase: receivePassphrase,
       })
       assertPublicFields(assetState, ['credentials', 'identity', 'independentKey'], 'asset session')

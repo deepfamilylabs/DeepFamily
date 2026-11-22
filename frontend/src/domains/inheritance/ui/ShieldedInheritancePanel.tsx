@@ -9,7 +9,7 @@ import {
   type ReactNode,
 } from "react";
 import { useTranslation } from "react-i18next";
-import { Fingerprint, KeyRound, LockOpen, QrCode, ShieldCheck } from "lucide-react";
+import { Fingerprint, KeyRound, QrCode, ShieldCheck } from "lucide-react";
 import {
   buildShieldedIndependentKeySigningMessage,
   normalizeShieldedIndependentKeyIdentity,
@@ -25,7 +25,7 @@ import {
   type Provider,
   type Signer,
 } from "ethers";
-import { PersonHashCalculator, type PersonHashCalculatorHandle } from "../../person";
+import type { PersonHashCalculatorHandle } from "../../person";
 import { useConfig } from "../../config";
 import { SUPPORTED_NETWORKS } from "../../../shared/config/networks";
 import { normalizeShieldedUiError, ShieldedUiMessageError } from "../model/shieldedUiErrors";
@@ -84,6 +84,7 @@ import {
 import { useShieldedPageIdentitySession } from "./ShieldedIdentitySessionContext";
 import { type ShieldedRecipientCredentialsFormHandle } from "./ShieldedRecipientCredentialsForm";
 import { CopyIconButton } from "../../../shared/ui";
+import { ShieldedIdentityUnlockForm } from "./ShieldedIdentityUnlockForm";
 import { useLatestCallback } from "../../../shared/ui/useLatestCallback";
 import {
   formatShieldedTimestamp,
@@ -1086,7 +1087,32 @@ export function ShieldedInheritancePanel({
       }
     }
   }
-  async function unlock() {
+  async function findRegisteredIdentities(formUnchanged: () => boolean) {
+    type LookupResult = ShieldedAssetWorkerCallMap["findRegisteredIdentities"]["result"];
+    let matches: LookupResult["matches"] | undefined;
+    await run(async (current) => {
+      const form = identityForm.current;
+      if (!form) return;
+      const identity = form.getRawIdentityFields();
+      normalizeShieldedIndependentKeyIdentity(identity);
+      normalizeShieldedIndependentKeyPassphrase(form.getSecretInputs().passphrase);
+      let found: LookupResult;
+      try {
+        found = await shieldedAssetWorkerCall("findRegisteredIdentities", {
+          context, identity, rawPassphrase: form.getSecretInputs().passphrase,
+        });
+      } catch (cause) {
+        if (current() && formUnchanged()) {
+          setErrorState(normalizeShieldedUiError(cause, t, { message: t("shielded.identityLookupFailed") }));
+        }
+        return;
+      }
+      if (!current() || !formUnchanged()) return;
+      matches = found.matches;
+    }, tr("unlocking"), "wallet");
+    return matches;
+  }
+  async function unlock(unlockSuite: number, expectedPersonHash?: string) {
     await run(async (current) => {
       const form = identityForm.current;
       if (!form) return;
@@ -1096,12 +1122,16 @@ export function ShieldedInheritancePanel({
       try {
         normalizeShieldedIndependentKeyIdentity(identity);
         normalizeShieldedIndependentKeyPassphrase(rawPassphrase);
-        const pending = shieldedAssetWorkerCall("unlockIdentity", { identity, rawPassphrase });
+        const pending = shieldedAssetWorkerCall("unlockIdentity", {
+          identity, rawPassphrase, identitySuiteId: unlockSuite,
+          ...(expectedPersonHash ? { expectedPersonHash } : {}),
+        });
         rawPassphrase = "";
         const state = await pending;
         if (current()) {
           latestSession.current.update(state);
           latestSession.current.rememberIdentityDraft({
+            identitySuiteId: unlockSuite,
             fullName: identity.fullName,
             isBirthBC: identity.isBirthBC,
             birthYear: identity.birthYear,
@@ -2365,7 +2395,7 @@ export function ShieldedInheritancePanel({
     receipt = null;
   } else if (action === "fund") {
     const fundingVersion = selectedPolicy?.rootVersionIndex ?? rootVersion;
-    const heirs = listShieldedFundingHeirs(wallet, fundingVersion, entry, localRecipientLabels);
+    const heirs = listShieldedFundingHeirs(wallet, fundingVersion, localRecipientLabels);
     const heirIndex = heirs.findIndex(
       (heir) => heir.personHash.toLowerCase() === personHash.toLowerCase(),
     );
@@ -2407,7 +2437,7 @@ export function ShieldedInheritancePanel({
         onEntryChange={(next) => {
           // The child, version, rule and amounts stay; only receiving material differs.
           if (template || next === entry) return;
-          if (!listShieldedFundingHeirs(wallet, fundingVersion, next).some(heir => heir.personHash.toLowerCase() === personHash.toLowerCase())) setPersonHash("");
+          if (!heirs.some((heir) => heir.personHash.toLowerCase() === personHash.toLowerCase())) setPersonHash("");
           setEntry(next);
           changeCode("");
           setRecipientInputMethod("receiveCode");
@@ -2417,7 +2447,7 @@ export function ShieldedInheritancePanel({
         onPolicyChange={(handle) => {
           if (handle === policyHandle) return;
           const nextVersion = wallet?.policies.find(item => item.handle === handle)?.rootVersionIndex ?? rootVersion;
-          const sameChildAvailable = listShieldedFundingHeirs(wallet, nextVersion, entry)
+          const sameChildAvailable = listShieldedFundingHeirs(wallet, nextVersion)
             .some(heir => heir.personHash.toLowerCase() === personHash.toLowerCase());
           setPolicyHandle(handle);
           if (!sameChildAvailable) {
@@ -2430,7 +2460,7 @@ export function ShieldedInheritancePanel({
         rootVersion={rootVersion}
         onRootVersionChange={(value) => {
           if (value === rootVersion) return;
-          const sameChildAvailable = listShieldedFundingHeirs(wallet, value, entry)
+          const sameChildAvailable = listShieldedFundingHeirs(wallet, value)
             .some(heir => heir.personHash.toLowerCase() === personHash.toLowerCase());
           setRootVersion(value);
           if (!sameChildAvailable) {
@@ -2888,33 +2918,11 @@ export function ShieldedInheritancePanel({
               {session.identity.identity.fullName} · {session.identity.personHash}
             </p>
           ) : (
-            <>
-              <PersonHashCalculator
-                key={`${identityFormEpoch}:${JSON.stringify(session.identityDraft)}`}
-                ref={identityForm}
-                initialValues={session.identityDraft ?? undefined}
-                computeHash={!busy}
-                independentKeyCredentials
-                showTitle={false}
-                collapsible={false}
-                showPassphraseGuidance={false}
-                className="border-0 bg-transparent p-0 shadow-none"
-              />
-              <PanelButton
-                variant="primary"
-                size="hero"
-                className="w-full"
-                busy={busy}
-                disabled={busy}
-                aria-label={busy ? tr("unlocking") : t("shielded.unlock", { symbol })}
-                onClick={() => void unlock()}
-              >
-                {busy ? null : <LockOpen className="h-[18px] w-[18px]" aria-hidden="true" />}
-                <span role="status">
-                  {busy ? tr("unlocking") : t("shielded.unlock", { symbol })}
-                </span>
-              </PanelButton>
-            </>
+            <ShieldedIdentityUnlockForm
+              key={JSON.stringify([contextKey, account, identityFormEpoch, session.identityDraft])}
+              form={identityForm} draft={session.identityDraft} symbol={symbol} busy={busy}
+              find={findRegisteredIdentities} unlock={unlock}
+            />
           )
         ) : (
           independentKeyManager

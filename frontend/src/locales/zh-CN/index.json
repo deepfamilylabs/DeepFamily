@@ -1602,6 +1602,9 @@
     "unreachable": "暂时无法读取网络状态，请稍后重试。",
     "wrongNetwork": "请将钱包切换至网络 {{chainId}}。",
     "identityTitle": "解锁身份",
+    "identitySuiteOption": "Suite {{suite}}",
+    "identityLookupFailed": "未能查找身份。请检查身份资料、口令和网络后重试。",
+    "registeredIdentities": "选择要解锁的身份",
     "identityDescription": "存入预算时使用父母身份，领取时使用子女身份。请妥善保存身份资料和口令。",
     "publicStateSync": {
       "title": "公开状态同步",

@@ -15,6 +15,7 @@ import {
   MAX_UINT32,
   NAME_PREHASH_DOMAIN,
   SNARK_SCALAR_FIELD,
+  SUPPORTED_IDENTITY_SUITE_IDS,
 } from "./constants.js";
 import { bigintFrom, bytesToHex, concatBytes, copyBytes, utf8Bytes, wipeBytes } from "./bytes.js";
 import { canonicalizeFullName, trimUnicodeWhiteSpace } from "./canonical.js";
@@ -59,9 +60,8 @@ export function packBirthGenderField(input) {
 }
 
 export function isIdentitySuiteSupported(identitySuiteId) {
-  return (
-    identitySuiteId === IDENTITY_SUITE_CANDIDATE_1 ||
-    identitySuiteId === BigInt(IDENTITY_SUITE_CANDIDATE_1)
+  return SUPPORTED_IDENTITY_SUITE_IDS.some(
+    (suite) => identitySuiteId === suite || identitySuiteId === BigInt(suite),
   );
 }
 

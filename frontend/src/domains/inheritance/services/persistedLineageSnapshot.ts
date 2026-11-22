@@ -30,6 +30,7 @@ import {
 import type { IndexedVersion, LineageSnapshot } from "./inheritanceChain";
 
 export type LocalLineageRequest = TargetedLineageRequest & {
+  versionPersonHashes?: readonly string[];
   publicEligibility?: readonly {
     heirPersonHash: string;
     rootIdentityCommitment: bigint;
@@ -831,6 +832,7 @@ async function select(
       }
       endorsements.set(hash, found);
     };
+    for (const hash of request.versionPersonHashes ?? []) await loadVersions(lower(hash));
     for (const rawIdentity of request.parentIdentityCommitments ?? []) {
       const identity = field(rawIdentity),
         ownVersions = await loadVersions(person(identity));

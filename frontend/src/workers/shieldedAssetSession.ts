@@ -1,11 +1,10 @@
 import {
-  IDENTITY_SUITE_CANDIDATE_1,
+  SUPPORTED_IDENTITY_SUITE_IDS,
   SHIELDED_POOL_PROTOCOL_VERSION,
   SHIELDED_POOL_ACTION,
   ProtocolError,
   initializeShieldedReceiveEncryption,
   buildShieldedPoolPublicSignals,
-  canonicalizeFullName,
   computeShieldedAllocationKeyCommitment,
   computeShieldedPolicyCommitment,
   computeShieldedValueOwnerCommitment,
@@ -79,6 +78,7 @@ import {
   loadLineageSnapshot,
 } from "../domains/inheritance/services/inheritanceChain";
 import { listShieldedClaimBudgetOptions } from "../domains/inheritance/services/shieldedClaimOverview";
+import { lookupRegisteredShieldedIdentities } from "../domains/inheritance/services/shieldedIdentityLookup";
 import {
   listShieldedFundingChildren,
   listShieldedFundingParentVersions,
@@ -128,6 +128,7 @@ type ReceiveDestination = {
 };
 class AssetSessionError extends Error {}
 const ASSET_METHODS = new Set([
+  "findRegisteredIdentities",
   "unlockIdentity",
   "createIndependentKey",
   "restoreSignature",
@@ -259,6 +260,34 @@ export class ShieldedAssetSession {
     return { ...this.independentKeyMaterial, keyMode: 1 };
   }
 
+  async findRegisteredIdentities(params: ShieldedAssetWorkerCallMap["findRegisteredIdentities"]["params"]) {
+    const epoch = this.credentialsEpoch;
+    const current = () => requireValue(epoch === this.credentialsEpoch, "Credentials session was replaced or locked.");
+    const candidates = [];
+    try {
+      for (const identitySuiteId of SUPPORTED_IDENTITY_SUITE_IDS) {
+        current();
+        const material = await deriveIdentityMaterial({
+          identity: params.identity, rawPassphrase: params.rawPassphrase, identitySuiteId,
+        });
+        try {
+          candidates.push({ identitySuiteId, personHash: material.personHash, identityCommitment: material.identityCommitment });
+        } finally {
+          wipeBytes(material.derivedSecretBytes);
+          wipeBytes(material.identitySalt);
+        }
+      }
+    } finally {
+      params.rawPassphrase = "";
+    }
+    current();
+    const env = await this.context(params.context);
+    const blockNumber = await env.provider.getBlockNumber();
+    const result = await lookupRegisteredShieldedIdentities(candidates, env, blockNumber);
+    current();
+    return result;
+  }
+
   async unlockIdentity(
     params: ShieldedAssetWorkerCallMap["unlockIdentity"]["params"],
   ): Promise<ShieldedAssetSessionState> {
@@ -268,6 +297,10 @@ export class ShieldedAssetSession {
     let keyIdentitySecret: Uint8Array | undefined;
     let material: IdentityMaterial | undefined;
     try {
+      requireValue(
+        Number.isInteger(params.identitySuiteId) && params.identitySuiteId > 0 && params.identitySuiteId <= 0xffffffff,
+        "Unlock requires an explicit identity suite.",
+      );
       // Both derivations receive the original form fields and share trim-only text preparation.
       // Run the two memory-hard KDFs sequentially.
       keyIdentitySecret = await deriveShieldedIndependentKeyIdentitySecret({
@@ -281,16 +314,17 @@ export class ShieldedAssetSession {
       requireValue(epoch === this.credentialsEpoch, "Credentials session was replaced or locked.");
       try {
         material = await deriveIdentityMaterial({
-          identity: {
-            ...params.identity,
-            fullName: canonicalizeFullName(params.identity.fullName),
-          },
+          identity: params.identity,
           rawPassphrase: params.rawPassphrase,
-          identitySuiteId: params.identitySuiteId ?? IDENTITY_SUITE_CANDIDATE_1,
+          identitySuiteId: params.identitySuiteId,
         });
       } catch {
         // Identity proof support is optional for recovering and spending existing VALUE.
       }
+      if (params.expectedPersonHash !== undefined) requireValue(
+        material && material.personHash.toLowerCase() === params.expectedPersonHash.toLowerCase(),
+        "These credentials no longer match the selected registered identity.",
+      );
       requireValue(epoch === this.credentialsEpoch, "Credentials session was replaced or locked.");
       // A destroyed Worker may later be recreated with its counters reset.
       const credentialsHandle = `credentials:${crypto.randomUUID()}`;

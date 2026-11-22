@@ -323,32 +323,32 @@ describe("funding destination validation before consolidation", () => {
     },
   );
 
-  it("blocks a registered and eligible suite-2 recipient before public funding", async () => {
-    const f = await setup();
-    const personHash = f.recipient.personHash!;
-    f.lineage.versions.get(personHash)![0].identitySuiteId = 2;
+  it("funds the registered commitment of an eligible child even if the payer cannot derive its suite", async () => {
+    const fixture = await setup();
+    const personHash = fixture.recipient.personHash!;
+    fixture.lineage.versions.get(personHash)![0].identitySuiteId = 2;
     const wallet = {
       children: [
-        { personHash, eligible: true, rootVersionIndex: 1, identitySuiteId: 2 },
-        { personHash: "supported", eligible: true, rootVersionIndex: 1, identitySuiteId: 1 },
+        { personHash, eligible: true, rootVersionIndex: 0, identitySuiteId: 2 },
+        { personHash: "ineligible", eligible: false, rootVersionIndex: 0, identitySuiteId: 2 },
+        { personHash: "otherVersion", eligible: true, rootVersionIndex: 1, identitySuiteId: 1 },
       ],
     } as ShieldedWalletSummary;
     expect(
-      listShieldedFundingHeirs(wallet, "1", "public").map((child) => child.personHash),
-    ).toEqual(["supported"]);
+      listShieldedFundingHeirs(wallet, "0"),
+    ).toEqual([expect.objectContaining({ personHash, identitySuiteId: 2 })]);
     const input = {
-      ...f.common,
+      ...fixture.common,
       fundMode: 0 as const,
       budgetKind: 1 as const,
-      policy: f.policy,
+      policy: fixture.policy,
       publicRecipientPersonHash: personHash,
       budgetPeriods: 1n,
     };
-    await expect(validateShieldedFundingDestination(input)).rejects.toThrow(
-      "Unsupported identity suite 2",
-    );
-    await expect(prepareShieldedFund(input)).rejects.toThrow("Unsupported identity suite 2");
-    expect(f.lineageIndex.identityCommitmentOf).not.toHaveBeenCalled();
+    await expect(validateShieldedFundingDestination(input)).resolves.toBeUndefined();
+    const budget = (await prepareShieldedFund(input)).outputs[0].note;
+    expect(budget.heirIdentityCommitment).toBe(heirIdentity);
+    expect(fixture.lineageIndex.identityCommitmentOf).not.toHaveBeenCalled();
   });
 
   it.each(["different identity", "different person", "inconsistent versions"] as const)(

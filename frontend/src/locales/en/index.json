@@ -1602,6 +1602,9 @@
     "unreachable": "Network state could not be read. Try again shortly.",
     "wrongNetwork": "Switch your wallet to network {{chainId}}.",
     "identityTitle": "Unlock identity",
+    "identitySuiteOption": "Suite {{suite}}",
+    "identityLookupFailed": "Could not look up your identity. Check your details, passphrase and network, then try again.",
+    "registeredIdentities": "Choose the identity to unlock",
     "identityDescription": "Use the parent's identity to fund budgets and the child's identity to claim. Keep your identity details and passphrase safe.",
     "publicStateSync": {
       "title": "Public state synchronization",
