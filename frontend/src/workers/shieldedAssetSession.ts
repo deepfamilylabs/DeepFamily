@@ -1,5 +1,4 @@
 import {
-  SUPPORTED_IDENTITY_SUITE_IDS,
   SHIELDED_POOL_PROTOCOL_VERSION,
   SHIELDED_POOL_ACTION,
   ProtocolError,
@@ -78,7 +77,7 @@ import {
   loadLineageSnapshot,
 } from "../domains/inheritance/services/inheritanceChain";
 import { listShieldedClaimBudgetOptions } from "../domains/inheritance/services/shieldedClaimOverview";
-import { lookupRegisteredShieldedIdentities } from "../domains/inheritance/services/shieldedIdentityLookup";
+import { discoverIdentityCandidates } from "./identityDiscovery";
 import {
   listShieldedFundingChildren,
   listShieldedFundingParentVersions,
@@ -128,7 +127,7 @@ type ReceiveDestination = {
 };
 class AssetSessionError extends Error {}
 const ASSET_METHODS = new Set([
-  "findRegisteredIdentities",
+  "findWalletIdentities",
   "unlockIdentity",
   "createIndependentKey",
   "restoreSignature",
@@ -260,32 +259,21 @@ export class ShieldedAssetSession {
     return { ...this.independentKeyMaterial, keyMode: 1 };
   }
 
-  async findRegisteredIdentities(params: ShieldedAssetWorkerCallMap["findRegisteredIdentities"]["params"]) {
+  async findWalletIdentities(params: ShieldedAssetWorkerCallMap["findWalletIdentities"]["params"]) {
     const epoch = this.credentialsEpoch;
     const current = () => requireValue(epoch === this.credentialsEpoch, "Credentials session was replaced or locked.");
-    const candidates = [];
-    try {
-      for (const identitySuiteId of SUPPORTED_IDENTITY_SUITE_IDS) {
-        current();
-        const material = await deriveIdentityMaterial({
-          identity: params.identity, rawPassphrase: params.rawPassphrase, identitySuiteId,
-        });
-        try {
-          candidates.push({ identitySuiteId, personHash: material.personHash, identityCommitment: material.identityCommitment });
-        } finally {
-          wipeBytes(material.derivedSecretBytes);
-          wipeBytes(material.identitySalt);
-        }
-      }
-    } finally {
-      params.rawPassphrase = "";
-    }
-    current();
-    const env = await this.context(params.context);
-    const blockNumber = await env.provider.getBlockNumber();
-    const result = await lookupRegisteredShieldedIdentities(candidates, env, blockNumber);
-    current();
-    return result;
+    const candidates = await discoverIdentityCandidates(params, async () => {
+      const env = await this.context(params.context);
+      const { chainId, factoryDeploymentBlock, lineageIndexAddress } = params.context;
+      return {
+        ...env,
+        pools: { chainId, factoryDeploymentBlock, lineageIndexAddress, factory: env.factory, verifierAddress: env.verifierAddress },
+      };
+    }, "wallet", current);
+    const matches = candidates.flatMap(({ identitySuiteId, personHash, history }) =>
+      history === "none" ? [] : [{ identitySuiteId, personHash }],
+    );
+    return { matches };
   }
 
   async unlockIdentity(

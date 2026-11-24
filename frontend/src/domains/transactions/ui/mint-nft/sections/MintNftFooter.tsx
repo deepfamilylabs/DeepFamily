@@ -14,7 +14,6 @@ export interface MintNftFooterProps {
   isEndorsed: boolean;
   allConsentsChecked: boolean;
   hasPersonInfo: boolean;
-  hasTargetInputs: boolean;
   hasValidTarget: boolean;
   hasVerifiedTargetEnvelope: boolean;
   transactionPreview: ArchiveTransactionPreview | null;
@@ -34,7 +33,6 @@ export function MintNftFooter({
   isEndorsed,
   allConsentsChecked,
   hasPersonInfo,
-  hasTargetInputs,
   hasValidTarget,
   hasVerifiedTargetEnvelope,
   transactionPreview,
@@ -89,7 +87,7 @@ export function MintNftFooter({
               {t("common.cancel", "Cancel")}
             </TransactionButton>
             <>
-              {hasValidTarget && !isEndorsed ? (
+              {hasValidTarget && !isEndorsed && (isCheckingStatus || hasVerifiedTargetEnvelope) ? (
                 <TransactionButton
                   variant="info"
                   onClick={onShowEndorseConfirm}
@@ -107,7 +105,7 @@ export function MintNftFooter({
                     isCheckingStatus ||
                     !allConsentsChecked ||
                     !hasPersonInfo ||
-                    !hasTargetInputs ||
+                    !hasValidTarget ||
                     !hasVerifiedTargetEnvelope
                   }
                   className="flex-[1.5]"

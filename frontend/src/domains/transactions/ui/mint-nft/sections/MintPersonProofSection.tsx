@@ -1,3 +1,4 @@
+import { DEFAULT_IDENTITY_SUITE_ID } from "@deepfamily/protocol-core";
 import type { Ref } from "react";
 import { PersonHashCalculator, type PersonHashCalculatorHandle } from "../../../../person";
 import type { MintNFTT, MintPersonInfo } from "../model/mintNftTypes";
@@ -8,6 +9,7 @@ export interface MintPersonProofSectionProps {
   t: MintNFTT;
   personCalcRef: Ref<PersonHashCalculatorHandle>;
   personInfo: MintPersonInfo | null;
+  hasTargetHash: boolean;
   targetSelfSuiteId: number | null;
   onPersonInfoChange: (value: MintPersonInfo) => void;
   onPassphraseChange: (risk: ProtocolPassphraseRisk) => void;
@@ -17,6 +19,7 @@ export function MintPersonProofSection({
   t,
   personCalcRef,
   personInfo,
+  hasTargetHash,
   targetSelfSuiteId,
   onPersonInfoChange,
   onPassphraseChange,
@@ -26,10 +29,12 @@ export function MintPersonProofSection({
       <div className="space-y-4">
         <ModalSectionHeading>{t("mintNFT.basicInfo", "Basic Information")}</ModalSectionHeading>
         <p className="text-xs text-ink-muted leading-relaxed">
-          {t(
-            "mintNFT.basicInfoMustMatch",
-            "Must match the target version's data exactly; the contract verifies this on chain before minting.",
-          )}
+          {DEFAULT_IDENTITY_SUITE_ID > 1 && targetSelfSuiteId !== null
+            ? t("mintNFT.targetProtocolHint", { suite: targetSelfSuiteId })
+            : t(
+                "mintNFT.basicInfoMustMatch",
+                "Must match the target version's data exactly; the contract verifies this on chain before minting.",
+              )}
         </p>
 
         <PersonHashCalculator
@@ -37,7 +42,10 @@ export function MintPersonProofSection({
           showTitle={false}
           collapsible={false}
           className="bg-transparent border-0 shadow-none p-0!"
-          identitySuiteId={targetSelfSuiteId ?? 1}
+          identityRole={hasTargetHash ? undefined : "person"}
+          identitySuiteId={targetSelfSuiteId ?? undefined}
+          autoResolveSuite={hasTargetHash}
+          computeHash={!hasTargetHash || targetSelfSuiteId !== null}
           requirePassphraseConfirmation
           onPassphraseChange={onPassphraseChange}
           initialValues={

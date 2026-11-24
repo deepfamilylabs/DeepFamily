@@ -196,6 +196,16 @@ describe("useDisclosureProof", () => {
     expect(result.current.proofStep).toBe("verified");
   });
 
+  it("stops before proving when the credentials derive a different record", async () => {
+    const { result } = renderHook(() => useDisclosureProof());
+    await act(async () => {
+      await expect(result.current.generateDisclosureProof({
+        ...proofArgs(), targetPersonHash: `0x${"ab".repeat(32)}`,
+      })).rejects.toThrow("The identity details or passphrase do not match the selected record.");
+    });
+    expect(mocks.zkWorkerCall).not.toHaveBeenCalled();
+  });
+
   it.each(["reset", "unmount"] as const)(
     "does not start a proof when identity derivation returns after %s",
     async (cancel) => {

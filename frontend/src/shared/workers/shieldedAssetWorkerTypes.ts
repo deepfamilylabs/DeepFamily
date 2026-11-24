@@ -166,8 +166,8 @@ export type ShieldedDiscoveredPoolSummary = {
   error?: string;
 };
 export type ShieldedAssetWorkerCallMap = {
-  findRegisteredIdentities: {
-    params: { identity: IdentityFields; rawPassphrase: string; context: ShieldedWorkerContext };
+  findWalletIdentities: {
+    params: { identity: IdentityFields; rawPassphrase: string; context: ShieldedWorkerContext; previousPersonHash?: string };
     result: { matches: { identitySuiteId: number; personHash: string }[] };
   };
   unlockIdentity: {

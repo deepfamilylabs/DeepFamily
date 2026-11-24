@@ -14,7 +14,6 @@ import {
   DFM1_MAX_ENVELOPE_BYTES,
   FILE_KDF_SUITE_ARGON2ID_CANDIDATE_1,
   FILE_SALT_BYTES,
-  IDENTITY_SUITE_CANDIDATE_1,
   PLAINTEXT_CODEC_CANONICAL_JSON_V1,
 } from "./constants.js";
 import {
@@ -30,6 +29,7 @@ import {
 } from "./bytes.js";
 import { computeFormat1Aad } from "./aad.js";
 import {
+  DEFAULT_IDENTITY_SUITE_ID,
   assertFileKdfSuiteSupported,
   assertIdentitySuiteSupported,
   deriveFileKekBytes,
@@ -177,7 +177,7 @@ export function parseMetadataEnvelope(envelope) {
 
 export function assembleFormat1Envelope(input) {
   const identitySuiteId = assertIdentitySuiteSupported(
-    input.identitySuiteId ?? IDENTITY_SUITE_CANDIDATE_1,
+    input.identitySuiteId ?? DEFAULT_IDENTITY_SUITE_ID,
   );
   const fileSalt = bytesOfLength(input.fileSalt, FILE_SALT_BYTES, "fileSalt");
   const wrapIV = bytesOfLength(input.wrapIV, AES_GCM_IV_BYTES, "wrapIV");
@@ -325,7 +325,7 @@ export async function encryptFormat1Compressed(input) {
       "Compressed plaintext cannot fit in a DFM1 format 1 envelope",
     );
     const identitySuiteId = assertIdentitySuiteSupported(
-      input.identitySuiteId ?? IDENTITY_SUITE_CANDIDATE_1,
+      input.identitySuiteId ?? DEFAULT_IDENTITY_SUITE_ID,
     );
     const selectors = format1Selectors();
     const aad = computeFormat1Aad({ context: input.context, identitySuiteId, ...selectors });

@@ -48,6 +48,8 @@ export type LineageSnapshot = {
   checkpointCreatedAt: bigint;
   /** Lowercase person hash → that person's versions. */
   versions: Map<string, IndexedVersion[]>;
+  /** Requested identities that already occur as someone's parent. */
+  referencedParents?: ReadonlySet<bigint>;
   /** `${personHash}:${versionIndex}` → current trusted endorsers, lowercase. */
   trustedEndorsers: Map<string, Set<string>>;
   endorsementTree: LineageTree;

@@ -1,4 +1,5 @@
 import type { Ref } from "react";
+import type { PersonIdentityLookupContext } from "../../../../../shared/workers/cryptoWorkerClient";
 import { Link } from "react-router-dom";
 import { MODAL_CHIP } from "../../../../../shared/ui";
 import { BookOpen, ChevronDown, ChevronRight, Users } from "lucide-react";
@@ -30,6 +31,8 @@ interface ParentIdentitySectionProps {
   onComputedHashChange: (value: string) => void;
   onVersionIndexChange: (value: number) => void;
   onPassphraseChange: () => void;
+  identityLookupContext?: PersonIdentityLookupContext;
+  onIdentityChoiceChange: () => void;
   onPassphraseConfirmationChange: () => void;
 }
 
@@ -49,6 +52,8 @@ export function ParentIdentitySection({
   onComputedHashChange,
   onVersionIndexChange,
   onPassphraseChange,
+  identityLookupContext,
+  onIdentityChoiceChange,
   onPassphraseConfirmationChange,
 }: ParentIdentitySectionProps) {
   const isFather = kind === "father";
@@ -169,6 +174,8 @@ export function ParentIdentitySection({
       </button>
 
       <div
+        ref={element => { element?.toggleAttribute("inert", !expanded); }}
+        aria-hidden={!expanded}
         className={`p-1 space-y-4 transition-all duration-300 ease-in-out ${expanded ? "opacity-100 max-h-[2000px]" : "opacity-0 max-h-0 overflow-hidden"}`}
       >
         <div className="bg-surface rounded-xl border border-hairline p-4 space-y-4">
@@ -179,6 +186,9 @@ export function ParentIdentitySection({
             collapsible={false}
             className="border-0 shadow-none bg-transparent"
             requirePassphraseConfirmation
+            identityRole={kind}
+            identityLookupContext={identityLookupContext}
+            onIdentityChoiceChange={onIdentityChoiceChange}
             onPassphraseChange={onPassphraseChange}
             onPassphraseConfirmationChange={onPassphraseConfirmationChange}
             onComputedHashChange={onComputedHashChange}
@@ -192,6 +202,7 @@ export function ParentIdentitySection({
             }}
             onPublicFormChange={(formData) => {
               onInfoChange({
+                identitySuiteId: formData.identitySuiteId,
                 fullName: formData.fullName,
                 gender: formData.gender,
                 birthYear: formData.birthYear,

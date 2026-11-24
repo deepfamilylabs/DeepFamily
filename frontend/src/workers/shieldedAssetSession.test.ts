@@ -28,6 +28,7 @@ import {
   buildShieldedIdentityAuthorizationState,
 } from "@deepfamily/protocol-core";
 import { ShieldedAssetSession, shieldedAssetErrorMessage } from "./shieldedAssetSession";
+import { discoverIdentityCandidates } from "./identityDiscovery";
 import {
   ShieldedProofConfigurationError,
   SHIELDED_PROOF_CONFIGURATION_ERROR_MESSAGE,
@@ -803,7 +804,7 @@ describe("independent-key credentials and async installation boundary", () => {
     const params = { ...identityParams(), context: { ...context, stateReadMode: "chain" as const } };
     const record = { identitySuiteId: 1, identityCommitment: 31n, personHash: `0x${"00".repeat(31)}1f` };
     mocks.loadLineage.mockResolvedValue({ versions: new Map([[record.personHash, [record]]]) });
-    const result = await session.call("findRegisteredIdentities", params);
+    const result = await session.call("findWalletIdentities", params);
     expect(result.matches).toEqual([{ identitySuiteId: 1, personHash: record.personHash }]);
     expect(mocks.loadTargetedLineage).not.toHaveBeenCalled();
     expect(params.rawPassphrase).toBe("");
@@ -811,6 +812,24 @@ describe("independent-key credentials and async installation boundary", () => {
     expect(material.identitySalt.every((value: number) => value === 0)).toBe(true);
     expect(material.derivedSecretBytes.every((value: number) => value === 0)).toBe(true);
     expect(session.state()).toEqual({ credentials: null, identity: null, independentKey: null });
+  });
+
+  it("preserves the local record hash if history is unavailable and requires history for automatic wallet selection", async () => {
+    const unavailable = async () => { throw new Error("History unavailable"); };
+    const record = await discoverIdentityCandidates(identityParams(), unavailable, "record");
+    expect(record).toEqual([{ identitySuiteId: 1, personHash: `0x${"00".repeat(31)}1f`, history: "unavailable" }]);
+    await expect(discoverIdentityCandidates(identityParams(), unavailable, "wallet")).rejects.toThrow("History unavailable");
+  });
+
+  it("retains a previous unregistered wallet only for credentials deriving the same person hash", async () => {
+    const session = new ShieldedAssetSession();
+    mocks.loadLineage.mockResolvedValue({ versions: new Map() });
+    const personHash = `0x${"00".repeat(31)}1f`;
+    const find = (previousPersonHash: string) => session.call("findWalletIdentities", {
+      ...identityParams(), context, previousPersonHash,
+    });
+    expect(await find(personHash)).toEqual({ matches: [{ personHash, identitySuiteId: 1 }] });
+    expect(await find("0x" + "ff".repeat(32))).toEqual({ matches: [] });
   });
 
   it("can find a registered suite-1 identity and unlock it with the actual identity KDF", async () => {
@@ -824,7 +843,7 @@ describe("independent-key credentials and async installation boundary", () => {
     wipeBytes(registered.identitySalt);
     mocks.loadLineage.mockResolvedValue({ versions: new Map([[record.personHash, [record]]]) });
     mocks.identity.mockImplementation(deriveIdentityMaterial);
-    const { matches } = await session.call("findRegisteredIdentities", { ...params, context });
+    const { matches } = await session.call("findWalletIdentities", { ...params, context });
     expect(matches).toEqual([{ personHash: record.personHash, identitySuiteId: 1 }]);
     const state = await session.call("unlockIdentity", { ...params, expectedPersonHash: matches[0].personHash });
     expect(state.identity).toMatchObject({

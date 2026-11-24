@@ -351,6 +351,18 @@ describe("SeedHelpers Library Tests", function () {
       console.log(`    NFT minted, TokenID: ${result.tokenId}`);
     });
 
+    it("rejects an explicit suite that differs from the selected version's archive", async function () {
+      const { deepFamily, archive, token, signer, testPersonHash, testPersonData } =
+        await createEndorsedPersonFixture();
+      await endorseVersion({ deepFamily, token, signer, personHash: testPersonHash, versionIndex: 1 });
+
+      await expect(mintPersonVersionNFT({
+        deepFamily, archive, signer, personHash: testPersonHash, versionIndex: 1, tokenURI: "",
+        basicInfo: { ...testPersonData, identitySuiteId: 2 },
+      })).to.be.rejectedWith("Provided identity suite does not match the target version");
+      expect(await deepFamily.versionToTokenId(testPersonHash, 1)).to.equal(0n);
+    });
+
     it("retains a successful mint receipt when its NFT event cannot be verified", async function () {
       const { deepFamily, archive, token, signer, testPersonHash, testPersonData } =
         await createEndorsedPersonFixture();

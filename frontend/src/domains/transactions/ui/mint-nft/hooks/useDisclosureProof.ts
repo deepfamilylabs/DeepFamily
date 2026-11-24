@@ -99,11 +99,11 @@ export function useDisclosureProof() {
       const suiteCommitment = BigInt(identity.suiteCommitment);
       const packedBirthGenderField = BigInt(identity.packedBirthGenderField);
 
-      if (targetPersonHash && computedPersonHash !== targetPersonHash) {
+      if (computedPersonHash.toLowerCase() !== targetPersonHash.toLowerCase()) {
         throw new Error(
           t(
             "mintNFT.personHashMismatch",
-            "The passphrase or identity suite does not match the target person hash",
+            "The identity details or passphrase do not match the selected record.",
           ),
         );
       }

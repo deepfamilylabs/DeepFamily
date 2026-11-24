@@ -4,6 +4,14 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { ToastProvider } from "../../../shared/ui";
 import { createRef } from "react";
 import { PersonHashCalculator, type PersonHashCalculatorHandle } from "./PersonHashCalculator";
+import type { PersonIdentityCandidate } from "../../../shared/workers/cryptoWorkerClient";
+
+const release = vi.hoisted(() => ({ suites: [1] }));
+vi.mock("@deepfamily/protocol-core", async importOriginal => ({
+  ...await importOriginal<typeof import("@deepfamily/protocol-core")>(),
+  get DEFAULT_IDENTITY_SUITE_ID() { return release.suites[0]; },
+  get SUPPORTED_IDENTITY_SUITE_IDS() { return release.suites; },
+}));
 
 const workerCall = vi.hoisted(() =>
   vi.fn<
@@ -11,7 +19,7 @@ const workerCall = vi.hoisted(() =>
       method: string,
       params: unknown,
       options?: { signal?: AbortSignal },
-    ) => Promise<{ identityHash: string }>
+    ) => Promise<{ identityHash: string } | PersonIdentityCandidate[]>
   >(() => new Promise(() => {})),
 );
 
@@ -33,9 +41,75 @@ afterEach(() => {
   cleanup();
   vi.useRealTimers();
   workerCall.mockClear();
+  release.suites = [1];
 });
 
 describe("PersonHashCalculator accessibility", () => {
+  it("does not render an add-version protocol control when the release defaults to suite 1", () => {
+    release.suites = [1, 2];
+    render(<ToastProvider><PersonHashCalculator identityRole="person" /></ToastProvider>);
+    expect(screen.queryByRole("button", { name: "addVersion.identityProtocol" })).toBeNull();
+    expect(screen.queryByRole("combobox")).toBeNull();
+  });
+
+  it("keeps a manual selection made during discovery and reuses candidates when switching back", async () => {
+    release.suites = [2, 1];
+    vi.useFakeTimers();
+    const ref = createRef<PersonHashCalculatorHandle>();
+    const candidates: PersonIdentityCandidate[] = [
+      { identitySuiteId: 2, personHash: "0x" + "22".repeat(32), history: "registered" },
+      { identitySuiteId: 1, personHash: "0x" + "11".repeat(32), history: "none" },
+    ];
+    let finishLookup!: (result: PersonIdentityCandidate[]) => void;
+    workerCall.mockImplementationOnce(() => new Promise(resolve => { finishLookup = resolve; }));
+    render(<ToastProvider>
+      <PersonHashCalculator ref={ref} identityRole="father" initialValues={{ fullName: "Alice" }}
+        identityLookupContext={{ chainId: 31337, rpcUrl: "http://localhost", familyAddress: "family" }} />
+    </ToastProvider>);
+    await act(async () => vi.advanceTimersByTimeAsync(500));
+    const protocol = screen.getByRole("button", { name: "addVersion.identityProtocol" });
+    fireEvent.click(protocol);
+    fireEvent.click(screen.getByRole("option", { name: "addVersion.identityProtocol" }));
+    await act(async () => finishLookup(candidates));
+    expect(ref.current?.getPublicFormData()).toMatchObject({ identitySuiteId: 1, resolvedPersonHash: candidates[1].personHash });
+    fireEvent.click(protocol);
+    fireEvent.click(screen.getByRole("option", { name: /addVersion.defaultProtocol/ }));
+    expect(ref.current?.getPublicFormData()).toMatchObject({ identitySuiteId: 2, resolvedPersonHash: candidates[0].personHash });
+    await act(async () => vi.advanceTimersByTimeAsync(500));
+    expect(workerCall).toHaveBeenCalledTimes(1);
+  });
+
+  it("waits for matching passphrases, retries failed discovery and discards the resolved identity after edits", async () => {
+    vi.useFakeTimers();
+    const ref = createRef<PersonHashCalculatorHandle>();
+    const context = { chainId: 31337, rpcUrl: "http://localhost", familyAddress: "family" };
+    const match: PersonIdentityCandidate = { identitySuiteId: 1, personHash: "0x" + "ab".repeat(32), history: "registered" };
+    workerCall.mockRejectedValueOnce(new Error("RPC unavailable")).mockResolvedValueOnce([match]);
+    render(
+      <ToastProvider>
+        <PersonHashCalculator ref={ref} showTitle={false} requirePassphraseConfirmation
+          identityLookupContext={context} initialValues={{ fullName: "Alice" }} />
+      </ToastProvider>,
+    );
+    const password = screen.getByLabelText("Identity passphrase");
+    const repeat = screen.getByPlaceholderText("Repeat the identity passphrase (empty is allowed)");
+    fireEvent.change(password, { target: { value: "old credentials" } });
+    await act(async () => vi.advanceTimersByTimeAsync(500));
+    expect(workerCall).not.toHaveBeenCalled();
+    fireEvent.change(repeat, { target: { value: "old credentials" } });
+    await act(async () => vi.advanceTimersByTimeAsync(500));
+    expect(screen.getByRole("alert").textContent).toContain("addVersion.identityLookupFailed");
+    expect(ref.current?.getPublicFormData().identitySuiteId).toBeUndefined();
+    fireEvent.click(screen.getByRole("button", { name: "common.retry" }));
+    await act(async () => vi.advanceTimersByTimeAsync(500));
+    expect(ref.current?.getPublicFormData()).toMatchObject({ identitySuiteId: 1, resolvedPersonHash: match.personHash });
+    expect(screen.queryByRole("radio")).toBeNull();
+    fireEvent.change(password, { target: { value: "new credentials" } });
+    expect(ref.current?.getPublicFormData().resolvedPersonHash).toBeUndefined();
+    act(() => ref.current?.clearSecretInputs());
+    await act(async () => vi.advanceTimersByTimeAsync(500));
+    expect(workerCall).toHaveBeenCalledTimes(2);
+  });
   it("reads identity credentials without automatically calculating a hash when disabled", async () => {
     vi.useFakeTimers();
     const ref = createRef<PersonHashCalculatorHandle>();

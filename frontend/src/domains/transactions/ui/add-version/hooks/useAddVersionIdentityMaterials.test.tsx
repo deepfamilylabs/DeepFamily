@@ -10,9 +10,10 @@ vi.mock("../../../../../shared/workers/cryptoWorkerClient", () => ({
   cryptoWorkerCall: (...args: unknown[]) => mocks.cryptoWorkerCall(...args),
 }));
 
-function calculator(passphrase: string): PersonHashCalculatorHandle {
+function calculator(passphrase: string, resolvedIdentity?: { identitySuiteId: number; resolvedPersonHash: string }): PersonHashCalculatorHandle {
   return {
     getPublicFormData: () => ({
+      ...resolvedIdentity,
       fullName: "Ada Lovelace",
       gender: 2,
       birthYear: 1815,
@@ -31,6 +32,14 @@ function calculator(passphrase: string): PersonHashCalculatorHandle {
 describe("useAddVersionIdentityMaterials", () => {
   beforeEach(() => {
     mocks.cryptoWorkerCall.mockReset();
+  });
+
+  it("checks the final derivation against the person hash resolved for this form", async () => {
+    const resolvedIdentity = { identitySuiteId: 1, resolvedPersonHash: "0x" + "aa".repeat(32) };
+    mocks.cryptoWorkerCall.mockResolvedValue({ identitySuiteId: 1, personHash: "0x" + "bb".repeat(32) });
+    const { result } = renderHook(() => useAddVersionIdentityMaterials());
+    await expect(result.current.resolveIdentityMaterial(calculator("changed passphrase", resolvedIdentity)))
+      .rejects.toThrow("credentials changed");
   });
 
   it("refuses malformed Unicode before deriving anything", async () => {

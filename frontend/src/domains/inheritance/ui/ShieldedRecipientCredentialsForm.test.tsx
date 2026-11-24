@@ -25,11 +25,11 @@ afterEach(() => {
   workerCall.mockClear();
 });
 
-function renderForm() {
+function renderForm(identitySuiteId?: number) {
   const ref = createRef<ShieldedRecipientCredentialsFormHandle>();
   render(
     <ToastProvider>
-      <ShieldedRecipientCredentialsForm ref={ref} />
+      <ShieldedRecipientCredentialsForm ref={ref} identitySuiteId={identitySuiteId} />
     </ToastProvider>,
   );
   return ref;
@@ -53,6 +53,15 @@ function chooseOption(currentLabel: string, nextLabel: string) {
 }
 
 describe("ShieldedRecipientCredentialsForm", () => {
+  it("passes the selected child's suite when deriving a receiving credential", () => {
+    const ref = renderForm(2);
+    changeName("Recipient");
+    changePassphrase("child identity secret");
+    let credentials;
+    act(() => { credentials = ref.current?.readAndClear(); });
+    expect(credentials).toMatchObject({ identitySuiteId: 2, identity: { fullName: "Recipient" } });
+  });
+
   it("reads the shared identity fields and clears the unchanged raw passphrase immediately", () => {
     const ref = renderForm();
     changeName("张三");
@@ -73,6 +82,7 @@ describe("ShieldedRecipientCredentialsForm", () => {
       credentials = ref.current?.readAndClear();
     });
     expect(credentials).toEqual({
+      identitySuiteId: 1,
       identity: {
         fullName: "张三",
         gender: 1,
@@ -102,6 +112,7 @@ describe("ShieldedRecipientCredentialsForm", () => {
       credentials = ref.current?.readAndClear();
     });
     expect(credentials).toEqual({
+      identitySuiteId: 1,
       identity: {
         fullName: "Ａlice",
         gender: 0,

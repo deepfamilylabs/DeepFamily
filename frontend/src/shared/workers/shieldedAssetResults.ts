@@ -112,7 +112,7 @@ const pair = z.tuple([z.union([text, z.bigint()]), z.union([text, z.bigint()])])
 // Strict objects reject unknown fields at every level. Secret exports have one
 // explicit method; no other result can carry recovery material or note openings.
 const results = {
-  findRegisteredIdentities: z.strictObject({
+  findWalletIdentities: z.strictObject({
     matches: z.array(z.strictObject({ identitySuiteId: suiteId, personHash: z.string().regex(/^0x[0-9a-f]{64}$/i) })),
   }),
   unlockIdentity: session,

@@ -55,9 +55,7 @@ credentials use the same packed one-byte header and occupy 401 bytes (655
 characters). They retain standalone counter and expiry fields and the 32-byte
 X25519 key. Only the current 385-byte ordinary and 401-byte Fund layouts are
 accepted; the former 402-byte layouts have no compatibility path.
-Version 1 fixes the identity suite, independent-key suite and independent-key
-derivation rules; those three constant identifiers are absent from the encoding
-and proof inputs. The packing changes neither the 8/9 issuer signals nor the
+Credential version 1 defines the packet format. The issuer uses the recipient’s identity suite as a private proof input bound into the identity commitment. The packet and issuer public signals carry no separate identity-suite or independent-key derivation identifiers. The packing changes neither the 8/9 issuer signals nor the
 circuits, proving keys or verifiers.
 
 This packing saves bytes without hiding the counter or expiry from code holders;

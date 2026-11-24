@@ -1,7 +1,6 @@
 import {
   DFM1_FORMAT_1_OVERHEAD_BYTES,
   DFM1_MAX_ENVELOPE_BYTES,
-  IDENTITY_SUITE_CANDIDATE_1,
   PROTOCOL_GENERATION,
   ZERO_BYTES32,
 } from "./constants.js";
@@ -21,7 +20,7 @@ import {
   parseFormat1Envelope,
 } from "./envelope.js";
 import { normalizeMetadataContext } from "./aad.js";
-import { deriveIdentityMaterial } from "./identity.js";
+import { DEFAULT_IDENTITY_SUITE_ID, deriveIdentityMaterial } from "./identity.js";
 import { readMetadataEnvelopeFromRef } from "./archive.js";
 import { protocolAssert } from "./errors.js";
 
@@ -129,7 +128,7 @@ export async function encryptPersonVersionEnvelope(input) {
     const result = await encryptFormat1Compressed({
       compressedPlaintext,
       rawPassphrase: input.rawPassphrase,
-      identitySuiteId: input.identitySuiteId ?? IDENTITY_SUITE_CANDIDATE_1,
+      identitySuiteId: input.identitySuiteId ?? DEFAULT_IDENTITY_SUITE_ID,
       context,
       randomBytes: input.randomBytes,
     });

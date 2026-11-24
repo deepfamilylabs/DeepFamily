@@ -93,7 +93,18 @@ export interface ValidatedPersonVersionV1Result {
   protocolGeneration: string;
 }
 
+export type PersonIdentityLookupContext = { rpcUrl: string; familyAddress: string; chainId: number };
+export type PersonIdentityCandidate = {
+  personHash: string;
+  identitySuiteId: number;
+  history: "registered" | "referenced" | "used" | "none" | "unavailable";
+};
+
 export type CryptoWorkerCallMap = {
+  findPersonIdentities: {
+    params: { identity: IdentityFields; rawPassphrase: string; context: PersonIdentityLookupContext };
+    result: PersonIdentityCandidate[];
+  };
   computeIdentityHash: { params: { input: IdentityHashInput }; result: { identityHash: string } };
   deriveIdentityMaterialV1: {
     params: {

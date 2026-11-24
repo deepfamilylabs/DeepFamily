@@ -105,6 +105,7 @@ export function useListboxA11y<TOption>({
       case "Escape":
         if (!open) return;
         event.preventDefault();
+        event.stopPropagation();
         onClose();
         break;
     }

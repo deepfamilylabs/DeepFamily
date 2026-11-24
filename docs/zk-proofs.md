@@ -300,8 +300,10 @@ ID and uses the same value in `identityCommitment` and `disclosureBinding`.
 ]
 ```
 
-The frontend obtains `selfSuiteId` by reading and strictly preflighting the target version's DFM1
-envelope. The Mint contract does not read or interpret that header. It consumes the proof's public
+The frontend and the command-line mint helper verify the archived bytes against the selected
+version's metadata reference, read `selfSuiteId` from the DFM1 common prefix, and check that
+they support that suite.
+The Mint contract consumes the proof's public
 `suiteCommitment`, recomputes the disclosure binding from the canonical public full name and
 birth/gender calldata, requires `minter == msg.sender`, and derives the target `personHash` from the
 public identity commitment.

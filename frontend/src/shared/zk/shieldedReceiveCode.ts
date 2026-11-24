@@ -1,5 +1,5 @@
 import {
-  IDENTITY_SUITE_CANDIDATE_1,
+  SUPPORTED_IDENTITY_SUITE_IDS,
   SHIELDED_RECEIVE_CREDENTIAL_VERSION,
   buildShieldedReceiveCredentialPublicSignals,
   computeShieldedAuthorizationAlias,
@@ -164,6 +164,8 @@ export async function createShieldedReceiveCode(
 export async function createShieldedReceiveCodeFromCredentials(input: {
   identity: IdentityFields;
   rawPassphrase: string;
+  identitySuiteId?: number;
+  expectedPersonHash?: string;
   purpose?: "receive" | "fund";
   context: {
     rpcUrl: string;
@@ -178,13 +180,17 @@ export async function createShieldedReceiveCodeFromCredentials(input: {
   let material;
   try {
     const stateReadMode = normalizeShieldedStateReadMode(input.context.stateReadMode);
+    const suite = input.identitySuiteId ?? (SUPPORTED_IDENTITY_SUITE_IDS.length === 1 ? SUPPORTED_IDENTITY_SUITE_IDS[0] : undefined);
+    if (suite === undefined) throw new Error("Choose the recipient identity suite");
     material = await deriveIdentityMaterial({
       identity: { ...input.identity, fullName: canonicalizeFullName(input.identity.fullName) },
       rawPassphrase: input.rawPassphrase,
-      identitySuiteId: IDENTITY_SUITE_CANDIDATE_1,
+      identitySuiteId: suite,
     });
     // The remaining proof needs the derived material, never the raw credential.
     input.rawPassphrase = "";
+    if (input.expectedPersonHash && material.personHash.toLowerCase() !== input.expectedPersonHash.toLowerCase())
+      throw new Error("The derived recipient differs from the selected child");
     const provider = new JsonRpcProvider(input.context.rpcUrl);
     try {
       if ((await provider.getNetwork()).chainId !== BigInt(input.context.chainId))

@@ -33,6 +33,7 @@ export interface EncryptedMetadataBundle {
 }
 
 export interface PersonInfoPublic {
+  identitySuiteId?: number;
   fullName: string;
   gender: number;
   birthYear: number;

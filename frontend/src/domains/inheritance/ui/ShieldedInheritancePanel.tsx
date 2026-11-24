@@ -1087,8 +1087,8 @@ export function ShieldedInheritancePanel({
       }
     }
   }
-  async function findRegisteredIdentities(formUnchanged: () => boolean) {
-    type LookupResult = ShieldedAssetWorkerCallMap["findRegisteredIdentities"]["result"];
+  async function findWalletIdentities(formUnchanged: () => boolean) {
+    type LookupResult = ShieldedAssetWorkerCallMap["findWalletIdentities"]["result"];
     let matches: LookupResult["matches"] | undefined;
     await run(async (current) => {
       const form = identityForm.current;
@@ -1098,8 +1098,9 @@ export function ShieldedInheritancePanel({
       normalizeShieldedIndependentKeyPassphrase(form.getSecretInputs().passphrase);
       let found: LookupResult;
       try {
-        found = await shieldedAssetWorkerCall("findRegisteredIdentities", {
+        found = await shieldedAssetWorkerCall("findWalletIdentities", {
           context, identity, rawPassphrase: form.getSecretInputs().passphrase,
+          ...(session.identityDraft?.personHash ? { previousPersonHash: session.identityDraft.personHash } : {}),
         });
       } catch (cause) {
         if (current() && formUnchanged()) {
@@ -1132,6 +1133,7 @@ export function ShieldedInheritancePanel({
           latestSession.current.update(state);
           latestSession.current.rememberIdentityDraft({
             identitySuiteId: unlockSuite,
+            personHash: state.identity?.personHash,
             fullName: identity.fullName,
             isBirthBC: identity.isBirthBC,
             birthYear: identity.birthYear,
@@ -1744,7 +1746,11 @@ export function ShieldedInheritancePanel({
       if (!form) return;
       const credentials = form.readAndClear();
       try {
-        const pending = createShieldedReceiveCodeForRecipient({ ...credentials, context, purpose: action === "fund" ? "fund" : "receive", expiresAt: String(Math.floor(Date.now() / 1000) + 90 * 86400) });
+        const pending = createShieldedReceiveCodeForRecipient({
+          ...credentials, context, purpose: action === "fund" ? "fund" : "receive",
+          ...(action === "fund" && personHash ? { expectedPersonHash: personHash } : {}),
+          expiresAt: String(Math.floor(Date.now() / 1000) + 90 * 86400),
+        });
         credentials.rawPassphrase = "";
         const result = await pending;
         if (current()) {
@@ -2921,7 +2927,7 @@ export function ShieldedInheritancePanel({
             <ShieldedIdentityUnlockForm
               key={JSON.stringify([contextKey, account, identityFormEpoch, session.identityDraft])}
               form={identityForm} draft={session.identityDraft} symbol={symbol} busy={busy}
-              find={findRegisteredIdentities} unlock={unlock}
+              find={findWalletIdentities} unlock={unlock}
             />
           )
         ) : (

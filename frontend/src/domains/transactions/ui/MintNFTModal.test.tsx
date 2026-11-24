@@ -11,6 +11,26 @@ const personHash = `0x${"12".repeat(32)}`;
 const ownerAddress = "0x00000000000000000000000000000000000000aa";
 const metadataEnvelope = `0x44464d3101${"00".repeat(11)}00000001`;
 
+function derivedIdentity(hash = personHash) {
+  return {
+    identitySuiteId: 1,
+    identity: {
+      fullName: "Ada Lovelace",
+      gender: 2,
+      birthYear: 1815,
+      birthMonth: 12,
+      birthDay: 10,
+      isBirthBC: false,
+    },
+    derivedSecretField: "1",
+    identityCommitment: "1",
+    personHash: hash,
+    nameField: "2",
+    suiteCommitment: "3",
+    packedBirthGenderField: "4",
+  };
+}
+
 const mocks = vi.hoisted(() => ({
   address: "0x00000000000000000000000000000000000000aa",
   getVersionDetails: vi.fn(),
@@ -158,7 +178,12 @@ vi.mock("../../person", () => ({
     useEffect(() => publishInitialForm.current(), []);
 
     return (
-      <div data-testid="person-hash-calculator">
+      <div
+        data-testid="person-hash-calculator"
+        data-compute-hash={props.computeHash ?? true}
+        data-identity-suite={props.identitySuiteId}
+        data-identity-role={props.identityRole}
+      >
         <input
           aria-label="mint identity passphrase test input"
           onChange={(event) => {
@@ -315,28 +340,64 @@ describe("MintNFTModal", () => {
       }
       return Promise.reject(new Error(`unexpected zk method ${method}`));
     });
-    mocks.cryptoWorkerCall.mockResolvedValue({
-      identitySuiteId: 1,
-      identity: {
-        fullName: "Ada Lovelace",
-        gender: 2,
-        birthYear: 1815,
-        birthMonth: 12,
-        birthDay: 10,
-        isBirthBC: false,
-      },
-      derivedSecretField: "1",
-      identityCommitment: "1",
-      personHash,
-      nameField: "2",
-      suiteCommitment: "3",
-      packedBirthGenderField: "4",
-    });
+    mocks.cryptoWorkerCall.mockResolvedValue(derivedIdentity());
   });
 
   afterEach(() => {
     cleanup();
     vi.restoreAllMocks();
+  });
+
+  it("waits for the selected archive before computing a hash preview", async () => {
+    const code = deferred<string>();
+    mocks.getMetadataCode.mockReturnValue(code.promise);
+    renderMintModal();
+    await waitFor(() => expect(mocks.getMetadataCode).toHaveBeenCalled());
+
+    const calculator = screen.getByTestId("person-hash-calculator");
+    expect(calculator.dataset.computeHash).toBe("false");
+    expect(calculator.dataset.identitySuite).toBeUndefined();
+
+    await act(async () => code.resolve(`0x00${metadataEnvelope.slice(2)}`));
+    await waitFor(() => expect(calculator.dataset.identitySuite).toBe("1"));
+    expect(calculator.dataset.computeHash).toBe("true");
+  });
+
+  it("keeps the user's protocol choice until a complete hash selects an archive", async () => {
+    renderMintModal({ initialPersonHash: undefined, initialVersionIndex: undefined });
+    const calculator = () => screen.getByTestId("person-hash-calculator");
+    const enterHash = (value: string) =>
+      act(async () => {
+        fireEvent.change(screen.getByPlaceholderText("search.versionsQuery.placeholder"), {
+          target: { value },
+        });
+      });
+    expect(calculator().dataset.identityRole).toBe("person");
+
+    await enterHash(personHash.slice(0, 20));
+    expect(calculator().dataset.identityRole).toBe("person");
+    expect(calculator().dataset.computeHash).toBe("true");
+
+    await enterHash(personHash);
+    expect(calculator().dataset.identityRole).toBeUndefined();
+  });
+
+  it("records the mint under the lowercase hash whatever case the target was typed in", async () => {
+    const typedHash = `0x${"Ab".repeat(32)}`;
+    const chainHash = typedHash.toLowerCase();
+    mocks.cryptoWorkerCall.mockResolvedValue(derivedIdentity(chainHash));
+    mocks.mintRunOrThrow.mockResolvedValue(successfulMint());
+    renderMintModal({ initialPersonHash: typedHash });
+
+    await waitForMintableTarget();
+    await checkAllConsents();
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Mint NFT" })); });
+
+    await waitFor(() => expect(mocks.markVersionMinted).toHaveBeenCalledTimes(1));
+    expect(mocks.mintRunOrThrow).toHaveBeenCalledWith(expect.objectContaining({ personHash: chainHash }));
+    expect(mocks.markVersionMinted).toHaveBeenCalledWith(
+      expect.objectContaining({ personHash: chainHash, versionIndex: 2 }),
+    );
   });
 
   it.each(["derive", "generate", "verify"] as const)(

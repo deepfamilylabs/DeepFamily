@@ -255,6 +255,7 @@
       "totalChildren": "总子女数"
     },
     "hashCalculator": {
+      "identitySuite": "身份协议",
       "title": "本地计算身份哈希",
       "name": "全名",
       "isBirthBC": "纪元",
@@ -276,7 +277,7 @@
       "identityInputRule": "全名和身份口令使用单行输入框，只移除首尾空白，内部空格及其余已输入字符均按原文保留。",
       "multilinePasteRejected": "此单行输入框无法保留换行。已取消粘贴并保留原有内容。",
       "confirmPassphrasePlaceholder": "再次输入身份口令（允许留空）",
-      "deterministicIdentityNotice": "身份套件 1 始终从规范化身份字段确定性派生盐值，不保存也不接受恢复盐。",
+      "deterministicIdentityNotice": "盐值由身份协议编号和规范化的身份资料共同推导，无需另行保存。",
       "passphraseHelp": {
         "title": "身份口令说明",
         "buttonAriaLabel": "身份口令帮助",
@@ -1095,6 +1096,27 @@
     }
   },
   "addVersion": {
+    "identityProtocol": "身份协议 {{suite}}",
+    "defaultProtocol": "身份协议 {{suite}}（默认）",
+    "protocolWithHistory": "身份协议 {{suite}}（有旧记录）",
+    "previouslyReferenced": "曾被子女引用，尚未建档",
+    "protocolAction": {
+      "person": {
+        "existing": "添加到已有的人物档案",
+        "new": "建立独立的人物档案"
+      },
+      "father": {
+        "existing": "引用已有的父亲档案",
+        "new": "记录为父亲，该身份尚未建档"
+      },
+      "mother": {
+        "existing": "引用已有的母亲档案",
+        "new": "记录为母亲，该身份尚未建档"
+      }
+    },
+    "findingIdentity": "正在查找已有身份…",
+    "identityLookupFailed": "未能计算身份哈希，请重试后继续。",
+    "historyUnavailable": "暂时无法核实历史记录，仍可使用已选身份。",
     "title": "添加版本",
     "parentVersionUnknown": "未知（0）",
     "parentVersionOption": "版本 {{index}} · {{endorsements}} 次背书",
@@ -1182,9 +1204,11 @@
     "targetRequired": "请填写有效的人物哈希和版本序号。",
     "targetEnvelopeHeaderRequired": "铸造前必须验证目标元数据 envelope 的 header。",
     "targetEnvelopeHeaderInvalid": "无法校验目标版本的元数据头，暂不能铸造。",
+    "unsupportedTargetSuite": "当前应用版本不支持这份档案使用的身份协议，无法为它铸造 NFT。请刷新页面或更新到最新版本后再试。",
     "invalidPersonHashFormat": "人物哈希格式错误，应为 0x 开头的 32 字节十六进制（64 个十六进制字符）。",
     "basicInfo": "基本信息",
     "basicInfoMustMatch": "须与目标版本数据完全一致，合约会在铸造前进行链上校验。",
+    "targetProtocolHint": "这份档案使用身份协议 {{suite}}。请填写建档时的身份信息和口令。",
     "consentTitle": "知情同意（必选）",
     "consentPublic": "我理解并同意：本次铸造将把填写的信息永久公开在区块链上，任何人可见且不可删除。",
     "consentAge": "我确认被铸造人物已年满 18 周岁。",
@@ -1216,7 +1240,6 @@
     "endorsementRequiredDesc": "您必须先背书此版本才能铸造。是否前往背书？",
     "personInfoRequired": "请填写人物信息",
     "fullNameRequired": "生成证明需要填写完整姓名",
-    "personHashRequired": "无法计算人物哈希",
     "walletRequired": "铸造前需要先连接钱包",
     "mintFailed": "铸造 NFT 失败",
     "detailsReadFailedTitle": "交易已确认，详情读取失败",
@@ -1236,7 +1259,7 @@
       "yearExceedsCurrent": "公元年份不能超过当前年份",
       "storyRequiredForTitle": "填写传记标题前请先填写正文"
     },
-    "personHashMismatch": "口令或身份套件与目标人物哈希不匹配"
+    "personHashMismatch": "填写的身份信息或口令与所选档案不符。"
   },
   "endorse": {
     "title": "背书版本",
@@ -1378,8 +1401,8 @@
       "VerifierNotConfigured": "未配置当前操作的证明验证器。",
       "DuplicateVersion": "该人物版本已存在。",
       "DuplicateVersionCommitment": "该加密版本承诺已存在于链上。",
-      "CallerOrIdentitySuiteMismatch": "调用者地址或身份套件与提交的证明不匹配。",
-      "InvalidIdentitySuite": "身份套件标识无效。",
+      "CallerOrIdentitySuiteMismatch": "调用者地址或身份协议与提交的证明不匹配。",
+      "InvalidIdentitySuite": "身份协议编号无效。",
       "InvalidMetadataArchive": "Metadata Archive 合约无效。",
       "MetadataArchiveAlreadySet": "Metadata Archive 已配置，不能替换。",
       "MetadataArchiveNotSet": "Metadata Archive 尚未配置。",
@@ -1602,7 +1625,11 @@
     "unreachable": "暂时无法读取网络状态，请稍后重试。",
     "wrongNetwork": "请将钱包切换至网络 {{chainId}}。",
     "identityTitle": "解锁身份",
-    "identitySuiteOption": "Suite {{suite}}",
+    "recipientIdentitySuite": "收款人的身份协议",
+    "chooseRecipientSuite": "选择收款人使用的身份协议",
+    "manualWalletSuite": "按已知身份协议打开钱包",
+    "autoWalletSuite": "自动查找我的钱包",
+    "identitySuiteOption": "身份协议 {{suite}}",
     "identityLookupFailed": "未能查找身份。请检查身份资料、口令和网络后重试。",
     "registeredIdentities": "选择要解锁的身份",
     "identityDescription": "存入预算时使用父母身份，领取时使用子女身份。请妥善保存身份资料和口令。",

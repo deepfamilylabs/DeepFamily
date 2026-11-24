@@ -5,8 +5,8 @@ const state = { credentials: { handle: "credentials:1" }, identity: null, indepe
 describe("asset Worker public result boundary", () => {
   it("returns only the public identities found and preserves a child's unfamiliar suite in recovery", () => {
     const match = { identitySuiteId: 2, personHash: "0x" + "12".repeat(32) };
-    expect(publicShieldedAssetResult("findRegisteredIdentities", { matches: [match] })).toEqual({ matches: [match] });
-    expect(() => publicShieldedAssetResult("findRegisteredIdentities", {
+    expect(publicShieldedAssetResult("findWalletIdentities", { matches: [match] })).toEqual({ matches: [match] });
+    expect(() => publicShieldedAssetResult("findWalletIdentities", {
       matches: [{ ...match, derivedSecretField: "secret" }],
     })).toThrow("invalid public result");
     const wallet = {

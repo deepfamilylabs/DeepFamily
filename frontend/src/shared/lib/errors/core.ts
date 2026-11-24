@@ -400,8 +400,8 @@ export const REASON_FRIENDLY_MAP: Record<string, string> = {
   DuplicateVersion: "This version already exists on-chain.",
   DuplicateVersionCommitment: "This encrypted version commitment already exists on-chain.",
   CallerOrIdentitySuiteMismatch:
-    "Caller address or identity suite does not match the submitted proof.",
-  InvalidIdentitySuite: "Identity suite identifier is invalid.",
+    "Caller address or identity protocol does not match the submitted proof.",
+  InvalidIdentitySuite: "Identity protocol number is invalid.",
   InvalidMetadataEnvelope: "Encrypted metadata envelope is invalid.",
   InvalidEnvelopePrefix: "Encrypted metadata envelope header is invalid.",
   InvalidStoryContent: "Archived story content failed integrity validation.",

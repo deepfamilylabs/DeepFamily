@@ -35,6 +35,9 @@ vi.mock("@deepfamily/protocol-core", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@deepfamily/protocol-core")>();
   return {
     ...actual,
+    get DEFAULT_IDENTITY_SUITE_ID() {
+      return mocks.supportedSuites?.[0] ?? actual.DEFAULT_IDENTITY_SUITE_ID;
+    },
     get SUPPORTED_IDENTITY_SUITE_IDS() {
       return mocks.supportedSuites ?? actual.SUPPORTED_IDENTITY_SUITE_IDS;
     },
@@ -340,7 +343,7 @@ describe("Shielded identity form privacy with a real session and form", () => {
     mocks.call.mockResolvedValueOnce({ matches: [suite1] });
     pressUnlock();
     await waitFor(() => expect(sessionState().identity?.personHash).toBe(suite1.personHash));
-    expect(mocks.call).toHaveBeenCalledWith("findRegisteredIdentities", {
+    expect(mocks.call).toHaveBeenCalledWith("findWalletIdentities", {
       context: expect.anything(),
       identity: expect.objectContaining({ fullName: "Alice" }), rawPassphrase: "private-identity-passphrase",
     });
@@ -375,7 +378,7 @@ describe("Shielded identity form privacy with a real session and form", () => {
     mocks.call.mockResolvedValueOnce({ matches: [] });
     pressUnlock();
     await waitFor(() => expect(sessionState().identity?.personHash).toBe(identity.personHash));
-    expect(unlockedCalls()[0][1].identitySuiteId).toBe(1);
+    expect(unlockedCalls()[0][1].identitySuiteId).toBe(2);
     expect(unlockedCalls()[0][1]).not.toHaveProperty("expectedPersonHash");
     expect(screen.queryByRole("dialog")).toBeNull();
   });
@@ -396,6 +399,7 @@ describe("Shielded identity form privacy with a real session and form", () => {
     pressUnlock();
     const dialog = await screen.findByRole("dialog");
     expect(unlockedCalls()).toHaveLength(1);
+    expect(mocks.call).toHaveBeenCalledWith("findWalletIdentities", expect.objectContaining({ previousPersonHash: suite2.personHash }));
     fireEvent.click(within(dialog).getByRole("button", { name: `Suite 1 ${suite1.personHash}` }));
     await waitFor(() => expect(sessionState().identity?.personHash).toBe(suite1.personHash));
     const attempts = unlockedCalls();
@@ -415,6 +419,21 @@ describe("Shielded identity form privacy with a real session and form", () => {
     mocks.call.mockResolvedValueOnce({ matches: [suite1] });
     pressUnlock();
     await waitFor(() => expect(sessionState().identity?.personHash).toBe(suite1.personHash));
+  });
+
+  it("lets users select their known suite after an incomplete lookup", async () => {
+    mocks.supportedSuites = [2, 1];
+    render(panel());
+    enterIdentity();
+    mocks.call.mockRejectedValueOnce(new Error("Pool history unavailable"));
+    pressUnlock();
+    await screen.findByRole("alert");
+    fireEvent.click(screen.getByText("shielded.manualWalletSuite"));
+    fireEvent.change(screen.getByRole("combobox", { name: "search.hashCalculator.identitySuite" }), { target: { value: "1" } });
+    pressUnlock();
+    await waitFor(() => expect(sessionState().identity?.personHash).toBe(suite1.personHash));
+    expect(unlockedCalls()).toEqual([["unlockIdentity", expect.objectContaining({ identitySuiteId: 1 })]]);
+    expect(mocks.call.mock.calls.filter(([method]) => method === "findWalletIdentities")).toHaveLength(1);
   });
 
   it.each([[suite1], [suite1, suite2], []].map(matches => ({ matches })))(

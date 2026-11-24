@@ -195,8 +195,10 @@ function copyValidatedPersonVersion(
 function publicIdentitySnapshot(calc: PersonHashCalculatorHandle | null) {
   const value = calc?.getPublicFormData();
   if (!value?.fullName) return null;
-  const { hasPassphrase: _hasPassphrase, ...identity } = value;
-  return identity;
+  // The frozen package keeps the resolved commitments. Clearing passphrase inputs also
+  // clears their previews; an explicit choice of another identity invalidates the package.
+  const { fullName, gender, birthYear, birthMonth, birthDay, isBirthBC } = value;
+  return { fullName, gender, birthYear, birthMonth, birthDay, isBirthBC };
 }
 
 function buildDraftKey(input: {

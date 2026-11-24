@@ -32,7 +32,6 @@ type GenerateDisclosureProof = (args: {
   selfSuiteId: number;
   getPassphrase: () => string;
 }) => Promise<{
-  computedPersonHash: string;
   proofEnvelope: any;
   publicSignals: MintDisclosurePublicSignals;
   coreInfo: MintCoreInfo;
@@ -44,7 +43,6 @@ interface UseMintNftSubmitArgs {
   address?: string | null;
   contract?: any;
   allConsentsChecked: boolean;
-  hasTargetInputs: boolean;
   hasValidTarget: boolean;
   isEndorsed: boolean;
   isAlreadyMinted: boolean;
@@ -80,7 +78,6 @@ export function useMintNftSubmit({
   address,
   contract,
   allConsentsChecked,
-  hasTargetInputs,
   hasValidTarget,
   isEndorsed,
   isAlreadyMinted,
@@ -154,7 +151,7 @@ export function useMintNftSubmit({
         return;
       }
 
-      if (!hasTargetInputs) {
+      if (!hasValidTarget) {
         setErrorResult(
           toMintNFTErrorResult(
             "INVALID_TARGET",
@@ -184,7 +181,7 @@ export function useMintNftSubmit({
         return;
       }
 
-      if (hasValidTarget && targetSelfSuiteId === null) {
+      if (targetSelfSuiteId === null) {
         setErrorResult(
           toMintNFTErrorResult(
             "TARGET_ENVELOPE_HEADER_UNAVAILABLE",
@@ -197,22 +194,22 @@ export function useMintNftSubmit({
         return;
       }
 
-      if (hasValidTarget) {
-        if (!isEndorsed) {
-          setShowEndorseConfirm(true);
-          return;
-        }
-        if (isAlreadyMinted) {
-          setErrorResult(
-            toMintNFTErrorResult(
-              "ALREADY_MINTED",
-              t("mintNFT.alreadyMinted", "NFT has already been minted for this version"),
-            ),
-          );
-          return;
-        }
+      if (!isEndorsed) {
+        setShowEndorseConfirm(true);
+        return;
+      }
+      if (isAlreadyMinted) {
+        setErrorResult(
+          toMintNFTErrorResult(
+            "ALREADY_MINTED",
+            t("mintNFT.alreadyMinted", "NFT has already been minted for this version"),
+          ),
+        );
+        return;
       }
 
+      // Tree nodes are keyed by the lowercase hash that chain reads return, whatever case was typed.
+      const personHash = targetPersonHash.toLowerCase();
       setSuccessResult(null);
       setErrorResult(null);
       const settle = captureSettlement({ newEntry: true }) ?? settleTransaction;
@@ -224,8 +221,8 @@ export function useMintNftSubmit({
           address,
           personInfo,
           formData: data,
-          targetPersonHash,
-          selfSuiteId: targetSelfSuiteId!,
+          targetPersonHash: personHash,
+          selfSuiteId: targetSelfSuiteId,
           getPassphrase: () => calculator.getSecretInputs().passphrase,
         });
         if (!isCurrentAttempt()) {
@@ -239,17 +236,11 @@ export function useMintNftSubmit({
         // wait, the same point add-version clears at.
         calculator.clearSecretInputs();
 
-        const finalPersonHash = targetPersonHash || proof.computedPersonHash;
-        if (!finalPersonHash) {
-          throw new Error(t("mintNFT.personHashRequired", "Unable to compute person hash"));
-        }
-        const finalVersionIndex = targetVersionIndex || 1;
-
         handedOff = true;
         const mintResult = await runMintNftOrThrow({
-          personHash: finalPersonHash,
-          versionIndex: finalVersionIndex,
-          selfSuiteId: targetSelfSuiteId!,
+          personHash,
+          versionIndex: targetVersionIndex,
+          selfSuiteId: targetSelfSuiteId,
           proofEnvelope: proof.proofEnvelope,
           publicSignals: proof.publicSignals,
           tokenURI: proof.tokenURI,
@@ -273,18 +264,12 @@ export function useMintNftSubmit({
         settle({ phase: "done", transactionHash: successfulResult.transactionHash, error: null });
         if (!isCurrentAttempt() || !isSameScope()) return;
 
-        if (
-          !didPatchCacheRef.current &&
-          tokenId > 0 &&
-          finalPersonHash &&
-          Number.isFinite(finalVersionIndex) &&
-          finalVersionIndex > 0
-        ) {
+        if (!didPatchCacheRef.current && tokenId > 0) {
           didPatchCacheRef.current = true;
           try {
             markVersionMinted({
-              personHash: finalPersonHash,
-              versionIndex: finalVersionIndex,
+              personHash,
+              versionIndex: targetVersionIndex,
               tokenId: String(tokenId),
               tokenURI: proof.tokenURI,
               receipt: successfulResult.receipt,
@@ -296,8 +281,8 @@ export function useMintNftSubmit({
         setSuccessResult(
           buildMintNFTSuccessResultView({
             result: successfulResult,
-            personHash: finalPersonHash,
-            versionIndex: finalVersionIndex,
+            personHash,
+            versionIndex: targetVersionIndex,
             tokenURI: proof.tokenURI,
             owner: address,
           }),
@@ -357,7 +342,6 @@ export function useMintNftSubmit({
       captureSettlement,
       didPatchCacheRef,
       generateDisclosureProof,
-      hasTargetInputs,
       hasValidTarget,
       isAlreadyMinted,
       isEndorsed,

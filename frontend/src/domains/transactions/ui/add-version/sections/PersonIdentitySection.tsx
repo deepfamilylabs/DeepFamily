@@ -1,4 +1,5 @@
 import type { Ref } from "react";
+import type { PersonIdentityLookupContext } from "../../../../../shared/workers/cryptoWorkerClient";
 import { PersonHashCalculator, type PersonHashCalculatorHandle } from "../../../../person";
 import type { AddVersionT, PersonInfoPublic } from "../model/addVersionTypes";
 import { ModalSectionHeading } from "../../../../../shared/ui";
@@ -10,6 +11,8 @@ export interface PersonIdentitySectionProps {
   initialPersonData?: Partial<PersonInfoPublic>;
   onPersonInfoChange: (value: PersonInfoPublic) => void;
   onPassphraseChange: () => void;
+  identityLookupContext?: PersonIdentityLookupContext;
+  onIdentityChoiceChange: () => void;
 }
 
 export function PersonIdentitySection({
@@ -19,9 +22,11 @@ export function PersonIdentitySection({
   initialPersonData,
   onPersonInfoChange,
   onPassphraseChange,
+  identityLookupContext,
+  onIdentityChoiceChange,
 }: PersonIdentitySectionProps) {
   return (
-    <div className="space-y-4">
+    <section aria-label={t("addVersion.personInfo", "Person Information")} className="space-y-4">
       <ModalSectionHeading>{t("addVersion.personInfo", "Person Information")}</ModalSectionHeading>
 
       <PersonHashCalculator
@@ -30,10 +35,14 @@ export function PersonIdentitySection({
         showTitle={false}
         collapsible={false}
         requirePassphraseConfirmation
+        identityRole="person"
+        identityLookupContext={identityLookupContext}
+        onIdentityChoiceChange={onIdentityChoiceChange}
         initialValues={initialPersonData}
         onPassphraseChange={onPassphraseChange}
         onPublicFormChange={(formData) => {
           onPersonInfoChange({
+            identitySuiteId: formData.identitySuiteId,
             fullName: formData.fullName,
             gender: formData.gender,
             birthYear: formData.birthYear,
@@ -43,6 +52,6 @@ export function PersonIdentitySection({
           });
         }}
       />
-    </div>
+    </section>
   );
 }

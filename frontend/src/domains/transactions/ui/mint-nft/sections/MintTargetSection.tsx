@@ -19,7 +19,7 @@ export interface MintTargetSectionProps {
   hashInputInvalid: boolean;
   hasValidTarget: boolean;
   isCheckingStatus: boolean;
-  envelopeHeaderError: string | null;
+  envelopeHeaderError: "unverified" | "unsupportedSuite" | null;
   versionLookup: PersonVersionLookup;
   onPersonHashChange: (value: string) => void;
   onVersionIndexChange: (value: number) => void;
@@ -183,10 +183,12 @@ export function MintTargetSection({
                 role="alert"
               >
                 <AlertCircle className="w-4 h-4 shrink-0" />
-                {t(
-                  "mintNFT.targetEnvelopeHeaderInvalid",
-                  "Couldn't verify the target version's metadata header, so it can't be minted.",
-                )}
+                {envelopeHeaderError === "unsupportedSuite"
+                  ? t("mintNFT.unsupportedTargetSuite")
+                  : t(
+                      "mintNFT.targetEnvelopeHeaderInvalid",
+                      "Couldn't verify the target version's metadata header, so it can't be minted.",
+                    )}
               </div>
             )}
           </div>

@@ -255,6 +255,7 @@ describe("AddVersion secret-state boundary", () => {
       });
       const calculator = {
         getPublicFormData: () => ({
+          ...(secretInput ? { identitySuiteId: 1, resolvedPersonHash: PERSON_HASH } : {}),
           fullName: "Ada Lovelace",
           gender: 2,
           birthYear: 1815,

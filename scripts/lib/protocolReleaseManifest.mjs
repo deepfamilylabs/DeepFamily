@@ -30,6 +30,7 @@ import {
   IDENTITY_PASSWORD_DOMAIN,
   IDENTITY_SALT_DOMAIN,
   IDENTITY_SUITE_CANDIDATE_1,
+  SUPPORTED_IDENTITY_SUITE_IDS,
   MAX_CANONICAL_JSON_BYTES,
   MAX_FULL_NAME_UTF8_BYTES,
   MAX_TAG_UTF8_BYTES,
@@ -1578,12 +1579,9 @@ export const inspectProtocolReleaseManifest = ({
     "data-contract runtime encoding changed",
   );
 
-  // The v1 selector registries are deliberately closed, not merely minimum baselines. Existing
-  // ID 1 definitions are exact-bound above/below, and adding an ID requires an explicit reviewed
-  // validator/manifest generation change, so a v1 release cannot silently reinterpret or append
-  // an unreviewed format or KDF suite.
+  // Every published identity ID must be explicitly enabled by the SDK.
   assertExactKeys(manifest.formats, ["1"], "format ID set");
-  assertExactKeys(manifest.identitySuites, ["1"], "identity suite ID set");
+  assertExactKeys(manifest.identitySuites, SUPPORTED_IDENTITY_SUITE_IDS.map(String), "identity suite ID set");
   assertExactKeys(manifest.fileKdfSuites, ["1"], "file KDF suite ID set");
   assert(
     Array.isArray(manifest.proofRoutes) && manifest.proofRoutes.length === 2,
@@ -1603,10 +1601,16 @@ export const inspectProtocolReleaseManifest = ({
 
   const identitySuite = manifest.identitySuites["1"];
   const fileSuite = manifest.fileKdfSuites["1"];
-  for (const [label, suite] of [
-    ["identity suite 1", identitySuite],
+  const kdfSuites = [
+    ...Object.entries(manifest.identitySuites).map(([id, suite]) => [`identity suite ${id}`, suite]),
     ["file KDF suite 1", fileSuite],
-  ]) {
+  ];
+  // IDs sharing this derivation are separated by their salt and commitment. Validate
+  // the full definition for every ID, including ones with the same KDF parameters.
+  for (const [id, suite] of Object.entries(manifest.identitySuites)) {
+    if (id !== "1") assertExactJson({ ...suite, status: identitySuite.status }, identitySuite, `identity suite ${id} definition`);
+  }
+  for (const [label, suite] of kdfSuites) {
     assert(
       suite?.status === "candidate-awaiting-device-benchmark" || suite?.status === "frozen",
       `${label} status is invalid`,
@@ -1910,10 +1914,7 @@ export const inspectProtocolReleaseManifest = ({
       "shared protocol implementation constants are not production-frozen",
     );
     assert(format1.status === "frozen", "format 1 is not frozen");
-    for (const [label, suite] of [
-      ["identity suite 1", identitySuite],
-      ["file KDF suite 1", fileSuite],
-    ]) {
+    for (const [label, suite] of kdfSuites) {
       assert(suite.status === "frozen", `${label} is not frozen`);
     }
     for (const route of [personRoute, disclosureRoute]) {

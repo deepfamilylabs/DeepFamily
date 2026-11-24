@@ -1,10 +1,11 @@
 import { forwardRef, useImperativeHandle, useRef } from "react";
-import type { IdentityFields } from "@deepfamily/protocol-core";
+import { DEFAULT_IDENTITY_SUITE_ID, type IdentityFields } from "@deepfamily/protocol-core";
 import { PersonHashCalculator, type PersonHashCalculatorHandle } from "../../person";
 
 export type ShieldedRecipientCredentials = {
   identity: IdentityFields;
   rawPassphrase: string;
+  identitySuiteId: number;
 };
 
 export type ShieldedRecipientCredentialsFormHandle = {
@@ -14,8 +15,8 @@ export type ShieldedRecipientCredentialsFormHandle = {
 };
 
 /** Shares the unlock form while keeping the recipient's credentials out of parent state. */
-export const ShieldedRecipientCredentialsForm = forwardRef<ShieldedRecipientCredentialsFormHandle>(
-  function ShieldedRecipientCredentialsForm(_props, ref) {
+export const ShieldedRecipientCredentialsForm = forwardRef<ShieldedRecipientCredentialsFormHandle, { identitySuiteId?: number }>(
+  function ShieldedRecipientCredentialsForm({ identitySuiteId = DEFAULT_IDENTITY_SUITE_ID }, ref) {
     const formRef = useRef<PersonHashCalculatorHandle>(null);
 
     useImperativeHandle(ref, () => ({
@@ -33,6 +34,7 @@ export const ShieldedRecipientCredentialsForm = forwardRef<ShieldedRecipientCred
               birthMonth: data?.birthMonth ?? 0,
               birthDay: data?.birthDay ?? 0,
             },
+            identitySuiteId,
             rawPassphrase: form?.getSecretInputs().passphrase ?? "",
           };
         } finally {
@@ -44,6 +46,7 @@ export const ShieldedRecipientCredentialsForm = forwardRef<ShieldedRecipientCred
     return (
       <PersonHashCalculator
         ref={formRef}
+        identitySuiteId={identitySuiteId}
         showTitle={false}
         collapsible={false}
         computeHash={false}

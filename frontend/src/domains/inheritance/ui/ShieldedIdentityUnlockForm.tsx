@@ -10,7 +10,7 @@ import { DEFAULT_IDENTITY_SUITE_ID } from "../../../shared/zk/zk";
 import { PanelButton, choiceCardClass } from "./inheritanceControls";
 import type { ShieldedIdentityDraft } from "./useShieldedIdentitySession";
 
-type LookupResult = ShieldedAssetWorkerCallMap["findRegisteredIdentities"]["result"];
+type LookupResult = ShieldedAssetWorkerCallMap["findWalletIdentities"]["result"];
 type IdentityMatch = LookupResult["matches"][number];
 
 export function ShieldedIdentityUnlockForm({
@@ -31,6 +31,7 @@ export function ShieldedIdentityUnlockForm({
   const { t } = useTranslation();
   const titleId = useId();
   const [choices, setChoices] = useState<IdentityMatch[]>();
+  const [manualSuite, setManualSuite] = useState<number>();
   const revision = useRef(0);
   const onlySuite =
     SUPPORTED_IDENTITY_SUITE_IDS.length === 1 ? SUPPORTED_IDENTITY_SUITE_IDS[0] : undefined;
@@ -51,8 +52,9 @@ export function ShieldedIdentityUnlockForm({
 
   async function submit() {
     if (busy || choices) return;
-    if (onlySuite !== undefined) {
-      unlock(onlySuite);
+    const explicitSuite = onlySuite ?? manualSuite;
+    if (explicitSuite !== undefined) {
+      unlock(explicitSuite);
       return;
     }
     const request = revision.current;
@@ -64,8 +66,7 @@ export function ShieldedIdentityUnlockForm({
     } else if (matches.length === 1) {
       unlockMatch(matches[0]);
     } else {
-      // A local wallet can hold VALUE without a registered person version.
-      unlock(draft?.identitySuiteId ?? DEFAULT_IDENTITY_SUITE_ID);
+      unlock(DEFAULT_IDENTITY_SUITE_ID);
     }
   }
 
@@ -77,12 +78,31 @@ export function ShieldedIdentityUnlockForm({
         identitySuiteId={onlySuite}
         computeHash={!busy && onlySuite !== undefined}
         onPublicFormChange={dismissChoices}
+        autoResolveSuite
         independentKeyCredentials
         showTitle={false}
         collapsible={false}
         showPassphraseGuidance={false}
         className="border-0 bg-transparent p-0 shadow-none"
       />
+      {onlySuite === undefined && (
+        <details className="text-sm text-ink-muted">
+          <summary className="cursor-pointer">{t("shielded.manualWalletSuite")}</summary>
+          <label className="mt-2 block">
+            {t("search.hashCalculator.identitySuite")}
+            <select className="ml-2 rounded-lg border border-hairline bg-surface px-2 py-1"
+              disabled={busy} value={manualSuite ?? ""} onChange={event => {
+                dismissChoices();
+                setManualSuite(event.target.value ? Number(event.target.value) : undefined);
+              }}>
+              <option value="">{t("shielded.autoWalletSuite")}</option>
+              {SUPPORTED_IDENTITY_SUITE_IDS.map(suite => (
+                <option key={suite} value={suite}>{t("shielded.identitySuiteOption", { suite })}</option>
+              ))}
+            </select>
+          </label>
+        </details>
+      )}
       <PanelButton
         variant="primary"
         size="hero"

@@ -31,6 +31,7 @@ import type { IndexedVersion, LineageSnapshot } from "./inheritanceChain";
 
 export type LocalLineageRequest = TargetedLineageRequest & {
   versionPersonHashes?: readonly string[];
+  referencedParentCommitments?: readonly bigint[];
   publicEligibility?: readonly {
     heirPersonHash: string;
     rootIdentityCommitment: bigint;
@@ -833,6 +834,16 @@ async function select(
       endorsements.set(hash, found);
     };
     for (const hash of request.versionPersonHashes ?? []) await loadVersions(lower(hash));
+    const referencedParents = new Set<bigint>();
+    for (const identity of request.referencedParentCommitments ?? []) {
+      // One verified child is sufficient, regardless of how many children or endorsements exist.
+      const [child] = await view.query<IndexedVersion>("version", `parent:${identity}`, 1);
+      if (!child) continue;
+      const record = version(child as unknown as Record<string, unknown>);
+      if (record.fatherIdentityCommitment !== identity && record.motherIdentityCommitment !== identity)
+        fail("Local child index is inconsistent");
+      referencedParents.add(identity);
+    }
     for (const rawIdentity of request.parentIdentityCommitments ?? []) {
       const identity = field(rawIdentity),
         ownVersions = await loadVersions(person(identity));
@@ -873,6 +884,7 @@ async function select(
     }
     return {
       blockNumber: head.blockNumber,
+      ...(request.referencedParentCommitments ? { referencedParents } : {}),
       blockHash: head.blockHash,
       timestamp: BigInt(state.timestamp),
       checkpointId: BigInt(state.checkpointId),

@@ -154,6 +154,7 @@ export const COMPRESSION_SUITE_GZIP_V1: 1;
 export const CIPHER_SUITE_AES_256_GCM: 1;
 export const FILE_KDF_SUITE_ARGON2ID_CANDIDATE_1: 1;
 export const IDENTITY_SUITE_CANDIDATE_1: 1;
+export const DEFAULT_IDENTITY_SUITE_ID: number;
 export const SUPPORTED_IDENTITY_SUITE_IDS: readonly number[];
 export const MAX_CANONICAL_JSON_BYTES: 1048576;
 export const MAX_TAG_UTF8_BYTES: 256;

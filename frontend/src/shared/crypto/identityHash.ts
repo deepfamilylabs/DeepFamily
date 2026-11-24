@@ -1,5 +1,5 @@
 import {
-  IDENTITY_SUITE_CANDIDATE_1,
+  DEFAULT_IDENTITY_SUITE_ID,
   bytesToHex,
   deriveDeterministicIdentitySalt,
   deriveIdentityMaterial,
@@ -30,7 +30,7 @@ export type IdentityHashComputation = {
 
 export function computeIdentitySaltHex(
   input: IdentityFields,
-  identitySuiteId = IDENTITY_SUITE_CANDIDATE_1,
+  identitySuiteId = DEFAULT_IDENTITY_SUITE_ID,
 ): string {
   const salt = deriveDeterministicIdentitySalt(input, identitySuiteId);
   try {
@@ -48,7 +48,7 @@ export async function computeIdentityHashMaterial(
     material = await deriveIdentityMaterial({
       identity: input,
       rawPassphrase: input.passphrase,
-      identitySuiteId: input.identitySuiteId ?? IDENTITY_SUITE_CANDIDATE_1,
+      identitySuiteId: input.identitySuiteId ?? DEFAULT_IDENTITY_SUITE_ID,
     });
     return {
       identitySuiteId: material.identitySuiteId,

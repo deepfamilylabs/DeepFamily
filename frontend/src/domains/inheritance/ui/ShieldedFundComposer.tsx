@@ -420,6 +420,7 @@ export function ShieldedFundComposer(props: ShieldedFundComposerProps) {
           ) : (
             <ShieldedRecipientInput
               purpose="fund"
+              recipientSuiteId={props.heirs.find(heir => heir.personHash.toLowerCase() === props.personHash.toLowerCase())?.identitySuiteId}
               method={props.recipientInputMethod}
               onMethodChange={props.onRecipientInputMethodChange}
               code={props.code}

@@ -69,6 +69,7 @@ const serializeValidatedPersonVersion = (result: {
  * substituting UI mocks or a fake Worker implementation.
  */
 export const cryptoWorkerHandlers: CryptoWorkerHandlerMap = {
+  findPersonIdentities: async (params) => (await import("./identityDiscovery")).findPersonIdentities(params),
   computeIdentityHash: async ({ input }) => {
     return { identityHash: await computeIdentityHash(input) };
   },

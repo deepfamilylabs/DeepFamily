@@ -307,14 +307,40 @@ credentials session with the original person details and identity passphrase.
 Identity and independent-key recovery both start from this form.
 With one supported suite, unlock derives the identity locally. The form previews the
 person hash as details are entered and cancels the preview when unlocking.
-With multiple supported suites, **Unlock** derives candidates locally and checks their person
-hashes against the current network's family records. A single match opens immediately. When
-several identities match, a dialog lists each suite and full person hash. Selecting a row
-unlocks that identity. If the search completes with no registration, local wallet access uses
-the retained suite or the default for new identities. A failed lookup can be retried.
+The first entry in `SUPPORTED_IDENTITY_SUITE_IDS` is the default for new identities. The
+current configuration enables suite 1. A release adding an ID lists it in both the SDK and
+`protocol-release-manifest.json` and keeps earlier IDs enabled. A new ID can reuse the same Argon2id parameters.
+The ID enters both the salt and the identity commitment, so the same credentials yield a
+different person hash under each ID. In **Add Version**, the person, father and mother
+each start with the frontend's default suite. When that default is greater than 1, each
+identity passphrase label has an **Identity protocol** menu. Any supported suite can be
+selected before entering credentials, including for an identity used only off-chain.
+After passphrase confirmation the menu identifies existing records, earlier parent
+references and older activity. A person's choice determines which record receives the
+new version. A parent's choice determines which identity is referenced and which
+record versions can be selected. A history read failure offers a retry and leaves the
+locally derived identity available for the selected suite.
 
-Identity lookup reads public family records and compares candidates on the device. After unlock,
-the wallet scans the selected pool. Claim verifies that the unlocked identity matches the
+**Mint NFT** takes a person hash and an existing record version. Opening it from a
+record fills in both. The form reads that version's authenticated metadata header
+and uses its identity suite for the local hash preview and the disclosure proof.
+When the frontend's default suite is above 1, the form names the record's protocol
+beside the identity instructions, and the standalone form lets a user who needs to
+calculate the person hash choose a supported protocol beside the passphrase before
+entering a target hash. A complete person hash, entered by the user or filled in
+from a record, makes the selected archive authoritative. A frontend that cannot
+verify the header or support the recorded suite stops before generating a proof.
+
+With multiple supported suites, **Unlock** derives candidates on the device. At one block
+on the current network it checks family registrations and parent references, then scans the factory's verified pools
+for notes that each remaining candidate can open. This finds an unregistered identity wallet
+even when its notes are in a different asset or have already been spent. A temporarily
+retained person hash also identifies the same credentials after an application lock. A single
+match opens directly. For several matches the user selects a suite and full person hash. A
+complete search with no matches opens the default. An incomplete search reports an error.
+Users can retry or select their known suite, including for an identity used only off chain.
+
+After unlock, the wallet scans the selected pool. Claim verifies that the unlocked identity matches the
 budget's heir commitment. Independent-key recovery also works when the hash preview is unavailable.
 The form passes raw fields to the Worker. Names and passphrases share the same
 trim-only text preparation. Independent asset-key credentials require a nonempty prepared passphrase. The Worker
@@ -527,7 +553,7 @@ Unknown letter submissions retain their original message ID, transaction hash an
 
 An existing verified key's settings offer optional backup inspection and recovery review. A newly generated key still requires its original backup verification. Credential expiry applies only to a newly generated receive code or budget receive credential and does not change budget schedules or revoke old credentials. Identity-wide revocation includes both credential types and wallets on the current chain, keeps its confirmed receipt visible, and takes effect within the authorization lifetime.
 
-A receive code needs the unlocked identity and selected slot, with independent-key mode past its recovery gate. Its proof binds identity, owner, viewing key, key mode and credential version. Version 1 determines the identity suite, independent-key suite and derivation rules; the three constant identifiers are absent from both credential encoding and proof inputs. Ordinary packets are 385 bytes before Bech32m encoding, producing 629-character `dfrecv` codes instead of 657 characters; Fund packets are 401 bytes (655 characters). Ordinary encoding uses one header byte, `(version << 1) | keyMode`, and packs the big-endian counter and expiry into the first 16 bytes of the address diversifier, followed by 16 fresh random bytes. Decoding reconstructs the same 8 ordinary or 9 Fund issuer signals; circuits and verifiers are unchanged. The former 402-byte ordinary and Fund layouts are rejected. Ordinary codes generate a fresh diversified receive address on each issuance and bind `ownerCommitment = Poseidon3(1013, ownerSecret, ownerNonce)`, where the complete address digest determines `ownerNonce`. The random tail supplies 128 bits of fresh diversifier randomness, without establishing a security level for the entire protocol. Packing does not hide the counter or expiry, and the unchanged authorization alias can still link codes and budget credentials. Budget receiving credentials use the same packed one-byte header and retain their standalone counter and expiry, original X25519 key and fixed `Poseidon2(1013, ownerSecret)` owner. The code fingerprint includes the authenticated receiving address and excludes randomized proof bytes. The main-thread verification display and the asset Worker's payment preparation both verify the code; preparation also checks the intended child/mode before any consolidation. A valid proof does not authenticate which independent root the recipient intended: anyone holding the recipient's identity credentials can produce another valid mode-1 code. Payers do not confirm a fingerprint, so the code must come from the recipient over a trusted channel and should be shared privately.
+A receive code needs the unlocked identity and selected slot, with independent-key mode past its recovery gate. Its proof binds identity, owner, viewing key, key mode and credential version. Credential version 1 defines the packet format. The issuer uses the recipient’s identity suite as a private proof input bound into the identity commitment. The packet and issuer public signals carry no separate identity-suite or independent-key derivation identifiers. When a payer generates a code from credentials, funding uses the registered child’s suite and checks the person hash. For an ordinary transfer, the payer selects the recipient’s suite when several are supported. Ordinary packets are 385 bytes before Bech32m encoding, producing 629-character `dfrecv` codes instead of 657 characters; Fund packets are 401 bytes (655 characters). Ordinary encoding uses one header byte, `(version << 1) | keyMode`, and packs the big-endian counter and expiry into the first 16 bytes of the address diversifier, followed by 16 fresh random bytes. Decoding reconstructs the same 8 ordinary or 9 Fund issuer signals; circuits and verifiers are unchanged. The former 402-byte ordinary and Fund layouts are rejected. Ordinary codes generate a fresh diversified receive address on each issuance and bind `ownerCommitment = Poseidon3(1013, ownerSecret, ownerNonce)`, where the complete address digest determines `ownerNonce`. The random tail supplies 128 bits of fresh diversifier randomness, without establishing a security level for the entire protocol. Packing does not hide the counter or expiry, and the unchanged authorization alias can still link codes and budget credentials. Budget receiving credentials use the same packed one-byte header and retain their standalone counter and expiry, original X25519 key and fixed `Poseidon2(1013, ownerSecret)` owner. The code fingerprint includes the authenticated receiving address and excludes randomized proof bytes. The main-thread verification display and the asset Worker's payment preparation both verify the code; preparation also checks the intended child/mode before any consolidation. A valid proof does not authenticate which independent root the recipient intended: anyone holding the recipient's identity credentials can produce another valid mode-1 code. Payers do not confirm a fingerprint, so the code must come from the recipient over a trusted channel and should be shared privately.
 
 VALUE notes use `Poseidon3(1013, ownerSecret, note.nonce)` for their owner. External receive-code transfers use the address-derived ownership nonce; deposits, own change and claim payouts choose fresh note nonces. Recovery and input selection verify each note against the selected root spending secret rather than comparing its public owner to the wallet's fixed budget owner. Notes with different diversified owners can be consolidated or spent together under the same root. This adds no note fields, per-code private-key backups or changes to budget and donor memo lengths.
 
@@ -789,6 +815,23 @@ npm run check               # Fast + circuits + integration + Solidity static an
 The commit hook and the first CI job both run `check:fast`, which needs neither downloaded proving files nor Python. `scripts/check.mjs` defines the profiles used by local commands and CI. Full checks require the pinned Circom compiler, Powers of Tau, matching proving files and the Python analyzer environment described in `contract-security-checks.md`. Failed profiles stop at the first failed command and record completed coverage and the working-tree state in `test-results/checks/`.
 
 `npm run browser:check --workspace deepfamily-frontend` deploys an isolated, in-process local EVM, builds a separate production bundle and drives the real pages with synthetic identities and a controlled injected wallet. It checks adding a version and reading it after reload, native deposit/funding/claim, claim replay rejection, and account/network changes while a wallet request is pending. It uses the committed real verifiers and matching proving files; it does not connect to an external chain or reuse local deployments. Reports, screenshots and Playwright traces are saved in `test-results/browser-acceptance/`; `BROWSER_ACCEPTANCE_VIDEO=1` also records videos. Chrome is the default, with `BROWSER_ACCEPTANCE_EXECUTABLE_PATH` and `BROWSER_ACCEPTANCE_CHROME_CHANNEL` available for other installations. CSP scans save separate screenshots and traces in `frontend/.csp-scan/evidence/`. CI retains these artifacts on success and failure.
+
+The same check opens a fresh browser against a build with the suite list set to `[2, 1]`
+and the same derivation rules. A new user gets the suite-2 reference hash and issues a
+budget receiving credential for it. Unlock recovers both a registered suite-1 identity
+(0.003 ETH available and 0.006 ETH of budget) and an unregistered suite-1 wallet with
+0.02 ETH deposited using the original frontend. A person with two suite-1 versions can create
+a separate record using the upgraded default, then explicitly select suite 1 to append a
+third version to their original record. A suite-2 child can reference a registered suite-1
+father and a suite-1 mother known only from her wallet. A parent referenced only in an old
+record can create their first version at that original hash. The check also selects a suite-1
+parent known only off-chain and verifies the new child reference. When one set of credentials
+has a suite-2 registration and an unregistered suite-1 deposit, the wallet recovers the
+chosen balance and Add Version writes to the selected person hash. The upgraded
+frontend also mints the original suite-1 record's second version and the suite-2
+record's first version using the same credentials. The check reads the proof's
+suite commitment from each mined transaction and verifies the token's person
+hash, record version and owner on chain.
 
 Verification reports live under `test-results/`, separate from Hardhat's `artifacts/`: a full Hardhat build prunes non-contract JSON directories there, and `hardhat clean` removes the entire directory. Each check overwrites its previous local report; browser acceptance also replaces its screenshots and traces. Copy a run elsewhere before rerunning if it needs to be kept.
 

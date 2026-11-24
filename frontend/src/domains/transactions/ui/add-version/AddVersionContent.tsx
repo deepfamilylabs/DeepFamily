@@ -15,6 +15,7 @@ export interface AddVersionModalProps {
   onSuccess?: (result: any) => void;
   onEndorse?: (personHash: string, versionIndex: number) => void;
   initialPersonData?: {
+    identitySuiteId?: number;
     fullName?: string;
     gender?: number;
     birthYear?: number;

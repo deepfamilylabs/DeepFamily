@@ -129,6 +129,25 @@ describe("explicit receive-code spending material", () => {
 describe("recipient empty-passphrase protection inside the ZK worker", () => {
   beforeEach(() => mocks.deriveIdentityMaterial.mockReset());
 
+  it("derives the supplied recipient suite and rejects a different child before reading its authorization", async () => {
+    const derivedSecretBytes = new Uint8Array(32).fill(1);
+    const identitySalt = new Uint8Array(32).fill(2);
+    mocks.deriveIdentityMaterial.mockResolvedValueOnce({
+      personHash: "0x" + "11".repeat(32), identitySalt, derivedSecretBytes,
+    });
+    const reads = mocks.authorizationMode.mock.calls.length;
+    const credentials = {
+      identity: identity.identity, rawPassphrase: "recipient passphrase", identitySuiteId: 2,
+      expectedPersonHash: "0x" + "22".repeat(32), purpose: "fund" as const, ...receiveOptions,
+    };
+    await expect(createShieldedReceiveCodeFromCredentials(credentials)).rejects.toThrow("Receive code could not be created");
+    expect(mocks.deriveIdentityMaterial).toHaveBeenCalledWith(expect.objectContaining({ identitySuiteId: 2 }));
+    expect(mocks.authorizationMode).toHaveBeenCalledTimes(reads);
+    expect(credentials.rawPassphrase).toBe("");
+    expect(derivedSecretBytes.every(byte => byte === 0)).toBe(true);
+    expect(identitySalt.every(byte => byte === 0)).toBe(true);
+  });
+
   it.each([
     ["empty", "", "passphraseRequired"],
     ["ASCII spaces", "   ", "passphraseRequired"],
@@ -351,6 +370,8 @@ describe("receive code proofs", () => {
     });
     const result = await createShieldedReceiveCodeFromCredentials({
       identity: identity.identity,
+      identitySuiteId: material.identitySuiteId,
+      expectedPersonHash: material.personHash,
       rawPassphrase: "recipient passphrase",
       ...receiveOptions,
     });

@@ -90,7 +90,7 @@ export default function SearchPage() {
             <p className="rounded-xl border border-info/20 bg-info/5 p-3 text-xs text-ink-muted">
               {t(
                 "search.hashCalculator.deterministicIdentityNotice",
-                "Identity suite 1 always derives its salt deterministically from the canonical identity fields. No recovery salt is stored or accepted.",
+                "The identity protocol number and canonical identity fields determine the salt. There is no separate recovery salt to save.",
               )}
             </p>
           )}

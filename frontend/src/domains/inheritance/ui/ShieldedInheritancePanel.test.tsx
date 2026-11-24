@@ -1098,7 +1098,7 @@ describe("Worker-backed shielded wallet", () => {
     fireEvent.change(screen.getByLabelText("identity passphrase"), { target: { value: "private-pass" } });
     fireEvent.change(screen.getByLabelText("identity passphrase"), { target: { value: "child-passphrase" } });
     fireEvent.click(screen.getByRole("button", { name: "shielded.unlock" }));
-    await waitFor(() => expect(mocks.rememberDraft).toHaveBeenCalledWith(draft));
+    await waitFor(() => expect(mocks.rememberDraft).toHaveBeenCalledWith({ ...draft, personHash: identity.personHash }));
     expect(JSON.stringify(mocks.rememberDraft.mock.calls)).not.toContain("private-pass");
     await waitFor(() => expect(screen.getByRole("button", { name: "shielded.lock" })).toBeTruthy());
     lockWorkspace();

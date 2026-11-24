@@ -11,7 +11,6 @@ import {
   FILE_PASSWORD_DOMAIN,
   IDENTITY_PASSWORD_DOMAIN,
   IDENTITY_SALT_DOMAIN,
-  IDENTITY_SUITE_CANDIDATE_1,
   MAX_UINT32,
   NAME_PREHASH_DOMAIN,
   SNARK_SCALAR_FIELD,
@@ -20,6 +19,9 @@ import {
 import { bigintFrom, bytesToHex, concatBytes, copyBytes, utf8Bytes, wipeBytes } from "./bytes.js";
 import { canonicalizeFullName, trimUnicodeWhiteSpace } from "./canonical.js";
 import { ProtocolError, UnsupportedProtocolError, protocolAssert } from "./errors.js";
+
+// New identities use the first supported suite. Stored identities retain their original ID.
+export const DEFAULT_IDENTITY_SUITE_ID = SUPPORTED_IDENTITY_SUITE_IDS[0];
 
 function assertSmallUnsigned(value, maximum, label) {
   return Number(bigintFrom(value, label, BigInt(maximum)));
@@ -128,7 +130,7 @@ export function buildFilePasswordBytes(rawPassphrase) {
 
 export function deriveDeterministicIdentitySalt(
   input,
-  identitySuiteId = IDENTITY_SUITE_CANDIDATE_1,
+  identitySuiteId = DEFAULT_IDENTITY_SUITE_ID,
 ) {
   const suite = assertIdentitySuiteSupported(identitySuiteId);
   const identity = normalizeIdentityFields(input);
@@ -194,7 +196,7 @@ async function deriveCandidateArgon2id(passwordBytes, saltBytes) {
 }
 
 export async function deriveIdentitySecretBytes(input) {
-  const suite = assertIdentitySuiteSupported(input.identitySuiteId ?? IDENTITY_SUITE_CANDIDATE_1);
+  const suite = assertIdentitySuiteSupported(input.identitySuiteId ?? DEFAULT_IDENTITY_SUITE_ID);
   const identity = normalizeIdentityFields(input.identity);
   const salt = deriveDeterministicIdentitySalt(identity, suite);
   const password = buildIdentityPasswordBytes(input.rawPassphrase);
@@ -295,7 +297,7 @@ export function computeIdentityFromDerivedSecret(input) {
 
 export async function deriveIdentityMaterial(input) {
   const identitySuiteId = assertIdentitySuiteSupported(
-    input.identitySuiteId ?? IDENTITY_SUITE_CANDIDATE_1,
+    input.identitySuiteId ?? DEFAULT_IDENTITY_SUITE_ID,
   );
   const identity = normalizeIdentityFields(input.identity);
   const identitySalt = deriveDeterministicIdentitySalt(identity, identitySuiteId);

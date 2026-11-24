@@ -94,6 +94,8 @@ export function peekShieldedReceiveCodePersonHash(code: string): string | null {
 export async function createShieldedReceiveCodeForRecipient(credentials: {
   identity: IdentityFields;
   rawPassphrase: string;
+  identitySuiteId?: number;
+  expectedPersonHash?: string;
   purpose?: "receive" | "fund";
   context: {
     rpcUrl: string;

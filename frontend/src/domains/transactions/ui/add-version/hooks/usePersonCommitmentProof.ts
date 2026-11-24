@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { formatGroth16ProofForContract, type PersonData } from "../../../../../shared/zk/zk";
+import { DEFAULT_IDENTITY_SUITE_ID, formatGroth16ProofForContract, type PersonData } from "../../../../../shared/zk/zk";
 import { decodePersonRelationPublicSignals } from "../../../../../shared/zk/publicSignalSpecs";
 import { PERSON_RELATION_PROOF_DESCRIPTOR } from "../../../../../shared/zk/proofDescriptors";
 import { zkWorkerCall } from "../../../../../shared/workers/zkWorkerClient";
@@ -70,9 +70,9 @@ export function usePersonCommitmentProof(t: AddVersionT) {
           father: fatherData,
           mother: motherData,
           submitterAddress,
-          selfSuiteId: personData.identitySuiteId ?? 1,
-          fatherSuiteId: fatherData?.identitySuiteId ?? 0,
-          motherSuiteId: motherData?.identitySuiteId ?? 0,
+          selfSuiteId: personData.identitySuiteId ?? DEFAULT_IDENTITY_SUITE_ID,
+          fatherSuiteId: fatherData ? fatherData.identitySuiteId ?? DEFAULT_IDENTITY_SUITE_ID : 0,
+          motherSuiteId: motherData ? motherData.identitySuiteId ?? DEFAULT_IDENTITY_SUITE_ID : 0,
           contentDigestLo,
           contentDigestHi,
         },

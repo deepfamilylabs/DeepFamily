@@ -22,6 +22,7 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useTranslation } from "react-i18next";
+import { DEFAULT_IDENTITY_SUITE_ID, SUPPORTED_IDENTITY_SUITE_IDS } from "@deepfamily/protocol-core";
 import { ChevronDown, Eye, EyeOff, Info } from "lucide-react";
 import {
   CopyIconButton,
@@ -38,7 +39,8 @@ import {
   type ProtocolPassphraseRisk,
 } from "../../../shared/crypto/passphraseStrength";
 import { safeCanonicalizeFullName } from "../../../shared/identity/fullName";
-import { cryptoWorkerCall } from "../../../shared/workers/cryptoWorkerClient";
+import { cryptoWorkerCall, type PersonIdentityLookupContext, type PersonIdentityCandidate } from "../../../shared/workers/cryptoWorkerClient";
+import { PersonIdentitySuiteSelect, type PersonIdentityRole } from "./PersonIdentitySuiteSelect";
 
 const MAX_FULL_NAME_BYTES = 256;
 
@@ -183,7 +185,7 @@ const hashFormSchema = z.object({
 
 export type HashForm = z.infer<typeof hashFormSchema>;
 
-export type PublicHashForm = Omit<HashForm, "passphrase"> & { hasPassphrase: boolean };
+export type PublicHashForm = Omit<HashForm, "passphrase"> & { hasPassphrase: boolean; identitySuiteId?: number; resolvedPersonHash?: string };
 export type SecretHashInputs = { passphrase: string; confirmPassphrase?: string };
 
 type HashFormInput = {
@@ -209,6 +211,7 @@ interface PersonHashCalculatorProps {
   isOpen?: boolean;
   onToggle?: () => void;
   initialValues?: {
+    identitySuiteId?: number;
     fullName?: string;
     gender?: number;
     birthYear?: number;
@@ -217,6 +220,11 @@ interface PersonHashCalculatorProps {
     isBirthBC?: boolean;
   };
   identitySuiteId?: number;
+  /** The enclosing action resolves the suite instead of asking the user. */
+  autoResolveSuite?: boolean;
+  identityRole?: PersonIdentityRole;
+  identityLookupContext?: PersonIdentityLookupContext;
+  onIdentityChoiceChange?: () => void;
   requirePassphraseConfirmation?: boolean;
   /** Disable live hash computation when the enclosing action derives the identity itself. */
   computeHash?: boolean;
@@ -229,7 +237,7 @@ interface PersonHashCalculatorProps {
 export type PersonHashCalculatorHandle = {
   getPublicFormData: () => PublicHashForm;
   /** Original field values, before an identity suite canonicalizes the name. */
-  getRawIdentityFields: () => Omit<PublicHashForm, "hasPassphrase">;
+  getRawIdentityFields: () => Omit<HashForm, "passphrase">;
   getSecretInputs: () => SecretHashInputs;
   hasPassphrase: () => boolean;
   passphrasesMatch: () => boolean;
@@ -252,7 +260,11 @@ export const PersonHashCalculator = forwardRef<
       isOpen = true,
       onToggle,
       initialValues,
-      identitySuiteId = 1,
+      identitySuiteId: fixedSuiteId,
+      autoResolveSuite = false,
+      identityRole,
+      identityLookupContext,
+      onIdentityChoiceChange,
       requirePassphraseConfirmation = false,
       computeHash = true,
       independentKeyCredentials = false,
@@ -261,6 +273,10 @@ export const PersonHashCalculator = forwardRef<
     ref,
   ) => {
     const { t, i18n } = useTranslation();
+    const [selectedSuite, setSelectedSuite] = useState(
+      identityRole ? DEFAULT_IDENTITY_SUITE_ID : initialValues?.identitySuiteId ?? DEFAULT_IDENTITY_SUITE_ID,
+    );
+    const requestedSuite = fixedSuiteId ?? selectedSuite;
     const [internalOpen, setInternalOpen] = useState(true);
     const [showPassphrase, setShowPassphrase] = useState(false);
     const [showConfirmPassphrase, setShowConfirmPassphrase] = useState(false);
@@ -273,6 +289,7 @@ export const PersonHashCalculator = forwardRef<
     const passphraseInputRef = useRef<HTMLInputElement | null>(null);
     const confirmPassphraseInputRef = useRef<HTMLInputElement | null>(null);
     const hashJobRef = useRef<AbortController | null>(null);
+    const skipClearedLookup = useRef(false);
     const pageHiddenRef = useRef(false);
     const passphraseHelpTitleId = useId();
     const passphraseHelpDescriptionId = useId();
@@ -444,11 +461,39 @@ export const PersonHashCalculator = forwardRef<
       };
     }, [getValues]);
 
-    const [computedHash, setComputedHash] = useState("");
+    // Discovery derives all suites together. Changing the selected role's suite
+    // can reuse those candidates, even if the user makes a choice during lookup.
+    const localSuite = identityLookupContext ? undefined : requestedSuite;
+    const hashInput = useMemo(() => ({
+      identity: buildTransformedData({ fullName, isBirthBC, birthYear, birthMonth, birthDay, gender: Number(gender || 0) }),
+      identityLookupContext, localSuite, passphraseRevision,
+    }), [fullName, isBirthBC, birthYear, birthMonth, birthDay, gender, buildTransformedData, identityLookupContext, localSuite, passphraseRevision]);
+    const [discovery, setDiscovery] = useState<{
+      input: typeof hashInput;
+      candidates: PersonIdentityCandidate[];
+      failed?: boolean;
+    }>();
+    // A result belongs only to the exact fields, passphrase revision and deployment used to find it.
+    const result = discovery?.input === hashInput ? discovery : undefined;
+    const choice = result?.candidates.find(candidate => candidate.identitySuiteId === requestedSuite);
+    const identitySuiteId = identityLookupContext ? choice?.identitySuiteId : requestedSuite;
+    const resolvedPersonHash = choice?.personHash;
+    const [localHash, setComputedHash] = useState("");
+    const computedHash = identityLookupContext ? resolvedPersonHash ?? "" : localHash;
     const [isComputingHash, setIsComputingHash] = useState(false);
+
+    const passphrasesMatch = useCallback(() => {
+      if (!requirePassphraseConfirmation) return true;
+      const first = passphraseInputRef.current?.value ?? "";
+      const second = confirmPassphraseInputRef.current?.value ?? "";
+      if (classifyProtocolPassphraseRisk(first) === "disallowed" || classifyProtocolPassphraseRisk(second) === "disallowed")
+        return first === second;
+      return normalizePassphraseForHash(first) === normalizePassphraseForHash(second);
+    }, [requirePassphraseConfirmation]);
 
     const clearSecretInputs = useCallback(() => {
       hashJobRef.current?.abort();
+      skipClearedLookup.current = true;
       if (passphraseInputRef.current) passphraseInputRef.current.value = "";
       if (confirmPassphraseInputRef.current) confirmPassphraseInputRef.current.value = "";
       setShowPassphrase(false);
@@ -531,6 +576,8 @@ export const PersonHashCalculator = forwardRef<
         getPublicFormData: () => {
           return {
             ...buildTransformedData(),
+            identitySuiteId,
+            ...(resolvedPersonHash ? { resolvedPersonHash } : {}),
             hasPassphrase:
               normalizePassphraseForHash(passphraseInputRef.current?.value ?? "").length > 0,
           };
@@ -543,61 +590,36 @@ export const PersonHashCalculator = forwardRef<
         }),
         hasPassphrase: () =>
           normalizePassphraseForHash(passphraseInputRef.current?.value ?? "").length > 0,
-        passphrasesMatch: () => {
-          if (!requirePassphraseConfirmation) return true;
-          const first = passphraseInputRef.current?.value ?? "";
-          const second = confirmPassphraseInputRef.current?.value ?? "";
-          // Input the protocol refuses normalizes to "", so comparing only the
-          // normalized forms would call two different refused inputs a match.
-          if (
-            classifyProtocolPassphraseRisk(first) === "disallowed" ||
-            classifyProtocolPassphraseRisk(second) === "disallowed"
-          ) {
-            return first === second;
-          }
-          return normalizePassphraseForHash(first) === normalizePassphraseForHash(second);
-        },
+        passphrasesMatch,
         clearSecretInputs,
       }),
       [
         getValues,
         buildTransformedData,
+        identitySuiteId,
+        resolvedPersonHash,
+        passphrasesMatch,
         requirePassphraseConfirmation,
         clearSecretInputs,
       ],
     );
 
     useEffect(() => {
-      const transformedData = buildTransformedData({
-        fullName,
-        isBirthBC,
-        birthYear,
-        birthMonth,
-        birthDay,
-        gender: Number(gender || 0),
-      });
       onPublicFormChangeRef.current?.({
-        ...transformedData,
+        ...hashInput.identity,
+        identitySuiteId,
+        ...(resolvedPersonHash ? { resolvedPersonHash } : {}),
         hasPassphrase,
       });
-    }, [fullName, isBirthBC, birthYear, birthMonth, birthDay, gender, passphraseRevision, hasPassphrase, buildTransformedData]);
+    }, [hashInput, hasPassphrase, identitySuiteId, resolvedPersonHash]);
 
     useEffect(() => {
       // Any edited field invalidates the previously computed hash immediately.
       setComputedHash("");
-      if (!computeHash || pageHiddenRef.current) {
-        setIsComputingHash(false);
-        return;
-      }
-      const transformedData = buildTransformedData({
-        fullName,
-        isBirthBC,
-        birthYear,
-        birthMonth,
-        birthDay,
-        gender: Number(gender || 0),
-      });
-      if (!transformedData.fullName.length || isPassphraseDisallowed) {
+      const justCleared = skipClearedLookup.current;
+      skipClearedLookup.current = false;
+      if (!computeHash || pageHiddenRef.current || !hashInput.identity.fullName || isPassphraseDisallowed ||
+        (identityLookupContext && (justCleared || !passphrasesMatch()))) {
         setIsComputingHash(false);
         return;
       }
@@ -608,26 +630,24 @@ export const PersonHashCalculator = forwardRef<
       const timer = window.setTimeout(
         () => {
           setIsComputingHash(true);
-          cryptoWorkerCall(
-            "computeIdentityHash",
-            {
-              // Read only when dispatching; the debounce closure is public.
-              input: {
-                ...transformedData,
-                passphrase: passphraseInputRef.current?.value ?? "",
-                identitySuiteId,
-              },
-            },
-            { timeoutMs: 180_000, signal: controller.signal },
-          )
-            .then(({ identityHash }) => {
-              if (!cancelled && !controller.signal.aborted) {
-                setComputedHash(identityHash);
-              }
-            })
+          const passphrase = passphraseInputRef.current?.value ?? "";
+          const options = { timeoutMs: identityLookupContext ? 240_000 : 180_000, signal: controller.signal };
+          const job = identityLookupContext
+            ? cryptoWorkerCall("findPersonIdentities", { identity: hashInput.identity, rawPassphrase: passphrase, context: identityLookupContext }, options)
+                .then(candidates => {
+                  if (cancelled || controller.signal.aborted) return;
+                  setDiscovery({ input: hashInput, candidates });
+                })
+            : cryptoWorkerCall("computeIdentityHash", {
+                input: { ...hashInput.identity, passphrase, identitySuiteId: hashInput.localSuite },
+              }, options).then(({ identityHash }) => {
+                if (!cancelled && !controller.signal.aborted) setComputedHash(identityHash);
+              });
+          job
             .catch(() => {
               if (!cancelled && !controller.signal.aborted) {
                 setComputedHash("");
+                if (identityLookupContext) setDiscovery({ input: hashInput, candidates: [], failed: true });
               }
             })
             .finally(() => {
@@ -637,7 +657,7 @@ export const PersonHashCalculator = forwardRef<
               }
             });
         },
-        hasPassphrase ? 250 : 0,
+        hasPassphrase || identityLookupContext ? 250 : 0,
       );
 
       return () => {
@@ -647,23 +667,22 @@ export const PersonHashCalculator = forwardRef<
         if (hashJobRef.current === controller) hashJobRef.current = null;
       };
     }, [
-      fullName,
-      isBirthBC,
-      birthYear,
-      birthMonth,
-      birthDay,
-      gender,
-      passphraseRevision,
-      isPassphraseDisallowed,
-      identitySuiteId,
-      computeHash,
-      hasPassphrase,
-      buildTransformedData,
-      independentKeyCredentials,
+      hashInput, identityLookupContext, isPassphraseDisallowed, computeHash, hasPassphrase, passphrasesMatch,
     ]);
 
     const content = (
       <div className="space-y-2">
+        {!identityRole && !autoResolveSuite && !identityLookupContext && fixedSuiteId === undefined && SUPPORTED_IDENTITY_SUITE_IDS.length > 1 && (
+          <label className="block space-y-1 text-xs text-ink-muted">
+            <span>{t("search.hashCalculator.identitySuite")}</span>
+            <select className="block rounded-lg border border-hairline bg-surface px-3 py-2 text-ink"
+              value={identitySuiteId} onChange={event => setSelectedSuite(Number(event.target.value))}>
+              {SUPPORTED_IDENTITY_SUITE_IDS.map(suite => (
+                <option key={suite} value={suite}>{t("shielded.identitySuiteOption", { suite })}</option>
+              ))}
+            </select>
+          </label>
+        )}
         <div className="w-full space-y-1">
           <div className="flex items-center gap-2">
             <div className="flex-1 min-w-0">
@@ -905,6 +924,18 @@ export const PersonHashCalculator = forwardRef<
                   </ModalShell>
                 </div>
               ) : null}
+              {identityRole && DEFAULT_IDENTITY_SUITE_ID > 1 && (
+                <PersonIdentitySuiteSelect
+                  role={identityRole}
+                  suite={requestedSuite}
+                  candidates={result?.candidates}
+                  onChange={suite => {
+                    if (suite === requestedSuite) return;
+                    setSelectedSuite(suite);
+                    onIdentityChoiceChange?.();
+                  }}
+                />
+              )}
             </div>
             <div className="relative">
               <input
@@ -1002,6 +1033,7 @@ export const PersonHashCalculator = forwardRef<
                     onPaste={(event) => handleSingleLinePaste(event, setConfirmationPasteError)}
                     onChange={() => {
                       setConfirmationPasteError(false);
+                      if (identityLookupContext) setPassphraseRevision(value => value + 1);
                       onPassphraseConfirmationChange?.();
                     }}
                   />
@@ -1108,6 +1140,12 @@ export const PersonHashCalculator = forwardRef<
             )}
           </div>
         </div>
+        {(result?.failed || choice?.history === "unavailable") && (
+          <div role="alert" className="space-y-1 text-sm text-danger">
+            <p>{t(result?.failed ? "addVersion.identityLookupFailed" : "addVersion.historyUnavailable")}</p>
+            <button type="button" className="underline" onClick={() => setPassphraseRevision(value => value + 1)}>{t("common.retry")}</button>
+          </div>
+        )}
         {computeHash && (computedHash || isComputingHash) && (
           <div className="space-y-2">
             {/* Local calculation result */}
@@ -1117,7 +1155,7 @@ export const PersonHashCalculator = forwardRef<
               </span>
               {isComputingHash ? (
                 <span className="font-mono text-xs text-ink-muted">
-                  {t("search.hashCalculator.calculatingHash", "Computing identity hash...")}
+                  {identityLookupContext ? t("addVersion.findingIdentity") : t("search.hashCalculator.calculatingHash", "Computing identity hash...")}
                 </span>
               ) : (
                 <>

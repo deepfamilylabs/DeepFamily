@@ -1,5 +1,6 @@
 import { trackedTransactionHash } from "../../../model/txStatus";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { DEFAULT_IDENTITY_SUITE_ID } from "@deepfamily/protocol-core";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useTranslation } from "react-i18next";
@@ -110,6 +111,8 @@ export function useAddVersionModalController({
   const { signer, rawProvider, connectedWalletId, connectWithProvider, isConnecting,
     ensureTransactionAuthorization } = useWallet();
   const { rpcUrl, chainId, contractAddress, readerAddress } = useConfig();
+  const identityLookupContext = useMemo(() => DEFAULT_IDENTITY_SUITE_ID > 1
+    ? { rpcUrl, chainId, familyAddress: contractAddress } : undefined, [rpcUrl, chainId, contractAddress]);
   const { isContractReady } = useContractClient();
   const toast = useToast();
   const { invalidateByTx, cacheConfirmedPersonVersion, captureMetadataCacheRevision } =
@@ -236,9 +239,20 @@ export function useAddVersionModalController({
   // Submitting mid-lookup would silently freeze the index at 0 for a parent
   // whose versions are about to appear, and the index is part of the immutable
   // version hash.
-  const isParentVersionLookupPending =
-    (fatherPresent && fatherVersionLookup.status === "loading") ||
-    (motherPresent && motherVersionLookup.status === "loading");
+  const isLookupPending = !frozenSubmission && (
+    (Boolean(identityLookupContext) && !personInfo?.identitySuiteId) ||
+    ([
+      [fatherPresent, fatherInfo, fatherHash, fatherVersionLookup, "father", watchedValues.fatherVersionIndex],
+      [motherPresent, motherInfo, motherHash, motherVersionLookup, "mother", watchedValues.motherVersionIndex],
+    ] as const).some(([present, info, hash, lookup, role, index]) => {
+      if (!present) return false;
+      if (lookup.status === "loading") return true;
+      if (!identityLookupContext) return false;
+      if (!info?.identitySuiteId || !hash || lookup.personHash !== hash) return true;
+      const update = reconcileParentVersionSelection(lookup, autoAppliedVersionHashRef.current[role]);
+      return update !== null && update.versionIndex !== index;
+    })
+  );
   const allConsentsChecked = areAddVersionConsentsSatisfied(consents);
   const isTransactionSubmitting =
     addVersionStatus === "validating" || addVersionStatus === "submitting" || addVersionStatus === "confirming";
@@ -306,6 +320,7 @@ export function useAddVersionModalController({
   useEffect(() => {
     if (initialPersonData) {
       setPersonInfo({
+        identitySuiteId: initialPersonData.identitySuiteId,
         fullName: initialPersonData.fullName || "",
         gender: initialPersonData.gender || 0,
         birthYear: initialPersonData.birthYear || 0,
@@ -486,6 +501,14 @@ export function useAddVersionModalController({
   const onSubmissionDiscarded = useCallback(() => {
     setConsents(invalidateAddVersionPassphraseConsents);
   }, []);
+  const onIdentityChoiceChange = useCallback((role: AddVersionIdentityRole) => {
+    submissionPackageRef.current = null;
+    setConsents(invalidateAddVersionPassphraseConsents);
+    if (role !== "person") {
+      autoAppliedVersionHashRef.current[role] = null;
+      setValue(role === "father" ? "fatherVersionIndex" : "motherVersionIndex", "");
+    }
+  }, [setValue]);
 
   const submitAddVersion = useAddVersionSubmit({
     t,
@@ -531,6 +554,7 @@ export function useAddVersionModalController({
         await submitAddVersion(data);
         return;
       }
+      if (isLookupPending) return;
       // The submission may spend minutes in KDF/proving/wallet/RPC work. A
       // later local-cache clear must fence its eventual plaintext completion.
       confirmedCacheRevisionRef.current = captureMetadataCacheRevision();
@@ -545,7 +569,7 @@ export function useAddVersionModalController({
       }
       await submitAddVersion(data);
     },
-    [captureMetadataCacheRevision, consents, submitAddVersion, t],
+    [captureMetadataCacheRevision, consents, isLookupPending, submitAddVersion, t],
   );
 
   return {
@@ -562,6 +586,7 @@ export function useAddVersionModalController({
     },
     intro: {},
     personSection: {
+      identityLookupContext, onIdentityChoiceChange: () => onIdentityChoiceChange("person"),
       formResetKey,
       personCalcRef,
       initialPersonData,
@@ -569,6 +594,7 @@ export function useAddVersionModalController({
       onPassphraseChange: handlePersonPassphraseChange,
     },
     fatherSection: {
+      identityLookupContext, onIdentityChoiceChange: () => onIdentityChoiceChange("father"),
       kind: "father" as ParentKind,
       formResetKey,
       expanded: fatherExpanded,
@@ -586,6 +612,7 @@ export function useAddVersionModalController({
       onPassphraseConfirmationChange: handleFatherPassphraseConfirmationChange,
     },
     motherSection: {
+      identityLookupContext, onIdentityChoiceChange: () => onIdentityChoiceChange("mother"),
       kind: "mother" as ParentKind,
       formResetKey,
       expanded: motherExpanded,
@@ -677,7 +704,7 @@ export function useAddVersionModalController({
       isSubmitting,
       personInfo,
       allConsentsChecked,
-      isParentVersionLookupPending,
+      isLookupPending,
       transactionPreview,
       onTransactionPreviewDecision: decideTransactionPreview,
       onClose: handleClose,

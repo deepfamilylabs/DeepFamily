@@ -10,15 +10,17 @@ interface ThemedSelectProps<T extends number | string> {
   disabled?: boolean;
   /** Shown when the value matches no option, e.g. before anything is chosen. */
   placeholder?: string;
-  /** Match the neighbouring field token: "sm" for MODAL_FIELD_SM, "md" for MODAL_FIELD. */
-  size?: "sm" | "md";
+  /** Compact trigger for selectors embedded in an existing label row. */
+  size?: "sm" | "md" | "inline";
+  triggerLabel?: string;
   /** The id of a visible label; the trigger then reads as that label and its current choice. */
   labelledBy?: string;
 }
 
-const SIZE_CLASS: Record<"sm" | "md", string> = {
-  sm: "h-10 px-3 text-xs",
-  md: "h-11 px-3.5 text-sm",
+const SIZE_CLASS = {
+  sm: "w-full h-10 px-3 text-xs rounded-lg border border-hairline-strong bg-surface",
+  md: "w-full h-11 px-3.5 text-sm rounded-lg border border-hairline-strong bg-surface",
+  inline: "gap-1 rounded-sm text-xs text-ink-muted",
 };
 
 export function ThemedSelect<T extends number | string>({
@@ -29,6 +31,7 @@ export function ThemedSelect<T extends number | string>({
   disabled = false,
   placeholder = "",
   size = "sm",
+  triggerLabel,
   labelledBy,
 }: ThemedSelectProps<T>) {
   const [open, setOpen] = useState(false);
@@ -37,7 +40,8 @@ export function ThemedSelect<T extends number | string>({
   const buttonId = useId();
   const listboxId = useId();
   const selected = options.find((option) => option.value === value);
-  const current = selected?.label ?? placeholder;
+  const current = triggerLabel ?? selected?.label ?? placeholder;
+  const enabledClass = size === "inline" ? "hover:text-primary" : "text-ink hover:bg-surface-alt/60";
   const selectedIndex = options.findIndex((option) => option.value === value);
   const {
     activeIndex,
@@ -89,10 +93,8 @@ export function ThemedSelect<T extends number | string>({
         disabled={disabled}
         onClick={() => setOpen((value) => !value)}
         onKeyDown={handleButtonKeyDown}
-        className={`w-full ${SIZE_CLASS[size]} rounded-lg border border-hairline-strong bg-surface text-left focus:outline-hidden focus:ring-3 focus:ring-primary/15 transition flex items-center justify-between ${
-          disabled
-            ? "cursor-not-allowed opacity-60 text-ink-subtle"
-            : "text-ink hover:bg-surface-alt/60"
+        className={`${SIZE_CLASS[size]} text-left focus:outline-hidden focus:ring-3 focus:ring-primary/15 transition flex items-center justify-between ${
+          disabled ? "cursor-not-allowed opacity-60 text-ink-subtle" : enabledClass
         }`}
         aria-haspopup="listbox"
         aria-expanded={open}
@@ -104,11 +106,11 @@ export function ThemedSelect<T extends number | string>({
         <ChevronDown size={16} className="text-ink-muted" />
       </button>
       {open && !disabled && (
-        <div className="absolute z-20 mt-1 w-full rounded-lg border border-hairline bg-surface shadow-lg overflow-hidden">
+        <div className={`absolute z-20 mt-1 rounded-lg border border-hairline bg-surface shadow-lg overflow-hidden ${size === "inline" ? "right-0 w-64 max-w-[75vw]" : "w-full"}`}>
           <ul
             id={listboxId}
             role="listbox"
-            aria-labelledby={labelledBy}
+            aria-labelledby={labelledBy ?? buttonId}
             className="max-h-60 overflow-auto"
           >
             {options.map((option, index) => (
@@ -134,7 +136,9 @@ export function ThemedSelect<T extends number | string>({
               >
                 <span className="block truncate">{option.label}</span>
                 {option.meta && (
-                  <span className="block truncate text-[11px] text-ink-subtle">{option.meta}</span>
+                  <span className={`block text-[11px] ${size === "inline" ? "whitespace-normal text-ink-muted" : "truncate text-ink-subtle"}`}>
+                    {option.meta}
+                  </span>
                 )}
               </li>
             ))}

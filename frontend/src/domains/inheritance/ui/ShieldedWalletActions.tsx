@@ -1,4 +1,5 @@
-import type { ReactNode, RefObject } from "react";
+import { SUPPORTED_IDENTITY_SUITE_IDS } from "@deepfamily/protocol-core";
+import { useState, type ReactNode, type RefObject } from "react";
 import { useTranslation } from "react-i18next";
 import { AlertTriangle, CheckCircle2 } from "lucide-react";
 import { formatShieldedAmount } from "../model/shieldedDisplay";
@@ -23,6 +24,7 @@ export type ShieldedValueBalance = { commitment: string; amount: string };
 
 export interface ShieldedRecipientInputProps {
   purpose?: "receive" | "fund";
+  recipientSuiteId?: number;
   method: ShieldedRecipientInputMethod;
   onMethodChange: (method: ShieldedRecipientInputMethod) => void;
   code: string;
@@ -39,6 +41,7 @@ export interface ShieldedRecipientInputProps {
 /** Recipient by receive code, or by complete identity credentials that generate one locally. */
 export function ShieldedRecipientInput({
   purpose = "receive",
+  recipientSuiteId,
   method,
   onMethodChange,
   code,
@@ -51,6 +54,8 @@ export function ShieldedRecipientInput({
   verification,
 }: ShieldedRecipientInputProps) {
   const { t } = useTranslation();
+  const [chosenSuite, setChosenSuite] = useState<number>();
+  const suite = recipientSuiteId ?? (SUPPORTED_IDENTITY_SUITE_IDS.length === 1 ? SUPPORTED_IDENTITY_SUITE_IDS[0] : chosenSuite);
   return (
     <div className="min-w-0 space-y-4">
       <fieldset className="min-w-0 space-y-2" disabled={busy}>
@@ -94,8 +99,17 @@ export function ShieldedRecipientInput({
           />
         ) : (
           <div className="space-y-3">
-            <ShieldedRecipientCredentialsForm ref={credentialsFormRef} />
-            <PanelButton busy={busy} disabled={busy} onClick={onGenerateCode}>
+            {recipientSuiteId === undefined && SUPPORTED_IDENTITY_SUITE_IDS.length > 1 && (
+              <label className="block space-y-1 text-xs text-ink-muted">
+                <span>{t("shielded.recipientIdentitySuite")}</span>
+                <select className={FIELD_INPUT} value={suite ?? ""} onChange={event => setChosenSuite(Number(event.target.value))}>
+                  <option value="" disabled>{t("shielded.chooseRecipientSuite")}</option>
+                  {SUPPORTED_IDENTITY_SUITE_IDS.map(id => <option key={id} value={id}>{t("shielded.identitySuiteOption", { suite: id })}</option>)}
+                </select>
+              </label>
+            )}
+            <ShieldedRecipientCredentialsForm ref={credentialsFormRef} identitySuiteId={suite} />
+            <PanelButton busy={busy} disabled={busy || suite === undefined} onClick={onGenerateCode}>
               {t(purpose === "fund" ? "shielded.generateFundReceiveCredential" : "shielded.generateReceiveCode")}
             </PanelButton>
           </div>

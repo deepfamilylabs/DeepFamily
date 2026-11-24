@@ -117,7 +117,6 @@ export function useMintNftModalController({
     applyVersionDecision,
   } = useTransactionTargetSelection({ isOpen });
   const targetVersionIndex = versionIndex;
-  const hasTargetInputs = hasValidTarget;
   const endorsedVersionLookup = useEndorsedVersionLookup(
     isOpen && isPersonHashFormatValid ? targetPersonHash : null,
     address,
@@ -346,7 +345,6 @@ export function useMintNftModalController({
     address,
     contract,
     allConsentsChecked,
-    hasTargetInputs,
     hasValidTarget,
     isEndorsed,
     isAlreadyMinted,
@@ -397,6 +395,8 @@ export function useMintNftModalController({
     personProofSection: {
       personCalcRef,
       personInfo,
+      // Only a complete hash selects an archive whose suite replaces the user's choice.
+      hasTargetHash: isPersonHashFormatValid,
       targetSelfSuiteId,
       onPersonInfoChange: setPersonInfo,
       onPassphraseChange: handlePassphraseChange,
@@ -469,7 +469,6 @@ export function useMintNftModalController({
       isAlreadyMinted,
       allConsentsChecked,
       hasPersonInfo,
-      hasTargetInputs,
       hasValidTarget,
       hasVerifiedTargetEnvelope: targetSelfSuiteId !== null,
       transactionPreview,

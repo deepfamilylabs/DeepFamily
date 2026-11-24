@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { UnsupportedProtocolError } from "@deepfamily/protocol-core";
 import { sanitizeErrorForLogging } from "../../../../../shared/lib/errors";
 import {
   readMintTargetEnvelopeHeader,
@@ -22,7 +23,7 @@ const defaultTargetStatus = {
   isAlreadyMinted: false,
   isCheckingStatus: false,
   selfSuiteId: null as number | null,
-  envelopeHeaderError: null as string | null,
+  envelopeHeaderError: null as "unverified" | "unsupportedSuite" | null,
 };
 
 export function useMintTargetStatus({
@@ -68,7 +69,7 @@ export function useMintTargetStatus({
           setStatus({
             ...defaultTargetStatus,
             targetKey,
-            envelopeHeaderError: "Target metadata envelope cannot be read",
+            envelopeHeaderError: "unverified",
           });
         }
         return;
@@ -101,7 +102,9 @@ export function useMintTargetStatus({
             isAlreadyMinted: false,
             isCheckingStatus: false,
             selfSuiteId: null,
-            envelopeHeaderError: "Target metadata envelope header could not be verified",
+            envelopeHeaderError: error instanceof UnsupportedProtocolError && error.code === "UNSUPPORTED_IDENTITY_SUITE"
+              ? "unsupportedSuite"
+              : "unverified",
           });
         }
       }

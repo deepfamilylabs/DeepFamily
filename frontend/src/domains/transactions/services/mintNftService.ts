@@ -4,6 +4,7 @@ import { encodePublicStoryRecord } from "../../../shared/config/storyEncoding";
 import { createDeepFamilyInterface } from "../../../shared/clients/contractFactory";
 import { parseReceiptEvents } from "../api/txGateway";
 import {
+  assertIdentitySuiteSupported,
   assertUnicodeScalarString,
   computeSuiteCommitment,
   readMetadataEnvelopeFromRef,
@@ -62,7 +63,7 @@ export async function readMintTargetEnvelopeHeader(input: {
 
   return {
     formatVersion: verified.prefix.formatVersion,
-    selfSuiteId: verified.prefix.identitySuiteId,
+    selfSuiteId: assertIdentitySuiteSupported(verified.prefix.identitySuiteId),
     versionDetails,
   };
 }

@@ -1,6 +1,6 @@
 import { useCallback } from "react";
 import {
-  IDENTITY_SUITE_CANDIDATE_1,
+  DEFAULT_IDENTITY_SUITE_ID,
   PERSON_VERSION_SCHEMA,
   ProtocolError,
   canonicalizeFullName,
@@ -26,7 +26,7 @@ function identityFields(info: PersonInfoPublic) {
   };
 }
 
-function getPublicIdentity(calc: PersonHashCalculatorHandle | null): PersonInfoPublic | null {
+function getPublicIdentity(calc: PersonHashCalculatorHandle | null) {
   const value = calc?.getPublicFormData();
   if (!value) return null;
   let fullName: string;
@@ -38,6 +38,8 @@ function getPublicIdentity(calc: PersonHashCalculatorHandle | null): PersonInfoP
   }
   return {
     fullName,
+    identitySuiteId: value.identitySuiteId,
+    resolvedPersonHash: value.resolvedPersonHash,
     gender: Number(value.gender),
     birthYear: Number(value.birthYear),
     birthMonth: Number(value.birthMonth),
@@ -49,8 +51,11 @@ function getPublicIdentity(calc: PersonHashCalculatorHandle | null): PersonInfoP
 export function useAddVersionIdentityMaterials() {
   const resolveIdentityMaterial = useCallback(
     async (calc: PersonHashCalculatorHandle | null): Promise<IdentityMaterial | null> => {
-      const identity = getPublicIdentity(calc);
-      if (!calc || !identity) return null;
+      const fields = getPublicIdentity(calc);
+      if (!calc || !fields) return null;
+      const { identitySuiteId, resolvedPersonHash, ...identity } = fields;
+      if (DEFAULT_IDENTITY_SUITE_ID > 1 && (!identitySuiteId || !resolvedPersonHash))
+        throw new Error("The person identity lookup has not finished");
       if (!calc.passphrasesMatch()) {
         throw new Error(
           "Identity passphrase confirmation does not match after trimming surrounding whitespace",
@@ -65,10 +70,13 @@ export function useAddVersionIdentityMaterials() {
         {
           identity,
           rawPassphrase,
-          identitySuiteId: IDENTITY_SUITE_CANDIDATE_1,
+          identitySuiteId: identitySuiteId ?? DEFAULT_IDENTITY_SUITE_ID,
         },
         { timeoutMs: 240_000 },
       );
+      if (resolvedPersonHash && (derived.identitySuiteId !== identitySuiteId ||
+        derived.personHash.toLowerCase() !== resolvedPersonHash.toLowerCase()))
+        throw new Error("The identity credentials changed after the lookup");
       const derivedSecretField = BigInt(derived.derivedSecretField);
       return {
         personData: {

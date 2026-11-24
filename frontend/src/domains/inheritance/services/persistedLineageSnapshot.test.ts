@@ -191,6 +191,14 @@ describe("persistent global current lineage synchronization", () => {
   });
   afterEach(() => vi.unstubAllGlobals());
 
+  it("checks parent references without fetching the child's versions or endorsements", async () => {
+    const f = fixture();
+    const snapshot = await load(f, { referencedParentCommitments: [ROOT_IC, 12345n] });
+    expect(snapshot.referencedParents).toEqual(new Set([ROOT_IC]));
+    expect(snapshot.versions.size).toBe(0);
+    expect(snapshot.endorsements.size).toBe(0);
+  });
+
   it("downloads bounded global current pages at one block and builds real authenticated funding paths", async () => {
     const f = fixture(257);
     const snapshot = await load(f);

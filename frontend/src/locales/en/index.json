@@ -255,6 +255,7 @@
       "totalChildren": "Total Children"
     },
     "hashCalculator": {
+      "identitySuite": "Identity protocol",
       "title": "Calculate Identity Hash Locally",
       "name": "Full Name",
       "isBirthBC": "Era",
@@ -276,7 +277,7 @@
       "identityInputRule": "Names and identity passphrases use single-line fields. Only leading and trailing whitespace is removed; internal spaces and other entered characters are preserved exactly.",
       "multilinePasteRejected": "This single-line field cannot preserve line breaks. The paste was cancelled and the previous value was kept.",
       "confirmPassphrasePlaceholder": "Repeat the identity passphrase (empty is allowed)",
-      "deterministicIdentityNotice": "Identity suite 1 always derives its salt deterministically from the canonical identity fields. No recovery salt is stored or accepted.",
+      "deterministicIdentityNotice": "The identity protocol number and canonical identity fields determine the salt. There is no separate recovery salt to save.",
       "passphraseHelp": {
         "title": "Identity Passphrase Usage Guide",
         "buttonAriaLabel": "Identity passphrase help",
@@ -1095,6 +1096,27 @@
     }
   },
   "addVersion": {
+    "identityProtocol": "Identity protocol {{suite}}",
+    "defaultProtocol": "Identity protocol {{suite}} (default)",
+    "protocolWithHistory": "Identity protocol {{suite}} (older activity found)",
+    "previouslyReferenced": "Previously referenced by a child, with no record of their own",
+    "protocolAction": {
+      "person": {
+        "existing": "Add to the existing person record",
+        "new": "Create a separate person record"
+      },
+      "father": {
+        "existing": "Reference the existing father’s record",
+        "new": "Reference this identity as the father. He has no record yet."
+      },
+      "mother": {
+        "existing": "Reference the existing mother’s record",
+        "new": "Reference this identity as the mother. She has no record yet."
+      }
+    },
+    "findingIdentity": "Checking existing identities…",
+    "identityLookupFailed": "The identity hash could not be calculated. Retry to continue.",
+    "historyUnavailable": "Record history is unavailable. You can still use the selected identity.",
     "title": "Add Version",
     "parentVersionUnknown": "Unknown (0)",
     "parentVersionOption": "Version {{index}} · {{endorsements}} endorsements",
@@ -1182,9 +1204,11 @@
     "targetRequired": "Please provide a valid person hash and version index.",
     "targetEnvelopeHeaderRequired": "The target metadata envelope header must be verified before minting.",
     "targetEnvelopeHeaderInvalid": "Couldn't verify the target version's metadata header, so it can't be minted.",
+    "unsupportedTargetSuite": "This version of the app does not support the identity protocol used by this record, so it can't mint its NFT. Refresh the page or update to the latest version, then try again.",
     "invalidPersonHashFormat": "Person hash must be 0x-prefixed 32-byte hex (64 hex chars).",
     "basicInfo": "Basic Information",
     "basicInfoMustMatch": "Must match the target version's data exactly; the contract verifies this on chain before minting.",
+    "targetProtocolHint": "This record uses identity protocol {{suite}}. Enter the identity details and passphrase used to create it.",
     "consentTitle": "Informed consent (required)",
     "consentPublic": "I understand this mint makes the entered info permanently public on-chain and undeletable.",
     "consentAge": "I confirm the person is 18 years or older.",
@@ -1216,7 +1240,6 @@
     "endorsementRequiredDesc": "You must endorse this version before minting. Would you like to go endorse now?",
     "personInfoRequired": "Please fill in person information",
     "fullNameRequired": "Full name is required to generate proof",
-    "personHashRequired": "Unable to compute person hash",
     "walletRequired": "Wallet connection required to mint",
     "mintFailed": "Failed to mint NFT",
     "detailsReadFailedTitle": "Transaction Confirmed; Details Unavailable",
@@ -1236,7 +1259,7 @@
       "yearExceedsCurrent": "AD year cannot exceed current year",
       "storyRequiredForTitle": "Add biography content before setting a title"
     },
-    "personHashMismatch": "The passphrase or identity suite does not match the target person hash"
+    "personHashMismatch": "The identity details or passphrase do not match the selected record."
   },
   "endorse": {
     "title": "Endorse Version",
@@ -1378,8 +1401,8 @@
       "VerifierNotConfigured": "Proof verification is not configured for this operation.",
       "DuplicateVersion": "This person version already exists.",
       "DuplicateVersionCommitment": "This encrypted version commitment already exists on-chain.",
-      "CallerOrIdentitySuiteMismatch": "Caller address or identity suite does not match the submitted proof.",
-      "InvalidIdentitySuite": "Identity suite identifier is invalid.",
+      "CallerOrIdentitySuiteMismatch": "Caller address or identity protocol does not match the submitted proof.",
+      "InvalidIdentitySuite": "Identity protocol number is invalid.",
       "InvalidMetadataArchive": "Metadata Archive contract is invalid.",
       "MetadataArchiveAlreadySet": "Metadata Archive is already configured and cannot be replaced.",
       "MetadataArchiveNotSet": "Metadata Archive is not configured.",
@@ -1602,7 +1625,11 @@
     "unreachable": "Network state could not be read. Try again shortly.",
     "wrongNetwork": "Switch your wallet to network {{chainId}}.",
     "identityTitle": "Unlock identity",
-    "identitySuiteOption": "Suite {{suite}}",
+    "recipientIdentitySuite": "Recipient’s identity protocol",
+    "chooseRecipientSuite": "Choose the identity protocol used by the recipient",
+    "manualWalletSuite": "Open a wallet with a known identity protocol",
+    "autoWalletSuite": "Find my wallet automatically",
+    "identitySuiteOption": "Identity protocol {{suite}}",
     "identityLookupFailed": "Could not look up your identity. Check your details, passphrase and network, then try again.",
     "registeredIdentities": "Choose the identity to unlock",
     "identityDescription": "Use the parent's identity to fund budgets and the child's identity to claim. Keep your identity details and passphrase safe.",

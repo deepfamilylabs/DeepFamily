@@ -1,6 +1,7 @@
 import { concat, keccak256, solidityPacked, toBeHex, toUtf8Bytes, zeroPadValue } from "ethers";
 import { poseidon4 } from "poseidon-lite";
 import {
+  DEFAULT_IDENTITY_SUITE_ID,
   canonicalizeFullName,
   packGroth16ProofEnvelope,
   type ProofEnvelope as CodecProofEnvelope,
@@ -20,7 +21,7 @@ export type Groth16Proof = {
 
 export const SNARK_FIELD =
   21888242871839275222246405745257275088548364400416034343698204186575808495617n;
-export const DEFAULT_IDENTITY_SUITE_ID = 1;
+export { DEFAULT_IDENTITY_SUITE_ID };
 export const DOMAIN_NAME_PREHASH = "deepfamily:name-prehash:v1";
 export const DOMAIN_SUITE = 1000n;
 export const DOMAIN_NAME_SECRET = 1001n;
