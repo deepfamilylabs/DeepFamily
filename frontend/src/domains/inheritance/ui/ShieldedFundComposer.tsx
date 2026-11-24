@@ -13,6 +13,7 @@ import {
   type ShieldedFundingHeir,
 } from "../model/shieldedFundingOptions";
 import type { ShieldedRecipientCredentialsFormHandle } from "./ShieldedRecipientCredentialsForm";
+import type { FindShieldedIdentities } from "./ShieldedIdentityChoice";
 import {
   ShieldedReceiveCodeInput,
   ShieldedRecipientChip,
@@ -67,7 +68,8 @@ export interface ShieldedFundComposerProps {
   recipientInputMethod: ShieldedRecipientInputMethod;
   onRecipientInputMethodChange: (value: ShieldedRecipientInputMethod) => void;
   recipientFormRef: RefObject<ShieldedRecipientCredentialsFormHandle>;
-  onGenerateRecipientCode: () => void;
+  findRecipientIdentities: FindShieldedIdentities;
+  onGenerateRecipientCode: (identitySuiteId: number, expectedPersonHash?: string) => void;
   /** The funding parent's own label, used to name existing arrangements. */
   parentLabel?: string;
 }
@@ -428,6 +430,7 @@ export function ShieldedFundComposer(props: ShieldedFundComposerProps) {
               codeError={codeError}
               onCodeChange={props.onCodeChange}
               credentialsFormRef={props.recipientFormRef}
+              findRecipientIdentities={props.findRecipientIdentities}
               onGenerateCode={props.onGenerateRecipientCode}
               busy={busy}
               verification={verification}

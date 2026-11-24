@@ -76,6 +76,8 @@ export function ShieldedAssetOverview({
     hashLabel: string;
     copyLabel: string;
     onCopy: () => void;
+    /** The identity protocol of the open wallet, when the frontend supports several. */
+    protocol?: string;
   };
   assetControls?: ReactNode;
   syncStatus?: ReactNode;
@@ -137,6 +139,12 @@ export function ShieldedAssetOverview({
                 {shortHex(person.hash)}
               </code>
               <CopyIconButton size="xs" label={person.copyLabel} onClick={person.onCopy} />
+              {person.protocol ? (
+                <>
+                  <span aria-hidden="true">·</span>
+                  <span className="shrink-0">{person.protocol}</span>
+                </>
+              ) : null}
             </div>
           </div>
         </div>

@@ -113,7 +113,11 @@ const pair = z.tuple([z.union([text, z.bigint()]), z.union([text, z.bigint()])])
 // explicit method; no other result can carry recovery material or note openings.
 const results = {
   findWalletIdentities: z.strictObject({
-    matches: z.array(z.strictObject({ identitySuiteId: suiteId, personHash: z.string().regex(/^0x[0-9a-f]{64}$/i) })),
+    matches: z.array(z.strictObject({
+      identitySuiteId: suiteId,
+      personHash: z.string().regex(/^0x[0-9a-f]{64}$/i),
+      history: z.enum(["registered", "referenced", "used"]),
+    })),
   }),
   unlockIdentity: session,
   createIndependentKey: session,

@@ -165,10 +165,13 @@ export type ShieldedDiscoveredPoolSummary = {
   rawBudgetBalance?: string;
   error?: string;
 };
+/** Why an identity is offered: a person record, a child's parent reference, or wallet activity. */
+export type ShieldedIdentityHistory = "registered" | "referenced" | "used";
+export type ShieldedIdentityMatch = { identitySuiteId: number; personHash: string; history: ShieldedIdentityHistory };
 export type ShieldedAssetWorkerCallMap = {
   findWalletIdentities: {
     params: { identity: IdentityFields; rawPassphrase: string; context: ShieldedWorkerContext; previousPersonHash?: string };
-    result: { matches: { identitySuiteId: number; personHash: string }[] };
+    result: { matches: ShieldedIdentityMatch[] };
   };
   unlockIdentity: {
     params: { identity: IdentityFields; rawPassphrase: string; identitySuiteId: number; expectedPersonHash?: string };

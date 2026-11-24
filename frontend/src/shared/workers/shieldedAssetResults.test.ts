@@ -4,14 +4,16 @@ import { publicShieldedAssetResult } from "./shieldedAssetResults";
 const state = { credentials: { handle: "credentials:1" }, identity: null, independentKey: null };
 describe("asset Worker public result boundary", () => {
   it("returns only the public identities found and preserves a child's unfamiliar suite in recovery", () => {
-    const match = { identitySuiteId: 2, personHash: "0x" + "12".repeat(32) };
+    const identity = { identitySuiteId: 2, personHash: "0x" + "12".repeat(32) };
+    const match = { ...identity, history: "used" };
     expect(publicShieldedAssetResult("findWalletIdentities", { matches: [match] })).toEqual({ matches: [match] });
-    expect(() => publicShieldedAssetResult("findWalletIdentities", {
-      matches: [{ ...match, derivedSecretField: "secret" }],
-    })).toThrow("invalid public result");
+    for (const unexpected of [{ ...match, derivedSecretField: "secret" }, { ...match, history: "none" }, identity]) {
+      expect(() => publicShieldedAssetResult("findWalletIdentities", { matches: [unexpected] }))
+        .toThrow("invalid public result");
+    }
     const wallet = {
       toBlock: 1, blockHash: "hash", parentVersions: [], policies: [], templates: [], claims: [], notes: [],
-      children: [{ ...match, eligible: true, rootVersionIndex: 1 }],
+      children: [{ ...identity, eligible: true, rootVersionIndex: 1 }],
     };
     expect(publicShieldedAssetResult("recover", wallet)).toEqual(wallet);
   });

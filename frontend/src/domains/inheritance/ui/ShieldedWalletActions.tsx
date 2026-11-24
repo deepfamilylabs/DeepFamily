@@ -1,5 +1,4 @@
-import { SUPPORTED_IDENTITY_SUITE_IDS } from "@deepfamily/protocol-core";
-import { useState, type ReactNode, type RefObject } from "react";
+import type { ReactNode, RefObject } from "react";
 import { useTranslation } from "react-i18next";
 import { AlertTriangle, CheckCircle2 } from "lucide-react";
 import { formatShieldedAmount } from "../model/shieldedDisplay";
@@ -7,6 +6,12 @@ import {
   ShieldedRecipientCredentialsForm,
   type ShieldedRecipientCredentialsFormHandle,
 } from "./ShieldedRecipientCredentialsForm";
+import {
+  ShieldedIdentityChooser,
+  ShieldedManualSuitePicker,
+  useShieldedSuiteResolution,
+  type FindShieldedIdentities,
+} from "./ShieldedIdentityChoice";
 import {
   CHOICE_INPUT,
   FIELD_BASE,
@@ -32,7 +37,9 @@ export interface ShieldedRecipientInputProps {
   codeError?: string;
   onCodeChange: (value: string) => void;
   credentialsFormRef: RefObject<ShieldedRecipientCredentialsFormHandle>;
-  onGenerateCode: () => void;
+  /** Finds the identities the recipient's credentials already use, like unlocking a wallet. */
+  findRecipientIdentities: FindShieldedIdentities;
+  onGenerateCode: (identitySuiteId: number, expectedPersonHash?: string) => void;
   busy: boolean;
   /** Shown under the code once it verifies, such as the recipient it belongs to. */
   verification?: ReactNode;
@@ -49,13 +56,20 @@ export function ShieldedRecipientInput({
   codeError,
   onCodeChange,
   credentialsFormRef,
+  findRecipientIdentities,
   onGenerateCode,
   busy,
   verification,
 }: ShieldedRecipientInputProps) {
   const { t } = useTranslation();
-  const [chosenSuite, setChosenSuite] = useState<number>();
-  const suite = recipientSuiteId ?? (SUPPORTED_IDENTITY_SUITE_IDS.length === 1 ? SUPPORTED_IDENTITY_SUITE_IDS[0] : chosenSuite);
+  // A known recipient's registered suite applies as given; otherwise the code goes to the wallet
+  // that the recipient's own unlock would open.
+  const resolution = useShieldedSuiteResolution({
+    busy,
+    fixedSuite: recipientSuiteId,
+    find: findRecipientIdentities,
+    proceed: onGenerateCode,
+  });
   return (
     <div className="min-w-0 space-y-4">
       <fieldset className="min-w-0 space-y-2" disabled={busy}>
@@ -99,22 +113,31 @@ export function ShieldedRecipientInput({
           />
         ) : (
           <div className="space-y-3">
-            {recipientSuiteId === undefined && SUPPORTED_IDENTITY_SUITE_IDS.length > 1 && (
-              <label className="block space-y-1 text-xs text-ink-muted">
-                <span>{t("shielded.recipientIdentitySuite")}</span>
-                <select className={FIELD_INPUT} value={suite ?? ""} onChange={event => setChosenSuite(Number(event.target.value))}>
-                  <option value="" disabled>{t("shielded.chooseRecipientSuite")}</option>
-                  {SUPPORTED_IDENTITY_SUITE_IDS.map(id => <option key={id} value={id}>{t("shielded.identitySuiteOption", { suite: id })}</option>)}
-                </select>
-              </label>
+            <ShieldedRecipientCredentialsForm ref={credentialsFormRef} onChange={resolution.dismissChoices} />
+            {resolution.canChooseSuite && (
+              <ShieldedManualSuitePicker
+                summary={t("shielded.manualRecipientSuite")}
+                label={t("shielded.recipientIdentitySuite")}
+                automatic={t("shielded.autoRecipientSuite")}
+                value={resolution.manualSuite}
+                disabled={busy}
+                onChange={resolution.chooseManualSuite}
+              />
             )}
-            <ShieldedRecipientCredentialsForm ref={credentialsFormRef} identitySuiteId={suite} />
-            <PanelButton busy={busy} disabled={busy || suite === undefined} onClick={onGenerateCode}>
+            <PanelButton busy={busy} disabled={busy} onClick={() => void resolution.submit()}>
               {t(purpose === "fund" ? "shielded.generateFundReceiveCredential" : "shielded.generateReceiveCode")}
             </PanelButton>
           </div>
         )}
       </fieldset>
+      {method === "credentials" && resolution.choices && (
+        <ShieldedIdentityChooser
+          title={t("shielded.recipientIdentities")}
+          matches={resolution.choices}
+          onChoose={resolution.choose}
+          onClose={resolution.dismissChoices}
+        />
+      )}
     </div>
   );
 }

@@ -1626,10 +1626,18 @@
     "wrongNetwork": "Switch your wallet to network {{chainId}}.",
     "identityTitle": "Unlock identity",
     "recipientIdentitySuite": "Recipient’s identity protocol",
-    "chooseRecipientSuite": "Choose the identity protocol used by the recipient",
+    "manualRecipientSuite": "Generate with the recipient’s known identity protocol",
+    "autoRecipientSuite": "Find the recipient’s wallet automatically",
+    "recipientIdentities": "Choose the recipient’s identity",
+    "recipientLookupFailed": "Could not look up the recipient’s identity. Check the recipient’s details, passphrase and network, then try again.",
     "manualWalletSuite": "Open a wallet with a known identity protocol",
     "autoWalletSuite": "Find my wallet automatically",
     "identitySuiteOption": "Identity protocol {{suite}}",
+    "identityHistory": {
+      "registered": "Has a person record",
+      "referenced": "Previously referenced by a child, with no record of their own",
+      "used": "Has wallet activity"
+    },
     "identityLookupFailed": "Could not look up your identity. Check your details, passphrase and network, then try again.",
     "registeredIdentities": "Choose the identity to unlock",
     "identityDescription": "Use the parent's identity to fund budgets and the child's identity to claim. Keep your identity details and passphrase safe.",
@@ -1784,7 +1792,8 @@
       "checkingGas": "Estimating fees…",
       "submitting": "Confirm the transaction in your wallet…",
       "confirming": "Waiting for transaction confirmation…",
-      "fundReceiveCredential": "Generating budget receiving credential…"
+      "fundReceiveCredential": "Generating budget receiving credential…",
+      "findingRecipient": "Finding the recipient’s wallet…"
     },
     "fundingPreview": "{{periods}} periods · {{rate}} {{symbol}} every {{days}} days",
     "valueOption": "Balance {{index}} · {{amount}} {{symbol}}",

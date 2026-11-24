@@ -297,7 +297,7 @@ describe("wallet spend action", () => {
     titleId: "withdrawal-title", action: "unshield", symbol: "DEEP", decimals: 0, busy: false,
     amount: "1000", onAmountChange: vi.fn(),
     recipient: { method: "receiveCode", onMethodChange: vi.fn(), code: "", onCodeChange: vi.fn(),
-      credentialsFormRef: createRef(), onGenerateCode: vi.fn(), verified: false,
+      credentialsFormRef: createRef(), findRecipientIdentities: vi.fn(), onGenerateCode: vi.fn(), verified: false,
       needsConfirmation: false, confirmed: false, onConfirmedChange: vi.fn() },
     withdrawalRecipient: "0x123", onWithdrawalRecipientChange: vi.fn(), values: notes,
     selectedCommitments: ["9"], onSelectedCommitmentsChange: vi.fn(),

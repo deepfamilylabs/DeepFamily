@@ -51,6 +51,7 @@ function renderDays(periodDays: string, overrides: Partial<ShieldedFundComposerP
         recipientInputMethod="receiveCode"
         onRecipientInputMethodChange={vi.fn()}
         recipientFormRef={createRef<ShieldedRecipientCredentialsFormHandle>()}
+        findRecipientIdentities={vi.fn()}
         onGenerateRecipientCode={vi.fn()}
         {...overrides}
       />

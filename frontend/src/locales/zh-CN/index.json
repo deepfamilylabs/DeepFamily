@@ -1626,10 +1626,18 @@
     "wrongNetwork": "请将钱包切换至网络 {{chainId}}。",
     "identityTitle": "解锁身份",
     "recipientIdentitySuite": "收款人的身份协议",
-    "chooseRecipientSuite": "选择收款人使用的身份协议",
+    "manualRecipientSuite": "按收款人已知的身份协议生成",
+    "autoRecipientSuite": "自动查找收款人的钱包",
+    "recipientIdentities": "选择收款人的身份",
+    "recipientLookupFailed": "未能查找收款人的身份。请检查收款人的身份资料、口令和网络后重试。",
     "manualWalletSuite": "按已知身份协议打开钱包",
     "autoWalletSuite": "自动查找我的钱包",
     "identitySuiteOption": "身份协议 {{suite}}",
+    "identityHistory": {
+      "registered": "已建档",
+      "referenced": "曾被子女引用，尚未建档",
+      "used": "已有钱包记录"
+    },
     "identityLookupFailed": "未能查找身份。请检查身份资料、口令和网络后重试。",
     "registeredIdentities": "选择要解锁的身份",
     "identityDescription": "存入预算时使用父母身份，领取时使用子女身份。请妥善保存身份资料和口令。",
@@ -1784,7 +1792,8 @@
       "checkingGas": "正在估算手续费…",
       "submitting": "请在钱包中确认交易…",
       "confirming": "正在等待交易确认…",
-      "fundReceiveCredential": "正在生成预算接收凭证…"
+      "fundReceiveCredential": "正在生成预算接收凭证…",
+      "findingRecipient": "正在查找收款人的钱包…"
     },
     "fundingPreview": "{{periods}} 期 · 每 {{days}} 天 {{rate}} {{symbol}}",
     "valueOption": "第 {{index}} 笔余额 · {{amount}} {{symbol}}",

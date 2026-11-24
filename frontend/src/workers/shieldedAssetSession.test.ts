@@ -805,7 +805,7 @@ describe("independent-key credentials and async installation boundary", () => {
     const record = { identitySuiteId: 1, identityCommitment: 31n, personHash: `0x${"00".repeat(31)}1f` };
     mocks.loadLineage.mockResolvedValue({ versions: new Map([[record.personHash, [record]]]) });
     const result = await session.call("findWalletIdentities", params);
-    expect(result.matches).toEqual([{ identitySuiteId: 1, personHash: record.personHash }]);
+    expect(result.matches).toEqual([{ identitySuiteId: 1, personHash: record.personHash, history: "registered" }]);
     expect(mocks.loadTargetedLineage).not.toHaveBeenCalled();
     expect(params.rawPassphrase).toBe("");
     const material = await mocks.identity.mock.results[0].value;
@@ -828,7 +828,7 @@ describe("independent-key credentials and async installation boundary", () => {
     const find = (previousPersonHash: string) => session.call("findWalletIdentities", {
       ...identityParams(), context, previousPersonHash,
     });
-    expect(await find(personHash)).toEqual({ matches: [{ personHash, identitySuiteId: 1 }] });
+    expect(await find(personHash)).toEqual({ matches: [{ personHash, identitySuiteId: 1, history: "used" }] });
     expect(await find("0x" + "ff".repeat(32))).toEqual({ matches: [] });
   });
 
@@ -844,7 +844,7 @@ describe("independent-key credentials and async installation boundary", () => {
     mocks.loadLineage.mockResolvedValue({ versions: new Map([[record.personHash, [record]]]) });
     mocks.identity.mockImplementation(deriveIdentityMaterial);
     const { matches } = await session.call("findWalletIdentities", { ...params, context });
-    expect(matches).toEqual([{ personHash: record.personHash, identitySuiteId: 1 }]);
+    expect(matches).toEqual([{ personHash: record.personHash, identitySuiteId: 1, history: "registered" }]);
     const state = await session.call("unlockIdentity", { ...params, expectedPersonHash: matches[0].personHash });
     expect(state.identity).toMatchObject({
       identitySuiteId: 1, identityCommitment: String(record.identityCommitment), personHash: record.personHash,

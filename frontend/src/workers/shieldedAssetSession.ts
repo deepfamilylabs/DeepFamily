@@ -270,8 +270,9 @@ export class ShieldedAssetSession {
         pools: { chainId, factoryDeploymentBlock, lineageIndexAddress, factory: env.factory, verifierAddress: env.verifierAddress },
       };
     }, "wallet", current);
+    // A wallet lookup fails instead of returning "unavailable", so every other entry has history.
     const matches = candidates.flatMap(({ identitySuiteId, personHash, history }) =>
-      history === "none" ? [] : [{ identitySuiteId, personHash }],
+      history === "none" || history === "unavailable" ? [] : [{ identitySuiteId, personHash, history }],
     );
     return { matches };
   }

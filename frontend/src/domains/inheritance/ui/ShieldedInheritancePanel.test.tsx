@@ -39,7 +39,20 @@ const mocks = vi.hoisted(() => ({
   configUpdate: vi.fn(),
   createRecipientCode: vi.fn(),
   syncListeners: new Set<(event: PublicStateSyncProgress) => void>(),
+  supportedSuites: null as number[] | null,
 }));
+vi.mock("@deepfamily/protocol-core", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@deepfamily/protocol-core")>();
+  return {
+    ...actual,
+    get DEFAULT_IDENTITY_SUITE_ID() {
+      return mocks.supportedSuites?.[0] ?? actual.DEFAULT_IDENTITY_SUITE_ID;
+    },
+    get SUPPORTED_IDENTITY_SUITE_IDS() {
+      return mocks.supportedSuites ?? actual.SUPPORTED_IDENTITY_SUITE_IDS;
+    },
+  };
+});
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({
     t: (key: string, options?: Record<string, unknown>) =>
@@ -578,6 +591,7 @@ describe("Worker-backed shielded wallet", () => {
     vi.clearAllMocks();
     mocks.submit.mockReset().mockResolvedValue(sentTransaction);
     mocks.stateReadMode = "rebuild";
+    mocks.supportedSuites = null;
     mocks.createRecipientCode.mockResolvedValue("recipient-code");
     mocks.identity = null;
     mocks.credentials = null;
@@ -661,6 +675,82 @@ describe("Worker-backed shielded wallet", () => {
     await waitFor(() => expect(mocks.createRecipientCode).toHaveBeenCalledWith(expect.objectContaining({
       context: expect.objectContaining({ stateReadMode: "chain" }), purpose: "fund",
     })));
+  });
+  describe("recipient credentials with several identity suites", () => {
+    const registeredRecipient = { identitySuiteId: 1, personHash: identity.personHash, history: "registered" };
+    const otherRecipient = { identitySuiteId: 2, personHash: "0x" + "34".repeat(32), history: "used" };
+    const childFields = { fullName: "Child", gender: 1, birthYear: 2000, birthMonth: 1, birthDay: 1, isBirthBC: false };
+    function answerLookup(answer: () => Promise<unknown>, wallet = emptyWallet, purpose = "receive") {
+      mocks.verify.mockResolvedValue({ purpose, personHash: identity.personHash, keyMode: 0, fingerprint: "recipient-fingerprint" });
+      const defaultCall = mocks.call.getMockImplementation();
+      mocks.call.mockImplementation(async (method: string, params: unknown) =>
+        method === "findWalletIdentities" ? answer()
+          : method === "recover" ? wallet : defaultCall?.(method, params));
+    }
+    function enterRecipient(method: "recipientMethods" | "fundRecipientMethods", button: string) {
+      fireEvent.click(screen.getByRole("radio", { name: `shielded.${method}.credentials` }));
+      fireEvent.change(screen.getByLabelText("identity passphrase"), { target: { value: "recipient-secret" } });
+      fireEvent.click(screen.getByRole("button", { name: button }));
+    }
+
+    it("looks up the transfer recipient's own credentials and generates for the identity chosen", async () => {
+      mocks.supportedSuites = [2, 1];
+      answerLookup(async () => ({ matches: [otherRecipient, registeredRecipient] }));
+      await renderUnlockedPanel();
+      chooseAction("privateTransfer");
+      enterRecipient("recipientMethods", "shielded.generateReceiveCode");
+      const dialog = await screen.findByRole("dialog", { name: "shielded.recipientIdentities" });
+      expect(mocks.call).toHaveBeenCalledWith("findWalletIdentities", {
+        context: expect.anything(), identity: childFields, rawPassphrase: "recipient-secret",
+      });
+      expect(mocks.createRecipientCode).not.toHaveBeenCalled();
+      fireEvent.click(within(dialog).getByRole("button", { name: new RegExp(registeredRecipient.personHash) }));
+      await waitFor(() => expect(mocks.createRecipientCode).toHaveBeenCalledWith(expect.objectContaining({
+        identity: childFields, rawPassphrase: "recipient-secret", purpose: "receive",
+        identitySuiteId: 1, expectedPersonHash: registeredRecipient.personHash,
+      })));
+      expect(screen.queryByRole("dialog")).toBeNull();
+    });
+
+    it("generates a budget credential only for the selected child when the child's suite is not indexed", async () => {
+      mocks.supportedSuites = [2, 1];
+      answerLookup(async () => ({ matches: [otherRecipient, registeredRecipient] }), {
+        ...emptyWallet,
+        children: [{ personHash: identity.personHash, rootVersionIndex: 0, eligible: true }],
+      } as typeof emptyWallet, "fund");
+      await renderUnlockedPanel();
+      chooseAction("fund");
+      chooseFundingEntry("privateConvenient");
+      chooseOption("shielded.fields.familyVersion", "shielded.fundingVersionOption:0");
+      chooseHeir(identity.personHash);
+      enterRecipient("fundRecipientMethods", "shielded.generateFundReceiveCredential");
+      await waitFor(() => expect(mocks.createRecipientCode).toHaveBeenCalledWith(expect.objectContaining({
+        purpose: "fund", identitySuiteId: 1, expectedPersonHash: identity.personHash,
+      })));
+      expect(screen.queryByRole("dialog")).toBeNull();
+    });
+
+    it("asks for the recipient's passphrase before deriving or looking anything up", async () => {
+      mocks.supportedSuites = [2, 1];
+      answerLookup(async () => ({ matches: [registeredRecipient] }));
+      await renderUnlockedPanel();
+      chooseAction("privateTransfer");
+      fireEvent.click(screen.getByRole("radio", { name: "shielded.recipientMethods.credentials" }));
+      fireEvent.click(screen.getByRole("button", { name: "shielded.generateReceiveCode" }));
+      expect(await screen.findByText("search.hashCalculator.passphrase: search.validation.required")).toBeTruthy();
+      expect(mocks.call.mock.calls.some(([method]) => method === "findWalletIdentities")).toBe(false);
+      expect(mocks.createRecipientCode).not.toHaveBeenCalled();
+    });
+
+    it("reports a failed recipient lookup without generating a code", async () => {
+      mocks.supportedSuites = [2, 1];
+      answerLookup(async () => { throw new Error("Pool history unavailable"); });
+      await renderUnlockedPanel();
+      chooseAction("privateTransfer");
+      enterRecipient("recipientMethods", "shielded.generateReceiveCode");
+      expect(await screen.findByText("shielded.recipientLookupFailed")).toBeTruthy();
+      expect(mocks.createRecipientCode).not.toHaveBeenCalled();
+    });
   });
   it("keeps the read-mode control absent while recovering or tracking a submission", async () => {
     let resolve!: (wallet: typeof emptyWallet) => void;

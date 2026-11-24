@@ -354,6 +354,9 @@ async function checkIdentitySuiteUpgrade({ env, baseline, address, reader, rootH
   );
   const { page } = await openPage("suite-upgrade", `${baseUrl}/inheritance`, address, rpcUrl, reader, rootHash);
   const walletHash = page.getByText("Person hash", { exact: true }).locator("..").locator("code");
+  // With several suites, the overview names the protocol of the wallet that is open.
+  const walletProtocol = (target, suite) =>
+    target.getByText("Person hash", { exact: true }).locator("..").getByText(`Identity protocol ${suite}`, { exact: true });
   const before = report.transactions.length;
 
   // Public reference hash calculated with suite 2 in the Argon2id salt and the circuit commitment.
@@ -366,6 +369,7 @@ async function checkIdentitySuiteUpgrade({ env, baseline, address, reader, rootH
   }
   await unlockIdentity(page, newUser);
   assert.equal(await walletHash.getAttribute("title"), newUserSuite2Hash, "A new identity uses the upgraded default");
+  await walletProtocol(page, 2).waitFor();
   const credential = decodeShieldedReceiveCredential(await receiveCode(page));
   assert.equal(wrapIdentityCommitmentAsPersonHash(credential.identityCommitment), newUserSuite2Hash);
   report.checks.push({
@@ -383,6 +387,7 @@ async function checkIdentitySuiteUpgrade({ env, baseline, address, reader, rootH
     registration.personHash,
     "The registered suite-1 identity is reopened",
   );
+  await walletProtocol(page, 1).waitFor();
   await checkClaimedBalances(page);
   assert.equal(report.transactions.length, before, "Discovering the old identity requires no wallet transaction");
   report.checks.push({
@@ -499,13 +504,29 @@ async function checkIdentitySuiteUpgrade({ env, baseline, address, reader, rootH
   await fillIdentity(both, newUser);
   await click(both.getByRole("button", { name: "Unlock identity", exact: true }));
   const chooser = both.getByRole("dialog", { name: "Choose the identity to unlock" });
-  await chooser.getByRole("button", { name: `Identity protocol 2 ${newUserSuite2Hash}`, exact: true }).waitFor();
-  await click(chooser.getByRole("button", { name: `Identity protocol 1 ${newUserSuite1Hash}`, exact: true }));
+  // Each choice says in words why it is offered.
+  await chooser.getByRole("button", { name: `Identity protocol 2 · Has a person record ${newUserSuite2Hash}`, exact: true }).waitFor();
+  await click(chooser.getByRole("button", { name: `Identity protocol 1 · Has wallet activity ${newUserSuite1Hash}`, exact: true }));
   await both.getByTitle(newUserSuite1Hash, { exact: true }).waitFor();
+  await walletProtocol(both, 1).waitFor();
   await choose(both, both.getByRole("button", { name: /^Asset DEEP$/ }), "ETH");
   const selectedBalance = both.getByRole("group", { name: "Identity credentials", exact: true }).locator("dd").first();
   await until(() => selectedBalance.textContent(), text => text.replace(/\s/g, "") === "0.001ETH", "selected suite-1 balance");
   report.checks.push({ label: "registered-suite-2-and-unregistered-funded-suite-1-offered-together", status: "passed" });
+
+  // A payer who generates a code from someone's credentials is offered the wallets that person's unlock offers.
+  const beforeRecipient = report.transactions.length;
+  await click(task(both, "Transfer"));
+  await click(both.getByRole("radio", { name: "Generate the recipient's code for them", exact: true }));
+  await fillIdentity(both, newUser);
+  await click(both.getByRole("button", { name: "Generate receive code", exact: true }));
+  const recipientChooser = both.getByRole("dialog", { name: "Choose the recipient’s identity" });
+  await recipientChooser.getByRole("button", { name: `Identity protocol 1 · Has wallet activity ${newUserSuite1Hash}`, exact: true }).waitFor();
+  await click(recipientChooser.getByRole("button", { name: `Identity protocol 2 · Has a person record ${newUserSuite2Hash}`, exact: true }));
+  const recipientCode = both.getByRole("textbox", { name: "Recipient's receive code", exact: true });
+  await until(() => recipientCode.inputValue(), (value) => value.startsWith("dfrecv"), "receive code for the chosen recipient identity");
+  assert.equal(report.transactions.length, beforeRecipient, "Looking up a recipient requires no wallet transaction");
+  report.checks.push({ label: "recipient-credentials-offer-the-identities-their-unlock-offers", status: "passed" });
 
   const { page: ambiguous } = await openPage("add-version-multiple-identities", `${baseUrl}/create?tab=add-version&open=1`, address, rpcUrl, reader, rootHash);
   const person = ambiguous.getByRole("region", { name: "Person Information" });

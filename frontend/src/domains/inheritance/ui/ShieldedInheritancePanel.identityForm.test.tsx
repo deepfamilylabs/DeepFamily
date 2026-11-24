@@ -301,11 +301,15 @@ describe("Shielded identity form privacy with a real session and form", () => {
     await act(async () => complete(unlocked));
     expect(sessionState().identity?.handle).toBe(identity.handle);
     expect(screen.getByRole("button", { name: "shielded.lock" })).toBeTruthy();
+    expect(screen.queryByText("Suite 1")).toBeNull();
     expect(screen.queryByRole("button", { name: "common.cancel" })).toBeNull();
   });
 
-  const suite1 = { identitySuiteId: 1, personHash: identity.personHash };
-  const suite2 = { identitySuiteId: 2, personHash: "0x" + "23".repeat(32) };
+  const suite1 = { identitySuiteId: 1, personHash: identity.personHash, history: "registered" };
+  const suite2 = { identitySuiteId: 2, personHash: "0x" + "23".repeat(32), history: "used" };
+  // Each choice names its protocol, says why it is offered, and shows the full person hash.
+  const choice = (match: typeof suite1) =>
+    `Suite ${match.identitySuiteId} · shielded.identityHistory.${match.history} ${match.personHash}`;
   const pressUnlock = () => fireEvent.click(screen.getByRole("button", { name: "shielded.unlock" }));
   const unlockedCalls = () => mocks.call.mock.calls.filter(([method]) => method === "unlockIdentity");
 
@@ -322,16 +326,18 @@ describe("Shielded identity form privacy with a real session and form", () => {
     mocks.call.mockResolvedValueOnce({ matches: [suite2, suite1] });
     pressUnlock();
     const dialog = await screen.findByRole("dialog", { name: "shielded.registeredIdentities" });
-    expect(within(dialog).getByRole("button", { name: `Suite 2 ${suite2.personHash}` })).toBeTruthy();
-    expect(within(dialog).getByRole("button", { name: `Suite 1 ${suite1.personHash}` })).toBeTruthy();
+    expect(within(dialog).getByRole("button", { name: choice(suite2) })).toBeTruthy();
+    expect(within(dialog).getByRole("button", { name: choice(suite1) })).toBeTruthy();
     expect(unlockedCalls()).toHaveLength(0);
     expect(sessionState().identity).toBeNull();
     mocks.call.mockResolvedValueOnce({ ...unlocked, identity: { ...identity, ...chosen } });
-    fireEvent.click(within(dialog).getByRole("button", { name: `Suite ${chosen.identitySuiteId} ${chosen.personHash}` }));
+    fireEvent.click(within(dialog).getByRole("button", { name: choice(chosen) }));
     await waitFor(() => expect(sessionState().identity?.personHash).toBe(chosen.personHash));
     expect(unlockedCalls()).toEqual([["unlockIdentity", expect.objectContaining({
       identitySuiteId: chosen.identitySuiteId, expectedPersonHash: chosen.personHash,
     })]]);
+    // A user can hold one wallet per suite, so the overview names the one that is open.
+    expect(await screen.findByText(`Suite ${chosen.identitySuiteId}`)).toBeTruthy();
     expect(sessionState().identityDraft.identitySuiteId).toBe(chosen.identitySuiteId);
     expect(screen.queryByRole("dialog")).toBeNull();
   });
@@ -400,7 +406,7 @@ describe("Shielded identity form privacy with a real session and form", () => {
     const dialog = await screen.findByRole("dialog");
     expect(unlockedCalls()).toHaveLength(1);
     expect(mocks.call).toHaveBeenCalledWith("findWalletIdentities", expect.objectContaining({ previousPersonHash: suite2.personHash }));
-    fireEvent.click(within(dialog).getByRole("button", { name: `Suite 1 ${suite1.personHash}` }));
+    fireEvent.click(within(dialog).getByRole("button", { name: choice(suite1) }));
     await waitFor(() => expect(sessionState().identity?.personHash).toBe(suite1.personHash));
     const attempts = unlockedCalls();
     expect(attempts).toHaveLength(2);

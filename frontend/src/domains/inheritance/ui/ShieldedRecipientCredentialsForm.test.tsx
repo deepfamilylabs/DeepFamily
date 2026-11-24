@@ -9,7 +9,20 @@ import {
 } from "./ShieldedRecipientCredentialsForm";
 
 const workerCall = vi.hoisted(() => vi.fn());
+const suites = vi.hoisted(() => ({ supported: null as number[] | null }));
 
+vi.mock("@deepfamily/protocol-core", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@deepfamily/protocol-core")>();
+  return {
+    ...actual,
+    get DEFAULT_IDENTITY_SUITE_ID() {
+      return suites.supported?.[0] ?? actual.DEFAULT_IDENTITY_SUITE_ID;
+    },
+    get SUPPORTED_IDENTITY_SUITE_IDS() {
+      return suites.supported ?? actual.SUPPORTED_IDENTITY_SUITE_IDS;
+    },
+  };
+});
 vi.mock("../../../shared/workers/cryptoWorkerClient", () => ({ cryptoWorkerCall: workerCall }));
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({
@@ -23,13 +36,14 @@ afterEach(() => {
   cleanup();
   vi.useRealTimers();
   workerCall.mockClear();
+  suites.supported = null;
 });
 
-function renderForm(identitySuiteId?: number) {
+function renderForm(onChange?: () => void) {
   const ref = createRef<ShieldedRecipientCredentialsFormHandle>();
   render(
     <ToastProvider>
-      <ShieldedRecipientCredentialsForm ref={ref} identitySuiteId={identitySuiteId} />
+      <ShieldedRecipientCredentialsForm ref={ref} onChange={onChange} />
     </ToastProvider>,
   );
   return ref;
@@ -53,13 +67,33 @@ function chooseOption(currentLabel: string, nextLabel: string) {
 }
 
 describe("ShieldedRecipientCredentialsForm", () => {
-  it("passes the selected child's suite when deriving a receiving credential", () => {
-    const ref = renderForm(2);
+  it("keeps the secret after a lookup read and clears it once the code is generated", () => {
+    const ref = renderForm();
     changeName("Recipient");
-    changePassphrase("child identity secret");
+    const password = changePassphrase("child identity secret");
+    const expected = {
+      identity: { fullName: "Recipient", gender: 0, isBirthBC: false, birthYear: 0, birthMonth: 0, birthDay: 0 },
+      rawPassphrase: "child identity secret",
+    };
+    expect(ref.current?.read()).toEqual(expected);
+    expect(password.value).toBe("child identity secret");
     let credentials;
     act(() => { credentials = ref.current?.readAndClear(); });
-    expect(credentials).toMatchObject({ identitySuiteId: 2, identity: { fullName: "Recipient" } });
+    expect(credentials).toEqual(expected);
+    expect(password.value).toBe("");
+  });
+
+  it("leaves the suite to the enclosing input and reports every edit", () => {
+    suites.supported = [2, 1];
+    const onChange = vi.fn();
+    renderForm(onChange);
+    expect(screen.queryByRole("combobox")).toBeNull();
+    onChange.mockClear();
+    changeName("Recipient");
+    expect(onChange).toHaveBeenCalled();
+    onChange.mockClear();
+    changePassphrase("another secret");
+    expect(onChange).toHaveBeenCalled();
   });
 
   it("reads the shared identity fields and clears the unchanged raw passphrase immediately", () => {
@@ -82,7 +116,6 @@ describe("ShieldedRecipientCredentialsForm", () => {
       credentials = ref.current?.readAndClear();
     });
     expect(credentials).toEqual({
-      identitySuiteId: 1,
       identity: {
         fullName: "张三",
         gender: 1,
@@ -112,7 +145,6 @@ describe("ShieldedRecipientCredentialsForm", () => {
       credentials = ref.current?.readAndClear();
     });
     expect(credentials).toEqual({
-      identitySuiteId: 1,
       identity: {
         fullName: "Ａlice",
         gender: 0,

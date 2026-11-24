@@ -14,6 +14,7 @@ import {
   buildShieldedIndependentKeySigningMessage,
   normalizeShieldedIndependentKeyIdentity,
   normalizeShieldedIndependentKeyPassphrase,
+  SUPPORTED_IDENTITY_SUITE_IDS,
 } from "@deepfamily/protocol-core";
 import {
   formatUnits,
@@ -58,6 +59,8 @@ import type {
   ShieldedWalletSummary,
   ShieldedWorkerContext,
 } from "../../../shared/workers/shieldedAssetWorkerTypes";
+import { getFundingPassphraseError } from "../../../shared/crypto/passphraseStrength";
+import { InheritanceError } from "../model/inheritanceErrors";
 import {
   createShieldedReceiveCodeForRecipient,
   verifyShieldedReceiveCode,
@@ -1740,15 +1743,53 @@ export function ShieldedInheritancePanel({
       cancelled = true;
     };
   }, [code, needsCode, action]);
-  async function generateConvenientCode() {
+  /**
+   * Looks up the recipient's credentials the way the recipient's own unlock does, so a
+   * generated code reaches the wallet that the recipient opens.
+   */
+  async function findRecipientIdentities(formUnchanged: () => boolean) {
+    type LookupResult = ShieldedAssetWorkerCallMap["findWalletIdentities"]["result"];
+    let matches: LookupResult["matches"] | undefined;
+    // A budget credential can belong only to the selected child.
+    const expectedPersonHash = action === "fund" && personHash ? personHash.toLowerCase() : undefined;
+    await run(async (current) => {
+      const form = recipientForm.current;
+      if (!form) return;
+      // The secret stays in the form for the code that follows; drop this copy once it is sent.
+      const credentials = form.read();
+      let found: LookupResult;
+      try {
+        const passphraseError = getFundingPassphraseError(credentials.rawPassphrase);
+        if (passphraseError) throw new InheritanceError(passphraseError);
+        const pending = shieldedAssetWorkerCall("findWalletIdentities", { context, ...credentials });
+        credentials.rawPassphrase = "";
+        found = await pending;
+      } catch (cause) {
+        if (cause instanceof InheritanceError) throw cause;
+        if (current() && formUnchanged()) {
+          setErrorState(normalizeShieldedUiError(cause, t, { message: t("shielded.recipientLookupFailed") }));
+        }
+        return;
+      } finally {
+        credentials.rawPassphrase = "";
+      }
+      if (!current() || !formUnchanged()) return;
+      matches = expectedPersonHash
+        ? found.matches.filter((match) => match.personHash.toLowerCase() === expectedPersonHash)
+        : found.matches;
+    }, t("shielded.stages.findingRecipient"));
+    return matches;
+  }
+  async function generateConvenientCode(identitySuiteId: number, matchedPersonHash?: string) {
     await run(async (current) => {
       const form = recipientForm.current;
       if (!form) return;
       const credentials = form.readAndClear();
       try {
+        const expectedPersonHash = action === "fund" && personHash ? personHash : matchedPersonHash;
         const pending = createShieldedReceiveCodeForRecipient({
-          ...credentials, context, purpose: action === "fund" ? "fund" : "receive",
-          ...(action === "fund" && personHash ? { expectedPersonHash: personHash } : {}),
+          ...credentials, identitySuiteId, context, purpose: action === "fund" ? "fund" : "receive",
+          ...(expectedPersonHash ? { expectedPersonHash } : {}),
           expiresAt: String(Math.floor(Date.now() / 1000) + 90 * 86400),
         });
         credentials.rawPassphrase = "";
@@ -2514,7 +2555,8 @@ export function ShieldedInheritancePanel({
           recipientForm.current?.clearSecretInputs();
         }}
         recipientFormRef={recipientForm}
-        onGenerateRecipientCode={() => void generateConvenientCode()}
+        findRecipientIdentities={findRecipientIdentities}
+        onGenerateRecipientCode={(suite, matchedPersonHash) => void generateConvenientCode(suite, matchedPersonHash)}
         parentLabel={parentLabel}
       />
     );
@@ -2737,7 +2779,8 @@ export function ShieldedInheritancePanel({
           codeError: needsCode ? codeError || undefined : undefined,
           onCodeChange: changeCode,
           credentialsFormRef: recipientForm,
-          onGenerateCode: () => void generateConvenientCode(),
+          findRecipientIdentities,
+          onGenerateCode: (suite, matchedPersonHash) => void generateConvenientCode(suite, matchedPersonHash),
           targetHash: recipientTargetHash ?? undefined,
           targetName: recipientTargetName,
           verified: !!verifiedRecipient,
@@ -3010,6 +3053,10 @@ export function ShieldedInheritancePanel({
               copyLabel: session.identity
                 ? t("shielded.copyIdentityHash", { symbol })
                 : tr("copyKeyFingerprint"),
+              // With several suites, a user can hold one wallet per suite; name the open one.
+              protocol: session.identity && SUPPORTED_IDENTITY_SUITE_IDS.length > 1
+                ? t("shielded.identitySuiteOption", { suite: session.identity.identitySuiteId })
+                : undefined,
               onCopy: () => void copy(overviewHash),
             }}
             assetControls={
