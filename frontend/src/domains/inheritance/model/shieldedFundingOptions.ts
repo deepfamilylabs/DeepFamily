@@ -1,6 +1,6 @@
 import type {
+  ShieldedFundingChild,
   ShieldedFundingEntry,
-  ShieldedWalletSummary,
 } from "../../../shared/workers/shieldedAssetWorkerTypes";
 
 export const SHIELDED_PERIOD_DAY_PRESETS = [1, 7, 14, 21, 30, 90, 180, 365] as const;
@@ -18,12 +18,12 @@ export type ShieldedFundingHeir = { personHash: string; identitySuiteId?: number
 
 /** Initial funding and refills require a current direct-child endorsement trusted by the selected parent version. */
 export function listShieldedFundingHeirs(
-  wallet: ShieldedWalletSummary | null,
+  family: { children: readonly ShieldedFundingChild[] } | null | undefined,
   fundingVersion: string,
   labels?: ReadonlyMap<string, string>,
 ): ShieldedFundingHeir[] {
   const children =
-    wallet?.children.filter(
+    family?.children.filter(
       (child) =>
         child.eligible &&
         String(child.rootVersionIndex) === fundingVersion,

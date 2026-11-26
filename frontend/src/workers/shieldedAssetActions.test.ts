@@ -8,9 +8,14 @@ import {
   createShieldedReceiveDiversifier,
   encodeShieldedIndependentKey,
   encodePublicShieldedBudgetEnvelope,
+  computeLineageEndorsementLeaf,
+  computeLineageParentsDigest,
+  createLineageTree,
+  wrapIdentityCommitmentAsPersonHash,
 } from "@deepfamily/protocol-core";
 import { getAddress, hexlify } from "ethers";
 import { ShieldedAssetSession } from "./shieldedAssetSession";
+import { PUBLIC_TREE_RECIPIENT_MESSAGE } from "../domains/inheritance/services/shieldedPublicTreeIdentity";
 import type { ShieldedWorkerContext } from "../shared/workers/shieldedAssetWorkerTypes";
 const mocks = vi.hoisted(() => ({
   scan: vi.fn(),
@@ -29,6 +34,7 @@ const mocks = vi.hoisted(() => ({
   knownCheckpoint: vi.fn(),
   proofLifetime: vi.fn(),
   fundingDestination: vi.fn(),
+  publicTree: vi.fn(),
   loadLineage: vi.fn(),
   loadTargetedLineage: vi.fn(),
   targetIdentity: vi.fn(),
@@ -128,6 +134,12 @@ vi.mock("../domains/inheritance/services/shieldedFundingPreparation", async (ori
   >()),
   prepareShieldedFund: mocks.fund,
   validateShieldedFundingDestination: mocks.fundingDestination,
+}));
+vi.mock("../domains/inheritance/services/shieldedPublicTreeIdentity", async (original) => ({
+  ...(await original<
+    typeof import("../domains/inheritance/services/shieldedPublicTreeIdentity")
+  >()),
+  findPublicTreeIdentityEvidence: mocks.publicTree,
 }));
 vi.mock("../domains/inheritance/services/inheritanceChain", () => ({
   loadTargetedLineageSnapshot: mocks.loadTargetedLineage,
@@ -266,6 +278,7 @@ beforeEach(async () => {
   mocks.knownCheckpoint.mockResolvedValue(true);
   mocks.proofLifetime.mockResolvedValue(300n);
   mocks.fundingDestination.mockResolvedValue(undefined);
+  mocks.publicTree.mockReset().mockResolvedValue(null);
   mocks.getBlock.mockResolvedValue({ number: 12, hash: blockHash, timestamp: 1000 });
   mocks.scan.mockResolvedValue({ blockHash, spentNullifiers: new Set() });
   mocks.proof.mockResolvedValue({
@@ -868,6 +881,162 @@ describe("asset Worker preview and proof boundary", () => {
       expect(mocks.authorizationMode.mock.calls.length).toBeGreaterThanOrEqual(2);
       expect(mocks.authorizationMode.mock.calls.every(([mode]) => mode === stateReadMode)).toBe(true);
       assertNoOpenings(preview);
+    });
+  });
+
+  describe("funding under another parent", () => {
+    const parentHash = wrapIdentityCommitmentAsPersonHash(41n).toLowerCase();
+    const childHash = wrapIdentityCommitmentAsPersonHash(43n).toLowerCase();
+    const endorser = "0x6666666666666666666666666666666666666666";
+    const family = () => ({
+      blockNumber: 12,
+      timestamp: 1000n,
+      checkpointId: 7n,
+      versions: new Map([
+        [parentHash, [1, 2].map((versionIndex) => ({
+          personHash: parentHash, versionIndex, identityCommitment: 41n, identitySuiteId: 1,
+          fatherIdentityCommitment: 0n, motherIdentityCommitment: 0n,
+        }))],
+        [childHash, [{
+          personHash: childHash, versionIndex: 1, identityCommitment: 43n, identitySuiteId: 1,
+          fatherIdentityCommitment: 41n, motherIdentityCommitment: 0n,
+        }]],
+      ]),
+      endorsements: new Map([[childHash, new Map([[endorser, { versionIndex: 1, timestamp: 900n }]])]]),
+      trustedEndorsers: new Map(),
+      endorsementTree: createLineageTree([computeLineageEndorsementLeaf({
+        identityCommitment: 43n,
+        parentsDigest: computeLineageParentsDigest({ fatherIdentityCommitment: 41n, motherIdentityCommitment: 0n }),
+        versionIndex: 1n,
+        endorser,
+        writtenAt: 900n,
+      })]),
+      trustedTree: createLineageTree([1n]),
+    });
+
+    it.each(["rebuild", "chain"] as const)("loads another parent's versions and children in %s mode", async (stateReadMode) => {
+      const session = await unlocked();
+      mocks.loadLineage.mockResolvedValue(family());
+      mocks.loadTargetedLineage.mockResolvedValue(family());
+      mocks.targetIdentity.mockResolvedValue(41n);
+      const result = await session.call("fundingFamily", {
+        context: { ...context, stateReadMode },
+        parentPersonHash: ` ${parentHash.toUpperCase().replace("0X", "0x")} `,
+      });
+      expect(result).toEqual({
+        parentPersonHash: parentHash,
+        parentIdentityCommitment: "41",
+        parentVersions: [2, 1],
+        // Eligibility itself is covered with real lineage proofs elsewhere; it is mocked here.
+        children: [2, 1].map((rootVersionIndex) => ({
+          personHash: childHash, identitySuiteId: 1, rootVersionIndex, eligible: false,
+        })),
+      });
+      if (stateReadMode === "chain") {
+        expect(mocks.targetIdentity).toHaveBeenCalledWith(parentHash);
+        expect(mocks.loadTargetedLineage).toHaveBeenCalledWith(expect.anything(), expect.anything(), {
+          parentIdentityCommitments: [41n],
+        });
+      } else {
+        expect(mocks.targetIdentity).not.toHaveBeenCalled();
+        expect(mocks.loadLineage.mock.calls.map((call) => call[2])).toEqual([
+          { selection: { versionPersonHashes: [parentHash] } },
+          { selection: { parentIdentityCommitments: [41n] } },
+        ]);
+      }
+    });
+
+    it.each(["rebuild", "chain"] as const)("reports an unregistered parent in %s mode", async (stateReadMode) => {
+      const session = await unlocked();
+      mocks.targetIdentity.mockResolvedValue(0n);
+      await expect(session.call("fundingFamily", {
+        context: { ...context, stateReadMode },
+        parentPersonHash: parentHash,
+      })).rejects.toThrow("No registered person matches this parent person hash.");
+      await expect(session.call("fundingFamily", { context, parentPersonHash: "0x1234" }))
+        .rejects.toThrow("valid parent person hash");
+    });
+
+    it("creates a new arrangement under the chosen parent and keeps each arrangement's own parent", async () => {
+      const session = await unlocked();
+      mocks.notes = [value(1n, 10n, secretKeys.ownerSecret)];
+      const request = {
+        context,
+        slot: "identity" as const,
+        action: "fund" as const,
+        fundingEntry: "public" as const,
+        amount: "10",
+        periods: "1",
+        periodDays: "30",
+        rootIdentityCommitment: "41",
+        rootVersionIndex: 2,
+        publicRecipient: childHash,
+        candidates: ["1"],
+      };
+      const preview = await session.call("preview", request);
+      expect(preview.action).toBe("fund");
+      expect(mocks.fund).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({
+        policy: expect.objectContaining({ rootIdentityCommitment: 41n, rootVersionIndex: 2n }),
+      }));
+      expect(mocks.loadLineage).toHaveBeenCalledWith(expect.anything(), expect.anything(), {
+        selection: { publicEligibility: [{ rootIdentityCommitment: 41n, rootVersionIndex: 2, heirPersonHash: childHash }] },
+      });
+      await expect(session.call("preview", {
+        ...request, policyHandle: preview.policyHandle, rootIdentityCommitment: "31",
+      })).rejects.toThrow("belongs to a different parent");
+      await expect(session.call("preview", { ...request, rootIdentityCommitment: "0" }))
+        .rejects.toThrow("Choose the parent whose children qualify.");
+    });
+  });
+
+  describe("identity-derived funding for a public-tree child", () => {
+    const child = `0x${"00".repeat(31)}1f`;
+    const request = (fundingEntry: "public" | "privateConvenient" | "privateIndependent") => ({
+      context,
+      slot: "identity" as const,
+      action: "fund" as const,
+      amount: "9",
+      fundingEntry,
+      periods: "1",
+      periodDays: "30",
+      rootVersionIndex: 1,
+      publicRecipient: child,
+      candidates: ["1", "2"],
+      ...(fundingEntry === "public" ? {} : { recipientCode: "verified-code" }),
+    });
+    beforeEach(() => {
+      // Two notes would need a preparatory merge, which must not happen for a refused child.
+      mocks.notes = [value(1n, 5n, secretKeys.ownerSecret), value(2n, 4n, secretKeys.ownerSecret)];
+      const snapshot = { blockNumber: 12, timestamp: 1000n, checkpointId: 7n, versions: new Map(), endorsements: new Map(), trustedEndorsers: new Map() };
+      mocks.loadLineage.mockResolvedValue(snapshot);
+      mocks.publicTree.mockResolvedValue({ versionIndex: 1 });
+    });
+
+    it.each(["public", "privateConvenient"] as const)(
+      "refuses %s funding before validating or merging any input",
+      async (fundingEntry) => {
+        const session = await unlocked();
+        if (fundingEntry === "privateConvenient") await verifiedCredential(await receiveCredential("fund"));
+        await expect(session.call("preview", request(fundingEntry))).rejects.toThrow(
+          PUBLIC_TREE_RECIPIENT_MESSAGE,
+        );
+        expect(mocks.publicTree).toHaveBeenCalledExactlyOnceWith(
+          expect.objectContaining({ chainId: 31337n, personHash: child, blockTag: 12 }),
+        );
+        expect(mocks.fundingDestination).not.toHaveBeenCalled();
+        expect(mocks.transfer).not.toHaveBeenCalled();
+        expect(mocks.fund).not.toHaveBeenCalled();
+        expect(mocks.proof).not.toHaveBeenCalled();
+      },
+    );
+
+    it("leaves independent-key funding to its authenticated credential", async () => {
+      const session = await unlocked();
+      await verifiedCredential({ ...(await receiveCredential("fund")), keyMode: 1 });
+      const preview = await session.call("preview", request("privateIndependent"));
+      expect(preview.steps.map((step) => step.action)).toEqual(["privateTransfer", "fund"]);
+      expect(mocks.publicTree).not.toHaveBeenCalled();
+      expect(mocks.fundingDestination).toHaveBeenCalledOnce();
     });
   });
 

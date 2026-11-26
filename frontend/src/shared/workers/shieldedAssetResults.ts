@@ -10,6 +10,13 @@ const bit = z.union([z.literal(0), z.literal(1)]);
 const action = z.enum(["shield", "fund", "claim", "privateTransfer", "unshield"]);
 const scalar = z.union([text, z.bigint(), z.number().int()]);
 const bytes = z.union([text, z.instanceof(Uint8Array)]);
+const personHash = z.string().regex(/^0x[0-9a-f]{64}$/i);
+const fundingChild = z.strictObject({
+  personHash: text,
+  rootVersionIndex: count,
+  eligible: z.boolean(),
+  identitySuiteId: suiteId.optional(),
+});
 const session = z.strictObject({
   credentials: z.strictObject({ handle: text }).nullable(),
   identity: z
@@ -58,6 +65,7 @@ const wallet = z.strictObject({
   policies: z.array(
     z.strictObject({
       handle: text,
+      rootPersonHash: personHash,
       rootVersionIndex: text,
       amountPerPeriod: text,
       periodDays: text,
@@ -91,9 +99,7 @@ const wallet = z.strictObject({
     }),
   ),
   parentVersions: z.array(count),
-  children: z.array(
-    z.strictObject({ personHash: text, rootVersionIndex: count, eligible: z.boolean(), identitySuiteId: suiteId.optional() }),
-  ),
+  children: z.array(fundingChild),
 });
 const receiveAuthorization = z.strictObject({
   checkpointId: scalar,
@@ -160,6 +166,12 @@ const results = {
     args: z.tuple([text, text, text, text, text]),
   }),
   recover: wallet,
+  fundingFamily: z.strictObject({
+    parentPersonHash: personHash,
+    parentIdentityCommitment: text,
+    parentVersions: z.array(count),
+    children: z.array(fundingChild),
+  }),
   discover: z.strictObject({
     complete: z.boolean(),
     error: text.optional(),

@@ -1,6 +1,7 @@
 import {
   SHIELDED_POOL_PROTOCOL_VERSION,
   SHIELDED_POOL_ACTION,
+  SNARK_SCALAR_FIELD,
   ProtocolError,
   initializeShieldedReceiveEncryption,
   buildShieldedPoolPublicSignals,
@@ -91,6 +92,10 @@ import {
 } from "../domains/inheritance/services/shieldedFundingPreparation";
 import { prepareShieldedClaim } from "../domains/inheritance/services/shieldedClaimPreparation";
 import {
+  PUBLIC_TREE_RECIPIENT_MESSAGE,
+  findPublicTreeIdentityEvidence,
+} from "../domains/inheritance/services/shieldedPublicTreeIdentity";
+import {
   prepareShieldedPrivateTransfer,
   prepareShieldedUnshield,
 } from "../domains/inheritance/services/shieldedTransferExitPreparation";
@@ -140,6 +145,7 @@ const ASSET_METHODS = new Set([
   "recoverLetters",
   "authorizeIdentityCounter",
   "recover",
+  "fundingFamily",
   "discover",
   "preview",
   "prove",
@@ -148,6 +154,15 @@ const ASSET_METHODS = new Set([
 function firstStepIsFinal(steps: ShieldedActionPreview["steps"]) { return steps.length === 1; }
 function requireValue(condition: unknown, message: string): asserts condition {
   if (!condition) throw new AssetSessionError(message);
+}
+/** The interface localizes this lookup result by its text. */
+const FUNDING_PARENT_NOT_FOUND = "No registered person matches this parent person hash.";
+/** A funding parent is a public identity commitment; its person hash is checked by its lineage. */
+function fundingRootIdentity(value: string): bigint {
+  requireValue(/^[1-9][0-9]{0,77}$/.test(value), "Choose the parent whose children qualify.");
+  const identity = BigInt(value);
+  requireValue(identity < SNARK_SCALAR_FIELD, "Choose the parent whose children qualify.");
+  return identity;
 }
 function serializeIdentity(material: IdentityMaterial): IdentityMaterialV1Result {
   return {
@@ -886,12 +901,9 @@ export class ShieldedAssetSession {
           pendingIdentity: true,
         });
       }
+      // A wallet may fund under any parent, so every recovered arrangement is listed with its parent.
       for (const policy of listRecoveredShieldedPolicies(wallet)) {
-        if (
-          !this.identity ||
-          getBigInt(policy.rootIdentityCommitment) !== this.identity.identityCommitment
-        )
-          continue;
+        if (!this.identity) continue;
         const handle = String(
           computeShieldedPolicyCommitment(
             {
@@ -907,17 +919,16 @@ export class ShieldedAssetSession {
         if (!summary.policies.some((item) => item.handle === handle))
           summary.policies.push({
             handle,
+            rootPersonHash: wrapIdentityCommitmentAsPersonHash(
+              policy.rootIdentityCommitment,
+            ).toLowerCase(),
             rootVersionIndex: String(policy.rootVersionIndex),
             amountPerPeriod: String(policy.amountPerPeriod),
             periodDays: String(policy.periodDays),
           });
       }
       for (const template of listRecoveredFundingTemplates(wallet)) {
-        if (
-          !this.identity ||
-          template.note.rootIdentityCommitment !== this.identity.identityCommitment
-        )
-          continue;
+        if (!this.identity) continue;
         summary.templates.push({
           handle: String(template.commitment),
           policyHandle: String(
@@ -1032,6 +1043,59 @@ export class ShieldedAssetSession {
     return summary;
   }
 
+  /** Any parent's versions and currently qualifying children, read only from public records. */
+  async fundingFamily(
+    params: ShieldedAssetWorkerCallMap["fundingFamily"]["params"],
+  ): Promise<ShieldedAssetWorkerCallMap["fundingFamily"]["result"]> {
+    const current = this.sessionGuard();
+    requireValue(this.identity, "Unlock your identity before funding a budget.");
+    const parentPersonHash = String(params.parentPersonHash ?? "").trim().toLowerCase();
+    requireValue(/^0x[0-9a-f]{64}$/.test(parentPersonHash), "Enter a valid parent person hash.");
+    const ctx = params.context;
+    const env = await this.context(ctx);
+    current();
+    const chain = normalizeShieldedStateReadMode(ctx.stateReadMode) === "chain";
+    // Local reconstruction resolves the person from its own versions without asking the RPC.
+    const identityCommitment = chain
+      ? getBigInt(await env.lineageIndex.identityCommitmentOf(parentPersonHash))
+      : ((
+          await loadLineageSnapshot(env.lineageIndex, env.family, {
+            selection: { versionPersonHashes: [parentPersonHash] },
+          })
+        ).versions.get(parentPersonHash)?.[0]?.identityCommitment ?? 0n);
+    current();
+    requireValue(
+      identityCommitment !== 0n &&
+        wrapIdentityCommitmentAsPersonHash(identityCommitment).toLowerCase() === parentPersonHash,
+      FUNDING_PARENT_NOT_FOUND,
+    );
+    const lineage = chain
+      ? await loadTargetedLineageSnapshot(env.lineageIndex, env.family, {
+          parentIdentityCommitments: [identityCommitment],
+        })
+      : await loadLineageSnapshot(env.lineageIndex, env.family, {
+          selection: { parentIdentityCommitments: [identityCommitment] },
+        });
+    current();
+    const parentVersions = listShieldedFundingParentVersions({
+      snapshot: lineage,
+      parentIdentityCommitment: identityCommitment,
+    });
+    return {
+      parentPersonHash,
+      parentIdentityCommitment: String(identityCommitment),
+      parentVersions,
+      children: parentVersions.flatMap((rootVersionIndex) =>
+        listShieldedFundingChildren({
+          snapshot: lineage,
+          asOf: lineage.timestamp,
+          parentIdentityCommitment: identityCommitment,
+          rootVersionIndex,
+        }).map((child) => ({ ...child, rootVersionIndex, eligible: !!child.eligible })),
+      ),
+    };
+  }
+
   async cancelPreview() {
     this.pending = null;
     return { ok: true as const };
@@ -1134,10 +1198,12 @@ export class ShieldedAssetSession {
       current();
     }
     if (request.action === "fund") {
-      requireValue(
-        this.identity,
-        "Unlock the funding parent's identity to select the family policy.",
-      );
+      requireValue(this.identity, "Unlock your identity before funding a budget.");
+      // Anyone may fund. The chosen parent only decides which direct children qualify.
+      const rootIdentityCommitment =
+        request.rootIdentityCommitment === undefined
+          ? this.identity.identityCommitment
+          : fundingRootIdentity(request.rootIdentityCommitment);
       const draftScope = `${scope.chainId}:${scope.poolAddress.toLowerCase()}:`;
       const sourceWallets = [...this.wallets.values()];
       const policy = request.policyHandle
@@ -1160,7 +1226,7 @@ export class ShieldedAssetSession {
             ) ?? this.policyDrafts.get(`${draftScope}${request.policyHandle}`))
         : createShieldedPolicyDescriptor(
             {
-              rootIdentityCommitment: this.identity.identityCommitment,
+              rootIdentityCommitment,
               rootVersionIndex: request.rootVersionIndex!,
               amountPerPeriod: amount,
               periodDays: request.periodDays!,
@@ -1168,8 +1234,8 @@ export class ShieldedAssetSession {
             scope,
           );
       requireValue(
-        policy && getBigInt(policy.rootIdentityCommitment) === this.identity.identityCommitment,
-        "The original funding policy is unavailable or belongs to a different identity.",
+        policy && getBigInt(policy.rootIdentityCommitment) === rootIdentityCommitment,
+        "The original funding policy is unavailable or belongs to a different parent.",
       );
       const periods = BigInt(request.periods ?? "0");
       requireValue(
@@ -1261,6 +1327,19 @@ export class ShieldedAssetSession {
               ? { eligibility: [{ ...root, heirIdentityCommitment: knownHeir }] }
               : { publicEligibility: [{ ...root, heirPersonHash: request.publicRecipient }] },
           });
+      current();
+      if (mode === 0) {
+        // Public and identity-credential budgets derive their owner from the identity secret,
+        // which anyone can rebuild for a public-tree record. Refuse before any consolidation.
+        const publicTree = await findPublicTreeIdentityEvidence({
+          family: env.family,
+          chainId: scope.chainId,
+          personHash: request.publicRecipient,
+          blockTag: lineage.blockNumber,
+        });
+        current();
+        requireValue(!publicTree, PUBLIC_TREE_RECIPIENT_MESSAGE);
+      }
       const common = {
         pool: env.pool,
         wallet,

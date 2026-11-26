@@ -418,6 +418,19 @@ Budget funding has three entries:
   independently derived independent-key identity secret. Claims retain identity and
   family, period and enrollment checks.
 
+The two `keyMode = 0` entries derive the budget owner from the child's identity secret. Anyone who
+knows the child's identity details and passphrase can claim them, including whoever registered the
+child or the child's children, because registration needs the same material. Before the
+funding-destination check and any preparatory consolidation, the asset Worker therefore refuses
+these entries for a public-tree child. It reads every version of the child at the lineage snapshot
+block and tries each metadata envelope with the empty passphrase; an opened envelope counts only
+when its identity fields and the empty passphrase reproduce the child's person hash. Registration
+encrypts the envelope with the identity passphrase and round-trips it before submission, so this
+covers every conforming record. Unreadable versions fail closed. The funder supplies no recipient
+details. A weak nonempty passphrase is not detected, nor is a non-conforming record whose envelope
+passphrase differs from its identity passphrase. Independent-key funding is unaffected and still
+relies on the authenticated credential channel.
+
 Both private entries use the same note encryption. They automatically check the
 selected child and code type; users do not save or compare fingerprints. The
 code must come from the recipient through a trusted channel. Switching entries
@@ -426,7 +439,7 @@ rule, amounts and payment owner. Original funding templates fix their entry and
 receiving key. All entries follow `shield → donor VALUE → fund → child BUDGET →
 claim → child VALUE`; funding consumes donor VALUE.
 
-The funding parent unlocks their own identity, selects a parent person-version index, and chooses a currently eligible direct child. For a refill, the recovered template supplies the original budget terms. Parent-version choices belong to the unlocked funding parent's identity, rather than the unlocked person's parents or their independent key. An empty choice list reports no matching loaded records; it does not establish that no version exists outside the scan scope. A new policy uses a per-period amount, period duration and funded-period count. An existing policy fixes its original terms. Private refills preserve the original owner, mode and viewing key; public refills preserve the original identity-bound schema. A policy draft's public handle survives preparatory consolidation, so a later funding step does not silently create a different policy. Changing the parent version, per-period amount or period length, or leaving the task, discards that draft.
+Any unlocked wallet may fund. The funder first chooses the qualifying parent: the unlocked identity by default, or another person looked up by person hash through the Worker's `fundingFamily` call, which reads that person's versions and children from public lineage records in the configured read mode. The funder then selects one of that parent's person versions and a direct child currently eligible under it. Eligibility is per parent version: the child's endorsed version must name the parent, and its endorser must be trusted by the selected parent version. The policy fixes that version for later refills. Funding proves nothing about the funder's relation to the parent. Existing arrangements are listed under their own parent, and changing the parent clears the arrangement, version, child and receiving code. For a refill, the recovered template supplies the original budget terms. An empty choice list reports no matching loaded records; it does not establish that no version exists outside the scan scope. A new policy uses a per-period amount, period duration and funded-period count. An existing policy fixes its original terms. Private refills preserve the original owner, mode and viewing key; public refills preserve the original identity-bound schema. A policy draft's public handle survives preparatory consolidation, so a later funding step does not silently create a different policy. Changing the parent version, per-period amount or period length, or leaving the task, discards that draft.
 
 #### Independent keys, backup and recovery
 

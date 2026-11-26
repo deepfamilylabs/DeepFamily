@@ -146,7 +146,7 @@ export function ShieldedFundReceipt({
           <ReceiptRows
             rows={[
               { label: t("shielded.fields.heirPersonHash", { symbol }), value: heirName ?? "—" },
-              { label: t("shielded.fields.familyVersion", { symbol }), value: versionLabel ?? "—" },
+              { label: t("shielded.fields.fundingParent", { symbol }), value: versionLabel ?? "—" },
               { label: t("shielded.fundingModeLabel", { symbol }), value: entryLabel },
             ]}
           />

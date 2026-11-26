@@ -586,25 +586,27 @@ describe("local unified funding preparation", () => {
   });
 
   it.each([0, 1] as const)(
-    "rejects an initial budget for another parent in visibility mode %s",
+    "lets a donor who is not the parent create an initial budget in visibility mode %s",
     async (budgetKind) => {
       const fixture = await setup();
-      await expect(
-        prepareShieldedFund({
-          ...fixture.common,
-          wallet: { ...fixture.common.wallet, walletIdentityCommitment: rootIdentity + 1n },
-          fundMode: 0,
-          budgetKind,
-          policy: fixture.policy,
-          lineageIndex: fixture.lineageIndex,
-          lineage: fixture.lineage,
-          budgetPeriods: 1n,
-        }),
-      ).rejects.toThrow("another parent identity");
+      const prepared = await prepareShieldedFund({
+        ...fixture.common,
+        wallet: { ...fixture.common.wallet, walletIdentityCommitment: rootIdentity + 1n },
+        fundMode: 0,
+        budgetKind,
+        policy: fixture.policy,
+        lineageIndex: fixture.lineageIndex,
+        lineage: fixture.lineage,
+        publicRecipientPersonHash: fixture.recipient.personHash,
+        budgetPeriods: 1n,
+      });
+      // The policy root, not the donor, decides which direct child qualifies.
+      expect(prepared.witness.rootIdentityCommitment).toBe(String(rootIdentity));
+      expect(prepared.outputs[0].note.rootIdentityCommitment).toBe(rootIdentity);
     },
   );
 
-  it("requires the current parent's identity when preparing funding", async () => {
+  it("does not require the donor wallet to carry an identity", async () => {
     const fixture = await setup();
     await expect(
       prepareShieldedFund({
@@ -616,10 +618,10 @@ describe("local unified funding preparation", () => {
         lineage: fixture.lineage,
         budgetPeriods: 1n,
       }),
-    ).rejects.toThrow("wallet recovered with the parent's identity");
+    ).resolves.toMatchObject({ data: { fundMode: 0n } });
   });
 
-  it("rejects additional funding against a different parent's template", async () => {
+  it("lets a different donor refill a template rooted at the parent", async () => {
     const fixture = await setup();
     const initial = await prepareShieldedFund({
       ...fixture.common,
@@ -629,19 +631,19 @@ describe("local unified funding preparation", () => {
       lineage: fixture.lineage,
       budgetPeriods: 1n,
     });
-    await expect(
-      prepareShieldedFund({
-        ...fixture.common,
-        fundMode: 1,
-        budget: {
-          ...initial.outputs[0],
-          note: { ...initial.outputs[0].note, rootIdentityCommitment: rootIdentity + 1n },
-          shardId: 0n,
-          viewingKey: fixture.common.recipient.viewingKey,
-        },
-        budgetPeriods: 1n,
-      }),
-    ).rejects.toThrow("another parent identity");
+    await recordFunding(fixture, initial);
+    const refill = await prepareShieldedFund({
+      ...fixture.common,
+      wallet: { ...fixture.common.wallet, walletIdentityCommitment: rootIdentity + 1n },
+      fundMode: 1,
+      budget: {
+        ...initial.outputs[0],
+        shardId: 0n,
+        viewingKey: fixture.common.recipient.viewingKey,
+      },
+      budgetPeriods: 1n,
+    });
+    expect(refill.witness.rootIdentityCommitment).toBe(String(rootIdentity));
   });
 
   it("builds the funding's named public inputs, a direct-child witness, and a child-decryptable budget", async () => {

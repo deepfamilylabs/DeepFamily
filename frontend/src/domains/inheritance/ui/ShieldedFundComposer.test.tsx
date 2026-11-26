@@ -30,6 +30,14 @@ function renderDays(periodDays: string, overrides: Partial<ShieldedFundComposerP
         wallet={null}
         identityReady
         heirs={[]}
+        parentChoice="self"
+        onParentChoiceChange={vi.fn()}
+        otherParentInput=""
+        onOtherParentInputChange={vi.fn()}
+        onOtherParentLookup={vi.fn()}
+        otherParentLoaded={false}
+        parentVersions={[]}
+        policies={[]}
         entry="public"
         onEntryChange={vi.fn()}
         policyHandle=""
@@ -67,8 +75,43 @@ describe("public funding", () => {
       notes: [], policies: [], templates: [], claims: [], parentVersions: [1], children: [child], toBlock: 1, blockHash: "hash",
     };
     const heirs = listShieldedFundingHeirs(wallet, "1", new Map([[child.personHash, "Child"]]));
-    renderDays("12", { personHash: child.personHash, heirs, rootVersion: "1", wallet });
+    renderDays("12", { personHash: child.personHash, heirs, rootVersion: "1", wallet, parentVersions: [1] });
     expect((screen.getByRole("radio", { name: /Child/ }) as HTMLInputElement).checked).toBe(true);
+  });
+});
+
+describe("qualifying parent", () => {
+  const wallet = {
+    notes: [], policies: [], templates: [], claims: [], parentVersions: [], children: [], toBlock: 1, blockHash: "hash",
+  };
+
+  it("asks for a lookup before another person's versions and children", () => {
+    const onLookup = vi.fn();
+    renderDays("12", { wallet, parentChoice: "other", otherParentInput: "", onOtherParentLookup: onLookup });
+    expect((screen.getByRole("radio", { name: "其他人物" }) as HTMLInputElement).checked).toBe(true);
+    expect(screen.getByLabelText("父母人物哈希")).toBeTruthy();
+    expect((screen.getByRole("button", { name: "查找" }) as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByText("请先查找资格父母。")).toBeTruthy();
+    expect(screen.queryByText("本人在当前网络没有人物版本，可改选其他人物。")).toBeNull();
+  });
+
+  it("offers the looked-up parent's versions and shows a lookup error beside the hash", () => {
+    renderDays("12", {
+      wallet,
+      parentChoice: "other",
+      otherParentInput: "0x" + "34".repeat(32),
+      otherParentLoaded: true,
+      otherParentError: "未找到该人物，请核对人物哈希。",
+      parentLabel: "Grandparent",
+      parentVersions: [3, 1],
+    });
+    const input = screen.getByLabelText("父母人物哈希");
+    expect(input.getAttribute("aria-invalid")).toBe("true");
+    expect(document.getElementById(input.getAttribute("aria-describedby")!)?.textContent).toBe(
+      "未找到该人物，请核对人物哈希。",
+    );
+    expect(screen.getByRole("status", { name: "" }).textContent).toContain("Grandparent");
+    expect(screen.getByText("请先选择父母人物版本。")).toBeTruthy();
   });
 });
 

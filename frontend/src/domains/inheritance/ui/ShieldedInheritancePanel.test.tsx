@@ -2345,6 +2345,55 @@ describe("Worker-backed shielded wallet", () => {
     expect(code.value).toBe("");
     expect(amount.value).toBe("2.5");
   });
+  it("funds a direct child of another parent after looking the parent up", async () => {
+    const otherParent = "0x" + "07".repeat(32);
+    const grandchild = "0x" + "08".repeat(32);
+    mocks.call.mockImplementation(async (method, params) => method === "recover" ? {
+      ...emptyWallet,
+      familyRecordsAvailable: true,
+      notes: [{ commitment: "101", ownerCommitment: "1", slot: "identity", kind: "value", amount: "10000000000000000000" }],
+    } : method === "discover" ? emptyDiscovery : method === "fundingFamily" ? {
+      parentPersonHash: otherParent,
+      parentIdentityCommitment: "77",
+      parentVersions: [3],
+      children: [{ personHash: grandchild, rootVersionIndex: 3, identitySuiteId: 1, eligible: true }],
+    } : method === "prove" ? stopAfterPreview() : {
+      handle: "preview:other-parent", action: params.action, slot: params.slot,
+      amount: params.amount ?? "1000000000000000000", steps: [], inputs: params.candidates ?? [],
+      inputAmounts: [], outputAmounts: [],
+    });
+    await renderUnlockedPanel();
+    chooseAction("fund");
+    fireEvent.click(screen.getByRole("radio", { name: "shielded.fundingParentOther" }));
+    expect(screen.getByText("shielded.fundingParentLookupRequired")).toBeTruthy();
+    const parentHash = screen.getByLabelText("shielded.fundingParentPersonHash");
+    fireEvent.change(parentHash, { target: { value: "0x12" } });
+    fireEvent.click(screen.getByRole("button", { name: "shielded.fundingParentLookup" }));
+    expect(screen.getByText("shielded.fundingParentInvalid")).toBeTruthy();
+    expect(mocks.call.mock.calls.some(([method]) => method === "fundingFamily")).toBe(false);
+
+    fireEvent.change(parentHash, { target: { value: otherParent } });
+    fireEvent.click(screen.getByRole("button", { name: "shielded.fundingParentLookup" }));
+    await waitFor(() => expect(selectOptions("shielded.fields.familyVersion")).toEqual([
+      "shielded.fundingVersionOption:3",
+    ]));
+    expect(mocks.call).toHaveBeenCalledWith("fundingFamily", expect.objectContaining({ parentPersonHash: otherParent }));
+    chooseFundingEntry("public");
+    chooseOption("shielded.fields.familyVersion", "shielded.fundingVersionOption:3");
+    expect(heirOptions()).toEqual([grandchild]);
+    chooseHeir(grandchild);
+    fireEvent.change(screen.getByLabelText("shielded.fields.rate"), { target: { value: "1" } });
+    await waitFor(() => expect((screen.getByRole("button", { name: submitLabel }) as HTMLButtonElement).disabled).toBe(false));
+    fireEvent.click(screen.getByRole("button", { name: submitLabel }));
+    await waitFor(() => expect(mocks.call).toHaveBeenCalledWith("preview", expect.objectContaining({
+      action: "fund", rootIdentityCommitment: "77", rootVersionIndex: 3, publicRecipient: grandchild,
+    }), expect.anything()));
+
+    // Returning to myself restores the unlocked identity's own family and clears the choices.
+    fireEvent.click(screen.getByRole("radio", { name: /^shielded\.fundingParentSelf/ }));
+    expect(checkedHeir()).toBeNull();
+    expect(screen.queryByLabelText("shielded.fundingParentPersonHash")).toBeNull();
+  });
   it("explains unavailable family records and enables recovered parent versions after refreshing", async () => {
     let familyRecordsAvailable = false;
     const defaultCall = mocks.call.getMockImplementation();
@@ -2385,7 +2434,7 @@ describe("Worker-backed shielded wallet", () => {
       familyRecordsAvailable: false,
       familyRecordsError: "incompatible",
       parentVersions: [],
-      policies: [{ handle: "policy:existing", rootVersionIndex: "1", amountPerPeriod: "1000000000000000000", periodDays: "30" }],
+      policies: [{ handle: "policy:existing", rootPersonHash: identity.personHash, rootVersionIndex: "1", amountPerPeriod: "1000000000000000000", periodDays: "30" }],
     } : defaultCall?.(method, params));
     await renderUnlockedPanel();
     chooseAction("fund");
@@ -2569,7 +2618,7 @@ describe("Worker-backed shielded wallet", () => {
       ...emptyWallet,
       parentVersions: [0, 1],
       children: [0, 1].map(rootVersionIndex => ({ personHash: identity.personHash, rootVersionIndex, identitySuiteId: 1, eligible: true })),
-      policies: [0, 1].map((version, index) => ({ handle: `policy:${index}`, rootVersionIndex: String(version), amountPerPeriod: "1000000000000000000", periodDays: "30" })),
+      policies: [0, 1].map((version, index) => ({ handle: `policy:${index}`, rootPersonHash: identity.personHash, rootVersionIndex: String(version), amountPerPeriod: "1000000000000000000", periodDays: "30" })),
     } : originalCall(method, ...args));
     await renderUnlockedPanel();
     chooseAction("fund");
@@ -2655,7 +2704,7 @@ describe("Worker-backed shielded wallet", () => {
         { personHash: identity.personHash, rootVersionIndex: 1, identitySuiteId: 1, eligible: true },
         { personHash: revokedChild, rootVersionIndex: 1, identitySuiteId: 1, eligible: false },
       ],
-      policies: [{ handle: "policy:existing", rootVersionIndex: "1", amountPerPeriod: "1000000000000000000", periodDays: "30" }],
+      policies: [{ handle: "policy:existing", rootPersonHash: identity.personHash, rootVersionIndex: "1", amountPerPeriod: "1000000000000000000", periodDays: "30" }],
       templates: [
         { handle: "template:existing", policyHandle: "policy:existing", personHash: identity.personHash, bindingKind, keyMode },
         { handle: "template:revoked", policyHandle: "policy:existing", personHash: revokedChild, bindingKind, keyMode },
@@ -4765,7 +4814,7 @@ describe("Worker-backed shielded wallet", () => {
       mocks.call.mockImplementation(async (method, params) => method === "recover" ? {
         ...emptyWallet,
         policies: rule === "fixed rule" ? [{
-          handle: "policy:existing", rootVersionIndex: "0", amountPerPeriod: "1000000000000000000", periodDays: "30",
+          handle: "policy:existing", rootPersonHash: identity.personHash, rootVersionIndex: "0", amountPerPeriod: "1000000000000000000", periodDays: "30",
         }] : [],
         children: [{ personHash: identity.personHash, rootVersionIndex: 0, identitySuiteId: 1, eligible: true }],
         notes: [{ commitment: "11", ownerCommitment: "1", slot: "identity", kind: "value", amount: "100000000000000000000" }],

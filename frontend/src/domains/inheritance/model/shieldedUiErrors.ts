@@ -19,6 +19,8 @@ const LEGACY_MESSAGES: readonly [RegExp, string][] = [
   [/no gas balance/i, "errors.contractError.INSUFFICIENT_FUNDS"],
   [/determine.*gas price/i, "archive.errors.feeUnavailable"],
   [/^Choose a public withdrawal destination\.$|^Unshield recipient must (?:be nonzero|not be the pool)$/im, "shielded.invalidExitRecipient"],
+  [/registered with the empty public family-tree passphrase/i, "shielded.publicTreeRecipient"],
+  [/No registered person matches this parent person hash/i, "shielded.fundingParentNotFound"],
 ];
 
 /** Marks wording translated by the calling flow, including parameterized messages. */

@@ -74,6 +74,8 @@ export type ShieldedNoteSummary = {
 };
 export type ShieldedPolicySummary = {
   handle: string;
+  /** The parent whose direct children qualify; any wallet may fund under any parent. */
+  rootPersonHash: string;
   rootVersionIndex: string;
   amountPerPeriod: string;
   periodDays: string;
@@ -118,7 +120,20 @@ export type ShieldedWalletSummary = {
   templates: ShieldedTemplateSummary[];
   claims: ShieldedClaimSummary[];
   parentVersions: number[];
-  children: { personHash: string; rootVersionIndex: number; eligible: boolean; identitySuiteId?: number }[];
+  children: ShieldedFundingChild[];
+};
+export type ShieldedFundingChild = {
+  personHash: string;
+  rootVersionIndex: number;
+  eligible: boolean;
+  identitySuiteId?: number;
+};
+/** A parent's versions and the children each version currently qualifies, from public records. */
+export type ShieldedFundingFamily = {
+  parentPersonHash: string;
+  parentIdentityCommitment: string;
+  parentVersions: number[];
+  children: ShieldedFundingChild[];
 };
 export type ShieldedFundingEntry = "public" | "privateConvenient" | "privateIndependent";
 export type ShieldedAssetActionRequest = {
@@ -130,6 +145,8 @@ export type ShieldedAssetActionRequest = {
   recipientCode?: string;
   publicRecipient?: string;
   fundingEntry?: ShieldedFundingEntry;
+  /** The parent whose children qualify for a new arrangement; omitted means the unlocked identity. */
+  rootIdentityCommitment?: string;
   rootVersionIndex?: number;
   periodDays?: string;
   periods?: string;
@@ -245,6 +262,10 @@ export type ShieldedAssetWorkerCallMap = {
     result: { address: string; args: [string, string, string, string, string] };
   };
   recover: { params: { context: ShieldedWorkerContext }; result: ShieldedWalletSummary };
+  fundingFamily: {
+    params: { context: ShieldedWorkerContext; parentPersonHash: string };
+    result: ShieldedFundingFamily;
+  };
   discover: {
     params: { context: ShieldedWorkerContext };
     result: {

@@ -519,16 +519,6 @@ function publicInputs(
   }).witness;
 }
 
-/** Client funding rules use the identity recovered alongside the parent's VALUE. */
-function assertFundingParent(wallet: LocalShieldedWalletSnapshot, rootIdentity: BigNumberish) {
-  if (wallet.walletIdentityCommitment === undefined) {
-    throw new Error("Funding requires a wallet recovered with the parent's identity");
-  }
-  if (getBigInt(rootIdentity) !== wallet.walletIdentityCommitment) {
-    throw new Error("Funding rule belongs to another parent identity");
-  }
-}
-
 async function fundingLineage(
   input: CommonFundingInput,
   ctx: Awaited<ReturnType<typeof currentContext>>,
@@ -641,8 +631,8 @@ async function fundingLineage(
   };
 }
 
+// Any wallet may fund. The policy root only decides which direct children qualify.
 async function initialFundingDestination(input: InitialFundingInput) {
-  assertFundingParent(input.wallet, input.policy.rootIdentityCommitment);
   const ctx = await currentContext(input);
   const policy = input.policy;
   const allocationKeyCommitment = computeShieldedAllocationKeyCommitment(policy.allocationKey, ctx);
@@ -806,7 +796,6 @@ async function continuationFundingDestination(input: ContinuationFundingInput) {
   if (input.budgetKind !== undefined && input.budgetKind !== oldKind)
     throw new Error("Continuation cannot change budget binding");
   input = { ...input, budgetKind: oldKind };
-  assertFundingParent(input.wallet, input.budget.note.rootIdentityCommitment);
   const ctx = await currentContext(input);
   const template = templatePath(input.wallet, input.budget, encodeShieldedBudgetNotePayload);
   const old = input.budget.note;

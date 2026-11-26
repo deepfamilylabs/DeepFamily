@@ -2,6 +2,7 @@ import { useId, useState, type RefObject } from "react";
 import { useTranslation } from "react-i18next";
 import type {
   ShieldedFundingEntry,
+  ShieldedPolicySummary,
   ShieldedWalletSummary,
 } from "../../../shared/workers/shieldedAssetWorkerTypes";
 import { ThemedSelect } from "../../../shared/ui/ThemedSelect";
@@ -25,6 +26,7 @@ import {
   CHOICE_INPUT,
   FIELD_INPUT,
   FieldBlock,
+  PanelButton,
   TaskHeader,
   TaskSection,
   WarningNotice,
@@ -33,6 +35,9 @@ import {
 } from "./inheritanceControls";
 
 const ENTRIES = ["public", "privateConvenient", "privateIndependent"] as const;
+
+/** Whose direct children qualify: the unlocked identity, or another person looked up by hash. */
+export type ShieldedFundingParentChoice = "self" | "other";
 
 export interface ShieldedFundComposerProps {
   titleId: string;
@@ -43,6 +48,19 @@ export interface ShieldedFundComposerProps {
   /** Independent-key credentials can be unlocked while the identity proof suite is unavailable. */
   identityReady: boolean;
   heirs: readonly ShieldedFundingHeir[];
+  parentChoice: ShieldedFundingParentChoice;
+  onParentChoiceChange: (value: ShieldedFundingParentChoice) => void;
+  /** The unlocked identity's label for the "myself" choice. */
+  selfLabel?: string;
+  otherParentInput: string;
+  onOtherParentInputChange: (value: string) => void;
+  onOtherParentLookup: () => void;
+  /** The looked-up person's public records are loaded for the other-parent choice. */
+  otherParentLoaded: boolean;
+  otherParentError?: string;
+  /** The chosen parent's versions and arrangements; the wallet's own family supplies "myself". */
+  parentVersions: readonly number[];
+  policies: readonly ShieldedPolicySummary[];
   /** The entry in effect: an existing heir keeps the entry and key it was first funded with. */
   entry: ShieldedFundingEntry;
   templateHandle?: string;
@@ -70,7 +88,7 @@ export interface ShieldedFundComposerProps {
   recipientFormRef: RefObject<ShieldedRecipientCredentialsFormHandle>;
   findRecipientIdentities: FindShieldedIdentities;
   onGenerateRecipientCode: (identitySuiteId: number, expectedPersonHash?: string) => void;
-  /** The funding parent's own label, used to name existing arrangements. */
+  /** The chosen parent's label, used to name existing arrangements. */
   parentLabel?: string;
 }
 
@@ -80,12 +98,14 @@ export function ShieldedFundComposer(props: ShieldedFundComposerProps) {
   const tr = (key: string) => t(`shielded.walletKeys.${key}`);
   const { symbol, decimals, busy, wallet, titleId } = props;
   const versionLabelId = useId();
+  const parentInputId = useId();
+  const parentErrorId = useId();
   const periodLabelId = useId();
   const periodErrorId = useId();
   const [customPeriodDays, setCustomPeriodDays] = useState(
     !SHIELDED_PERIOD_DAY_PRESETS.some((days) => String(days) === props.periodDays),
   );
-  const selectedPolicy = wallet?.policies.find((policy) => policy.handle === props.policyHandle);
+  const selectedPolicy = props.policies.find((policy) => policy.handle === props.policyHandle);
   let periodDaysError: string | undefined;
   if (!selectedPolicy && customPeriodDays) {
     try {
@@ -95,8 +115,12 @@ export function ShieldedFundComposer(props: ShieldedFundComposerProps) {
     }
   }
   const fundingVersion = selectedPolicy?.rootVersionIndex ?? props.rootVersion;
-  const familyUnavailable = wallet?.familyRecordsAvailable === false;
-  const noParentVersions = !!wallet && !familyUnavailable && wallet.parentVersions.length === 0;
+  const otherParent = props.parentChoice === "other";
+  // The wallet's family records describe only the unlocked identity.
+  const familyUnavailable = !otherParent && wallet?.familyRecordsAvailable === false;
+  const awaitingParent = otherParent && !props.otherParentLoaded;
+  const noParentVersions =
+    !!wallet && !familyUnavailable && !awaitingParent && props.parentVersions.length === 0;
   const fixed = !!props.templateHandle;
   const privateFunding = props.entry !== "public";
   const heirName = (personHash: string) => {
@@ -111,18 +135,20 @@ export function ShieldedFundComposer(props: ShieldedFundComposerProps) {
         : shortHex(personHash))
     );
   };
-  const policies = wallet?.policies ?? [];
+  const policies = props.policies;
   const placeholder = familyUnavailable
     ? null
     : !wallet
       ? t("shielded.recipientPicker.loading")
-      : noParentVersions && !selectedPolicy
-        ? t("shielded.fundingParentMissing")
-        : !fundingVersion
-          ? t("shielded.fundingVersionRequired", { symbol })
-          : props.heirs.length === 0
-            ? t("shielded.recipientPicker.emptyChildren")
-            : null;
+      : awaitingParent
+        ? t("shielded.fundingParentLookupRequired")
+        : noParentVersions && !selectedPolicy
+          ? t(otherParent ? "shielded.fundingParentNotFound" : "shielded.fundingParentMissing")
+          : !fundingVersion
+            ? t("shielded.fundingVersionRequired", { symbol })
+            : props.heirs.length === 0
+              ? t("shielded.recipientPicker.emptyChildren")
+              : null;
   const verification = props.recipientMatches ? (
     <ShieldedRecipientChip>
       {t("shielded.recipientTarget", { symbol, identity: heirName(props.personHash) })}
@@ -146,9 +172,78 @@ export function ShieldedFundComposer(props: ShieldedFundComposerProps) {
         ) : null}
       </TaskHeader>
 
+      <TaskSection id={`${titleId}-parent`} step={1} title={t("shielded.fields.fundingParent")}>
+        <p className="text-[13px] leading-relaxed text-ink-muted">
+          {t("shielded.fundingParentHint")}
+        </p>
+        <fieldset disabled={busy} className="flex min-w-0 flex-col gap-1.5">
+          {(["self", "other"] as const).map((choice) => {
+            const selected = props.parentChoice === choice;
+            return (
+              <label
+                key={choice}
+                className={`flex min-h-[52px] items-center gap-3 px-3.5 ${choiceCardClass(selected, busy)}`}
+              >
+                <input
+                  type="radio"
+                  name={`${titleId}-parent`}
+                  className={CHOICE_INPUT}
+                  checked={selected}
+                  onChange={() => props.onParentChoiceChange(choice)}
+                />
+                <span className="flex-1 text-sm font-semibold text-ink">
+                  {t(choice === "self" ? "shielded.fundingParentSelf" : "shielded.fundingParentOther")}
+                </span>
+                {choice === "self" && props.selfLabel ? (
+                  <span className="min-w-0 truncate text-xs text-ink-muted">{props.selfLabel}</span>
+                ) : null}
+              </label>
+            );
+          })}
+        </fieldset>
+        {otherParent ? (
+          <FieldBlock
+            label={t("shielded.fundingParentPersonHash")}
+            htmlFor={parentInputId}
+            error={props.otherParentError}
+            errorId={parentErrorId}
+          >
+            <div className="flex gap-2">
+              <input
+                id={parentInputId}
+                aria-invalid={!!props.otherParentError}
+                aria-describedby={props.otherParentError ? parentErrorId : undefined}
+                className={`${FIELD_INPUT} min-w-0 flex-1 font-mono`}
+                spellCheck={false}
+                autoComplete="off"
+                disabled={busy}
+                value={props.otherParentInput}
+                onChange={(event) => props.onOtherParentInputChange(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") props.onOtherParentLookup();
+                }}
+                placeholder="0x…"
+              />
+              <PanelButton
+                disabled={busy || !props.otherParentInput.trim()}
+                onClick={props.onOtherParentLookup}
+              >
+                {t("shielded.fundingParentLookup")}
+              </PanelButton>
+            </div>
+          </FieldBlock>
+        ) : null}
+        {otherParent && props.otherParentLoaded && props.parentLabel ? (
+          <p role="status" className="text-xs text-ink-muted">
+            {t("shielded.fields.fundingParent")}:{" "}
+            <span className="font-medium text-ink">{props.parentLabel}</span>
+          </p>
+        ) : null}
+      </TaskSection>
+
       <TaskSection
         id={`${titleId}-rule`}
-        step={1}
+        step={2}
         title={t("shielded.fields.fundingRule", { symbol })}
         trailing={
           policies.length > 0 ? (
@@ -279,7 +374,7 @@ export function ShieldedFundComposer(props: ShieldedFundComposerProps) {
 
       <TaskSection
         id={`${titleId}-heir`}
-        step={2}
+        step={3}
         title={t("shielded.fields.heirPersonHash", { symbol })}
         trailing={
           <div className="flex items-center gap-2">
@@ -298,17 +393,17 @@ export function ShieldedFundComposer(props: ShieldedFundComposerProps) {
                 <div className="w-40">
                   <ThemedSelect
                     labelledBy={versionLabelId}
-                    disabled={busy || !wallet || wallet.parentVersions.length === 0}
+                    disabled={busy || !wallet || props.parentVersions.length === 0}
                     value={props.rootVersion}
                     onChange={props.onRootVersionChange}
                     // A version that is no longer available stays shown but cannot be chosen.
                     placeholder={
                       props.rootVersion &&
-                      !wallet?.parentVersions.includes(Number(props.rootVersion))
+                      !props.parentVersions.includes(Number(props.rootVersion))
                         ? t("shielded.fundingVersionOption", { symbol, version: props.rootVersion })
                         : t("shielded.fundingVersionPlaceholder", { symbol })
                     }
-                    options={(wallet?.parentVersions ?? []).map((version) => ({
+                    options={props.parentVersions.map((version) => ({
                       value: String(version),
                       label: t("shielded.fundingVersionOption", { symbol, version }),
                     }))}
@@ -371,7 +466,7 @@ export function ShieldedFundComposer(props: ShieldedFundComposerProps) {
 
       <TaskSection
         id={`${titleId}-entry`}
-        step={3}
+        step={4}
         title={t("shielded.fundingModeLabel", { symbol })}
       >
         <fieldset className="flex min-w-0 flex-col gap-1.5" disabled={busy || fixed}>

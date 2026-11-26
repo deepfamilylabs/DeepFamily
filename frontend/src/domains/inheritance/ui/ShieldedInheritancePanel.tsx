@@ -55,6 +55,7 @@ import type {
   ShieldedAssetSessionState,
   ShieldedAssetWorkerCallMap,
   ShieldedFundingEntry,
+  ShieldedFundingFamily,
   ShieldedKeySlot,
   ShieldedWalletSummary,
   ShieldedWorkerContext,
@@ -122,7 +123,7 @@ import {
   type ShieldedCompletedSpendStep,
   type ShieldedSpendReviewProps,
 } from "./ShieldedSpendReview";
-import { ShieldedFundComposer } from "./ShieldedFundComposer";
+import { ShieldedFundComposer, type ShieldedFundingParentChoice } from "./ShieldedFundComposer";
 import {
   listShieldedFundingHeirs,
   shieldedFundingEntryLabelKey,
@@ -347,6 +348,14 @@ export function ShieldedInheritancePanel({
   const [policyHandle, setPolicyHandle] = useState(""),
     [personHash, setPersonHash] = useState(""),
     [code, setCode] = useState("");
+  const [fundingParentChoice, setFundingParentChoice] =
+    useState<ShieldedFundingParentChoice>("self");
+  const [otherParentInput, setOtherParentInput] = useState(""),
+    [otherParentError, setOtherParentError] = useState("");
+  const [otherFamilyState, setOtherFamilyState] = useState<{
+    scope: string;
+    family: ShieldedFundingFamily;
+  } | null>(null);
   const draftPolicy = useRef<{ handle: string; key: string } | null>(null);
   const [verifiedRecipient, setVerifiedRecipient] = useState<VerifiedShieldedRecipient | null>(
     null,
@@ -471,11 +480,33 @@ export function ShieldedInheritancePanel({
     onRejected: () => setTransactionPending(false),
   });
 
+  // Looked-up family records belong to one network and session.
+  const fundingFamilyScope = JSON.stringify([contextKey, ownerContextKey]);
+  const otherFamily =
+    otherFamilyState?.scope === fundingFamilyScope ? otherFamilyState.family : null;
+  // The chosen parent decides which direct children qualify; anyone may fund.
+  const fundingFamily: ShieldedFundingFamily | null =
+    fundingParentChoice === "other"
+      ? otherFamily
+      : wallet && session.identity
+        ? {
+            parentPersonHash: session.identity.personHash.toLowerCase(),
+            parentIdentityCommitment: session.identity.identityCommitment,
+            parentVersions: wallet.parentVersions,
+            children: wallet.children,
+          }
+        : null;
+  const fundingParentHash = fundingFamily?.parentPersonHash ?? "";
+  const fundingPolicies =
+    wallet?.policies.filter(
+      (policy) => !!fundingParentHash && policy.rootPersonHash.toLowerCase() === fundingParentHash,
+    ) ?? [];
   const draftKey = JSON.stringify([
     contextKey,
     session.identity?.handle,
     slot,
     selectedKeyFingerprint,
+    fundingParentHash,
     rootVersion,
     amount,
     periodDays,
@@ -546,7 +577,7 @@ export function ShieldedInheritancePanel({
     ) ?? [];
   const claims = wallet?.claims.filter((claim) => claim.slot === slot) ?? [];
   const selectedClaim = claims.find((claim) => claim.handle === claimHandle);
-  const selectedPolicy = wallet?.policies.find((policy) => policy.handle === policyHandle);
+  const selectedPolicy = fundingPolicies.find((policy) => policy.handle === policyHandle);
   const template = wallet?.templates.find(
     (item) =>
       item.policyHandle === policyHandle &&
@@ -610,6 +641,8 @@ export function ShieldedInheritancePanel({
     manualValueSelection,
     code,
     entry,
+    fundingParentChoice,
+    fundingParentHash,
     rootVersion,
     periodDays,
     periods,
@@ -1894,6 +1927,40 @@ export function ShieldedInheritancePanel({
     assertCurrent();
     if (getBigInt(allowance) < value) throw new ShieldedUiMessageError(tr("approveFirst"));
   }
+  /** Arrangements, versions and children all depend on the chosen parent. */
+  function resetFundingParentSelection() {
+    setPolicyHandle("");
+    setRootVersion("");
+    setPersonHash("");
+    changeCode("");
+    recipientForm.current?.clearSecretInputs();
+    setErrorState(null);
+  }
+  async function lookupFundingParent() {
+    const parentPersonHash = otherParentInput.trim();
+    if (!/^0x[0-9a-fA-F]{64}$/.test(parentPersonHash)) {
+      setOtherParentError(t("shielded.fundingParentInvalid"));
+      return;
+    }
+    setOtherParentError("");
+    const scope = fundingFamilyScope;
+    await run(async (current) => {
+      let family: ShieldedFundingFamily;
+      try {
+        family = await shieldedAssetWorkerCall("fundingFamily", { context, parentPersonHash });
+      } catch (cause) {
+        if (current())
+          setOtherParentError(
+            normalizeShieldedUiError(cause, t, { fallbackKey: "shielded.fundingParentLookupFailed" })
+              .message,
+          );
+        return;
+      }
+      if (!current()) return;
+      setOtherFamilyState({ scope, family });
+      resetFundingParentSelection();
+    }, t("shielded.fundingParentLoading"));
+  }
   /**
    * Review the full plan once. A rebuilt remainder can continue only when it
    * exactly matches that approval, rebased onto the confirmed output notes.
@@ -1927,6 +1994,8 @@ export function ShieldedInheritancePanel({
       if (requiresAmount && parsedAmount === undefined)
         throw new ShieldedUiMessageError(tr("amountInvalid"));
       const amountValue = parsedAmount?.toString();
+      if (action === "fund" && !fundingFamily)
+        throw new ShieldedUiMessageError(t("shielded.fundingParentLookupRequired"));
       if (action === "fund" && !parseShieldedFundingPeriods(periods.trim()))
         throw new ShieldedUiMessageError(tr("periodsInvalid"));
       if (action === "fund" && !selectedPolicy) parseShieldedPeriodDays(periodDays);
@@ -1980,6 +2049,8 @@ export function ShieldedInheritancePanel({
               recipientCode: needsCode ? code : undefined,
               publicRecipient: action === "unshield" ? withdrawalRecipient : personHash,
               fundingEntry: effectiveEntry,
+              rootIdentityCommitment:
+                action === "fund" ? fundingFamily?.parentIdentityCommitment : undefined,
               rootVersionIndex: rootVersion ? Number(rootVersion) : undefined,
               periodDays,
               periods,
@@ -2442,7 +2513,7 @@ export function ShieldedInheritancePanel({
     receipt = null;
   } else if (action === "fund") {
     const fundingVersion = selectedPolicy?.rootVersionIndex ?? rootVersion;
-    const heirs = listShieldedFundingHeirs(wallet, fundingVersion, localRecipientLabels);
+    const heirs = listShieldedFundingHeirs(fundingFamily, fundingVersion, localRecipientLabels);
     const heirIndex = heirs.findIndex(
       (heir) => heir.personHash.toLowerCase() === personHash.toLowerCase(),
     );
@@ -2466,7 +2537,10 @@ export function ShieldedInheritancePanel({
     }
     const fundingPeriods = parseShieldedFundingPeriods(periods.trim());
     const fundingBalance = values.reduce((sum, note) => sum + BigInt(note.amount), 0n);
-    const parentLabel = session.identity
+    const parentLabel = fundingParentHash
+      ? (localRecipientLabels.get(fundingParentHash) ?? shortHex(fundingParentHash))
+      : undefined;
+    const selfLabel = session.identity
       ? (localRecipientLabels.get(session.identity.personHash.toLowerCase()) ??
         shortHex(session.identity.personHash))
       : undefined;
@@ -2479,6 +2553,29 @@ export function ShieldedInheritancePanel({
         wallet={wallet}
         identityReady={!!session.identity}
         heirs={heirs}
+        parentChoice={fundingParentChoice}
+        onParentChoiceChange={(choice) => {
+          if (choice === fundingParentChoice) return;
+          setFundingParentChoice(choice);
+          setOtherParentError("");
+          resetFundingParentSelection();
+        }}
+        selfLabel={selfLabel}
+        otherParentInput={otherParentInput}
+        onOtherParentInputChange={(value) => {
+          setOtherParentInput(value);
+          setOtherParentError("");
+          // Editing the hash discards the records loaded for the previous one.
+          if (otherFamily && value.trim().toLowerCase() !== otherFamily.parentPersonHash) {
+            setOtherFamilyState(null);
+            resetFundingParentSelection();
+          }
+        }}
+        onOtherParentLookup={() => void lookupFundingParent()}
+        otherParentLoaded={!!otherFamily}
+        otherParentError={otherParentError || undefined}
+        parentVersions={fundingFamily?.parentVersions ?? []}
+        policies={fundingPolicies}
         entry={effectiveEntry}
         templateHandle={template?.handle}
         onEntryChange={(next) => {
@@ -2493,8 +2590,8 @@ export function ShieldedInheritancePanel({
         policyHandle={policyHandle}
         onPolicyChange={(handle) => {
           if (handle === policyHandle) return;
-          const nextVersion = wallet?.policies.find(item => item.handle === handle)?.rootVersionIndex ?? rootVersion;
-          const sameChildAvailable = listShieldedFundingHeirs(wallet, nextVersion)
+          const nextVersion = fundingPolicies.find(item => item.handle === handle)?.rootVersionIndex ?? rootVersion;
+          const sameChildAvailable = listShieldedFundingHeirs(fundingFamily, nextVersion)
             .some(heir => heir.personHash.toLowerCase() === personHash.toLowerCase());
           setPolicyHandle(handle);
           if (!sameChildAvailable) {
@@ -2507,7 +2604,7 @@ export function ShieldedInheritancePanel({
         rootVersion={rootVersion}
         onRootVersionChange={(value) => {
           if (value === rootVersion) return;
-          const sameChildAvailable = listShieldedFundingHeirs(wallet, value)
+          const sameChildAvailable = listShieldedFundingHeirs(fundingFamily, value)
             .some(heir => heir.personHash.toLowerCase() === personHash.toLowerCase());
           setRootVersion(value);
           if (!sameChildAvailable) {
@@ -2578,7 +2675,9 @@ export function ShieldedInheritancePanel({
         heirName={heirName}
         versionLabel={
           fundingVersion
-            ? t("shielded.fundingVersionOption", { symbol, version: fundingVersion })
+            ? parentLabel
+              ? t("shielded.fundingParentVersion", { symbol, parent: parentLabel, version: fundingVersion })
+              : t("shielded.fundingVersionOption", { symbol, version: fundingVersion })
             : undefined
         }
         entryLabel={t(shieldedFundingEntryLabelKey(effectiveEntry))}
@@ -2608,6 +2707,7 @@ export function ShieldedInheritancePanel({
               submissionPending ||
               !slotReady ||
               !session.identity ||
+              !fundingFamily ||
               !signer ||
               !rate || rate <= 0n ||
               !fundingPeriods ||
