@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   computeLineageEndorsementLeaf,
   computeLineageParentsDigest,
@@ -184,7 +184,7 @@ describe("shielded funding family selection", () => {
         snapshot: lineage,
         asOf: AS_OF,
         parentIdentityCommitment,
-        rootVersionIndex,
+        parentVersions: [rootVersionIndex],
       })
         .filter((child) => child.eligible)
         .map((child) => child.personHash);
@@ -234,17 +234,32 @@ describe("shielded funding family selection", () => {
         snapshot: lineage,
         asOf: AS_OF,
         parentIdentityCommitment: FATHER,
-        rootVersionIndex: 2,
+        parentVersions: [2, 1],
       }),
-    ).toEqual([{ personHash: hash(CHILD), eligible: false }]);
-    expect(
-      listShieldedFundingChildren({
-        snapshot: lineage,
-        asOf: AS_OF,
-        parentIdentityCommitment: FATHER,
-        rootVersionIndex: 1,
-      }),
-    ).toEqual([{ personHash: hash(CHILD), eligible: true }]);
+    ).toEqual([
+      { personHash: hash(CHILD), rootVersionIndex: 2, eligible: false },
+      { personHash: hash(CHILD), rootVersionIndex: 1, eligible: true },
+    ]);
+  });
+
+  it("checks each trusted version once when listing all versions for one child", () => {
+    const parentVersions = Array.from({ length: 8 }, (_, i) => i + 1);
+    const child = version(CHILD, 1, FATHER);
+    const lineage = snapshot({
+      records: [...parentVersions.map((index) => version(FATHER, index)), child],
+      endorsements: [{ version: child, account: A, timestamp: 100n }],
+      trusted: parentVersions.map((versionIndex) => ({ identity: FATHER, versionIndex, account: A })),
+    });
+    const trustedLookups = vi.spyOn(lineage.trustedTree, "indexOf");
+    expect(listShieldedFundingChildren({
+      snapshot: lineage,
+      asOf: AS_OF,
+      parentIdentityCommitment: FATHER,
+      parentVersions,
+    })).toEqual(parentVersions.map((rootVersionIndex) => ({
+      personHash: hash(CHILD), rootVersionIndex, eligible: true,
+    })));
+    expect(trustedLookups).toHaveBeenCalledTimes(parentVersions.length);
   });
 
   it("limits a parent's children to their own directly confirmed relationships", () => {
@@ -282,9 +297,9 @@ describe("shielded funding family selection", () => {
         snapshot: lineage,
         asOf: AS_OF,
         parentIdentityCommitment: FATHER.toString(),
-        rootVersionIndex: 1,
+        parentVersions: [1],
       }),
-    ).toEqual([{ personHash: hash(CHILD), eligible: true }]);
+    ).toEqual([{ personHash: hash(CHILD), rootVersionIndex: 1, eligible: true }]);
   });
 
   it("does not borrow the other parent's qualification for the selected parent's children", () => {
@@ -296,17 +311,17 @@ describe("shielded funding family selection", () => {
         snapshot: lineage,
         asOf: AS_OF,
         parentIdentityCommitment: FATHER,
-        rootVersionIndex: 2,
+        parentVersions: [2],
       }),
-    ).toEqual([{ personHash: hash(CHILD), eligible: false }]);
+    ).toEqual([{ personHash: hash(CHILD), rootVersionIndex: 2, eligible: false }]);
     expect(
       listShieldedFundingChildren({
         snapshot: lineage,
         asOf: AS_OF,
         parentIdentityCommitment: MOTHER,
-        rootVersionIndex: 2,
+        parentVersions: [2],
       }),
-    ).toEqual([{ personHash: hash(CHILD), eligible: true }]);
+    ).toEqual([{ personHash: hash(CHILD), rootVersionIndex: 2, eligible: true }]);
   });
 
   it("does not reuse a parent's relationship from a replaced child endorsement", () => {
@@ -337,7 +352,7 @@ describe("shielded funding family selection", () => {
         snapshot: lineage,
         asOf: AS_OF,
         parentIdentityCommitment: FATHER,
-        rootVersionIndex: 1,
+        parentVersions: [1],
       }),
     ).toEqual([]);
     expect(
@@ -345,9 +360,9 @@ describe("shielded funding family selection", () => {
         snapshot: lineage,
         asOf: AS_OF,
         parentIdentityCommitment: OTHER_FATHER,
-        rootVersionIndex: 1,
+        parentVersions: [1],
       }),
-    ).toEqual([{ personHash: hash(CHILD), eligible: true }]);
+    ).toEqual([{ personHash: hash(CHILD), rootVersionIndex: 1, eligible: true }]);
   });
 
   it("ignores cancelled or future endorsements even when their metadata remains", () => {
@@ -393,9 +408,9 @@ describe("shielded funding family selection", () => {
         snapshot: lineage,
         asOf: AS_OF,
         parentIdentityCommitment: FATHER,
-        rootVersionIndex: 2,
+        parentVersions: [2],
       }),
-    ).toEqual([{ personHash: hash(CHILD), eligible: false }]);
+    ).toEqual([{ personHash: hash(CHILD), rootVersionIndex: 2, eligible: false }]);
   });
 
   it("does not invent a family root when parent records are absent", () => {

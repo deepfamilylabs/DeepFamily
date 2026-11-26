@@ -36,6 +36,7 @@ const mocks = vi.hoisted(() => ({
   proofLifetime: vi.fn(),
   fundingDestination: vi.fn(),
   publicTree: vi.fn(),
+  rebuiltPublicTree: vi.fn(),
   loadLineage: vi.fn(),
   loadTargetedLineage: vi.fn(),
   targetIdentity: vi.fn(),
@@ -141,6 +142,7 @@ vi.mock("../domains/inheritance/services/shieldedPublicTreeIdentity", async (ori
     typeof import("../domains/inheritance/services/shieldedPublicTreeIdentity")
   >()),
   findPublicTreeIdentityEvidence: mocks.publicTree,
+  findRebuiltPublicTreeIdentityEvidence: mocks.rebuiltPublicTree,
 }));
 vi.mock("../domains/inheritance/services/inheritanceChain", () => ({
   loadTargetedLineageSnapshot: mocks.loadTargetedLineage,
@@ -209,7 +211,7 @@ function preparedValueOutputs(amounts: bigint[], offset = 0n, capacity = 4) {
       inputNullifiers: Array.from({ length: capacity }, (_, index) => BigInt(51 + index)),
       periodNullifiers: Array(3).fill(0n),
       outputCommitments: [61n + offset, 62n + offset],
-      outputCiphertexts: [`0x${"00".repeat(512)}`, `0x${"00".repeat(512)}`],
+      outputCiphertexts: [`0x${"00".repeat(512)}`, `0x${"01".repeat(512)}`],
       relation0: 0n,
       relation1: 0n,
       asOf: 0n,
@@ -280,6 +282,7 @@ beforeEach(async () => {
   mocks.proofLifetime.mockResolvedValue(300n);
   mocks.fundingDestination.mockResolvedValue(undefined);
   mocks.publicTree.mockReset().mockResolvedValue(null);
+  mocks.rebuiltPublicTree.mockReset().mockResolvedValue(null);
   mocks.getBlock.mockResolvedValue({ number: 12, hash: blockHash, timestamp: 1000 });
   mocks.scan.mockResolvedValue({ blockHash, spentNullifiers: new Set() });
   mocks.proof.mockResolvedValue({
@@ -1008,22 +1011,37 @@ describe("asset Worker preview and proof boundary", () => {
     beforeEach(() => {
       // Two notes would need a preparatory merge, which must not happen for a refused child.
       mocks.notes = [value(1n, 5n, secretKeys.ownerSecret), value(2n, 4n, secretKeys.ownerSecret)];
-      const snapshot = { blockNumber: 12, timestamp: 1000n, checkpointId: 7n, versions: new Map(), endorsements: new Map(), trustedEndorsers: new Map() };
+      const snapshot = { blockNumber: 12, blockHash, timestamp: 1000n, checkpointId: 7n, versions: new Map(), endorsements: new Map(), trustedEndorsers: new Map() };
       mocks.loadLineage.mockResolvedValue(snapshot);
+      mocks.loadTargetedLineage.mockResolvedValue(snapshot);
       mocks.publicTree.mockResolvedValue({ versionIndex: 1 });
+      mocks.rebuiltPublicTree.mockResolvedValue({ versionIndex: 1 });
     });
 
-    it.each(["public", "privateConvenient"] as const)(
-      "refuses %s funding before validating or merging any input",
-      async (fundingEntry) => {
+    it.each([
+      ["public", undefined],
+      ["privateConvenient", "rebuild"],
+      ["public", "chain"],
+      ["privateConvenient", "chain"],
+    ] as const)(
+      "refuses %s funding in %s mode before validating or merging any input",
+      async (fundingEntry, stateReadMode) => {
         const session = await unlocked();
         if (fundingEntry === "privateConvenient") await verifiedCredential(await receiveCredential("fund"));
-        await expect(session.call("preview", request(fundingEntry))).rejects.toThrow(
-          PUBLIC_TREE_RECIPIENT_MESSAGE,
-        );
-        expect(mocks.publicTree).toHaveBeenCalledExactlyOnceWith(
-          expect.objectContaining({ chainId: 31337n, personHash: child, blockTag: 12 }),
-        );
+        await expect(session.call("preview", {
+          ...request(fundingEntry), context: { ...context, stateReadMode },
+        })).rejects.toThrow(PUBLIC_TREE_RECIPIENT_MESSAGE);
+        if (stateReadMode === "chain") {
+          expect(mocks.publicTree).toHaveBeenCalledExactlyOnceWith(
+            expect.objectContaining({ chainId: 31337n, personHash: child, blockTag: 12 }),
+          );
+          expect(mocks.rebuiltPublicTree).not.toHaveBeenCalled();
+        } else {
+          expect(mocks.publicTree).not.toHaveBeenCalled();
+          expect(mocks.rebuiltPublicTree).toHaveBeenCalledExactlyOnceWith(
+            expect.objectContaining({ chainId: 31337n, personHash: child, lineage: expect.objectContaining({ blockNumber: 12, blockHash }) }),
+          );
+        }
         expect(mocks.fundingDestination).not.toHaveBeenCalled();
         expect(mocks.transfer).not.toHaveBeenCalled();
         expect(mocks.fund).not.toHaveBeenCalled();
@@ -1037,6 +1055,7 @@ describe("asset Worker preview and proof boundary", () => {
       const preview = await session.call("preview", request("privateIndependent"));
       expect(preview.steps.map((step) => step.action)).toEqual(["privateTransfer", "fund"]);
       expect(mocks.publicTree).not.toHaveBeenCalled();
+      expect(mocks.rebuiltPublicTree).not.toHaveBeenCalled();
       expect(mocks.fundingDestination).toHaveBeenCalledOnce();
     });
   });

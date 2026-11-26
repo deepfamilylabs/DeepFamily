@@ -5,6 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { WitnessCalculatorBuilder } from "circom_runtime";
+import { poseidon4 } from "poseidon-lite";
 import {
   SNARK_SCALAR_FIELD,
   buildShieldedReceiveCredentialPublicSignals,
@@ -37,6 +38,12 @@ const material = computeIdentityFromDerivedSecret({
   derivedSecretField: 123456789n,
 });
 const keys = deriveShieldedHeirKeyMaterial(material.derivedSecretField);
+// The circuit's identity commitment for any suite ID, including IDs the SDK does not support.
+function identityCommitmentWithSuite(suiteId) {
+  const suite = poseidon4([1000n, suiteId, 0n, 0n]);
+  const nameSecret = poseidon4([1001n, material.nameField, material.derivedSecretField, suite]);
+  return poseidon4([1002n, nameSecret, material.packedBirthGenderField, suite]);
+}
 
 async function fixture(purpose, keyMode, diversifier) {
   const spendingSecret = keyMode === 0 ? keys.ownerSecret : 37n;
@@ -158,6 +165,24 @@ test("credential issuers bind diversified VALUE owners and fixed budget owners i
         const independent = await fixture(purpose, 1, 3);
         await assertConstraintViolation(() =>
           calc.calculateWitness({ ...independent.witness, keyMode: 0 }, 1),
+        );
+      });
+      await t.test(`${purpose}: nonzero uint32 suites and a separate mode-1 secret`, async () => {
+        assert.equal(identityCommitmentWithSuite(1n), material.identityCommitment);
+        const independent = (await fixture(purpose, 1, 4)).witness;
+        const withSuite = (suiteId) => ({
+          ...independent,
+          suiteId: String(suiteId),
+          identityCommitment: String(identityCommitmentWithSuite(suiteId)),
+        });
+        // Registration requires a nonzero uint32 suite; issuance accepts the same range.
+        await calc.calculateWitness(withSuite(0xffff_ffffn), 1);
+        await assertConstraintViolation(() => calc.calculateWitness(withSuite(0n), 1));
+        await assertConstraintViolation(() => calc.calculateWitness(withSuite(1n << 32n), 1));
+        // Whoever knows the identity details can rebuild this secret, so mode 1 cannot claim it.
+        const identityKeyed = (await fixture(purpose, 0, 4)).witness;
+        await assertConstraintViolation(() =>
+          calc.calculateWitness({ ...identityKeyed, keyMode: 1 }, 1),
         );
       });
     }

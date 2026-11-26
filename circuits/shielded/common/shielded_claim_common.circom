@@ -6,6 +6,7 @@ include "circomlib/circuits/poseidon.circom";
 include "shielded_merkle_common.circom";
 include "../../lib/identity.circom";
 include "shielded_funding_common.circom";
+include "shielded_lineage_common.circom";
 
 // Claim consumes one budget note and preserves its policy, enrollment and owner.
 // All three period nullifiers are public, and inactive slots carry
@@ -138,46 +139,25 @@ template ShieldedClaim(LINEAGE_DEPTH) {
     heir.gender <== gender;
     heir.suiteCommitment <== suite.suiteCommitment;
 
-    rootIsMother * (1 - rootIsMother) === 0;
-    signal rootIdentityCommitment <==
-        fatherIdentityCommitment + rootIsMother * (motherIdentityCommitment - fatherIdentityCommitment);
-    component rootIsZero = IsZero();
-    rootIsZero.in <== rootIdentityCommitment;
-    rootIsZero.out === 0;
-
-    component parents = Poseidon(3);
-    parents.inputs[0] <== 1009;
-    parents.inputs[1] <== fatherIdentityCommitment;
-    parents.inputs[2] <== motherIdentityCommitment;
-    component endorserBits = Num2Bits(160);
-    endorserBits.in <== endorser;
-    component writtenAtBits = Num2Bits(64);
-    writtenAtBits.in <== writtenAt;
-    signal endorserAndTime <== writtenAt * (1 << 160) + endorser;
-    component endorsementLeaf = Poseidon(5);
-    endorsementLeaf.inputs[0] <== 1007;
-    endorsementLeaf.inputs[1] <== heir.identityCommitment;
-    endorsementLeaf.inputs[2] <== parents.out;
-    endorsementLeaf.inputs[3] <== versionIndex;
-    endorsementLeaf.inputs[4] <== endorserAndTime;
-    component trustedLeaf = Poseidon(4);
-    trustedLeaf.inputs[0] <== 1008;
-    trustedLeaf.inputs[1] <== rootIdentityCommitment;
-    trustedLeaf.inputs[2] <== rootVersionIndex;
-    trustedLeaf.inputs[3] <== endorser;
-
-    component endorsementMerkle = ShieldedMerkleRoot(LINEAGE_DEPTH);
-    endorsementMerkle.leaf <== endorsementLeaf.out;
-    endorsementMerkle.depth <== endorsementDepth;
-    endorsementMerkle.index <== endorsementIndex;
-    endorsementMerkle.siblings <== endorsementSiblings;
-    endorsementMerkle.out === endorsementRoot;
-    component trustedMerkle = ShieldedMerkleRoot(LINEAGE_DEPTH);
-    trustedMerkle.leaf <== trustedLeaf.out;
-    trustedMerkle.depth <== trustedDepth;
-    trustedMerkle.index <== trustedIndex;
-    trustedMerkle.siblings <== trustedSiblings;
-    trustedMerkle.out === trustedRoot;
+    // Fund proves the same current direct-child rule at 64 levels.
+    component directChild = ShieldedDirectChildCurrent(LINEAGE_DEPTH);
+    directChild.heirIdentityCommitment <== heir.identityCommitment;
+    directChild.rootVersionIndex <== rootVersionIndex;
+    directChild.heirVersionIndex <== versionIndex;
+    directChild.fatherIdentityCommitment <== fatherIdentityCommitment;
+    directChild.motherIdentityCommitment <== motherIdentityCommitment;
+    directChild.rootIsMother <== rootIsMother;
+    directChild.endorser <== endorser;
+    directChild.writtenAt <== writtenAt;
+    directChild.endorsementDepth <== endorsementDepth;
+    directChild.endorsementIndex <== endorsementIndex;
+    directChild.endorsementSiblings <== endorsementSiblings;
+    directChild.trustedDepth <== trustedDepth;
+    directChild.trustedIndex <== trustedIndex;
+    directChild.trustedSiblings <== trustedSiblings;
+    directChild.endorsementRoot <== endorsementRoot;
+    directChild.trustedRoot <== trustedRoot;
+    signal rootIdentityCommitment <== directChild.rootIdentityCommitment;
 
     component derivedSecretNotZero = IsZero();
     derivedSecretNotZero.in <== derivedSecretField;

@@ -37,6 +37,17 @@ const valueBase = {
   inputNullifiers: Array.from({ length: 4 }, (_, index) => index + 21),
 };
 
+test("the pool signal builder rejects the same output bytes in different encodings", () => {
+  assert.throws(
+    () => buildShieldedPoolPublicInputs({
+      ...valueBase,
+      action: SHIELDED_POOL_ACTION.PrivateTransfer,
+      outputCiphertexts: [ciphertextA, `0x${"11".repeat(512)}`],
+    }),
+    (error) => error.code === "DUPLICATE_SHIELDED_OUTPUT_CIPHERTEXT",
+  );
+});
+
 test("each pool action has the verifier input count in ProofConstants.sol", () => {
   assert.deepEqual(
     Object.fromEntries(

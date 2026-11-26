@@ -2,8 +2,8 @@ import {
   computeLineageEndorsementLeaf,
   computeLineageParentsDigest,
 } from "@deepfamily/protocol-core";
+import type { ShieldedFundingChild } from "../../../shared/workers/shieldedAssetWorkerTypes";
 import { findHeirLegitimacy, type LineageSnapshot } from "./inheritanceChain";
-import type { ShieldedRecipientOption } from "./shieldedRecipientOptions";
 
 export type ShieldedFundingParentOption = {
   personHash: string;
@@ -122,15 +122,18 @@ export function listShieldedFundingChildren({
   snapshot,
   asOf,
   parentIdentityCommitment,
-  rootVersionIndex,
+  parentVersions,
 }: {
   snapshot: LineageSnapshot;
   asOf: bigint;
   parentIdentityCommitment: string | bigint;
-  rootVersionIndex: number;
-}): ShieldedRecipientOption[] {
+  parentVersions: readonly number[];
+}): ShieldedFundingChild[] {
+  if (parentVersions.length === 0) return [];
   const parentIdentity = BigInt(parentIdentityCommitment);
-  const candidates: ShieldedRecipientOption[] = [];
+  const childrenByVersion = new Map(
+    parentVersions.map((version) => [version, [] as ShieldedFundingChild[]]),
+  );
   for (const [personHash, versions] of snapshot.versions) {
     // Metadata only narrows the search. Live endorsements and the scoped
     // parent's trusted records still establish eligibility below.
@@ -147,17 +150,21 @@ export function listShieldedFundingChildren({
       heirPersonHash: personHash,
       asOf,
     });
-    const scopedParents = parents.filter((parent) => parent.identityCommitment === parentIdentity);
-    if (!scopedParents.length) continue;
-    candidates.push({
-      personHash,
-      identitySuiteId: versions[0]?.identitySuiteId,
-      eligible: scopedParents.some((parent) =>
-        parent.versions.some(
-          (version) => version.eligible && version.versionIndex === rootVersionIndex,
-        ),
-      ),
-    });
+    const parent = parents.find((option) => option.identityCommitment === parentIdentity);
+    if (!parent) continue;
+    const eligibleVersions = new Set(
+      parent.versions.filter((version) => version.eligible).map((version) => version.versionIndex),
+    );
+    for (const [rootVersionIndex, children] of childrenByVersion) {
+      children.push({
+        personHash,
+        identitySuiteId: versions[0]?.identitySuiteId,
+        rootVersionIndex,
+        eligible: eligibleVersions.has(rootVersionIndex),
+      });
+    }
   }
-  return candidates.sort((a, b) => a.personHash.localeCompare(b.personHash));
+  return [...childrenByVersion.values()].flatMap((children) =>
+    children.sort((a, b) => a.personHash.localeCompare(b.personHash)),
+  );
 }

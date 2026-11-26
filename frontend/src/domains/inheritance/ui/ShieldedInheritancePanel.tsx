@@ -480,8 +480,11 @@ export function ShieldedInheritancePanel({
     onRejected: () => setTransactionPending(false),
   });
 
-  // Looked-up family records belong to one network and session.
-  const fundingFamilyScope = JSON.stringify([contextKey, ownerContextKey]);
+  const otherParentHash = otherParentInput.trim().toLowerCase();
+  // Looked-up records belong to the requested parent, network and session.
+  const fundingFamilyScope = JSON.stringify([contextKey, ownerContextKey, otherParentHash]);
+  const latestFundingFamilyScope = useRef(fundingFamilyScope);
+  latestFundingFamilyScope.current = fundingFamilyScope;
   const otherFamily =
     otherFamilyState?.scope === fundingFamilyScope ? otherFamilyState.family : null;
   // The chosen parent decides which direct children qualify; anyone may fund.
@@ -1640,6 +1643,10 @@ export function ShieldedInheritancePanel({
           }
         }
         if (!allPools || !current()) return;
+        if (fundingParentChoice === "other" && otherFamily) {
+          await loadFundingParent(current, result);
+        }
+        if (!current()) return;
         const found = await shieldedAssetWorkerCall(
           "discover",
           { context },
@@ -1936,30 +1943,55 @@ export function ShieldedInheritancePanel({
     recipientForm.current?.clearSecretInputs();
     setErrorState(null);
   }
+  async function loadFundingParent(current: () => boolean, refreshedWallet?: ShieldedWalletSummary) {
+    const currentParent = () => current() && latestFundingFamilyScope.current === fundingFamilyScope;
+    const anchor = refreshedWallet && {
+      blockNumber: refreshedWallet.toBlock,
+      blockHash: refreshedWallet.blockHash,
+    };
+    setOtherParentError("");
+    let family: ShieldedFundingFamily;
+    try {
+      family = await shieldedAssetWorkerCall("fundingFamily", {
+        context,
+        parentPersonHash: otherParentHash,
+        ...(anchor ? { anchor } : {}),
+      });
+    } catch (cause) {
+      if (currentParent()) {
+        setOtherFamilyState(null);
+        setOtherParentError(
+          normalizeShieldedUiError(cause, t, { fallbackKey: "shielded.fundingParentLookupFailed" })
+            .message,
+        );
+      }
+      return;
+    }
+    if (!currentParent()) return;
+    setOtherFamilyState({ scope: fundingFamilyScope, family });
+    const version = selectedPolicy?.rootVersionIndex ?? rootVersion;
+    if (
+      !refreshedWallet ||
+      (version && !family.parentVersions.includes(Number(version))) ||
+      (policyHandle && !refreshedWallet.policies.some((item) => item.handle === policyHandle))
+    ) {
+      resetFundingParentSelection();
+    } else if (
+      personHash &&
+      !listShieldedFundingHeirs(family, version)
+        .some((heir) => heir.personHash.toLowerCase() === personHash.toLowerCase())
+    ) {
+      setPersonHash("");
+      changeCode("");
+      recipientForm.current?.clearSecretInputs();
+    }
+  }
   async function lookupFundingParent() {
-    const parentPersonHash = otherParentInput.trim();
-    if (!/^0x[0-9a-fA-F]{64}$/.test(parentPersonHash)) {
+    if (!/^0x[0-9a-f]{64}$/.test(otherParentHash)) {
       setOtherParentError(t("shielded.fundingParentInvalid"));
       return;
     }
-    setOtherParentError("");
-    const scope = fundingFamilyScope;
-    await run(async (current) => {
-      let family: ShieldedFundingFamily;
-      try {
-        family = await shieldedAssetWorkerCall("fundingFamily", { context, parentPersonHash });
-      } catch (cause) {
-        if (current())
-          setOtherParentError(
-            normalizeShieldedUiError(cause, t, { fallbackKey: "shielded.fundingParentLookupFailed" })
-              .message,
-          );
-        return;
-      }
-      if (!current()) return;
-      setOtherFamilyState({ scope, family });
-      resetFundingParentSelection();
-    }, t("shielded.fundingParentLoading"));
+    await run(loadFundingParent, t("shielded.fundingParentLoading"));
   }
   /**
    * Review the full plan once. A rebuilt remainder can continue only when it
@@ -2566,7 +2598,7 @@ export function ShieldedInheritancePanel({
           setOtherParentInput(value);
           setOtherParentError("");
           // Editing the hash discards the records loaded for the previous one.
-          if (otherFamily && value.trim().toLowerCase() !== otherFamily.parentPersonHash) {
+          if (value.trim().toLowerCase() !== otherParentHash) {
             setOtherFamilyState(null);
             resetFundingParentSelection();
           }
@@ -2713,7 +2745,7 @@ export function ShieldedInheritancePanel({
               !fundingPeriods ||
               !days ||
               !wallet ||
-              wallet.familyRecordsAvailable === false ||
+              (fundingParentChoice === "self" && wallet.familyRecordsAvailable === false) ||
               (needsCode && !recipientReady) ||
               fundingDeficit !== undefined ||
               heirIndex < 0 ||
@@ -3103,7 +3135,7 @@ export function ShieldedInheritancePanel({
     </section>
   );
 
-  const publicSyncItems = (["authorization", "lineage"] as const)
+  const publicSyncItems = (["authorization", "lineage", "metadata"] as const)
     .map((domain) => publicSyncProgress[domain])
     .filter((item): item is PublicStateSyncProgress => !!item);
   const publicSyncPauseDisabled = submissionPending || !!executingReview || session.isWalletRequestPending() ||

@@ -59,8 +59,10 @@ function lineageWitness(overrides = {}, leafEndorsers = {}) {
     1,
   );
   const trusted = buildLineageMerkleProof(createLineageTree([77n, 88n, trustedLeaf]), 2);
+  // The template selects the root itself; the value here only builds the trusted leaf.
+  const { rootIdentityCommitment: _root, ...inputs } = fields;
   return {
-    ...Object.fromEntries(Object.entries(fields).map(([name, value]) => [name, String(value)])),
+    ...Object.fromEntries(Object.entries(inputs).map(([name, value]) => [name, String(value)])),
     endorsementRoot: String(endorsement.root),
     endorsementDepth: String(endorsement.depth),
     endorsementIndex: String(endorsement.index),
@@ -81,7 +83,7 @@ test("current direct-child lineage constraints with independently rebuilt roots"
       source,
       `pragma circom 2.2.3;
 include "shielded/common/shielded_lineage_common.circom";
-component main = ShieldedDirectChildCurrent();
+component main = ShieldedDirectChildCurrent(64);
 `,
     );
     execFileSync(
@@ -104,7 +106,14 @@ component main = ShieldedDirectChildCurrent();
       { singleThread: true },
     );
     const valid = async (witness) => {
-      assert.equal((await calculator.calculateWitness(witness, 1))[0], 1n);
+      const wires = await calculator.calculateWitness(witness, 1);
+      assert.equal(wires[0], 1n);
+      // The only output is the selected parent, which callers bind into their policy.
+      const selected =
+        witness.rootIsMother === "1"
+          ? witness.motherIdentityCommitment
+          : witness.fatherIdentityCommitment;
+      assert.equal(wires[1], BigInt(selected));
     };
     const invalid = (witness) =>
       assertConstraintViolation(() => calculator.calculateWitness(witness, 1));
@@ -157,6 +166,10 @@ component main = ShieldedDirectChildCurrent();
       // Match the linear parent expression so only its Boolean selector rejects this case.
       await invalid(lineageWitness({ rootIsMother: 2n, rootIdentityCommitment: 105n }));
       await invalid(lineageWitness({ heirIdentityCommitment: 0n }));
+    });
+    await t.test("rejects an absent selected parent even with its trusted leaf present", async () => {
+      await invalid(lineageWitness({ fatherIdentityCommitment: 0n }));
+      await invalid(lineageWitness({ rootIsMother: 1n, motherIdentityCommitment: 0n }));
     });
     for (const tree of ["endorsement", "trusted"]) {
       await t.test(`enforces ${tree} Merkle bounds and root membership`, async () => {

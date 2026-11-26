@@ -584,26 +584,28 @@ describe("ShieldedErc20Pool contract boundaries", function () {
 
   it("rejects one envelope shared by both outputs, which chain recovery could open only once", async () => {
     const { pool, token, depositor } = await setup();
-    const shared = actionData({ outputCiphertexts: [ciphertext("01"), ciphertext("01")] });
+    const deposit = actionData();
+    const depositProof = await proofFor(pool, 0, deposit, 100n);
+    const shared = { ...deposit, outputCiphertexts: [ciphertext("01"), ciphertext("01")] };
     await expect(
-      pool.connect(depositor).shield(100n, shared, await proofFor(pool, 0, shared, 100n)),
+      pool.connect(depositor).shield(100n, shared, depositProof),
     ).to.be.revertedWithCustomError(pool, "InvalidCiphertext");
     expect(await token.balanceOf(await pool.getAddress())).to.equal(0n);
 
-    const deposit = actionData();
-    await pool.connect(depositor).shield(100n, deposit, await proofFor(pool, 0, deposit, 100n));
+    await pool.connect(depositor).shield(100n, deposit, depositProof);
     const root = (await pool.noteShard(0)).root;
     const transfer = valueActionData({
       inputRoots: [root, root],
       inputNullifiers: [201n, 202n],
       outputCommitments: [103n, 104n],
-      outputCiphertexts: [ciphertext("03"), ciphertext("03")],
+      outputCiphertexts: [ciphertext("03"), ciphertext("04")],
     });
+    const transferProof = await proofFor(pool, 3, transfer);
+    const repeated = { ...transfer, outputCiphertexts: [ciphertext("03"), ciphertext("03")] };
     await expect(
-      pool.privateTransfer(transfer, await proofFor(pool, 3, transfer)),
+      pool.privateTransfer(repeated, transferProof),
     ).to.be.revertedWithCustomError(pool, "InvalidCiphertext");
-    const distinct = { ...transfer, outputCiphertexts: [ciphertext("03"), ciphertext("04")] };
-    await pool.privateTransfer(distinct, await proofFor(pool, 3, distinct));
+    await pool.privateTransfer(transfer, transferProof);
     expect(await pool.nullifierSpent(201n)).to.equal(true);
   });
 

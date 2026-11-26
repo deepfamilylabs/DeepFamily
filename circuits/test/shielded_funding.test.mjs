@@ -13,6 +13,7 @@ import { poseidon2, poseidon3, poseidon4, poseidon5, poseidon7, poseidon8 } from
 import { SNARK_SCALAR_FIELD, computeShieldedEnrollmentNullifier } from "@deepfamily/protocol-core";
 import { buildShieldedFundingFixtures } from "./generate_shielded_funding_input.mjs";
 import { buildShieldedClaimFixture } from "./generate_shielded_claim_input.mjs";
+import { buildLineageFixture } from "./generate_lineage_fixture.mjs";
 import { assertConstraintViolation } from "./constraint_assertions.mjs";
 import {
   fixtureFundReceive,
@@ -256,6 +257,53 @@ test("shielded initial Fund and continuation Fund constraints", async (t) => {
         }
       },
     );
+    await t.test(
+      "fund bounds the last period's maturity by uint64 time, counting a refill template",
+      async () => {
+        const periodDays = (1n << 32n) - 1n;
+        const seconds = periodDays * 86_400n;
+        const at = (budgetPeriods) =>
+          buildShieldedFundingFixtures({
+            periodDays,
+            budgetPeriods,
+            oldBudgetRemainingPeriods: 3n,
+            donorAmount: 100n * budgetPeriods + 1n,
+          });
+        const eligibleFrom = BigInt(at(1n).initial.eligibleFrom);
+        const capacity = ((1n << 64n) - 1n - eligibleFrom) / seconds;
+        // An initial funding is the enrollment's only budget.
+        await valid("fund", at(capacity).initial);
+        await invalid("fund", at(capacity + 1n).initial);
+        // A refill's periods follow the template's three remaining periods.
+        await valid("fund", at(capacity - 3n).continuation);
+        await invalid("fund", at(capacity - 2n).continuation);
+      },
+    );
+    await t.test("accepts the last maturity at uint64 max and rejects one second over", async () => {
+      const max = (1n << 64n) - 1n;
+      const sharedLineage = buildLineageFixture().witness;
+      const periodDays = (1n << 32n) - 1n;
+      const oldBudgetRemainingPeriods = 3n;
+      const budgetPeriods = 4n;
+      for (const binding of legalBudgetBindings) {
+        for (const mode of ["initial", "continuation"]) {
+          const fundedPeriods =
+            budgetPeriods + (mode === "continuation" ? oldBudgetRemainingPeriods : 0n);
+          const fixture = (lastMaturity) => buildShieldedFundingFixtures({
+            ...binding,
+            periodDays,
+            budgetPeriods,
+            oldBudgetRemainingPeriods,
+            lineage: {
+              ...sharedLineage,
+              eligibleFrom: String(lastMaturity - fundedPeriods * periodDays * 86_400n),
+            },
+          })[mode];
+          await valid("fund", fixture(max));
+          await invalid("fund", fixture(max + 1n));
+        }
+      }
+    });
     await t.test(
       "private funding keeps every recovery field, including its cycle, hidden",
       async () => {

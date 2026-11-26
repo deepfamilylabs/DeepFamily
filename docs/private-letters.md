@@ -198,9 +198,9 @@ receive presentation for every external recipient output. Both proofs authentica
 the same randomized recipient commitment, including the heir identity for Fund.
 The pool verifies both atomically before spending notes or appending outputs. The
 presentation binds chain, pool, action, output slot and the hash of all actual action
-data. Fund receipts use only output slot 0, the budget; the Fund presentation circuit also
-accepts slot 1, which the pool rejects, so the SDK refuses it before proving.
-PrivateTransfer uses slot 0 or 1. The original credential and issuer proof do not appear on chain. A zero receive
+data. Fund receipts use only output slot 0, the budget, which the Fund presentation
+circuit and the pool both require; PrivateTransfer uses slot 0 or 1. The SDK checks
+the slot before proving. The original credential and issuer proof do not appear on chain. A zero receive
 commitment is allowed only where the business circuit proves the output owner is
 derived from the input root spending secret and that output's nonce; Shield
 remains a self-deposit operation.

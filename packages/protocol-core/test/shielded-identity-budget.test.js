@@ -380,6 +380,7 @@ test("public budget envelope encodes the full uint32 period and rejects old payl
 test("public fund signal fields come from the canonical output while claim exposes no recipient or binding kind", () => {
   const envelope = encodePublicShieldedBudgetEnvelope(budget, context);
   const privateEnvelope = new Uint8Array(512).fill(0x22);
+  const changeEnvelope = new Uint8Array(512).fill(0x33);
   const base = {
     ...context,
     action: SHIELDED_POOL_ACTION.Fund,
@@ -408,7 +409,7 @@ test("public fund signal fields come from the canonical output while claim expos
     () =>
       buildShieldedPoolPublicInputs({
         ...base,
-        outputCiphertexts: [privateEnvelope, privateEnvelope],
+        outputCiphertexts: [privateEnvelope, changeEnvelope],
       }),
     (error) => error.code === "INVALID_SHIELDED_PUBLIC_BUDGET",
   );
@@ -433,7 +434,7 @@ test("public fund signal fields come from the canonical output while claim expos
     inputRoots: [11],
     inputNullifiers: [13],
     budgetKind: 0,
-    outputCiphertexts: [privateEnvelope, privateEnvelope],
+    outputCiphertexts: [privateEnvelope, changeEnvelope],
   });
   assert.equal(claim.signals.length, 14);
   assert.equal("budgetKind" in claim.witness, false);

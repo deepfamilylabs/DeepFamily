@@ -184,7 +184,7 @@ test("linked receive presentations preserve credential prefixes and complete ope
     });
 
     await t.test(
-      "letters permit a message ID while money operations require output slots",
+      "letters permit a message ID, transfers use output 0 or 1 and Fund only output 0",
       async () => {
         const calc = calculators.receive;
         const { witness } = fixture("receive");
@@ -194,10 +194,12 @@ test("linked receive presentations preserve credential prefixes and complete ope
           calc.calculateWitness({ ...witness, action: "4", messageId: "2" }, 1),
         );
         const fund = fixture("fund").witness;
-        await calculators.fund.calculateWitness({ ...fund, messageId: "1" }, 1);
-        await assertConstraintViolation(() =>
-          calculators.fund.calculateWitness({ ...fund, messageId: "2" }, 1),
-        );
+        await calculators.fund.calculateWitness({ ...fund, messageId: "0" }, 1);
+        // Output 1 is the donor change; the pool accepts a Fund receipt only on the budget.
+        for (const messageId of ["1", "2"])
+          await assertConstraintViolation(() =>
+            calculators.fund.calculateWitness({ ...fund, messageId }, 1),
+          );
       },
     );
 

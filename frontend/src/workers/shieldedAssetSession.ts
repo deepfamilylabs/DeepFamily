@@ -99,6 +99,9 @@ import { prepareShieldedClaim } from "../domains/inheritance/services/shieldedCl
 import {
   PUBLIC_TREE_RECIPIENT_MESSAGE,
   findPublicTreeIdentityEvidence,
+  findRebuiltPublicTreeIdentityEvidence,
+  PUBLIC_TREE_METADATA_UNAVAILABLE_CODE,
+  PUBLIC_TREE_METADATA_UNAVAILABLE_MESSAGE,
 } from "../domains/inheritance/services/shieldedPublicTreeIdentity";
 import {
   prepareShieldedPrivateTransfer,
@@ -1033,15 +1036,12 @@ export class ShieldedAssetSession {
         snapshot: lineage,
         parentIdentityCommitment: this.identity.identityCommitment,
       });
-      for (const rootVersionIndex of summary.parentVersions)
-        summary.children.push(
-          ...listShieldedFundingChildren({
-            snapshot: lineage,
-            asOf: BigInt(block.timestamp),
-            parentIdentityCommitment: this.identity.identityCommitment,
-            rootVersionIndex,
-          }).map((child) => ({ ...child, rootVersionIndex, eligible: !!child.eligible })),
-        );
+      summary.children = listShieldedFundingChildren({
+        snapshot: lineage,
+        asOf: BigInt(block.timestamp),
+        parentIdentityCommitment: this.identity.identityCommitment,
+        parentVersions: summary.parentVersions,
+      });
     }
     summary.sessionState = this.state();
     this.summary = summary;
@@ -1060,11 +1060,17 @@ export class ShieldedAssetSession {
     const env = await this.context(ctx);
     current();
     const chain = normalizeShieldedStateReadMode(ctx.stateReadMode) === "chain";
+    const anchor = params.anchor;
+    const at = anchor ? { blockTag: anchor.blockNumber } : undefined;
+    const rebuildAt = anchor ? { toBlock: anchor.blockNumber } : {};
     // Local reconstruction resolves the person from its own versions without asking the RPC.
     const identityCommitment = chain
-      ? getBigInt(await env.lineageIndex.identityCommitmentOf(parentPersonHash))
+      ? getBigInt(await (at
+          ? env.lineageIndex.identityCommitmentOf(parentPersonHash, at)
+          : env.lineageIndex.identityCommitmentOf(parentPersonHash)))
       : ((
           await loadLineageSnapshot(env.lineageIndex, env.family, {
+            ...rebuildAt,
             selection: { versionPersonHashes: [parentPersonHash] },
           })
         ).versions.get(parentPersonHash)?.[0]?.identityCommitment ?? 0n);
@@ -1076,12 +1082,18 @@ export class ShieldedAssetSession {
     );
     const lineage = chain
       ? await loadTargetedLineageSnapshot(env.lineageIndex, env.family, {
+          ...(anchor ? { blockNumber: anchor.blockNumber } : {}),
           parentIdentityCommitments: [identityCommitment],
         })
       : await loadLineageSnapshot(env.lineageIndex, env.family, {
+          ...rebuildAt,
           selection: { parentIdentityCommitments: [identityCommitment] },
         });
     current();
+    requireValue(
+      !anchor || (lineage.blockNumber === anchor.blockNumber && lineage.blockHash === anchor.blockHash),
+      "Funding family snapshot changed. Refresh the wallet and try again.",
+    );
     const parentVersions = listShieldedFundingParentVersions({
       snapshot: lineage,
       parentIdentityCommitment: identityCommitment,
@@ -1090,14 +1102,12 @@ export class ShieldedAssetSession {
       parentPersonHash,
       parentIdentityCommitment: String(identityCommitment),
       parentVersions,
-      children: parentVersions.flatMap((rootVersionIndex) =>
-        listShieldedFundingChildren({
-          snapshot: lineage,
-          asOf: lineage.timestamp,
-          parentIdentityCommitment: identityCommitment,
-          rootVersionIndex,
-        }).map((child) => ({ ...child, rootVersionIndex, eligible: !!child.eligible })),
-      ),
+      children: listShieldedFundingChildren({
+        snapshot: lineage,
+        asOf: lineage.timestamp,
+        parentIdentityCommitment: identityCommitment,
+        parentVersions,
+      }),
     };
   }
 
@@ -1320,7 +1330,8 @@ export class ShieldedAssetSession {
       };
       const knownHeir = verified?.identityCommitment ??
         (template ? getBigInt(template.note.heirIdentityCommitment) : undefined);
-      const lineage = normalizeShieldedStateReadMode(ctx.stateReadMode) === "chain"
+      const chain = normalizeShieldedStateReadMode(ctx.stateReadMode) === "chain";
+      const lineage = chain
         ? await loadTargetedLineageSnapshot(env.lineageIndex, env.family, {
             eligibility: [{
               ...root,
@@ -1333,8 +1344,7 @@ export class ShieldedAssetSession {
               : { publicEligibility: [{ ...root, heirPersonHash: request.publicRecipient }] },
           });
       current();
-      // Every period of this heir and policy must fall due within uint64 time. A refill adds to
-      // the template's remaining periods. Refuse before any consolidation.
+      // Bound the funded periods and the selected refill template before consolidation.
       const templateRate = template ? getBigInt(template.note.amountPerPeriod) : 0n;
       const templatePeriods =
         template && templateRate > 0n ? getBigInt(template.note.remaining) / templateRate : 0n;
@@ -1351,12 +1361,14 @@ export class ShieldedAssetSession {
       if (mode === 0) {
         // Public and identity-credential budgets derive their owner from the identity secret,
         // which anyone can rebuild for a public-tree record. Refuse before any consolidation.
-        const publicTree = await findPublicTreeIdentityEvidence({
+        const metadataQuery = {
           family: env.family,
           chainId: scope.chainId,
           personHash: request.publicRecipient,
-          blockTag: lineage.blockNumber,
-        });
+        };
+        const publicTree = chain
+          ? await findPublicTreeIdentityEvidence({ ...metadataQuery, blockTag: lineage.blockNumber })
+          : await findRebuiltPublicTreeIdentityEvidence({ ...metadataQuery, lineageIndex: env.lineageIndex, lineage });
         current();
         requireValue(!publicTree, PUBLIC_TREE_RECIPIENT_MESSAGE);
       }
@@ -1833,6 +1845,8 @@ export function shieldedAssetErrorMessage(
 ): string {
   if (error instanceof AssetSessionError) return error.message;
   if (error instanceof ShieldedProofConfigurationError) return SHIELDED_PROOF_CONFIGURATION_ERROR_MESSAGE;
+  if (error instanceof ProtocolError && error.code === PUBLIC_TREE_METADATA_UNAVAILABLE_CODE)
+    return PUBLIC_TREE_METADATA_UNAVAILABLE_MESSAGE;
   return method === "receiveCode"
     ? "Receive code generation failed. Check the network and proving files, then try again."
     : "Asset operation could not be completed. Please try again.";

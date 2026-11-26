@@ -20,6 +20,7 @@ const LEGACY_MESSAGES: readonly [RegExp, string][] = [
   [/determine.*gas price/i, "archive.errors.feeUnavailable"],
   [/^Choose a public withdrawal destination\.$|^Unshield recipient must (?:be nonzero|not be the pool)$/im, "shielded.invalidExitRecipient"],
   [/registered with the empty public family-tree passphrase/i, "shielded.publicTreeRecipient"],
+  [/could not verify public family metadata for identity-derived funding/i, "shielded.fundingMetadataUnavailable"],
   [/No registered person matches this parent person hash/i, "shielded.fundingParentNotFound"],
   [/fall due after the uint64 time limit/i, "shielded.periodsBeyondTimeLimit"],
 ];

@@ -187,10 +187,10 @@ describe("targeted on-chain lineage paths", () => {
       listShieldedFundingChildren({
         snapshot,
         parentIdentityCommitment: ROOT_IC,
-        rootVersionIndex: 1,
+        parentVersions: [1],
         asOf: 1000n,
       }),
-    ).toEqual([{ personHash: HEIR, identitySuiteId: 1, eligible: true }]);
+    ).toEqual([{ personHash: HEIR, identitySuiteId: 1, rootVersionIndex: 1, eligible: true }]);
     const found = findHeirLegitimacy({
       snapshot,
       heir: { personHash: HEIR, identityCommitment: HEIR_IC },
@@ -466,10 +466,10 @@ describe("targeted on-chain lineage paths", () => {
       listShieldedFundingChildren({
         snapshot,
         parentIdentityCommitment: ROOT_IC,
-        rootVersionIndex: 1,
+        parentVersions: [1],
         asOf: 1000n,
       }),
-    ).toEqual([{ personHash: HEIR, identitySuiteId: 1, eligible: true }]);
+    ).toEqual([{ personHash: HEIR, identitySuiteId: 1, rootVersionIndex: 1, eligible: true }]);
   });
   it("does not restrict child qualification to the bucket's parent version", async () => {
     const f = fixture();
@@ -491,10 +491,10 @@ describe("targeted on-chain lineage paths", () => {
       listShieldedFundingChildren({
         snapshot,
         parentIdentityCommitment: ROOT_IC,
-        rootVersionIndex: 2,
+        parentVersions: [2],
         asOf: 1000n,
       }),
-    ).toEqual([{ personHash: HEIR, identitySuiteId: 1, eligible: true }]);
+    ).toEqual([{ personHash: HEIR, identitySuiteId: 1, rootVersionIndex: 2, eligible: true }]);
   });
   it("uses bounded paths when the global trees have over a trillion leaf slots", async () => {
     const f = fixture(),

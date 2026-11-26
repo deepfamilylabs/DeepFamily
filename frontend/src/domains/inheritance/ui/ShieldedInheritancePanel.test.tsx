@@ -2345,12 +2345,12 @@ describe("Worker-backed shielded wallet", () => {
     expect(code.value).toBe("");
     expect(amount.value).toBe("2.5");
   });
-  it("funds a direct child of another parent after looking the parent up", async () => {
+  it.each([true, false])("funds a direct child of another parent with own family available=%s", async (familyRecordsAvailable) => {
     const otherParent = "0x" + "07".repeat(32);
     const grandchild = "0x" + "08".repeat(32);
     mocks.call.mockImplementation(async (method, params) => method === "recover" ? {
       ...emptyWallet,
-      familyRecordsAvailable: true,
+      familyRecordsAvailable,
       notes: [{ commitment: "101", ownerCommitment: "1", slot: "identity", kind: "value", amount: "10000000000000000000" }],
     } : method === "discover" ? emptyDiscovery : method === "fundingFamily" ? {
       parentPersonHash: otherParent,
@@ -2389,10 +2389,60 @@ describe("Worker-backed shielded wallet", () => {
       action: "fund", rootIdentityCommitment: "77", rootVersionIndex: 3, publicRecipient: grandchild,
     }), expect.anything()));
 
-    // Returning to myself restores the unlocked identity's own family and clears the choices.
+    // Returning to myself clears the other family's choices.
     fireEvent.click(screen.getByRole("radio", { name: /^shielded\.fundingParentSelf/ }));
     expect(checkedHeir()).toBeNull();
     expect(screen.queryByLabelText("shielded.fundingParentPersonHash")).toBeNull();
+  });
+  it("refreshes the selected third-party family and clears a child who no longer qualifies", async () => {
+    const otherParent = "0x" + "07".repeat(32);
+    const firstChild = "0x" + "08".repeat(32);
+    const nextChild = "0x" + "09".repeat(32);
+    let child = firstChild;
+    let toBlock = 30;
+    mocks.verify.mockResolvedValue({
+      purpose: "fund", personHash: firstChild, keyMode: 0, fingerprint: "child-fingerprint",
+    });
+    mocks.call.mockImplementation(async (method) => {
+      if (method === "recover") return { ...emptyWallet, toBlock, blockHash: `0x${toBlock}` };
+      if (method === "discover") return emptyDiscovery;
+      if (method === "fundingFamily") return {
+        parentPersonHash: otherParent,
+        parentIdentityCommitment: "77",
+        parentVersions: [3],
+        children: [{ personHash: child, rootVersionIndex: 3, identitySuiteId: 1, eligible: true }],
+      };
+    });
+    await renderUnlockedPanel();
+    chooseAction("fund");
+    fireEvent.click(screen.getByRole("radio", { name: "shielded.fundingParentOther" }));
+    fireEvent.change(screen.getByLabelText("shielded.fundingParentPersonHash"), { target: { value: otherParent } });
+    fireEvent.click(screen.getByRole("button", { name: "shielded.fundingParentLookup" }));
+    await waitFor(() => expect(selectOptions("shielded.fields.familyVersion")).toEqual(["shielded.fundingVersionOption:3"]));
+    chooseFundingEntry("privateConvenient");
+    chooseOption("shielded.fields.familyVersion", "shielded.fundingVersionOption:3");
+    chooseHeir(firstChild);
+    const code = screen.getByLabelText("shielded.fundReceiveCredentialInputLabel") as HTMLTextAreaElement;
+    fireEvent.change(code, { target: { value: "first-child-code" } });
+    expect(checkedHeir()?.value).toBe(firstChild);
+
+    toBlock = 31;
+    refreshAssets();
+    await waitUntilIdle();
+    expect(checkedHeir()?.value).toBe(firstChild);
+    expect(code.value).toBe("first-child-code");
+
+    child = nextChild;
+    toBlock = 32;
+    refreshAssets();
+    await waitUntilIdle();
+    expect(mocks.call).toHaveBeenCalledWith("fundingFamily", expect.objectContaining({
+      parentPersonHash: otherParent,
+      anchor: { blockNumber: 32, blockHash: "0x32" },
+    }));
+    expect(heirOptions()).toEqual([nextChild]);
+    expect(checkedHeir()).toBeNull();
+    expect(code.value).toBe("");
   });
   it("explains unavailable family records and enables recovered parent versions after refreshing", async () => {
     let familyRecordsAvailable = false;

@@ -7,8 +7,9 @@ include "common/shielded_scope_common.circom";
 
 // Action 0 of the asset pool. The deposited asset amount is public; the two
 // output amounts and their owner are private. Both outputs, including a
-// zero-value dummy, must carry distinct encrypted note ciphertexts whose exact
-// hashes are public inputs. Shielding consumes no old notes.
+// zero-value dummy, carry encrypted note ciphertexts whose exact hashes are
+// public inputs; the pool rejects two identical ciphertexts. Shielding
+// consumes no old notes.
 template ShieldedShield() {
     signal input chainId;
     signal input pool;

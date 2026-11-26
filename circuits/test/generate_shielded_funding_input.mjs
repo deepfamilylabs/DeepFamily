@@ -31,6 +31,7 @@ export function buildShieldedFundingFixtures({
   oldKeyMode = keyMode,
   oldBudgetKind = budgetKind,
   oldBudgetRemainingPeriods = 3n,
+  budgetPeriods = 4n,
   lineage,
 } = {}) {
   chainId = BigInt(chainId);
@@ -89,7 +90,7 @@ export function buildShieldedFundingFixtures({
     rate,
     periodDays,
   ]);
-  const budgetPeriods = 4n;
+  budgetPeriods = BigInt(budgetPeriods);
   const fundedAmount = rate * budgetPeriods;
   const budgetNonce = 107n;
   const budgetCiphertextHash = 108n;

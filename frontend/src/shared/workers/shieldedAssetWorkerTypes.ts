@@ -263,7 +263,11 @@ export type ShieldedAssetWorkerCallMap = {
   };
   recover: { params: { context: ShieldedWorkerContext }; result: ShieldedWalletSummary };
   fundingFamily: {
-    params: { context: ShieldedWorkerContext; parentPersonHash: string };
+    params: {
+      context: ShieldedWorkerContext;
+      parentPersonHash: string;
+      anchor?: { blockNumber: number; blockHash: string };
+    };
     result: ShieldedFundingFamily;
   };
   discover: {

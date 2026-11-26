@@ -90,8 +90,8 @@ export async function createShieldedReceiveCode(
       keys.hpkeIkm.toLowerCase() !== identityKeys.hpkeIkm.toLowerCase())
   )
     throw new Error("Identity receive mode requires canonical identity keys");
-  // The issuer circuit only requires a nonzero mode-1 secret. Identity keys are rebuildable by
-  // whoever knows the identity details and passphrase, so they must not be labeled independent.
+  // The issuer requires a different nonzero spending secret in mode 1.
+  // The wallet also requires different viewing key material.
   if (
     keyMode === 1 &&
     (keys.ownerSecret === identityKeys.ownerSecret ||

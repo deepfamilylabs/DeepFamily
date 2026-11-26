@@ -1,16 +1,17 @@
 import {
+  ProtocolError,
   decryptFormat1Compressed,
   deriveIdentityMaterial,
   gunzipV1Strict,
   parseCanonicalPersonVersion,
   parseFormat1Envelope,
-  readMetadataEnvelopeFromRef,
   wipeBytes,
   type IdentityFields,
   type MetadataContextInput,
 } from "@deepfamily/protocol-core";
 import { getBigInt, isHexString, type Contract } from "ethers";
-import { createArchiveContract } from "../../../shared/clients/contractFactory";
+import { fundingMetadataSource, loadRebuiltFundingMetadata, readFundingVersionMetadata } from "./fundingRecipientMetadata";
+import type { LineageSnapshot } from "./inheritanceChain";
 
 /** Empty and whitespace-only passphrases both prepare to this public family-tree passphrase. */
 const PUBLIC_TREE_PASSPHRASE = "";
@@ -18,6 +19,9 @@ const PUBLIC_TREE_PASSPHRASE = "";
 /** Worker wording for a refused recipient; shieldedUiErrors localizes it by matching this text. */
 export const PUBLIC_TREE_RECIPIENT_MESSAGE =
   "The selected child is registered with the empty public family-tree passphrase, so anyone could claim a budget owned by that identity.";
+export const PUBLIC_TREE_METADATA_UNAVAILABLE_MESSAGE =
+  "The wallet could not verify public family metadata for identity-derived funding.";
+export const PUBLIC_TREE_METADATA_UNAVAILABLE_CODE = "SHIELDED_FUNDING_METADATA_UNAVAILABLE";
 
 /** The version whose public envelope shows that the empty passphrase reproduces the identity. */
 export type PublicTreeIdentityEvidence = { versionIndex: number };
@@ -41,50 +45,63 @@ export async function findPublicTreeIdentityEvidence(input: {
   blockTag: number;
 }): Promise<PublicTreeIdentityEvidence | null> {
   if (!isHexString(input.personHash, 32)) throw new Error("Recipient person hash is invalid");
-  const provider = input.family.runner?.provider;
-  if (!provider) throw new Error("The family contract has no provider");
   const personHash = input.personHash.toLowerCase();
-  const at = { blockTag: input.blockTag };
-  const [deepFamilyProxy, archiveAddress, versionCount] = await Promise.all([
-    input.family.getAddress(),
-    input.family.archive(at),
-    input.family.personVersionsCount(personHash, at),
+  const [source, versionCount] = await Promise.all([
+    fundingMetadataSource(input.family, input.chainId, input.blockTag),
+    input.family.personVersionsCount(personHash, { blockTag: input.blockTag }),
   ]);
   const count = getBigInt(versionCount);
   if (count < 1n || count > BigInt(Number.MAX_SAFE_INTEGER))
     throw new Error("Recipient identity has no readable registered version");
-  const archive = createArchiveContract(String(archiveAddress), provider);
-  const getCode = (pointer: string, blockTag: string | number) =>
-    provider.getCode(pointer, blockTag);
   for (let versionIndex = 1; versionIndex <= Number(count); versionIndex += 1) {
-    const [version, ref] = await Promise.all([
-      input.family.personVersionAt(personHash, versionIndex - 1, at),
-      archive.metadataRef(personHash, versionIndex, at),
-    ]);
-    const { envelope } = await readMetadataEnvelopeFromRef({
-      pointer: ref.pointer,
-      payloadHash: ref.payloadHash,
-      payloadLength: ref.payloadLength,
-      segmentCount: ref.segmentCount,
-      blockTag: input.blockTag,
-      getCode,
-    });
-    // The contract bound this header suite to the version's proof.
-    const { identitySuiteId } = parseFormat1Envelope(envelope);
-    const opened = await openWithPublicTreePassphrase(envelope, {
-      chainId: input.chainId,
-      deepFamilyProxy,
-      personHash,
-      fatherHash: version.fatherHash,
-      fatherVersionIndex: version.fatherVersionIndex,
-      motherHash: version.motherHash,
-      motherVersionIndex: version.motherVersionIndex,
-      versionCommitment: version.versionCommitment,
-    });
-    if (opened && (await reproducesWithPublicTreePassphrase(opened, identitySuiteId, personHash)))
-      return { versionIndex };
+    const { envelope, context } = await readFundingVersionMetadata(source, personHash, versionIndex);
+    if (await isPublicTreeEnvelope(envelope, context, personHash)) return { versionIndex };
   }
   return null;
+}
+
+export async function findRebuiltPublicTreeIdentityEvidence(input: {
+  family: Contract;
+  lineageIndex: Contract;
+  chainId: bigint;
+  personHash: string;
+  lineage: Pick<LineageSnapshot, "blockNumber" | "blockHash" | "versions">;
+}): Promise<PublicTreeIdentityEvidence | null> {
+  if (!isHexString(input.personHash, 32)) throw new Error("Recipient person hash is invalid");
+  const personHash = input.personHash.toLowerCase();
+  const { blockNumber, blockHash, versions } = input.lineage;
+  const versionIndices = (versions.get(personHash) ?? [])
+    .map((version) => version.versionIndex)
+    .sort((a, b) => a - b);
+  try {
+    if (!versionIndices.length) throw new Error("Recipient identity has no readable registered version");
+    const metadata = await loadRebuiltFundingMetadata({
+      family: input.family,
+      lineageIndex: input.lineageIndex,
+      chainId: input.chainId,
+      blockNumber,
+      blockHash,
+    }, personHash, versionIndices);
+    for (const [index, { envelope, context }] of metadata.entries()) {
+      if (await isPublicTreeEnvelope(envelope, context, personHash)) {
+        return { versionIndex: versionIndices[index] };
+      }
+    }
+    return null;
+  } catch (cause) {
+    throw new ProtocolError(
+      PUBLIC_TREE_METADATA_UNAVAILABLE_CODE,
+      PUBLIC_TREE_METADATA_UNAVAILABLE_MESSAGE,
+      { cause },
+    );
+  }
+}
+
+async function isPublicTreeEnvelope(envelope: Uint8Array, context: MetadataContextInput, personHash: string) {
+  // The contract bound this header suite to the version's proof.
+  const { identitySuiteId } = parseFormat1Envelope(envelope);
+  const opened = await openWithPublicTreePassphrase(envelope, context);
+  return opened !== null && (await reproducesWithPublicTreePassphrase(opened, identitySuiteId, personHash));
 }
 
 /** Returns the plaintext identity fields only when the envelope opens with the empty passphrase. */

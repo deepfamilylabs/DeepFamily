@@ -209,7 +209,8 @@ template ShieldedReceivePresentation(KIND) {
         (action - 1) * outputSlotBoolean === 0;
     } else {
         action === 3;
-        messageId * (1 - messageId) === 0;
+        // Fund carries a receipt only on its budget output; output 1 is the donor change.
+        messageId === 0;
     }
 
     component lookup = ShieldedReceiveCounterLookup();

@@ -1,5 +1,5 @@
 import { getAddress } from "ethers";
-import { bigintFrom } from "./bytes.js";
+import { bigintFrom, equalBytesConstantTime } from "./bytes.js";
 import { MAX_UINT64, MAX_UINT128, SNARK_SCALAR_FIELD } from "./constants.js";
 import { protocolAssert } from "./errors.js";
 import { computeShieldedCiphertextHashField } from "./shielded-inheritance.js";
@@ -86,6 +86,12 @@ export function buildShieldedPoolPublicInputs(input) {
       "Public budget fields must equal the envelope, or zero for private funding",
     );
   }
+  const ciphertextHashes = input.outputCiphertexts.map(computeShieldedCiphertextHashField);
+  protocolAssert(
+    !equalBytesConstantTime(...input.outputCiphertexts),
+    "DUPLICATE_SHIELDED_OUTPUT_CIPHERTEXT",
+    "Shielded outputs need distinct ciphertexts",
+  );
   const available = {
     chainId: [bigintFrom(input.chainId, "chainId", MAX_UINT64)],
     pool: [BigInt(getAddress(input.poolAddress))],
@@ -96,7 +102,7 @@ export function buildShieldedPoolPublicInputs(input) {
     inputNullifiers,
     periodNullifiers,
     outputCommitments,
-    ciphertextHashes: input.outputCiphertexts.map(computeShieldedCiphertextHashField),
+    ciphertextHashes,
     amount: [bigintFrom(input.amount ?? 0n, "amount", MAX_UINT128)],
     recipient: [input.recipient === undefined ? 0n : BigInt(getAddress(input.recipient))],
     endorsementRoot: [field(input.relation0 ?? 0n, "relation0")],

@@ -1,5 +1,5 @@
 export type PublicStateSyncProgress = {
-  domain: "authorization" | "lineage";
+  domain: "authorization" | "lineage" | "metadata";
   phase: "download" | "verify" | "catchup" | "complete";
   completed: number;
   total: number;
@@ -30,7 +30,7 @@ export function isPublicStateSyncProgress(value: unknown): value is PublicStateS
   if (!value || typeof value !== "object") return false;
   const item = value as PublicStateSyncProgress;
   return (
-    (item.domain === "authorization" || item.domain === "lineage") &&
+    (item.domain === "authorization" || item.domain === "lineage" || item.domain === "metadata") &&
     ["download", "verify", "catchup", "complete"].includes(item.phase) &&
     Number.isSafeInteger(item.completed) &&
     Number.isSafeInteger(item.total) &&

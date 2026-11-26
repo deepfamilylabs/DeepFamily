@@ -30,6 +30,10 @@ template ShieldedReceiveCredential(KIND) {
 
     component suite = AtomicSuiteCommitment();
     suite.suiteId <== suiteId;
+    // Registration requires a nonzero uint32 self suite; issue only for that range.
+    component suiteZero = IsZero();
+    suiteZero.in <== suiteId;
+    suiteZero.out === 0;
     receiveCodeVersion === 1;
     keyMode * (1 - keyMode) === 0;
 
@@ -53,6 +57,11 @@ template ShieldedReceiveCredential(KIND) {
     ownerSecret.inputs[1] <== derivedSecretField;
 
     (1 - keyMode) * (spendingSecret - ownerSecret.out) === 0;
+    // Whoever knows the identity details and passphrase can rebuild the identity-derived
+    // secret, so mode 1 must use a different one. Its root source remains unproved.
+    component identityKeyed = IsZero();
+    identityKeyed.in <== spendingSecret - ownerSecret.out;
+    keyMode * identityKeyed.out === 0;
     component spendNonzero = IsZero();
     spendNonzero.in <== spendingSecret;
     spendNonzero.out === 0;

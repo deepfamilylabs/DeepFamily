@@ -164,9 +164,8 @@ template ShieldedFund() {
     (1 - budgetKind) * ownerNotZero.out === 0;
     budgetKind * heirOwnerCommitment === 0;
 
-    component directChild = ShieldedDirectChildCurrent();
+    component directChild = ShieldedDirectChildCurrent(64);
     directChild.heirIdentityCommitment <== heirIdentityCommitment;
-    directChild.rootIdentityCommitment <== rootIdentityCommitment;
     directChild.rootVersionIndex <== rootVersionIndex;
     directChild.heirVersionIndex <== heirVersionIndex;
     directChild.fatherIdentityCommitment <== fatherIdentityCommitment;
@@ -182,6 +181,7 @@ template ShieldedFund() {
     directChild.trustedSiblings <== trustedSiblings;
     directChild.endorsementRoot <== endorsementRoot;
     directChild.trustedRoot <== trustedRoot;
+    directChild.rootIdentityCommitment === rootIdentityCommitment;
     initial * (eligibleFrom - asOf - 7200) === 0;
 
     component enrollment = ShieldedPrivateEnrollment();
@@ -274,6 +274,16 @@ template ShieldedFund() {
     signal budgetAmount <== rate * budgetPeriods;
     component amountBits = Num2Bits(128);
     amountBits.in <== budgetAmount;
+    // Claim accepts only uint64 maturities, and every budget of one heir under one policy
+    // shares one period index sequence. The new periods follow the template's remaining
+    // periods; an initial funding has none. Claimed periods and other refills are not
+    // visible here, so a refill bound can only under-count.
+    component eligibleFromBits = Num2Bits(64);
+    eligibleFromBits.in <== eligibleFrom;
+    signal fundedPeriods <== oldBudgetRemainingPeriods + budgetPeriods;
+    signal lastMaturity <== eligibleFrom + fundedPeriods * (periodDays * 86400);
+    component lastMaturityBits = Num2Bits(64);
+    lastMaturityBits.in <== lastMaturity;
     component budgetNonceNotZero = IsZero();
     budgetNonceNotZero.in <== budgetNonce;
     budgetNonceNotZero.out === 0;

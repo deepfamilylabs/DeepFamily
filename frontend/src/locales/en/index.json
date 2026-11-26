@@ -1650,7 +1650,8 @@
       "balanceUpdating": "Updating…",
       "domains": {
         "authorization": "Receive authorization",
-        "lineage": "Family endorsements"
+        "lineage": "Family endorsements",
+        "metadata": "Public family metadata"
       },
       "phases": {
         "download": "Downloading public state",
@@ -1838,6 +1839,7 @@
     "familyRecordsUnavailable": "The child list could not be loaded. Use Refresh above to try again.",
     "familyRecordsIncompatible": "Child budgets on this network require a service update. Contact the maintainer.",
     "publicTreeRecipient": "This child was registered with an empty passphrase. Their name, birth date and other details are public in the family tree, so anyone could use them to claim a budget sent to this child. To protect the funds, Public budget and Private (identity credentials) are unavailable for this child.",
+    "fundingMetadataUnavailable": "Could not verify public family metadata for this budget. Retry synchronization, or use an independent-key budget.",
     "periodsBeyondTimeLimit": "Too many periods to fund: the last ones would fall due after the on-chain time limit and could never be claimed. Fund fewer periods or shorten the claim interval.",
     "transactionFailed": "Transaction success could not be confirmed: {{hash}}. Check its status before retrying.",
     "claimPeriodsLabel": "Periods to claim",
