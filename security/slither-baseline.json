@@ -11,7 +11,7 @@
     "contracts/libraries/LeanMerklePath.sol": "c1ba4aad31d52e07a99e62a5649367d9a73cd9c1a1bf9fabe79b6cc66afd4499",
     "contracts/receive/IdentityAuthorizationState.sol": "2e3a1472e5452a62b5e976b0f333dd1f1e9c164d3ad70b744c89a221d31d1790",
     "contracts/shielded/ShieldedNativePool.sol": "97ca57ef47f986be5af91265154b22a00f2d03c2e9ddd33e1ed90c12bd15da8e",
-    "contracts/shielded/ShieldedPoolCore.sol": "bf473daaa83f139d460da1b2e17793c443a348a52715fb09a0665fe54570db31",
+    "contracts/shielded/ShieldedPoolCore.sol": "dc79c48354453decf96861a2fa6457ec1468972713a4ade976c4d6e82cda08a5",
     "contracts/verifiers/DisclosureBindingVerifier.sol": "1b5af28ee1386cfef2e9aaa5955ddf30d98456bdfc4b770a98ffc6848341aae8",
     "contracts/verifiers/PersonCommitmentVerifier.sol": "0a0ca8c74e7f5576cdbcb7b9458550baa778fb4cf87b6ac2d138f8465255f99a",
     "contracts/verifiers/ShieldedClaim32Verifier.sol": "a5b2e2d71e4cb348111e6a7834b051b884c299c99093ab51bfd4834ef612e791",
@@ -88,7 +88,7 @@
       "id": "0fc1b0b77e100e0cf92f20fdda565973698ab4eb2db5ce13d9a9bcbeee878806",
       "check": "incorrect-return",
       "impact": "High",
-      "subject": "ShieldedPoolCore.unshield(address,uint256,ShieldedPoolCore.ActionData,bytes) (contracts/shielded/ShieldedPoolCore.sol#189-203) calls ShieldedPoolCore._appendOutputs(ShieldedPoolCore.Action,ShieldedPoolCore.ActionData) (contracts/shielded/ShieldedPoolCore.sol#550-565) which halt the execution return(uint256,uint256)(0,0x20) (node_modules/poseidon-solidity/PoseidonT3.sol#388)",
+      "subject": "ShieldedPoolCore.unshield(address,uint256,ShieldedPoolCore.ActionData,bytes) (contracts/shielded/ShieldedPoolCore.sol#189-203) calls ShieldedPoolCore._appendOutputs(ShieldedPoolCore.Action,ShieldedPoolCore.ActionData) (contracts/shielded/ShieldedPoolCore.sol#555-570) which halt the execution return(uint256,uint256)(0,0x20) (node_modules/poseidon-solidity/PoseidonT3.sol#388)",
       "reason": "The reported RETURN belongs to a public linked Poseidon library function, which executes in its own DELEGATECALL frame. Returning the hash exits that library call and resumes this caller; it does not skip the caller's subsequent state updates or guards.",
       "sources": [
         "contracts/shielded/ShieldedPoolCore.sol",
@@ -455,7 +455,7 @@
       "id": "f4361682e5950e9629610bc7444666866812a4001eca4c5f8663893136e82b49",
       "check": "incorrect-return",
       "impact": "High",
-      "subject": "ShieldedPoolCore._appendOutputs(ShieldedPoolCore.Action,ShieldedPoolCore.ActionData) (contracts/shielded/ShieldedPoolCore.sol#550-565) calls ShieldedPoolCore._append(uint256,bytes) (contracts/shielded/ShieldedPoolCore.sol#567-592) which halt the execution return(uint256,uint256)(0,0x20) (node_modules/poseidon-solidity/PoseidonT3.sol#388)",
+      "subject": "ShieldedPoolCore._appendOutputs(ShieldedPoolCore.Action,ShieldedPoolCore.ActionData) (contracts/shielded/ShieldedPoolCore.sol#555-570) calls ShieldedPoolCore._append(uint256,bytes) (contracts/shielded/ShieldedPoolCore.sol#572-597) which halt the execution return(uint256,uint256)(0,0x20) (node_modules/poseidon-solidity/PoseidonT3.sol#388)",
       "reason": "The reported RETURN belongs to a public linked Poseidon library function, which executes in its own DELEGATECALL frame. Returning the hash exits that library call and resumes this caller; it does not skip the caller's subsequent state updates or guards.",
       "sources": [
         "contracts/shielded/ShieldedPoolCore.sol",
@@ -515,7 +515,7 @@
       "id": "2c1352de1916010a29bf5da3c54ec313ee25679de45e737ffd745d14c177c77f",
       "check": "uninitialized-local",
       "impact": "Medium",
-      "subject": "ShieldedPoolCore._publicSignals(ShieldedPoolCore.Action,ShieldedPoolCore.ActionData,uint256,address).n (contracts/shielded/ShieldedPoolCore.sol#444) is a local variable never initialized",
+      "subject": "ShieldedPoolCore._publicSignals(ShieldedPoolCore.Action,ShieldedPoolCore.ActionData,uint256,address).n (contracts/shielded/ShieldedPoolCore.sol#449) is a local variable never initialized",
       "reason": "The unsigned signal cursor intentionally starts at Solidity's default zero. It increments while writing the already allocated public-input array in schema order; zero is the required first index, and this local value never refers to an uninitialized storage pointer.",
       "sources": ["contracts/shielded/ShieldedPoolCore.sol"]
     },
@@ -523,7 +523,7 @@
       "id": "328787bb65c525db3a0ad0b4fe69c07c8e157580ba5dfbe9148a77d10ccd6dc7",
       "check": "uninitialized-local",
       "impact": "Medium",
-      "subject": "ShieldedPoolCore._publicBudgetFields(bytes).value (contracts/shielded/ShieldedPoolCore.sol#499) is a local variable never initialized",
+      "subject": "ShieldedPoolCore._publicBudgetFields(bytes).value (contracts/shielded/ShieldedPoolCore.sol#504) is a local variable never initialized",
       "reason": "The unsigned accumulator intentionally starts at Solidity's default zero, then shifts and incorporates each byte while decoding a fixed-width public-budget field. A zero initial accumulator is required for canonical big-endian decoding.",
       "sources": ["contracts/shielded/ShieldedPoolCore.sol"]
     },
@@ -531,7 +531,7 @@
       "id": "3c8df2b29df8f44b4fef3edf8df258a9024f527749575bf99e6f1be77d308709",
       "check": "uninitialized-local",
       "impact": "Medium",
-      "subject": "ShieldedPoolCore._verifyReceiveAuthorizations(ShieldedPoolCore.Action,ShieldedPoolCore.ActionData).actionHash (contracts/shielded/ShieldedPoolCore.sol#376) is a local variable never initialized",
+      "subject": "ShieldedPoolCore._verifyReceiveAuthorizations(ShieldedPoolCore.Action,ShieldedPoolCore.ActionData).actionHash (contracts/shielded/ShieldedPoolCore.sol#381) is a local variable never initialized",
       "reason": "bytes32 actionHash intentionally starts at Solidity's zero default as a lazy-computation sentinel. It is computed from action data before use by an active receipt, while empty authorization slots skip it entirely.",
       "sources": ["contracts/shielded/ShieldedPoolCore.sol"]
     },

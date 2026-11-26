@@ -28,6 +28,7 @@ vi.mock("../../../shared/clients/contractFactory", () => ({
   createLineageIndexContract: mocks.lineageContract,
 }));
 const CIPHERTEXT = `0x${"ab".repeat(512)}`;
+const CHANGE_CIPHERTEXT = `0x${"cd".repeat(512)}`;
 const PROOF = {
   pi_a: ["1", "2", "1"],
   pi_b: [
@@ -47,7 +48,7 @@ function actionData(capacity = 2): ShieldedPoolActionData {
     inputNullifiers: Array(capacity).fill(0n),
     periodNullifiers: Array<bigint>(3).fill(0n),
     outputCommitments: [123n, 456n],
-    outputCiphertexts: [CIPHERTEXT, CIPHERTEXT],
+    outputCiphertexts: [CIPHERTEXT, CHANGE_CIPHERTEXT],
     relation0: 0n,
     relation1: 0n,
     asOf: 0n,
@@ -736,6 +737,14 @@ describe("shielded pool asset-worker proof submission", () => {
     const data = { ...f.common.data, outputCiphertexts: ["0xab", CIPHERTEXT] as const };
     await expect(submitClaim({ ...f.common, data })).rejects.toThrow("exactly 512 bytes");
     expect(f.estimateGas).not.toHaveBeenCalled();
+  });
+
+  it("rejects one envelope reused for both outputs before estimation or submission", async () => {
+    const f = fixture(1);
+    const data = { ...f.common.data, outputCiphertexts: [CIPHERTEXT, CIPHERTEXT] as const };
+    await expect(submitClaim({ ...f.common, data })).rejects.toThrow("distinct ciphertexts");
+    expect(f.estimateGas).not.toHaveBeenCalled();
+    expect(f.methods.claim).not.toHaveBeenCalled();
   });
 });
 

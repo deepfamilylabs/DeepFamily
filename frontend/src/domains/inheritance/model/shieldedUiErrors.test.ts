@@ -5,6 +5,7 @@ import { restoreChainError, serializeChainError } from "@deepfamily/chain-client
 import { normalizeShieldedUiError } from "./shieldedUiErrors";
 import { InheritanceError } from "./inheritanceErrors";
 import { PUBLIC_TREE_RECIPIENT_MESSAGE } from "../services/shieldedPublicTreeIdentity";
+import { SHIELDED_PERIODS_BEYOND_TIME_LIMIT_MESSAGE } from "./shieldedBudgetPeriod";
 
 const t = ((key: string) => key) as TFunction;
 describe("shielded error presentation", () => {
@@ -31,11 +32,12 @@ describe("shielded error presentation", () => {
     expect(normalizeShieldedUiError(new InheritanceError("periodDaysInvalid"), t).message).toBe("shielded.periodDaysInvalid");
     expect(normalizeShieldedUiError(new Error("The proof expired before submission. Prepare and confirm a fresh preview."), t).message).toBe("shielded.walletKeys.reviewAgain");
   });
-  it("localizes a public-tree recipient refused across the asset Worker boundary", () => {
-    const refused = restoreChainError(
-      serializeChainError(new Error(PUBLIC_TREE_RECIPIENT_MESSAGE), PUBLIC_TREE_RECIPIENT_MESSAGE),
-    );
-    expect(normalizeShieldedUiError(refused, t).message).toBe("shielded.publicTreeRecipient");
+  it.each([
+    [PUBLIC_TREE_RECIPIENT_MESSAGE, "shielded.publicTreeRecipient"],
+    [SHIELDED_PERIODS_BEYOND_TIME_LIMIT_MESSAGE, "shielded.periodsBeyondTimeLimit"],
+  ])("localizes a funding refusal across the asset Worker boundary: %s", (message, key) => {
+    const refused = restoreChainError(serializeChainError(new Error(message), message));
+    expect(normalizeShieldedUiError(refused, t).message).toBe(key);
   });
   it("keeps unknown diagnostics out of the main instruction", () => {
     const error = normalizeShieldedUiError(new Error("Unexpected low-level configuration value"), t);

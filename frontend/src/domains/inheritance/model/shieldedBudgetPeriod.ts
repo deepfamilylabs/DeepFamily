@@ -1,7 +1,26 @@
 import { InheritanceError } from "./inheritanceErrors";
 
 const MAX_UINT32 = (1n << 32n) - 1n;
+const MAX_UINT64 = (1n << 64n) - 1n;
+const SECONDS_PER_DAY = 86_400n;
 const MAX_DATE_SECONDS = 8_640_000_000_000n;
+
+/** Asset Worker text for an unclaimable period count; the interface localizes it. */
+export const SHIELDED_PERIODS_BEYOND_TIME_LIMIT_MESSAGE =
+  "The last funded periods would fall due after the uint64 time limit and could never be claimed.";
+
+/**
+ * Claim proves each period index's maturity, `eligibleFrom + (index + 1) * periodDays` days,
+ * within uint64 time, and all budgets of one heir under one policy share one index sequence.
+ * `periods` counts the indices those budgets still need.
+ */
+export function shieldedPeriodsMatureInTime(
+  eligibleFrom: bigint,
+  periodDays: bigint,
+  periods: bigint,
+): boolean {
+  return eligibleFrom + periods * periodDays * SECONDS_PER_DAY <= MAX_UINT64;
+}
 
 /** Days are protocol integers, never floating point or calendar-month units. */
 export function parseShieldedPeriodDays(value: string): bigint {

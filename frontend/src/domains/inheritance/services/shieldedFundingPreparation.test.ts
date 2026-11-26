@@ -32,6 +32,7 @@ import {
   validateShieldedFundingDestination,
 } from "./shieldedFundingPreparation";
 import { listShieldedFundingHeirs } from "../model/shieldedFundingOptions";
+import { SHIELDED_PERIODS_BEYOND_TIME_LIMIT_MESSAGE } from "../model/shieldedBudgetPeriod";
 import type { ShieldedWalletSummary } from "../../../shared/workers/shieldedAssetWorkerTypes";
 import { prepareShieldedShield } from "./shieldedNotePreparation";
 import type { LocalShieldedWalletSnapshot } from "./shieldedWalletRecovery";
@@ -583,6 +584,45 @@ describe("local unified funding preparation", () => {
         { chainId, poolAddress },
       ),
     ).toThrow("positive uint32");
+  });
+
+  it("refuses periods that fall due after uint64 time, counting a refill template's periods", async () => {
+    const periodDays = 4_294_967_295n;
+    const fixture = await setup(periodDays);
+    const capacity = ((1n << 64n) - 1n - (BigInt(timestamp) + 7200n)) / (periodDays * 86_400n);
+    const initialInput = {
+      ...fixture.common,
+      fundMode: 0 as const,
+      policy: fixture.policy,
+      lineageIndex: fixture.lineageIndex,
+      lineage: fixture.lineage,
+    };
+    await expect(
+      validateShieldedFundingDestination({ ...initialInput, budgetPeriods: capacity }),
+    ).resolves.toBeUndefined();
+    await expect(
+      validateShieldedFundingDestination({ ...initialInput, budgetPeriods: capacity + 1n }),
+    ).rejects.toThrow(SHIELDED_PERIODS_BEYOND_TIME_LIMIT_MESSAGE);
+
+    const initial = await prepareShieldedFund({ ...initialInput, budgetPeriods: 5n });
+    await recordFunding(fixture, initial);
+    const refill = {
+      ...fixture.common,
+      fundMode: 1 as const,
+      budget: {
+        note: initial.outputs[0].note,
+        commitment: initial.outputs[0].commitment,
+        ciphertext: initial.outputs[0].ciphertext,
+        shardId: 0n,
+        viewingKey: fixture.common.recipient.viewingKey,
+      },
+    };
+    await expect(
+      validateShieldedFundingDestination({ ...refill, budgetPeriods: capacity - 5n }),
+    ).resolves.toBeUndefined();
+    await expect(
+      validateShieldedFundingDestination({ ...refill, budgetPeriods: capacity - 4n }),
+    ).rejects.toThrow(SHIELDED_PERIODS_BEYOND_TIME_LIMIT_MESSAGE);
   });
 
   it.each([0, 1] as const)(

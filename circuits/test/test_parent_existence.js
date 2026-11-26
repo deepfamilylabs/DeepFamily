@@ -1,3 +1,4 @@
+import { assertConstraintViolation } from "./constraint_assertions.mjs";
 import { calculateWitnessIsolated } from "./witness_helper.js";
 
 const baseInput = {
@@ -47,14 +48,14 @@ const zeroRole = (input, role) => ({
   [`has${role[0].toUpperCase()}${role.slice(1)}`]: 0,
 });
 
+// Input, artifact and verification errors must fail the case, not pass it as rejected.
 async function expectRejected(label, input) {
   try {
-    await calculateWitnessIsolated(input);
-  } catch {
-    console.log(`PASS: ${label}`);
-    return;
+    await assertConstraintViolation(() => calculateWitnessIsolated(input));
+  } catch (error) {
+    throw new Error(`${label}: expected a circuit constraint failure`, { cause: error });
   }
-  throw new Error(`${label}: circuit accepted a non-canonical parent witness`);
+  console.log(`PASS: ${label}`);
 }
 
 async function testParentExistence() {

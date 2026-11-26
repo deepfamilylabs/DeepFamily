@@ -84,6 +84,11 @@ import {
   listShieldedFundingParentVersions,
 } from "../domains/inheritance/services/shieldedFundingFamily";
 import { InheritanceError } from "../domains/inheritance/model/inheritanceErrors";
+import {
+  SHIELDED_FUNDING_START_DELAY_SECONDS,
+  SHIELDED_PERIODS_BEYOND_TIME_LIMIT_MESSAGE,
+  shieldedPeriodsMatureInTime,
+} from "../domains/inheritance/model/shieldedBudgetPeriod";
 import { prepareShieldedShield } from "../domains/inheritance/services/shieldedNotePreparation";
 import {
   createShieldedPolicyDescriptor,
@@ -1328,6 +1333,21 @@ export class ShieldedAssetSession {
               : { publicEligibility: [{ ...root, heirPersonHash: request.publicRecipient }] },
           });
       current();
+      // Every period of this heir and policy must fall due within uint64 time. A refill adds to
+      // the template's remaining periods. Refuse before any consolidation.
+      const templateRate = template ? getBigInt(template.note.amountPerPeriod) : 0n;
+      const templatePeriods =
+        template && templateRate > 0n ? getBigInt(template.note.remaining) / templateRate : 0n;
+      requireValue(
+        shieldedPeriodsMatureInTime(
+          template
+            ? getBigInt(template.note.eligibleFrom)
+            : lineage.timestamp + SHIELDED_FUNDING_START_DELAY_SECONDS,
+          getBigInt(template ? template.note.periodDays : policy.periodDays),
+          periods + templatePeriods,
+        ),
+        SHIELDED_PERIODS_BEYOND_TIME_LIMIT_MESSAGE,
+      );
       if (mode === 0) {
         // Public and identity-credential budgets derive their owner from the identity secret,
         // which anyone can rebuild for a public-tree record. Refuse before any consolidation.

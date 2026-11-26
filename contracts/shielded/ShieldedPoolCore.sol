@@ -297,6 +297,11 @@ abstract contract ShieldedPoolCore is ReentrancyGuardTransient {
     if (data.outputCommitments[0] == data.outputCommitments[1]) {
       revert DuplicateCommitment();
     }
+    // Chain-only recovery opens each note from its own envelope. The circuits bind each
+    // output to its envelope hash but cannot see both, so a shared envelope is refused here.
+    if (keccak256(data.outputCiphertexts[0]) == keccak256(data.outputCiphertexts[1])) {
+      revert InvalidCiphertext();
+    }
     if (
       isInitialFund &&
       (data.inputShardIds[1] != data.inputShardIds[0] || data.inputRoots[1] != data.inputRoots[0])

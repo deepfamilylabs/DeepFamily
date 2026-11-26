@@ -42,7 +42,11 @@ import type { LocalShieldedWalletSnapshot } from "./shieldedWalletRecovery";
 import { getLocalShieldedNoteProof } from "./shieldedPoolChain";
 
 import { validateShieldedKeyMaterial, type ShieldedKeyMaterial } from "./shieldedKeyAuthorization";
-import { SHIELDED_FUNDING_START_DELAY_SECONDS } from "../model/shieldedBudgetPeriod";
+import {
+  SHIELDED_FUNDING_START_DELAY_SECONDS,
+  SHIELDED_PERIODS_BEYOND_TIME_LIMIT_MESSAGE,
+  shieldedPeriodsMatureInTime,
+} from "../model/shieldedBudgetPeriod";
 
 const MAX_UINT64 = (1n << 64n) - 1n;
 const MAX_UINT32 = (1n << 32n) - 1n;
@@ -208,6 +212,11 @@ function fundingAmount(
   const amount = rate * periods;
   if (amount > MAX_UINT128) throw new Error("Funding amount exceeds uint128");
   return { periods, amount };
+}
+
+function assertPeriodsMatureInTime(eligibleFrom: bigint, periodDays: bigint, periods: bigint) {
+  if (!shieldedPeriodsMatureInTime(eligibleFrom, periodDays, periods))
+    throw new Error(SHIELDED_PERIODS_BEYOND_TIME_LIMIT_MESSAGE);
 }
 
 function decimal(values: readonly bigint[]): string[] {
@@ -653,6 +662,9 @@ async function initialFundingDestination(input: InitialFundingInput) {
   if (input.wallet.spentNullifiers.has(enrollmentNullifier))
     throw new Error("This child is already enrolled under this policy");
   const lineage = await fundingLineage(input, ctx, policy);
+  const eligibleFrom = uint64(lineage.data.asOf + PROOF_LIFETIME, "eligibleFrom");
+  // An initial funding is the enrollment's only budget, so this bound is exact.
+  assertPeriodsMatureInTime(eligibleFrom, positiveUint32(policy.periodDays, "periodDays"), periods);
   return {
     ctx,
     policy,
@@ -663,7 +675,7 @@ async function initialFundingDestination(input: InitialFundingInput) {
     heir,
     enrollmentNullifier,
     lineage,
-    eligibleFrom: uint64(lineage.data.asOf + PROOF_LIFETIME, "eligibleFrom"),
+    eligibleFrom,
   };
 }
 
@@ -829,6 +841,13 @@ async function continuationFundingDestination(input: ContinuationFundingInput) {
   if (rate === 0n || oldRemaining % rate !== 0n)
     throw new Error("Template budget has fractional periods");
   const { periods, amount } = fundingAmount(rate, input.budgetPeriods);
+  // Claimed periods and other refills also hold indices but are invisible here, so counting
+  // only the template's remaining periods can reject too little, never too much.
+  assertPeriodsMatureInTime(
+    uint64(old.eligibleFrom, "eligibleFrom"),
+    periodDays,
+    oldRemaining / rate + periods,
+  );
   const { policyCommitment, enrollmentCommitment } = getShieldedBudgetCommitments(old, ctx);
   if (
     computeShieldedPolicyCommitment({ ...old, ...ruleOpening }, ctx) !== policyCommitment ||

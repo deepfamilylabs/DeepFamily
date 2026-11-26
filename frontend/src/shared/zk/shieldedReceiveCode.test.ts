@@ -461,6 +461,15 @@ describe("receive code proofs", () => {
     await expect(
       createShieldedReceiveCode({ ...identity, keyMode: 0, keyMaterial: keys }),
     ).rejects.toThrow();
+    const identityKeys = deriveShieldedHeirKeyMaterial(identity.derivedSecretField);
+    for (const keyMaterial of [
+      identityKeys,
+      { ...keys, hpkeIkm: identityKeys.hpkeIkm },
+      { ...identityKeys, hpkeIkm: hexlify(keys.hpkeIkm) },
+    ])
+      await expect(
+        createShieldedReceiveCode({ ...identity, keyMode: 1, keyMaterial }),
+      ).rejects.toThrow("Independent receive mode cannot use identity-derived keys");
   }, 120_000);
 
   it("rejects a well-formed code whose identity was swapped", async () => {

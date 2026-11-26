@@ -166,6 +166,31 @@ test("current state rejects revoked code and renewal changes the address with th
   assert.throws(() => prepareShieldedReceivePresentation({ ...request, credential: fund }));
 });
 
+test("money presentations accept only output slots the pool can verify", () => {
+  const fund = {
+    ...credential,
+    purpose: "fund",
+    identityCommitment: 101n,
+    viewingKey: new Uint8Array(32).fill(17),
+  };
+  const fundRequest = { ...request, action: 3, credential: fund };
+  assert.equal(prepareShieldedReceivePresentation({ ...fundRequest, messageId: 0 }).publicSignals[3], 0n);
+  // Slot 1 is the donor change; the pool rejects a receive authorization there.
+  assert.throws(
+    () => prepareShieldedReceivePresentation({ ...fundRequest, messageId: 1 }),
+    /output slot 0/u,
+  );
+  for (const messageId of [0, 1])
+    assert.equal(
+      prepareShieldedReceivePresentation({ ...request, action: 4, messageId }).publicSignals[3],
+      BigInt(messageId),
+    );
+  assert.throws(
+    () => prepareShieldedReceivePresentation({ ...request, action: 4, messageId: 2 }),
+    /output slot 0 or 1/u,
+  );
+});
+
 test("presentation accepts only an alias-bound path checked against its trusted root", () => {
   const authorizationWitness = getShieldedIdentityAuthorizationWitness(request.state, 13n);
   const pathRequest = {

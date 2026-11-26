@@ -21,6 +21,7 @@ const LEGACY_MESSAGES: readonly [RegExp, string][] = [
   [/^Choose a public withdrawal destination\.$|^Unshield recipient must (?:be nonzero|not be the pool)$/im, "shielded.invalidExitRecipient"],
   [/registered with the empty public family-tree passphrase/i, "shielded.publicTreeRecipient"],
   [/No registered person matches this parent person hash/i, "shielded.fundingParentNotFound"],
+  [/fall due after the uint64 time limit/i, "shielded.periodsBeyondTimeLimit"],
 ];
 
 /** Marks wording translated by the calling flow, including parameterized messages. */

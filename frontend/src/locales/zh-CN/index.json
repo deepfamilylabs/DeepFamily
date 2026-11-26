@@ -1838,6 +1838,7 @@
     "familyRecordsUnavailable": "子女名单加载失败，请点击上方“刷新”重试。",
     "familyRecordsIncompatible": "当前网络的子女预算服务版本不兼容，请联系维护者更新。",
     "publicTreeRecipient": "该子女登记时使用了空口令，姓名、生日等资料在家谱中公开，任何人都能据此领取存给 TA 的预算。为保护资金，不能用“公开预算”或“私密（身份凭据）”为 TA 存入。",
+    "periodsBeyondTimeLimit": "存入期数过多，最后几期超出链上时间上限，永远无法领取。请减少存入期数或缩短领取周期。",
     "transactionFailed": "交易未确认成功：{{hash}}。请核对状态后重试。",
     "claimPeriodsLabel": "领取期次",
     "claimPeriodsHint": "每次最多领取 3 期。",

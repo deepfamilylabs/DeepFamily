@@ -90,6 +90,14 @@ export async function createShieldedReceiveCode(
       keys.hpkeIkm.toLowerCase() !== identityKeys.hpkeIkm.toLowerCase())
   )
     throw new Error("Identity receive mode requires canonical identity keys");
+  // The issuer circuit only requires a nonzero mode-1 secret. Identity keys are rebuildable by
+  // whoever knows the identity details and passphrase, so they must not be labeled independent.
+  if (
+    keyMode === 1 &&
+    (keys.ownerSecret === identityKeys.ownerSecret ||
+      keys.hpkeIkm.toLowerCase() === identityKeys.hpkeIkm.toLowerCase())
+  )
+    throw new Error("Independent receive mode cannot use identity-derived keys");
   const purpose = input.purpose ?? "receive";
   let viewingKey: Uint8Array;
   let ownerCommitment = keys.ownerCommitment;

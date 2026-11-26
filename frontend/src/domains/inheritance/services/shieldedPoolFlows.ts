@@ -132,6 +132,10 @@ function copyActionData(data: ShieldedPoolActionData): ContractActionData {
   if (outputCiphertexts.some((ciphertext) => getBytes(ciphertext).length !== 512)) {
     throw new Error("Shielded output ciphertext must be exactly 512 bytes");
   }
+  // The pool rejects a shared envelope: chain-only recovery could restore only one note.
+  if (outputCiphertexts[0] === outputCiphertexts[1]) {
+    throw new Error("Shielded outputs need distinct ciphertexts");
+  }
   const authorizations = data.receiveAuthorizations ?? Array.from({ length: 2 }, () => ({ checkpointId: 0n, asOf: 0n, deadline: 0n, recipientBinding: 0n, proof: "0x" }));
   if (authorizations.length !== 2) throw new Error("Shielded action needs two receive authorization slots");
   return {

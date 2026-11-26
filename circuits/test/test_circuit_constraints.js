@@ -5,20 +5,21 @@ import {
   parseCircuitArguments,
   selectCircuitNames,
 } from "../../scripts/lib/zkCircuitSelection.mjs";
+import { assertConstraintViolation } from "./constraint_assertions.mjs";
 import { calculateCircuitProofIsolated, calculateWitnessIsolated } from "./witness_helper.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const readFixture = (name) =>
   JSON.parse(fs.readFileSync(path.join(__dirname, "proof", name), "utf8"));
 
+// Input, artifact and verification errors must fail the case, not pass it as rejected.
 async function expectRejected(label, operation) {
   try {
-    await operation();
-  } catch {
-    console.log(`PASS: ${label}`);
-    return;
+    await assertConstraintViolation(operation);
+  } catch (error) {
+    throw new Error(`${label}: expected a circuit constraint failure`, { cause: error });
   }
-  throw new Error(`${label}: circuit accepted an invalid witness`);
+  console.log(`PASS: ${label}`);
 }
 
 const MAX_UINT32 = (1n << 32n) - 1n;

@@ -16,6 +16,7 @@ import {
 import { getAddress, hexlify } from "ethers";
 import { ShieldedAssetSession } from "./shieldedAssetSession";
 import { PUBLIC_TREE_RECIPIENT_MESSAGE } from "../domains/inheritance/services/shieldedPublicTreeIdentity";
+import { SHIELDED_PERIODS_BEYOND_TIME_LIMIT_MESSAGE } from "../domains/inheritance/model/shieldedBudgetPeriod";
 import type { ShieldedWorkerContext } from "../shared/workers/shieldedAssetWorkerTypes";
 const mocks = vi.hoisted(() => ({
   scan: vi.fn(),
@@ -1224,6 +1225,32 @@ describe("asset Worker preview and proof boundary", () => {
     ]);
     expect(mocks.unshield).not.toHaveBeenCalled();
     assertNoOpenings(preview);
+  });
+
+  it("rejects periods falling due after uint64 time before any consolidation", async () => {
+    const session = await unlocked();
+    mocks.notes = [
+      value(1n, 4n, secretKeys.ownerSecret),
+      value(2n, 7n, secretKeys.ownerSecret),
+    ];
+    // After the snapshot's start delay, the longest interval leaves room for 49,710 periods.
+    await expect(
+      session.call("preview", {
+        context,
+        slot: "identity",
+        action: "fund",
+        fundingEntry: "public",
+        amount: "1",
+        periods: "49711",
+        periodDays: "4294967295",
+        rootVersionIndex: 1,
+        publicRecipient: `0x${"00".repeat(31)}1f`,
+        candidates: ["1", "2"],
+      }),
+    ).rejects.toThrow(SHIELDED_PERIODS_BEYOND_TIME_LIMIT_MESSAGE);
+    expect(mocks.fundingDestination).not.toHaveBeenCalled();
+    expect(mocks.transfer).not.toHaveBeenCalled();
+    expect(mocks.fund).not.toHaveBeenCalled();
   });
 
   it.each(["Recipient identity is unknown", "Heir has no current direct-child endorsement"])(
