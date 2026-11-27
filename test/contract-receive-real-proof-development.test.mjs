@@ -282,7 +282,7 @@ describe("Receive presentation real-proof canonical pool and letter integration"
         const makeBudget = async (remaining, nonce) => {
           const note = {
             budgetOrigin: "fund",
-            rootIdentityCommitment: BigInt(fixture.initial.rootIdentityCommitment),
+            rootIdentityCommitment: fixture.rootIdentityCommitment,
             rootVersionIndex: BigInt(fixture.initial.rootVersionIndex),
             policySalt: BigInt(fixture.initial.policySalt),
             allocationKeyCommitment: BigInt(fixture.initial.allocationKeyCommitment),
@@ -397,8 +397,6 @@ describe("Receive presentation real-proof canonical pool and letter integration"
             changeNonce: String(nonce + 1n),
             ...(iteration
               ? {
-                  oldHeirOwnerCommitment: String(heirOwnerCommitment),
-                  oldBudgetRemaining: String(template.remaining),
                   oldBudgetRemainingPeriods: String(template.remaining / 100n),
                   oldBudgetNonce: String(template.nonce),
                   oldBudgetCiphertextHash: String(template.ciphertextHashField),

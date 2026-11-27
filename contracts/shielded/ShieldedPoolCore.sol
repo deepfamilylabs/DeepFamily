@@ -444,7 +444,8 @@ abstract contract ShieldedPoolCore is ReentrancyGuardTransient {
         (action == Action.Shield || action == Action.Unshield ? 1 : 0) +
         (action == Action.Unshield ? 1 : 0) +
         (action == Action.Fund || action == Action.Claim ? 3 : 0) +
-        (action == Action.Fund || action == Action.PrivateTransfer ? 2 : 0)
+        (action == Action.Fund ? 1 : 0) +
+        (action == Action.PrivateTransfer ? 2 : 0)
     );
     uint256 n;
     signals[n++] = block.chainid;
@@ -478,7 +479,10 @@ abstract contract ShieldedPoolCore is ReentrancyGuardTransient {
       signals[n++] = data.relation1;
       signals[n++] = data.asOf;
     }
-    if (action == Action.Fund || action == Action.PrivateTransfer) {
+    if (action == Action.Fund) {
+      signals[n++] = data.receiveAuthorizations[0].recipientBinding;
+    }
+    if (action == Action.PrivateTransfer) {
       for (uint256 i; i < 2; ++i) signals[n++] = data.receiveAuthorizations[i].recipientBinding;
     }
   }

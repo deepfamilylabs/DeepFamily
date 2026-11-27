@@ -522,7 +522,8 @@ describe("local unified funding preparation", () => {
     );
     const refill = await prepareShieldedFund(input);
     expect(refill.outputs[0].note.keyMode).toBe(1n);
-    expect(refill.witness.oldKeyMode).toBe("1");
+    expect(refill.witness.keyMode).toBe("1");
+    expect(refill.witness).not.toHaveProperty("oldKeyMode");
     await expect(
       prepareShieldedFund({ ...input, recipient: { ...fixture.common.recipient, keyMode: 0 } }),
     ).rejects.toThrow("recipient");
@@ -641,7 +642,10 @@ describe("local unified funding preparation", () => {
         budgetPeriods: 1n,
       });
       // The policy root, not the donor, decides which direct child qualifies.
-      expect(prepared.witness.rootIdentityCommitment).toBe(String(rootIdentity));
+      expect(prepared.witness).toMatchObject({
+        fatherIdentityCommitment: String(rootIdentity),
+        rootIsMother: "0",
+      });
       expect(prepared.outputs[0].note.rootIdentityCommitment).toBe(rootIdentity);
     },
   );
@@ -683,7 +687,8 @@ describe("local unified funding preparation", () => {
       },
       budgetPeriods: 1n,
     });
-    expect(refill.witness.rootIdentityCommitment).toBe(String(rootIdentity));
+    expect(refill.outputs[0].note.rootIdentityCommitment).toBe(rootIdentity);
+    expect(refill.witness).not.toHaveProperty("rootIdentityCommitment");
   });
 
   it("builds the funding's named public inputs, a direct-child witness, and a child-decryptable budget", async () => {
@@ -1089,7 +1094,7 @@ describe("local unified funding preparation", () => {
           });
           witness.receiveAuthorizationAlias = String(authorizationAlias);
           witness.receiveSalt = String(salt);
-          witness.receiveBindings = [String(binding), "0"];
+          witness.receiveBinding = String(binding);
           prepared.data.receiveAuthorizations = emptyShieldedReceiveAuthorizations();
           prepared.data.receiveAuthorizations[0] = {
             checkpointId: 1n,

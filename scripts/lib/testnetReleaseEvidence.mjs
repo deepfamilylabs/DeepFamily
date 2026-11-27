@@ -1494,11 +1494,11 @@ const requireShieldedAcceptanceEvidence = (report, repositoryRoot, expectedChain
   ])
     if (requireSafeInteger(scenario[field], `shielded.scenario.${field}`) > maximum)
       throw new Error(`shielded.scenario.${field} exceeds circuit capacity`);
-  // Fund appends two receive bindings after asOf; Claim ends with asOf.
+  // Fund appends its recipient binding after asOf. Claim ends with asOf.
   const eligibleFrom = BigInt(scenario.eligibleFrom);
   requireExact(
     eligibleFrom.toString(),
-    (BigInt(proofs.fund.publicSignals.at(-3)) + 7200n).toString(),
+    (BigInt(proofs.fund.publicSignals.at(-2)) + 7200n).toString(),
     "shielded.scenario.eligibleFrom",
   );
   requireExact(

@@ -46,7 +46,7 @@ function withFundingOutputs(
   const authorization = publicBudget
     ? poseidon7([
         scoped(1029n),
-        BigInt(updated.rootIdentityCommitment),
+        fixture.rootIdentityCommitment,
         BigInt(updated.rootVersionIndex),
         BigInt(updated.heirIdentityCommitment),
         BigInt(updated.eligibleFrom),
@@ -85,7 +85,7 @@ function withFundingOutputs(
   return updated;
 }
 
-function withClaimSource(witness, source) {
+function withClaimSource({ witness, claimCount }, source) {
   const updated = structuredClone(witness);
   const scoped = (purpose) => shieldedFixtureTag(purpose, updated.chainId, updated.pool);
   const old = BigInt(source.commitment);
@@ -100,7 +100,7 @@ function withClaimSource(witness, source) {
   const root = source.prefixRoot ? poseidon2([BigInt(source.prefixRoot), pairRoot]) : pairRoot;
   updated.inputRoots = [String(root)];
   updated.inputNullifiers = [poseidon3([scoped(1016n), ownerSecret, old])].map(String);
-  for (let slot = Number(updated.claimCount); slot < 3; slot++) {
+  for (let slot = claimCount; slot < 3; slot++) {
     updated.periodNullifiers[slot] = String(
       poseidon4([scoped(1019n), ownerSecret, old, BigInt(slot)]),
     );
@@ -166,6 +166,20 @@ test("shielded initial Fund and continuation Fund constraints", async (t) => {
       assert.equal(initial[3], 0n);
       assert.equal(continuation[3], 1n);
     });
+    await t.test("both Fund modes bind the selected mother as the policy root", async () => {
+      const lineage = buildLineageFixture({ rootIsMother: true }).witness;
+      const { initial, continuation, rootIdentityCommitment } = buildShieldedFundingFixtures({
+        budgetKind: 1,
+        lineage: { ...lineage, rootIsMother: 1 },
+      });
+      assert.equal(initial.publicBudget[0], initial.motherIdentityCommitment);
+      assert.equal(rootIdentityCommitment, BigInt(initial.motherIdentityCommitment));
+      for (const witness of [initial, continuation]) {
+        await valid("fund", witness);
+        await invalid("fund", { ...witness, rootIsMother: "0" });
+        await invalid("fund", { ...witness, receiveBinding: "1" });
+      }
+    });
     await t.test(
       "private Fund initial and top-up require the exact authenticated recipient binding",
       async () => {
@@ -184,20 +198,11 @@ test("shielded initial Fund and continuation Fund constraints", async (t) => {
               }),
             );
           }
-          for (const slot of [0, 1]) {
-            await invalid(
-              "fund",
-              mutate(witness, (w) => {
-                w.receiveBindings[slot] = String(BigInt(w.receiveBindings[slot]) + 1n);
-              }),
-            );
-          }
-          await invalid(
-            "fund",
-            mutate(witness, (w) => {
-              w.receiveBindings[0] = "0";
-            }),
-          );
+          await invalid("fund", {
+            ...witness,
+            receiveBinding: String(BigInt(witness.receiveBinding) + 1n),
+          });
+          await invalid("fund", { ...witness, receiveBinding: "0" });
         }
       },
     );
@@ -423,7 +428,7 @@ test("shielded initial Fund and continuation Fund constraints", async (t) => {
           const first = buildShieldedClaimFixture({ keyMode, claimCount: 1, remainingPeriods: 4 });
           assert.equal(first.policy, funded.policy);
           assert.equal(first.enrollment, funded.enrollment);
-          const claim = withClaimSource(first.witness, {
+          const claim = withClaimSource(first, {
             commitment: funded.initial.outputCommitments[0],
             sibling: funded.initial.outputCommitments[1],
             nonce: funded.initial.budgetNonce,
@@ -437,7 +442,7 @@ test("shielded initial Fund and continuation Fund constraints", async (t) => {
             claimCount: 1,
             remainingPeriods: 3,
           });
-          const continuation = withClaimSource(second.witness, {
+          const continuation = withClaimSource(second, {
             commitment: claim.outputCommitments[0],
             sibling: claim.outputCommitments[1],
             nonce: claim.newBudgetNonce,
@@ -576,15 +581,8 @@ test("shielded initial Fund and continuation Fund constraints", async (t) => {
       );
     });
     await t.test(
-      "continuation cannot reinterpret a private template or change its private owner",
+      "continuation cannot change the private owner of a historical template",
       async () => {
-        await invalid(
-          "fund",
-          mutate(fixture.continuation, (w) => {
-            w.oldBudgetKind = "1";
-            w.oldHeirOwnerCommitment = "0";
-          }),
-        );
         for (const keyMode of [0, 1]) {
           const privateFixture = buildShieldedFundingFixtures({ chainId: 71n, keyMode });
           const unchanged = withFundingOutputs(privateFixture, privateFixture.continuation);
@@ -601,13 +599,6 @@ test("shielded initial Fund and continuation Fund constraints", async (t) => {
             }),
           );
         }
-        const identity = buildShieldedFundingFixtures({ budgetKind: 1 });
-        await invalid(
-          "fund",
-          mutate(identity.continuation, (w) => {
-            w.oldBudgetKind = "0";
-          }),
-        );
       },
     );
 
@@ -721,7 +712,7 @@ test("shielded initial Fund and continuation Fund constraints", async (t) => {
       ]);
       const trustedLeaf = poseidon4([
         1008n,
-        BigInt(initial.rootIdentityCommitment),
+        fixture.rootIdentityCommitment,
         BigInt(initial.rootVersionIndex),
         BigInt(initial.endorser),
       ]);
@@ -903,11 +894,11 @@ test("shielded initial Fund and continuation Fund constraints", async (t) => {
           const fundedAmount = BigInt(continuation.rate) * BigInt(continuation.budgetPeriods);
           const correctChange = BigInt(continuation.donorAmount) - fundedAmount;
           await valid("fund", withFundingOutputs(funding, continuation, correctChange));
-          const reusedChange = correctChange + BigInt(continuation.oldBudgetRemaining);
+          const reusedChange = correctChange + funding.oldBudgetRemaining;
           const attempted = withFundingOutputs(funding, continuation, reusedChange);
           assert.equal(
             fundedAmount + reusedChange,
-            BigInt(continuation.donorAmount) + BigInt(continuation.oldBudgetRemaining),
+            BigInt(continuation.donorAmount) + funding.oldBudgetRemaining,
           );
           await invalid("fund", attempted);
         }

@@ -71,7 +71,7 @@ function checkWitness(
       ...witness,
       receiveAuthorizationAlias: String(authorizationAlias),
       receiveSalt: String(salt),
-      receiveBindings: [String(binding), "0"],
+      receiveBinding: String(binding),
     };
   }
   const repoRoot = fileURLToPath(new URL("../../../../../", import.meta.url));
@@ -410,7 +410,8 @@ describe("unified budget recovery and claims", () => {
         periodIndices: [0n, 1n],
       });
       checkWitness("claim", claimed.witness);
-      expect(claimed.witness.budgetKind).toBe("1");
+      for (const name of ["budgetKind", "remaining", "claimCount"])
+        expect(claimed.witness).not.toHaveProperty(name);
       expect(claimed.witness.periodDays).toBe(periodDays.toString());
       for (const name of ["policySalt", "allocationKeyCommitment", "enrollmentSalt"])
         expect(claimed.witness[name]).toBe("0");
@@ -552,7 +553,7 @@ describe("unified budget recovery and claims", () => {
         periodIndices: [0n, 1n],
       });
       checkWitness("claim", claim.witness);
-      expect(claim.witness.budgetKind).toBe("0");
+      expect(claim.witness.policySalt).not.toBe("0");
       expect(claim.witness).not.toHaveProperty("secondBudgetKind");
       expect(claim.outputs[0].note).toMatchObject({
         heirOwnerCommitment: f.childKeys.ownerCommitment,

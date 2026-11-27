@@ -869,6 +869,16 @@ describe("asset Worker preview and proof boundary", () => {
       expect(proof.action).toBe(action);
       expect(mocks.receipt).toHaveBeenCalledOnce();
       expect(mocks.proof).toHaveBeenCalledOnce();
+      const { witness, expectedPublicSignals } = mocks.proof.mock.calls[0][0];
+      if (action === "fund") {
+        expect(expectedPublicSignals).toHaveLength(26);
+        expect(witness.receiveBinding).toBe(expectedPublicSignals.at(-1));
+        expect(witness.receiveBinding).not.toBe("0");
+        expect(witness).not.toHaveProperty("receiveBindings");
+      } else {
+        expect(witness.receiveBindings).toEqual(expectedPublicSignals.slice(-2));
+        expect(witness.receiveBindings[1]).toBe("0");
+      }
       assertNoOpenings(preview);
     });
 

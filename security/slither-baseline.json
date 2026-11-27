@@ -2,7 +2,7 @@
   "version": 1,
   "slitherVersion": "0.11.6",
   "sourceSha256": {
-    "contracts/adapters/Groth16VerifierAdapter.sol": "2c685c80534014b5c62517d8ffe31da9af125d4713dfa78be00be5e68aa2a4f8",
+    "contracts/adapters/Groth16VerifierAdapter.sol": "a2fdead4f59a6e4153d45dd3203852edf08bd1c41bdfdc077d963b85a9c50cdf",
     "contracts/family/AdultAgeGate.sol": "5bf06089e8be949f735553218a277d330076d3c4ac6aa55c65b87bea3141e6a6",
     "contracts/family/DeepFamily.sol": "2ebe2512da8ca6102663bfdfc42ed4d084ee9e7049fc27ffc3859d30cdc6dc15",
     "contracts/family/DeepFamilyLineageIndex.sol": "62194f1820da66c514c2f77425c83cc8ab563eca2a752913e14fae74d45a6e81",
@@ -11,12 +11,12 @@
     "contracts/libraries/LeanMerklePath.sol": "c1ba4aad31d52e07a99e62a5649367d9a73cd9c1a1bf9fabe79b6cc66afd4499",
     "contracts/receive/IdentityAuthorizationState.sol": "2e3a1472e5452a62b5e976b0f333dd1f1e9c164d3ad70b744c89a221d31d1790",
     "contracts/shielded/ShieldedNativePool.sol": "97ca57ef47f986be5af91265154b22a00f2d03c2e9ddd33e1ed90c12bd15da8e",
-    "contracts/shielded/ShieldedPoolCore.sol": "dc79c48354453decf96861a2fa6457ec1468972713a4ade976c4d6e82cda08a5",
+    "contracts/shielded/ShieldedPoolCore.sol": "fdf5405a3e9855111ed37e78b8838fe93473f450e50756587b954e56e58b8b7d",
     "contracts/verifiers/DisclosureBindingVerifier.sol": "5a868d2a83b391a1410f0e4177150e1a0ab175412297c6bef7da5d25d3bdd846",
     "contracts/verifiers/PersonCommitmentVerifier.sol": "f000db378f0496155271749c20e277fa26bffe5829681f45a024d1a7ee533812",
-    "contracts/verifiers/ShieldedClaim32Verifier.sol": "d4880070d7ef6d1300bb3024ad6ecf1f9aafe21f7f73e57ebc1590297eed45c6",
-    "contracts/verifiers/ShieldedClaim64Verifier.sol": "dbeb8d054f8b6476f41f8527d9b46b2b537c0367ab624b6d0b5120ac18a6326c",
-    "contracts/verifiers/ShieldedFundVerifier.sol": "24b80e92401c8202a74bf6f241cbe06234e570a2cc3b459837adaf1fd1e76482",
+    "contracts/verifiers/ShieldedClaim32Verifier.sol": "f12ab7034e23afed5f29555847e35ea5e0a899d12478537abacfa7cdd3e3991b",
+    "contracts/verifiers/ShieldedClaim64Verifier.sol": "f93cf6125f2fec7008b84e685514327755965727d0e653ddbf0964e7f5f96867",
+    "contracts/verifiers/ShieldedFundVerifier.sol": "dc0560029ccc4170432b44f495f728e60933fc7383ed1d05caf318a08232ebb2",
     "contracts/verifiers/ShieldedIdentityCounterUpdateVerifier.sol": "cb8b78e5a849688e6ca2463e7e99191d0dd810ad8649fda6c6dd4c856c9d554d",
     "contracts/verifiers/ShieldedPrivateTransfer4Verifier.sol": "65aabb62e02cca72f5c884a4d5cbb460a3ea6ec5ae26a304aba68c8ffa6b32cf",
     "contracts/verifiers/ShieldedPrivateTransferVerifier.sol": "b6208ac2b0844a1c7d819535bde6f084efd4e3c223006f79481ba4b046a0a9b5",
@@ -69,10 +69,10 @@
       "sources": ["contracts/family/AdultAgeGate.sol"]
     },
     {
-      "id": "089442745c1e4033c3c78b2f4ba56833a9be486f4b0c3d3a2a8fd373bba5c5be",
+      "id": "9ece02fd37498dfe41f8d460ae452ecf88e78a01d2890c8f188dfb1f5f065ae9",
       "check": "incorrect-return",
       "impact": "High",
-      "subject": "ShieldedFundVerifier.verifyProof(uint256[2],uint256[2][2],uint256[2],uint256[27]) (contracts/verifiers/ShieldedFundVerifier.sol#137-349) calls ShieldedFundVerifier.verifyProof.asm_0.checkField() (contracts/verifiers/ShieldedFundVerifier.sol#139-144) which halt the execution return(uint256,uint256)(0,0x20) (contracts/verifiers/ShieldedFundVerifier.sol#142)",
+      "subject": "ShieldedFundVerifier.verifyProof(uint256[2],uint256[2][2],uint256[2],uint256[26]) (contracts/verifiers/ShieldedFundVerifier.sol#134-342) calls ShieldedFundVerifier.verifyProof.asm_0.checkField() (contracts/verifiers/ShieldedFundVerifier.sol#136-141) which halt the execution return(uint256,uint256)(0,0x20) (contracts/verifiers/ShieldedFundVerifier.sol#139)",
       "reason": "This generated snarkjs verifier deliberately returns one ABI-encoded false word on an invalid field or a failed precompile. Its outer verifyProof has no modifier or required cleanup. The consuming adapter and business contract reject false; exiting the verifier at this point is the intended fail-closed behavior.",
       "sources": ["contracts/verifiers/ShieldedFundVerifier.sol"]
     },
@@ -88,7 +88,7 @@
       "id": "0fc1b0b77e100e0cf92f20fdda565973698ab4eb2db5ce13d9a9bcbeee878806",
       "check": "incorrect-return",
       "impact": "High",
-      "subject": "ShieldedPoolCore.unshield(address,uint256,ShieldedPoolCore.ActionData,bytes) (contracts/shielded/ShieldedPoolCore.sol#189-203) calls ShieldedPoolCore._appendOutputs(ShieldedPoolCore.Action,ShieldedPoolCore.ActionData) (contracts/shielded/ShieldedPoolCore.sol#555-570) which halt the execution return(uint256,uint256)(0,0x20) (node_modules/poseidon-solidity/PoseidonT3.sol#388)",
+      "subject": "ShieldedPoolCore.unshield(address,uint256,ShieldedPoolCore.ActionData,bytes) (contracts/shielded/ShieldedPoolCore.sol#189-203) calls ShieldedPoolCore._appendOutputs(ShieldedPoolCore.Action,ShieldedPoolCore.ActionData) (contracts/shielded/ShieldedPoolCore.sol#559-574) which halt the execution return(uint256,uint256)(0,0x20) (node_modules/poseidon-solidity/PoseidonT3.sol#388)",
       "reason": "The reported RETURN belongs to a public linked Poseidon library function, which executes in its own DELEGATECALL frame. Returning the hash exits that library call and resumes this caller; it does not skip the caller's subsequent state updates or guards.",
       "sources": [
         "contracts/shielded/ShieldedPoolCore.sol",
@@ -148,10 +148,10 @@
       ]
     },
     {
-      "id": "2e76b78ebcab83a15f097cdb5aec1be456671bfdea3106fe30857f5ce4a89b1a",
+      "id": "76e7f87994ace02f35bfe397247b3082aba238e3846350442cba3e9f543c3260",
       "check": "incorrect-return",
       "impact": "High",
-      "subject": "ShieldedFundVerifier.verifyProof.asm_0.checkPairing() (contracts/verifiers/ShieldedFundVerifier.sol#172-281) calls ShieldedFundVerifier.verifyProof.asm_0.g1_mulAccC() (contracts/verifiers/ShieldedFundVerifier.sol#147-170) which halt the execution return(uint256,uint256)(0,0x20) (contracts/verifiers/ShieldedFundVerifier.sol#158)",
+      "subject": "ShieldedFundVerifier.verifyProof.asm_0.checkPairing() (contracts/verifiers/ShieldedFundVerifier.sol#169-276) calls ShieldedFundVerifier.verifyProof.asm_0.g1_mulAccC() (contracts/verifiers/ShieldedFundVerifier.sol#144-167) which halt the execution return(uint256,uint256)(0,0x20) (contracts/verifiers/ShieldedFundVerifier.sol#155)",
       "reason": "This generated snarkjs verifier deliberately returns one ABI-encoded false word on an invalid field or a failed precompile. Its outer verifyProof has no modifier or required cleanup. The consuming adapter and business contract reject false; exiting the verifier at this point is the intended fail-closed behavior.",
       "sources": ["contracts/verifiers/ShieldedFundVerifier.sol"]
     },
@@ -376,10 +376,10 @@
       "sources": ["contracts/verifiers/ShieldedIdentityCounterUpdateVerifier.sol"]
     },
     {
-      "id": "c49e05218830b58f56b95911d22223dc3337666ca03db793e0a5d6e2086d8075",
+      "id": "e2909e689a3fa45f25d859724ccbbf11b8a18a12e274da233bad62974695f290",
       "check": "incorrect-return",
       "impact": "High",
-      "subject": "ShieldedFundVerifier.verifyProof(uint256[2],uint256[2][2],uint256[2],uint256[27]) (contracts/verifiers/ShieldedFundVerifier.sol#137-349) calls ShieldedFundVerifier.verifyProof.asm_0.checkPairing() (contracts/verifiers/ShieldedFundVerifier.sol#172-281) which halt the execution return(uint256,uint256)(0,0x20) (contracts/verifiers/ShieldedFundVerifier.sol#158)",
+      "subject": "ShieldedFundVerifier.verifyProof(uint256[2],uint256[2][2],uint256[2],uint256[26]) (contracts/verifiers/ShieldedFundVerifier.sol#134-342) calls ShieldedFundVerifier.verifyProof.asm_0.checkPairing() (contracts/verifiers/ShieldedFundVerifier.sol#169-276) which halt the execution return(uint256,uint256)(0,0x20) (contracts/verifiers/ShieldedFundVerifier.sol#155)",
       "reason": "This generated snarkjs verifier deliberately returns one ABI-encoded false word on an invalid field or a failed precompile. Its outer verifyProof has no modifier or required cleanup. The consuming adapter and business contract reject false; exiting the verifier at this point is the intended fail-closed behavior.",
       "sources": ["contracts/verifiers/ShieldedFundVerifier.sol"]
     },
@@ -455,7 +455,7 @@
       "id": "f4361682e5950e9629610bc7444666866812a4001eca4c5f8663893136e82b49",
       "check": "incorrect-return",
       "impact": "High",
-      "subject": "ShieldedPoolCore._appendOutputs(ShieldedPoolCore.Action,ShieldedPoolCore.ActionData) (contracts/shielded/ShieldedPoolCore.sol#555-570) calls ShieldedPoolCore._append(uint256,bytes) (contracts/shielded/ShieldedPoolCore.sol#572-597) which halt the execution return(uint256,uint256)(0,0x20) (node_modules/poseidon-solidity/PoseidonT3.sol#388)",
+      "subject": "ShieldedPoolCore._appendOutputs(ShieldedPoolCore.Action,ShieldedPoolCore.ActionData) (contracts/shielded/ShieldedPoolCore.sol#559-574) calls ShieldedPoolCore._append(uint256,bytes) (contracts/shielded/ShieldedPoolCore.sol#576-601) which halt the execution return(uint256,uint256)(0,0x20) (node_modules/poseidon-solidity/PoseidonT3.sol#388)",
       "reason": "The reported RETURN belongs to a public linked Poseidon library function, which executes in its own DELEGATECALL frame. Returning the hash exits that library call and resumes this caller; it does not skip the caller's subsequent state updates or guards.",
       "sources": [
         "contracts/shielded/ShieldedPoolCore.sol",
@@ -515,7 +515,7 @@
       "id": "2c1352de1916010a29bf5da3c54ec313ee25679de45e737ffd745d14c177c77f",
       "check": "uninitialized-local",
       "impact": "Medium",
-      "subject": "ShieldedPoolCore._publicSignals(ShieldedPoolCore.Action,ShieldedPoolCore.ActionData,uint256,address).n (contracts/shielded/ShieldedPoolCore.sol#449) is a local variable never initialized",
+      "subject": "ShieldedPoolCore._publicSignals(ShieldedPoolCore.Action,ShieldedPoolCore.ActionData,uint256,address).n (contracts/shielded/ShieldedPoolCore.sol#450) is a local variable never initialized",
       "reason": "The unsigned signal cursor intentionally starts at Solidity's default zero. It increments while writing the already allocated public-input array in schema order; zero is the required first index, and this local value never refers to an uninitialized storage pointer.",
       "sources": ["contracts/shielded/ShieldedPoolCore.sol"]
     },
@@ -523,7 +523,7 @@
       "id": "328787bb65c525db3a0ad0b4fe69c07c8e157580ba5dfbe9148a77d10ccd6dc7",
       "check": "uninitialized-local",
       "impact": "Medium",
-      "subject": "ShieldedPoolCore._publicBudgetFields(bytes).value (contracts/shielded/ShieldedPoolCore.sol#504) is a local variable never initialized",
+      "subject": "ShieldedPoolCore._publicBudgetFields(bytes).value (contracts/shielded/ShieldedPoolCore.sol#508) is a local variable never initialized",
       "reason": "The unsigned accumulator intentionally starts at Solidity's default zero, then shifts and incorporates each byte while decoding a fixed-width public-budget field. A zero initial accumulator is required for canonical big-endian decoding.",
       "sources": ["contracts/shielded/ShieldedPoolCore.sol"]
     },
@@ -600,10 +600,10 @@
       "sources": ["contracts/adapters/Groth16VerifierAdapter.sol"]
     },
     {
-      "id": "ecc6d3079d43d1a10692c1e720ac089cdf3cc2c3bd9d398debda85354695e460",
+      "id": "8a4a913d0569677923c74807771fc052a6115c8b4b492ced74b5f31fb560ead8",
       "check": "uninitialized-local",
       "impact": "Medium",
-      "subject": "Groth16VerifierAdapter._verifyShieldedAction(address,uint256[2],uint256[2][2],uint256[2],uint256[]).signals27 (contracts/adapters/Groth16VerifierAdapter.sol#253) is a local variable never initialized",
+      "subject": "Groth16VerifierAdapter._verifyShieldedAction(address,uint256[2],uint256[2][2],uint256[2],uint256[]).signals26 (contracts/adapters/Groth16VerifierAdapter.sol#253) is a local variable never initialized",
       "reason": "This is a fixed-size memory uint256 array. Solidity allocates and zero-initializes it, and the following bounded loop writes every element before the external verifier reads it. Length checks run before this branch. It is not an uninitialized dynamic memory or storage reference.",
       "sources": ["contracts/adapters/Groth16VerifierAdapter.sol"]
     },

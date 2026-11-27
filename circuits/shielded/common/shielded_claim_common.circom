@@ -50,7 +50,6 @@ template ShieldedClaim(LINEAGE_DEPTH) {
 
     // The policy and enrollment are private. Initial allocation must separately
     // prove that eligibleFrom was valid at its block and that value was conserved.
-    signal input budgetKind;
     signal input keyMode;
     signal input ownerSecret;
     signal input heirViewKeyLo;
@@ -64,7 +63,6 @@ template ShieldedClaim(LINEAGE_DEPTH) {
     signal input eligibleFrom;
     signal input rate;
     signal input periodDays;
-    signal input remaining;
     signal input remainingPeriods;
     signal input budgetNonce;
     signal input budgetCiphertextHash;
@@ -74,9 +72,8 @@ template ShieldedClaim(LINEAGE_DEPTH) {
     signal input noteIndex;
     signal input noteSiblings[32];
 
-    // All 3 slots are public nullifiers. claimCount is private; inactive slots
-    // have domain-separated dummy nullifiers and zero periodIndex witnesses.
-    signal input claimCount;
+    // The first slot always claims a period, including period 0. Zero indices
+    // in the second and third slots select the corresponding dummy nullifiers.
     signal input periodIndices[3];
     signal input newBudgetNonce;
     signal input payoutNonce;
@@ -109,15 +106,17 @@ template ShieldedClaim(LINEAGE_DEPTH) {
 
     component asOfBits = Num2Bits(64);
     asOfBits.in <== asOf;
-    budgetKind * (1 - budgetKind) === 0;
+    // Identity budgets carry a zero salt. Owner-bound budgets open a nonzero salt.
+    component policySaltZero = IsZero();
+    policySaltZero.in <== policySalt;
+    signal budgetKind <== policySaltZero.out;
     inputBudgetIsClaim[0] * (1 - inputBudgetIsClaim[0]) === 0;
     budgetKind * inputBudgetIsClaim[0] === 0;
     keyMode * (1 - keyMode) === 0;
     budgetKind * keyMode === 0;
     signal requiresOpening <== 1 - budgetKind;
-    (1 - requiresOpening) * policySalt === 0;
-    (1 - requiresOpening) * allocationKeyCommitment === 0;
-    (1 - requiresOpening) * enrollmentSalt === 0;
+    budgetKind * allocationKeyCommitment === 0;
+    budgetKind * enrollmentSalt === 0;
     component policyCommitmentNotZero = IsZero();
     policyCommitmentNotZero.in <== policyCommitmentInput;
     policyCommitmentNotZero.out === 0;
@@ -162,9 +161,6 @@ template ShieldedClaim(LINEAGE_DEPTH) {
     component derivedSecretNotZero = IsZero();
     derivedSecretNotZero.in <== derivedSecretField;
     derivedSecretNotZero.out === 0;
-    component policySaltNotZero = IsZero();
-    policySaltNotZero.in <== policySalt;
-    requiresOpening * policySaltNotZero.out === 0;
     component enrollmentSaltNotZero = IsZero();
     enrollmentSaltNotZero.in <== enrollmentSalt;
     requiresOpening * enrollmentSaltNotZero.out === 0;
@@ -187,11 +183,11 @@ template ShieldedClaim(LINEAGE_DEPTH) {
     component periodDaysNotZero = IsZero();
     periodDaysNotZero.in <== periodDays;
     periodDaysNotZero.out === 0;
-    component remainingBits = Num2Bits(128);
-    remainingBits.in <== remaining;
     component remainingPeriodsBits = Num2Bits(64);
     remainingPeriodsBits.in <== remainingPeriods;
-    remaining === rate * remainingPeriods;
+    signal remaining <== rate * remainingPeriods;
+    component remainingBits = Num2Bits(128);
+    remainingBits.in <== remaining;
     component eligibleFromBits = Num2Bits(64);
     eligibleFromBits.in <== eligibleFrom;
 
@@ -263,30 +259,27 @@ template ShieldedClaim(LINEAGE_DEPTH) {
     spend.inputs[1] <== ownerSecret;
     spend.inputs[2] <== oldBudget.commitment;
     spend.out === inputNullifiers[0];
-    component countBits = Num2Bits(2);
-    countBits.in <== claimCount;
-    component countPositive = LessThan(2);
-    countPositive.in[0] <== 0;
-    countPositive.in[1] <== claimCount;
-    countPositive.out === 1;
-    component countAtMostThree = LessEqThan(2);
-    countAtMostThree.in[0] <== claimCount;
-    countAtMostThree.in[1] <== 3;
-    countAtMostThree.out === 1;
 
-    component active[3];
+    signal active[3];
+    active[0] <== 1;
+    component periodIndexZero[2];
     component epochBits[3];
     component epochMature[3];
     component ascending[2];
     component realPeriod[3];
-    component dummyPeriod[3];
+    component dummyPeriod[2];
     for (var i = 0; i < 3; i++) {
-        active[i] = LessThan(2);
-        active[i].in[0] <== i;
-        active[i].in[1] <== claimCount;
         epochBits[i] = Num2Bits(64);
         epochBits[i].in <== periodIndices[i];
-        (1 - active[i].out) * periodIndices[i] === 0;
+        if (i > 0) {
+            periodIndexZero[i - 1] = IsZero();
+            periodIndexZero[i - 1].in <== periodIndices[i];
+            active[i] <== 1 - periodIndexZero[i - 1].out;
+            ascending[i - 1] = LessThan(65);
+            ascending[i - 1].in[0] <== periodIndices[i - 1];
+            ascending[i - 1].in[1] <== periodIndices[i];
+            active[i] * (1 - ascending[i - 1].out) === 0;
+        }
         // The 64-bit index plus one is at most 2^64; the positive uint32
         // periodDays and 86400 seconds/day keep maturity below 2^113,
         // including the uint64 eligibility start. This comparison therefore
@@ -294,38 +287,37 @@ template ShieldedClaim(LINEAGE_DEPTH) {
         epochMature[i] = LessEqThan(113);
         epochMature[i].in[0] <== eligibleFrom + (periodIndices[i] + 1) * periodDays * 86400;
         epochMature[i].in[1] <== asOf;
-        active[i].out * (1 - epochMature[i].out) === 0;
-        if (i > 0) {
-            ascending[i - 1] = LessThan(65);
-            ascending[i - 1].in[0] <== periodIndices[i - 1];
-            ascending[i - 1].in[1] <== periodIndices[i];
-            active[i].out * (1 - ascending[i - 1].out) === 0;
-        }
+        active[i] * (1 - epochMature[i].out) === 0;
         realPeriod[i] = Poseidon(5);
         realPeriod[i].inputs[0] <== periodTag.tag;
         realPeriod[i].inputs[1] <== derivedSecretField;
         realPeriod[i].inputs[2] <== heir.identityCommitment;
         realPeriod[i].inputs[3] <== policyCommitmentInput;
         realPeriod[i].inputs[4] <== periodIndices[i];
-        dummyPeriod[i] = Poseidon(4);
-        dummyPeriod[i].inputs[0] <== dummyPeriodTag.tag;
-        dummyPeriod[i].inputs[1] <== ownerSecret;
-        dummyPeriod[i].inputs[2] <== oldBudget.commitment;
-        dummyPeriod[i].inputs[3] <== i;
-        periodNullifiers[i] ===
-            dummyPeriod[i].out + active[i].out * (realPeriod[i].out - dummyPeriod[i].out);
+        if (i == 0) {
+            periodNullifiers[i] === realPeriod[i].out;
+        } else {
+            dummyPeriod[i - 1] = Poseidon(4);
+            dummyPeriod[i - 1].inputs[0] <== dummyPeriodTag.tag;
+            dummyPeriod[i - 1].inputs[1] <== ownerSecret;
+            dummyPeriod[i - 1].inputs[2] <== oldBudget.commitment;
+            dummyPeriod[i - 1].inputs[3] <== i;
+            periodNullifiers[i] === dummyPeriod[i - 1].out
+                + active[i] * (realPeriod[i].out - dummyPeriod[i - 1].out);
+        }
     }
+    active[2] * (1 - active[1]) === 0;
+    signal claimCount <== active[0] + active[1] + active[2];
 
     signal payout <== rate * claimCount;
     component payoutBits = Num2Bits(128);
     payoutBits.in <== payout;
-    signal newRemaining <== remaining - payout;
-    component newRemainingBits = Num2Bits(128);
-    newRemainingBits.in <== newRemaining;
     signal newRemainingPeriods <== remainingPeriods - claimCount;
     component newRemainingPeriodsBits = Num2Bits(64);
     newRemainingPeriodsBits.in <== newRemainingPeriods;
-    newRemaining === rate * newRemainingPeriods;
+    signal newRemaining <== rate * newRemainingPeriods;
+    component newRemainingBits = Num2Bits(128);
+    newRemainingBits.in <== newRemaining;
 
     component nextBudget = ShieldedBoundBudgetCommitment();
     nextBudget.privateNoteTag <== budgetTags.claimPrivateNoteTag;

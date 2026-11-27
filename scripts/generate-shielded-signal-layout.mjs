@@ -42,6 +42,7 @@ const SCALARS = Object.freeze({
   endorsementRoot: "data.relation0",
   trustedRoot: "data.relation1",
   asOf: "data.asOf",
+  receiveBinding: "data.receiveAuthorizations[0].recipientBinding",
 });
 const ARRAYS = Object.freeze({
   inputRoots: "data.inputRoots[i]",

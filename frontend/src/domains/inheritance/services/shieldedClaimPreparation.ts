@@ -373,7 +373,6 @@ export async function prepareShieldedClaim(
   const decimal = (values: readonly bigint[]) => values.map(String);
   const witness: ShieldedWitness = {
     ...publicInputs,
-    budgetKind: budget.binding === "identity" ? "1" : "0",
     keyMode: String(keyMode),
     heirViewKeyLo: ownerBudget ? String(splitShieldedViewPublicKey(viewingKey).viewKeyLo) : "0",
     heirViewKeyHi: ownerBudget ? String(splitShieldedViewPublicKey(viewingKey).viewKeyHi) : "0",
@@ -410,14 +409,12 @@ export async function prepareShieldedClaim(
     eligibleFrom: String(budget.eligibleFrom),
     rate: String(budget.amountPerPeriod),
     periodDays: String(budget.periodDays),
-    remaining: String(budget.remaining),
     remainingPeriods: String(budget.remaining / budget.amountPerPeriod),
     budgetNonce: String(budget.nonce),
     budgetCiphertextHash: String(budgetCiphertextHash),
     noteDepth: path.proofDepth,
     noteIndex: String(path.proofIndex),
     noteSiblings: decimal(path.siblings),
-    claimCount: String(batch.periodIndices.length),
     periodIndices: decimal([
       ...batch.periodIndices,
       ...Array<bigint>(3 - batch.periodIndices.length).fill(0n),

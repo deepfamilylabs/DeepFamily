@@ -19,7 +19,11 @@ const HEIR_VERSION_INDEX = 2n;
 const ENDORSER = "0x1111111111111111111111111111111111111111";
 const WRITTEN_AT = 1760000000n;
 
-export function buildLineageFixture({ heirNames = ["First Heir"], heirIndex = 0 } = {}) {
+export function buildLineageFixture({
+  heirNames = ["First Heir"],
+  heirIndex = 0,
+  rootIsMother = false,
+} = {}) {
   const identityFields = {
     gender: 2,
     birthYear: 1960,
@@ -56,7 +60,7 @@ export function buildLineageFixture({ heirNames = ["First Heir"], heirIndex = 0 
       account: "0x3333333333333333333333333333333333333333",
     }),
     computeLineageTrustedLeaf({
-      rootIdentityCommitment: ROOT_IDENTITY_COMMITMENT,
+      rootIdentityCommitment: rootIsMother ? SPOUSE_IDENTITY_COMMITMENT : ROOT_IDENTITY_COMMITMENT,
       rootVersionIndex: ROOT_VERSION_INDEX,
       account: ENDORSER,
     }),
@@ -79,7 +83,7 @@ export function buildLineageFixture({ heirNames = ["First Heir"], heirIndex = 0 
       versionIndex: decimal(HEIR_VERSION_INDEX),
       fatherIdentityCommitment: decimal(ROOT_IDENTITY_COMMITMENT),
       motherIdentityCommitment: decimal(SPOUSE_IDENTITY_COMMITMENT),
-      rootIsMother: "0",
+      rootIsMother: rootIsMother ? "1" : "0",
       endorser: decimal(BigInt(ENDORSER)),
       writtenAt: decimal(WRITTEN_AT),
       endorsementDepth: decimal(endorsementProof.depth),

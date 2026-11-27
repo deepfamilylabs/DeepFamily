@@ -47,7 +47,11 @@ export function buildShieldedClaimFixture({
       : BigInt(suppliedOwnerSecret);
   const ownerCommitment = poseidon2([1013n, ownerSecret]);
   const { viewKeyLo, viewKeyHi } = shieldedFixtureViewLimbs(viewingKey, budgetKind);
-  const rootIdentityCommitment = BigInt(lineage.fatherIdentityCommitment);
+  const rootIdentityCommitment = BigInt(
+    BigInt(lineage.rootIsMother) === 1n
+      ? lineage.motherIdentityCommitment
+      : lineage.fatherIdentityCommitment,
+  );
   const heirIdentityCommitment = poseidon4([
     1002n,
     poseidon4([1001n, BigInt(lineage.nameField), derivedSecret, poseidon4([1000n, 1n, 0n, 0n])]),
@@ -175,7 +179,6 @@ export function buildShieldedClaimFixture({
     trustedDepth: lineage.trustedDepth,
     trustedIndex: lineage.trustedIndex,
     trustedSiblings: lineage.trustedSiblings,
-    budgetKind: decimal(budgetKind),
     keyMode: decimal(keyMode),
     ownerSecret: decimal(ownerSecret),
     heirViewKeyLo: decimal(viewKeyLo),
@@ -189,14 +192,12 @@ export function buildShieldedClaimFixture({
     eligibleFrom: decimal(eligibleFrom),
     rate: decimal(rate),
     periodDays: decimal(periodDays),
-    remaining: decimal(remaining),
     remainingPeriods: decimal(remainingPeriodCount),
     budgetNonce: decimal(budgetNonce),
     budgetCiphertextHash: decimal(budgetCiphertextHash),
     noteDepth: "0",
     noteIndex: "0",
     noteSiblings: Array(32).fill("0"),
-    claimCount: decimal(claimCountBigInt),
     periodIndices: periodIndices.map(decimal),
     newBudgetNonce: decimal(newBudgetNonce),
     payoutNonce: decimal(payoutNonce),
@@ -207,10 +208,13 @@ export function buildShieldedClaimFixture({
     policy,
     enrollment,
     inputBudget,
+    rootIdentityCommitment,
     heirIdentityCommitment,
     ownerSecret,
     ownerCommitment,
     viewingKey,
     budgetOrigin,
+    remaining,
+    claimCount,
   };
 }

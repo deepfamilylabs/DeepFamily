@@ -58,7 +58,7 @@ test("each pool action has the verifier input count in ProofConstants.sol", () =
     ),
     {
       Shield: 7,
-      Fund: 27,
+      Fund: 26,
       Claim: 14,
       PrivateTransfer: 10,
       Unshield: 10,
@@ -128,10 +128,11 @@ test("claim signals follow the circuit's named public inputs", () => {
   assert.equal(witness.asOf, "31");
 });
 
-test("VALUE transfers list roots and nullifiers without transaction shard routing", () => {
-  const signals = buildShieldedPoolPublicSignals({
+test("VALUE transfers list roots, nullifiers and both recipient bindings", () => {
+  const { signals, witness } = buildShieldedPoolPublicInputs({
     ...valueBase,
     action: SHIELDED_POOL_ACTION.PrivateTransfer,
+    receiveBindings: [32n, 33n],
   });
   assert.deepEqual(signals, [
     1030n,
@@ -142,9 +143,10 @@ test("VALUE transfers list roots and nullifiers without transaction shard routin
     28n,
     hashA,
     hashB,
-    0n,
-    0n,
+    32n,
+    33n,
   ]);
+  assert.deepEqual(witness.receiveBindings, ["32", "33"]);
 });
 
 test("shard routing is validated without changing a business proof statement", () => {
@@ -210,7 +212,6 @@ test("fund includes its mode before the roots and binds lineage and time in both
       30n,
       31n,
       0n,
-      0n,
     ],
   );
   assert.deepEqual(
@@ -221,6 +222,7 @@ test("fund includes its mode before the roots and binds lineage and time in both
       relation0: 29,
       relation1: 30,
       asOf: 40,
+      receiveBindings: [32n, 0n],
     }),
     [
       1030n,
@@ -239,8 +241,7 @@ test("fund includes its mode before the roots and binds lineage and time in both
       29n,
       30n,
       40n,
-      0n,
-      0n,
+      32n,
     ],
   );
   assert.throws(() =>
@@ -252,6 +253,26 @@ test("fund includes its mode before the roots and binds lineage and time in both
       action: SHIELDED_POOL_ACTION.PrivateTransfer,
       fundMode: 1,
     }),
+  );
+});
+
+test("fund derives one scalar from the budget recipient and rejects a change recipient binding", () => {
+  const input = {
+    ...base,
+    action: SHIELDED_POOL_ACTION.Fund,
+    fundMode: 1,
+    receiveAuthorizations: [{ recipientBinding: 32n }, { recipientBinding: 0n }],
+  };
+  const { signals, witness } = buildShieldedPoolPublicInputs(input);
+  assert.equal(signals.at(-1), 32n);
+  assert.equal(witness.receiveBinding, "32");
+  assert.equal("receiveBindings" in witness, false);
+  assert.throws(
+    () => buildShieldedPoolPublicInputs({
+      ...input,
+      receiveAuthorizations: [{ recipientBinding: 32n }, { recipientBinding: 33n }],
+    }),
+    (error) => error.code === "INVALID_SHIELDED_ACTION_DATA",
   );
 });
 

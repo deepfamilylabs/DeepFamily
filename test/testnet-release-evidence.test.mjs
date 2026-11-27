@@ -332,8 +332,7 @@ const shieldedProofs = (chainId) =>
       const signals = Array(spec.publicSignals).fill("0");
       signals[0] = String(chainId);
       signals[1] = BigInt(SHIELDED_ADDRESSES.shieldedErc20Pool).toString();
-      // Fund appends receive bindings after asOf; Claim ends with asOf.
-      if (action === "fund") signals[signals.length - 3] = "1000";
+      if (action === "fund") signals[signals.length - 2] = "1000";
       if ((action === "claim" || action === "claim32")) signals[signals.length - 1] = String(8200 + 3 * 2_592_000);
       return [
         action,

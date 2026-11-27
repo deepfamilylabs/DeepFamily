@@ -91,7 +91,7 @@ const zeroData = () => ({
 
 async function prepareFundReceive(pool, data, witness) {
   const receive = fixtureFundReceive(witness);
-  await authorizeMockReceive(hre, pool, data, 3, receive.receiveBindings);
+  await authorizeMockReceive(hre, pool, data, 3, [receive.receiveBinding, 0n]);
   return receive;
 }
 
@@ -561,7 +561,7 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
       const asOf = BigInt((await hre.ethers.provider.getBlock("latest")).timestamp);
       const eligibleFrom = asOf + 7200n;
       const common = {
-        rootIdentityCommitment: BigInt(fixture.initial.rootIdentityCommitment),
+        rootIdentityCommitment: fixture.rootIdentityCommitment,
         rootVersionIndex: BigInt(fixture.initial.rootVersionIndex),
         amountPerPeriod: 100n,
         periodDays: PERIOD_DAYS,
@@ -692,7 +692,7 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
           template ? base.continuation : base.initial,
         );
         const inputs = buildShieldedPoolPublicInputs({ action: 1, chainId, poolAddress, ...data });
-        assert.equal(inputs.signals.length, 27);
+        assert.equal(inputs.signals.length, 26);
         const witness = {
           ...(template ? base.continuation : base.initial),
           ...receive,
@@ -709,7 +709,6 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
           changeNonce: String(nonce + 1n),
           ...(template
             ? {
-                oldBudgetRemaining: String(template.note.remaining),
                 oldBudgetRemainingPeriods: String(template.note.remaining / 100n),
                 oldBudgetNonce: String(template.note.nonce),
                 oldBudgetCiphertextHash: String(template.ciphertextHashField),
@@ -825,7 +824,7 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
         },
         /Assert Failed/u,
       );
-      assertInvalidCircuitWitness("claim", { ...pure.witness, budgetKind: "0" }, /Assert Failed/u);
+      assertInvalidCircuitWitness("claim", { ...pure.witness, policySalt: "1" }, /Assert Failed/u);
       await hre.networkHelpers.time.increaseTo(Number(pure.data.asOf));
       await pool.claim(pure.data, pureProof);
       const recovered = await decryptShieldedNote({
@@ -930,7 +929,9 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
     const [signer] = await hre.ethers.getSigners();
     const generated = await deployCurrentGeneratedVerifiers(["fund"], signer);
     const adapter = await deployUnifiedVerifierAdapter(hre, generated);
-    const { initial, continuation } = buildShieldedFundingFixtures({ periodDays: PERIOD_DAYS });
+    const { initial, continuation, rootIdentityCommitment } = buildShieldedFundingFixtures({
+      periodDays: PERIOD_DAYS,
+    });
     const donor = syntheticFullMerklePath(initial.inputRoots[0], 32, (1n << 31n) | 5n, 4100);
     for (const witness of [initial, continuation]) {
       witness.donorDepth = donor.depth;
@@ -952,7 +953,7 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
       writtenAt: initial.writtenAt,
     });
     const trustedLeaf = computeLineageTrustedLeaf({
-      rootIdentityCommitment: initial.rootIdentityCommitment,
+      rootIdentityCommitment,
       rootVersionIndex: initial.rootVersionIndex,
       account: endorser,
     });
@@ -1370,7 +1371,7 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
       heirViewKeyLo: String(heirViewLimbs.viewKeyLo),
       heirViewKeyHi: String(heirViewLimbs.viewKeyHi),
     };
-    const rootIdentityCommitment = BigInt(allocationWitness.rootIdentityCommitment);
+    const rootIdentityCommitment = fundingFixture.rootIdentityCommitment;
     const rootVersionIndex = BigInt(allocationWitness.rootVersionIndex);
     const rate = 100n;
     const policySalt = BigInt(allocationWitness.policySalt);
@@ -1631,7 +1632,6 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
       donorIndex: additionalFundingDonorMembership.index,
       donorSiblings: additionalFundingDonorMembership.siblings,
       eligibleFrom: String(eligibleFrom),
-      oldBudgetRemaining: "1200",
       oldBudgetRemainingPeriods: "12",
       oldBudgetNonce: String(budgetNonce),
       oldBudgetCiphertextHash: String(encryptedBudget.ciphertextHashField),
@@ -1816,7 +1816,6 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
         policyCommitmentInput: String(policyCommitment),
         enrollmentCommitmentInput: String(enrollmentCommitment),
         eligibleFrom: String(eligibleFrom),
-        remaining: "1200",
         remainingPeriods: "12",
         budgetNonce: String(budgetNonce),
         budgetCiphertextHash: String(encryptedBudget.ciphertextHashField),
@@ -2171,7 +2170,6 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
       {
         ...threePeriods.witness,
         ...underfundedClaimPublicInputs,
-        remaining: "200",
         remainingPeriods: "2",
         budgetNonce: String(additionalFundingBudgetNonce),
         budgetCiphertextHash: String(encryptedAdditionalFundingBudget.ciphertextHashField),
@@ -2188,12 +2186,11 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
       threePeriodsClaim.witness,
       threePeriodsClaim.claimSignals,
     );
-    // The circuit's private count is range constrained even though all public
-    // period slots have the same fixed shape.
+    // The fixed-shape witness supports at most three period indices.
     assertInvalidCircuitWitness(
       "claim",
-      { ...threePeriodsClaim.witness, claimCount: "4" },
-      /ShieldedClaim/u,
+      { ...threePeriodsClaim.witness, periodIndices: ["0", "1", "2", "3"] },
+      /Too many values for input signal periodIndices/u,
     );
     expect(onePeriod.claimData.periodNullifiers[0]).to.equal(
       threePeriodsClaim.claimData.periodNullifiers[0],

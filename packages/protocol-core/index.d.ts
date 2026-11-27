@@ -1046,6 +1046,7 @@ export type ShieldedPoolPublicInputName =
   | "endorsementRoot"
   | "trustedRoot"
   | "asOf"
+  | "receiveBinding"
   | "receiveBindings";
 /** Each pool action circuit's named public inputs, in verifier order. */
 export const SHIELDED_POOL_PUBLIC_INPUTS: Readonly<
@@ -1058,7 +1059,7 @@ export interface ShieldedPoolPublicSignalInput {
   receiveAuthorizations?: readonly ShieldedReceiveAuthorization[];
   fundMode?: BigNumberish;
   budgetKind?: BigNumberish;
-  /** Optional cross-check; otherwise the nine fields are read from the public output envelope. */
+  /** Optional cross-check for the ten fields read from the public output envelope. */
   publicBudget?: readonly BigNumberish[];
   action: BigNumberish;
   chainId: BigNumberish;

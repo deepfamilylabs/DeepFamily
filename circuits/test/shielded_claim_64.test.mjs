@@ -63,8 +63,7 @@ function withPrivateClaimOutput(fixture, witness, purpose = CLAIM_PRIVATE_BUDGET
         BigInt(changed.heirViewKeyHi),
       ]),
       BigInt(changed.rate),
-      BigInt(changed.remaining) -
-        BigInt(changed.claimCount) * BigInt(changed.rate),
+      fixture.remaining - BigInt(fixture.claimCount) * BigInt(changed.rate),
       BigInt(changed.newBudgetNonce),
       BigInt(changed.ciphertextHashes[0]),
     ]),
@@ -268,16 +267,6 @@ test("shielded claim constraints", async (t) => {
             }),
           );
         }
-        await invalid(
-          mutate(witness, (w) => {
-            w.budgetKind = "2";
-          }),
-        );
-        await invalid(
-          mutate(witness, (w) => {
-            w.budgetKind = "0";
-          }),
-        );
         for (const field of ["policySalt", "allocationKeyCommitment", "enrollmentSalt"]) {
           await invalid(
             mutate(witness, (w) => {
@@ -350,8 +339,7 @@ test("shielded claim constraints", async (t) => {
                 fixture.enrollment,
                 binding,
                 BigInt(w.rate),
-                BigInt(w.remaining) -
-                  BigInt(w.claimCount) * BigInt(w.rate),
+                fixture.remaining - BigInt(fixture.claimCount) * BigInt(w.rate),
                 BigInt(w.newBudgetNonce),
                 BigInt(w.ciphertextHashes[0]),
               ]).toString();
@@ -402,7 +390,7 @@ test("shielded claim constraints", async (t) => {
             viewingKey: fixture.viewingKey,
             budgetOrigin: fixture.budgetOrigin,
             amountPerPeriod: witness.rate,
-            remaining: witness.remaining,
+            remaining: fixture.remaining,
             nonce: witness.budgetNonce,
             ciphertextHashField: witness.budgetCiphertextHash,
           },
@@ -437,14 +425,14 @@ test("shielded claim constraints", async (t) => {
       assert.deepEqual(
         computeShieldedClaimBatch({
           amountPerPeriod: witness.rate,
-          remaining: witness.remaining,
+          remaining: fixture.remaining,
           eligibleFrom: witness.eligibleFrom,
           periodDays: witness.periodDays,
           now: witness.asOf,
-          periodIndices: witness.periodIndices.slice(0, Number(witness.claimCount)),
+          periodIndices: witness.periodIndices.slice(0, fixture.claimCount),
         }),
         {
-          periodIndices: witness.periodIndices.slice(0, Number(witness.claimCount)).map(BigInt),
+          periodIndices: witness.periodIndices.slice(0, fixture.claimCount).map(BigInt),
           amount: 200n,
           remaining: 100n,
         },
@@ -488,8 +476,8 @@ test("shielded claim constraints", async (t) => {
       await valid(witness);
       // Rebalance the outputs as if another 100-unit budget had been added.
       // Membership still opens only the selected 200-unit note.
-      const inflated = withPrivateClaimOutput(fixture, { ...witness, remaining: "300" });
-      await invalid(inflated);
+      const inflated = buildShieldedClaimFixture({ claimCount: 2, remainingPeriods: 3 }).witness;
+      await invalid({ ...inflated, inputRoots: witness.inputRoots });
       await assert.rejects(() => calculator.calculateWitness({
         ...witness,
         inputRoots: [witness.inputRoots[0], witness.inputRoots[0]],
@@ -585,10 +573,9 @@ test("shielded claim constraints", async (t) => {
 
     const { witness: base, heirIdentityCommitment } = buildShieldedClaimFixture();
     await t.test("rejects four periods", async () => {
-      await invalid(
-        mutate(base, (w) => {
-          w.claimCount = "4";
-        }),
+      await assert.rejects(
+        () => calculator.calculateWitness({ ...base, periodIndices: ["0", "1", "2", "3"] }, 1),
+        /Too many values for input signal periodIndices/u,
       );
     });
     await t.test("rejects a period before its full end", async () => {
@@ -636,12 +623,28 @@ test("shielded claim constraints", async (t) => {
       );
     });
     await t.test("rejects duplicate period indices", async () => {
+      const { witness } = buildShieldedClaimFixture({ claimCount: 3 });
       await invalid(
-        mutate(base, (w) => {
-          w.periodIndices[1] = w.periodIndices[0];
-          w.periodNullifiers[1] = w.periodNullifiers[0];
+        mutate(witness, (w) => {
+          w.periodIndices[2] = w.periodIndices[1];
+          w.periodNullifiers[2] = w.periodNullifiers[1];
         }),
       );
+    });
+    await t.test("requires a contiguous prefix of active period slots", async () => {
+      const two = buildShieldedClaimFixture({ claimCount: 2 });
+      const three = buildShieldedClaimFixture({ claimCount: 3 });
+      const { witness } = two;
+      const dummy = computeShieldedDummyPeriodNullifier(
+        { ownerSecret: two.ownerSecret, budgetNoteCommitment: two.inputBudget, slotIndex: 1 },
+        two.scope,
+      );
+      await invalid({
+        ...witness,
+        asOf: three.witness.asOf,
+        periodIndices: ["0", "0", "2"],
+        periodNullifiers: [witness.periodNullifiers[0], String(dummy), three.witness.periodNullifiers[2]],
+      });
     });
     await t.test("rejects an insufficient whole-period budget", async () => {
       await invalid(

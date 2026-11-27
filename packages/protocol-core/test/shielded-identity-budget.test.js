@@ -398,7 +398,7 @@ test("public fund signal fields come from the canonical output while claim expos
   };
   const { signals, witness } = buildShieldedPoolPublicInputs(base);
   const publicBudget = getShieldedPublicBudgetFields(budget, context);
-  assert.equal(signals.length, 27);
+  assert.equal(signals.length, 26);
   assert.deepEqual(signals.slice(0, 14), [1030n, 1n, 0n, 1n, ...publicBudget]);
   assert.deepEqual(witness.publicBudget, publicBudget.map(String));
   assert.throws(

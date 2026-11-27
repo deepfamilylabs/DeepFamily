@@ -1561,11 +1561,12 @@ export class ShieldedAssetSession {
       const salt = generateShieldedRandomField();
       const binding = computeShieldedReceiveCredentialBinding({ credential, salt });
       prepared.data.receiveAuthorizations[0] = { checkpointId: 0n, asOf: 0n, deadline: 0n, recipientBinding: binding, proof: "0x" };
-      prepared.witness.receiveBindings = [String(binding), "0"];
       if (actualAction === "fund") {
+        prepared.witness.receiveBinding = String(binding);
         prepared.witness.receiveAuthorizationAlias = String(credential.authorizationAlias);
         prepared.witness.receiveSalt = String(salt);
       } else {
+        prepared.witness.receiveBindings = [String(binding), "0"];
         const view = splitShieldedViewPublicKey(credential.viewingKey);
         prepared.witness.receiveAuthorizationAliases = [String(credential.authorizationAlias), "0"];
         prepared.witness.receiveSalts = [String(salt), "0"];

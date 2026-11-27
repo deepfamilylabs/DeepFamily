@@ -1361,7 +1361,7 @@ not establish an unlimited write capacity or low transaction fees.
 | Action            | Purpose | Signals | Public inputs, in order                                                                                                                                                                   |
 | ----------------- | ------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `shield`          | 2       | 7       | chainId, pool, outputCommitments[2], ciphertextHashes[2], amount                                                                                                                          |
-| `fund`            | 3       | 27      | chainId, pool, fundMode, budgetKind, publicBudget[10], inputRoots[2], inputNullifiers[2], outputCommitments[2], ciphertextHashes[2], endorsementRoot, trustedRoot, asOf, receiveBindings[2] |
+| `fund`            | 3       | 26      | chainId, pool, fundMode, budgetKind, publicBudget[10], inputRoots[2], inputNullifiers[2], outputCommitments[2], ciphertextHashes[2], endorsementRoot, trustedRoot, asOf, receiveBinding |
 | `claim`           | 4       | 14      | chainId, pool, inputRoots[1], inputNullifiers[1], periodNullifiers[3], outputCommitments[2], ciphertextHashes[2], endorsementRoot, trustedRoot, asOf                   |
 | `privateTransfer` | 5       | 10 / 16 | chainId, pool, inputRoots[1/4], inputNullifiers[1/4], outputCommitments[2], ciphertextHashes[2], receiveBindings[2] |
 | `unshield`        | 6       | 10 / 16 | chainId, pool, inputRoots[1/4], inputNullifiers[1/4], outputCommitments[2], ciphertextHashes[2], amount, recipient                                                                  |
@@ -1406,7 +1406,7 @@ Localhost, testnet acceptance and guarded Mainnet release use the same integrate
 
 ### Shielded action verifiers
 
-The pool uses five action routes with eight verifier targets and 7 to 27 public signals, as listed above. They receive encoding-1, 256-byte ABC proof payloads through the same `Groth16VerifierAdapter` used for identity and disclosure. The single `zk:setup` command generates `contracts/verifiers/Shielded*Verifier.sol` for all five pool routes. It also synchronizes the matching browser assets, including the receive-credential proving and verification keys, to `frontend/public/zk/shielded/` alongside the identity/disclosure workflow.
+The pool uses five action routes with eight verifier targets and 7 to 26 public signals, as listed above. They receive encoding-1, 256-byte ABC proof payloads through the same `Groth16VerifierAdapter` used for identity and disclosure. The single `zk:setup` command generates `contracts/verifiers/Shielded*Verifier.sol` for all five pool routes. It also synchronizes the matching browser assets, including the receive-credential proving and verification keys, to `frontend/public/zk/shielded/` alongside the identity/disclosure workflow.
 
 The person and disclosure verifiers are generated from their Circom circuits by snarkjs. DeepFamily selects them through the permanent `(purpose,circuitId)` route and an `IProofVerifierAdapter`. Encoding ID `1`
 requires a 256-byte ABI encoding of Groth16 `a/b/c`, and the adapter forwards to the typed verifier:

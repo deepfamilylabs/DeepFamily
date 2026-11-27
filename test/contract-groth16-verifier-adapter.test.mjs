@@ -5,7 +5,7 @@ import { deployUnifiedVerifierAdapter } from "./helpers/unifiedVerifierAdapter.m
 
 const ACTIONS = ["shield", "fund", "claim", "privateTransfer", "unshield"];
 // Mirrors ProofConstants.sol and SHIELDED_POOL_PUBLIC_SIGNAL_COUNTS.
-const SIGNAL_COUNTS = [7, 27, 14, 10, 10];
+const SIGNAL_COUNTS = [7, 26, 14, 10, 10];
 const PROOF = hre.ethers.AbiCoder.defaultAbiCoder().encode(
   ["uint256[2]", "uint256[2][2]", "uint256[2]"],
   [
@@ -74,10 +74,10 @@ describe("Unified Groth16 verifier adapter", function () {
       [1, 5],
       [2, 8],
       [3, 12],
-      [3, 29],
+      [3, 27],
       [4, 12],
       [4, 15],
-      [4, 27],
+      [4, 26],
       [5, 30],
       [5, 11],
       [5, 20],
@@ -146,13 +146,13 @@ describe("Unified Groth16 verifier adapter", function () {
     await fund.configure(true, 10n);
     const adapter = await deployUnifiedVerifierAdapter(hre, { fund });
     expect(await adapter.verifierForPurpose(3)).to.equal(await fund.getAddress());
-    const signals = Array(27).fill(0n);
-    signals[26] = 10n;
+    const signals = Array(26).fill(0n);
+    signals[25] = 10n;
     for (const mode of [0n, 1n]) {
       signals[2] = mode;
       expect(await adapter.verifyProof(3, 1, PROOF, signals)).to.equal(true);
     }
-    signals[26] = 11n;
+    signals[25] = 11n;
     expect(await adapter.verifyProof(3, 1, PROOF, signals)).to.equal(false);
   });
 

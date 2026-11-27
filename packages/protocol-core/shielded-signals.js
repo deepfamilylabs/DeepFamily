@@ -92,6 +92,17 @@ export function buildShieldedPoolPublicInputs(input) {
     "DUPLICATE_SHIELDED_OUTPUT_CIPHERTEXT",
     "Shielded outputs need distinct ciphertexts",
   );
+  const receiveBindings = values(
+    input.receiveBindings ??
+      input.receiveAuthorizations?.map((item) => item.recipientBinding) ?? [0n, 0n],
+    2,
+    "receiveBindings",
+  );
+  if (action === SHIELDED_POOL_ACTION.Fund) {
+    unused(receiveBindings[1] === 0n, "Fund change recipient binding");
+  } else if (action !== SHIELDED_POOL_ACTION.PrivateTransfer) {
+    unused(receiveBindings.every((value) => value === 0n), "receiveBindings");
+  }
   const available = {
     chainId: [bigintFrom(input.chainId, "chainId", MAX_UINT64)],
     pool: [BigInt(getAddress(input.poolAddress))],
@@ -108,12 +119,8 @@ export function buildShieldedPoolPublicInputs(input) {
     endorsementRoot: [field(input.relation0 ?? 0n, "relation0")],
     trustedRoot: [field(input.relation1 ?? 0n, "relation1")],
     asOf: [bigintFrom(input.asOf ?? 0n, "asOf", MAX_UINT64)],
-    receiveBindings: values(
-      input.receiveBindings ??
-        input.receiveAuthorizations?.map((item) => item.recipientBinding) ?? [0n, 0n],
-      2,
-      "receiveBindings",
-    ),
+    receiveBinding: [receiveBindings[0]],
+    receiveBindings,
   };
 
   const uses = new Set(names);
@@ -139,7 +146,6 @@ export function buildShieldedPoolPublicInputs(input) {
     "endorsementRoot",
     "trustedRoot",
     "asOf",
-    "receiveBindings",
   ]) {
     if (!uses.has(name))
       unused(

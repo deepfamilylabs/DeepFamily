@@ -22,7 +22,7 @@ template ShieldedFund() {
     signal input endorsementRoot;
     signal input trustedRoot;
     signal input asOf;
-    signal input receiveBindings[2];
+    signal input receiveBinding;
     signal input receiveAuthorizationAlias;
     signal input receiveSalt;
 
@@ -33,7 +33,6 @@ template ShieldedFund() {
     signal input donorDepth;
     signal input donorIndex;
     signal input donorSiblings[32];
-    signal input rootIdentityCommitment;
     signal input rootVersionIndex;
     signal input rate;
     signal input periodDays;
@@ -60,11 +59,7 @@ template ShieldedFund() {
     signal input trustedIndex;
     signal input trustedSiblings[64];
 
-    signal input oldBudgetKind;
     signal input oldBudgetIsClaim;
-    signal input oldKeyMode;
-    signal input oldHeirOwnerCommitment;
-    signal input oldBudgetRemaining;
     signal input oldBudgetRemainingPeriods;
     signal input oldBudgetNonce;
     signal input oldBudgetCiphertextHash;
@@ -96,11 +91,7 @@ template ShieldedFund() {
     fundMode * (1 - fundMode) === 0;
     signal initial <== 1 - fundMode;
     budgetKind * (1 - budgetKind) === 0;
-    oldBudgetKind * (1 - oldBudgetKind) === 0;
-    oldBudgetIsClaim * (1 - oldBudgetIsClaim) === 0;
-    oldBudgetKind * oldBudgetIsClaim === 0;
     keyMode * (1 - keyMode) === 0;
-    oldKeyMode * (1 - oldKeyMode) === 0;
     budgetKind * keyMode === 0;
     component receive = ShieldedReceiveRecipientBinding();
     receive.enabled <== 1 - budgetKind;
@@ -114,15 +105,10 @@ template ShieldedFund() {
     fundReceive.inputs[0] <== 202610220102;
     fundReceive.inputs[1] <== receive.binding;
     fundReceive.inputs[2] <== heirIdentityCommitment;
-    receiveBindings[0] === (1 - budgetKind) * fundReceive.out;
-    receiveBindings[1] === 0;
+    receiveBinding === (1 - budgetKind) * fundReceive.out;
     component receiveZero = IsZero();
-    receiveZero.in <== receiveBindings[0];
+    receiveZero.in <== receiveBinding;
     (1 - budgetKind) * receiveZero.out === 0;
-    oldBudgetKind * oldKeyMode === 0;
-    initial * oldKeyMode === 0;
-    fundMode * (budgetKind - oldBudgetKind) === 0;
-    fundMode * (keyMode - oldKeyMode) === 0;
     initial * (inputRoots[1] - inputRoots[0]) === 0;
     component asOfBits = Num2Bits(64);
     asOfBits.in <== asOf;
@@ -138,6 +124,25 @@ template ShieldedFund() {
     donor.index <== donorIndex;
     donor.siblings <== donorSiblings;
     donor.spendNullifier === inputNullifiers[0];
+
+    component directChild = ShieldedDirectChildCurrent(64);
+    directChild.heirIdentityCommitment <== heirIdentityCommitment;
+    directChild.rootVersionIndex <== rootVersionIndex;
+    directChild.heirVersionIndex <== heirVersionIndex;
+    directChild.fatherIdentityCommitment <== fatherIdentityCommitment;
+    directChild.motherIdentityCommitment <== motherIdentityCommitment;
+    directChild.rootIsMother <== rootIsMother;
+    directChild.endorser <== endorser;
+    directChild.writtenAt <== writtenAt;
+    directChild.endorsementDepth <== endorsementDepth;
+    directChild.endorsementIndex <== endorsementIndex;
+    directChild.endorsementSiblings <== endorsementSiblings;
+    directChild.trustedDepth <== trustedDepth;
+    directChild.trustedIndex <== trustedIndex;
+    directChild.trustedSiblings <== trustedSiblings;
+    directChild.endorsementRoot <== endorsementRoot;
+    directChild.trustedRoot <== trustedRoot;
+    signal rootIdentityCommitment <== directChild.rootIdentityCommitment;
 
     component policy = ShieldedPrivatePolicy();
     policy.poolDomain <== sharedScope.domain;
@@ -164,24 +169,6 @@ template ShieldedFund() {
     (1 - budgetKind) * ownerNotZero.out === 0;
     budgetKind * heirOwnerCommitment === 0;
 
-    component directChild = ShieldedDirectChildCurrent(64);
-    directChild.heirIdentityCommitment <== heirIdentityCommitment;
-    directChild.rootVersionIndex <== rootVersionIndex;
-    directChild.heirVersionIndex <== heirVersionIndex;
-    directChild.fatherIdentityCommitment <== fatherIdentityCommitment;
-    directChild.motherIdentityCommitment <== motherIdentityCommitment;
-    directChild.rootIsMother <== rootIsMother;
-    directChild.endorser <== endorser;
-    directChild.writtenAt <== writtenAt;
-    directChild.endorsementDepth <== endorsementDepth;
-    directChild.endorsementIndex <== endorsementIndex;
-    directChild.endorsementSiblings <== endorsementSiblings;
-    directChild.trustedDepth <== trustedDepth;
-    directChild.trustedIndex <== trustedIndex;
-    directChild.trustedSiblings <== trustedSiblings;
-    directChild.endorsementRoot <== endorsementRoot;
-    directChild.trustedRoot <== trustedRoot;
-    directChild.rootIdentityCommitment === rootIdentityCommitment;
     initial * (eligibleFrom - asOf - 7200) === 0;
 
     component enrollment = ShieldedPrivateEnrollment();
@@ -200,17 +187,14 @@ template ShieldedFund() {
     terms.rate <== rate;
     terms.periodDays <== periodDays;
 
-    initial * oldBudgetKind === 0;
+    // A refill reconstructs its template with the new budget's binding and owner.
+    // Initial funding uses zero for the disabled template fields.
+    signal oldBudgetKind <== fundMode * budgetKind;
+    signal oldKeyMode <== fundMode * keyMode;
+    signal oldHeirOwnerCommitment <== fundMode * heirOwnerCommitment;
+    oldBudgetIsClaim * (1 - oldBudgetIsClaim) === 0;
+    oldBudgetKind * oldBudgetIsClaim === 0;
     initial * oldBudgetIsClaim === 0;
-    initial * oldHeirOwnerCommitment === 0;
-    oldBudgetKind * oldHeirOwnerCommitment === 0;
-    component oldOwnerNotZero = IsZero();
-    oldOwnerNotZero.in <== oldHeirOwnerCommitment;
-    signal oldPrivate <== fundMode * (1 - oldBudgetKind);
-    oldPrivate * oldOwnerNotZero.out === 0;
-    signal privateContinuation <== oldPrivate * (1 - budgetKind);
-    privateContinuation * (heirOwnerCommitment - oldHeirOwnerCommitment) === 0;
-    initial * oldBudgetRemaining === 0;
     initial * oldBudgetRemainingPeriods === 0;
     initial * oldBudgetNonce === 0;
     initial * oldBudgetCiphertextHash === 0;
@@ -218,11 +202,11 @@ template ShieldedFund() {
     initial * oldBudgetIndex === 0;
     initial * budgetUseNonce === 0;
     for (var i = 0; i < 32; i++) initial * oldBudgetSiblings[i] === 0;
-    component oldAmountBits = Num2Bits(128);
-    oldAmountBits.in <== oldBudgetRemaining;
     component oldPeriodsBits = Num2Bits(64);
     oldPeriodsBits.in <== oldBudgetRemainingPeriods;
-    oldBudgetRemaining === rate * oldBudgetRemainingPeriods;
+    signal oldBudgetRemaining <== rate * oldBudgetRemainingPeriods;
+    component oldAmountBits = Num2Bits(128);
+    oldAmountBits.in <== oldBudgetRemaining;
     component oldNonceNotZero = IsZero();
     oldNonceNotZero.in <== oldBudgetNonce;
     fundMode * oldNonceNotZero.out === 0;
@@ -326,5 +310,5 @@ template ShieldedFund() {
 
 component main {
     public [chainId, pool, fundMode, budgetKind, publicBudget, inputRoots, inputNullifiers,
-        outputCommitments, ciphertextHashes, endorsementRoot, trustedRoot, asOf, receiveBindings]
+        outputCommitments, ciphertextHashes, endorsementRoot, trustedRoot, asOf, receiveBinding]
 } = ShieldedFund();

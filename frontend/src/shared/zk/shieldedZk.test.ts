@@ -72,7 +72,7 @@ describe("shielded proof public inputs", () => {
       ["fundReceivePresentation", 20],
       ["identityCounterUpdate", 6],
       ["shield", 7],
-      ["fund", 27],
+      ["fund", 26],
       ["claim", 14],
       ["claim32", 14],
       ["privateTransfer", 10],
@@ -104,10 +104,10 @@ describe("shielded proof public inputs", () => {
 
   it("shares one Fund artifact set across both modes and retains each witness", async () => {
     mocks.verify.mockResolvedValue(true);
-    const fetch = vi.fn(async () => new Response(JSON.stringify({ nPublic: 27 })));
+    const fetch = vi.fn(async () => new Response(JSON.stringify({ nPublic: 26 })));
     vi.stubGlobal("fetch", fetch);
     for (const fundMode of [0, 1] as const) {
-      const expectedPublicSignals = Array(27).fill("0");
+      const expectedPublicSignals = Array(26).fill("0");
       expectedPublicSignals[2] = String(fundMode);
       mocks.fullProve.mockResolvedValue({ proof: {}, publicSignals: expectedPublicSignals });
       const witness = { fundMode: String(fundMode), endorsementSiblings: Array(64).fill("0") };
@@ -132,7 +132,7 @@ describe("shielded proof public inputs", () => {
         generateShieldedProof({
           circuit: "fund",
           witness,
-          expectedPublicSignals: Array(27).fill("0"),
+          expectedPublicSignals: Array(26).fill("0"),
         }),
       ).rejects.toThrow("mode must be 0 or 1");
     }

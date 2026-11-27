@@ -28,7 +28,8 @@ export const SHIELDED_POOL_SIGNAL_SEGMENTS = Object.freeze(
       [Fund, Claim],
       ["endorsementRoot", "trustedRoot", "asOf"],
     ],
-    [[Fund, PrivateTransfer], ["receiveBindings"]],
+    [[Fund], ["receiveBinding"]],
+    [[PrivateTransfer], ["receiveBindings"]],
   ].map(([actions, fields]) =>
     Object.freeze({ actions: Object.freeze(actions), fields: Object.freeze(fields) }),
   ),
@@ -63,6 +64,7 @@ export const SHIELDED_POOL_INPUT_WIDTHS = Object.freeze({
   endorsementRoot: 1,
   trustedRoot: 1,
   asOf: 1,
+  receiveBinding: 1,
   receiveBindings: 2,
 });
 

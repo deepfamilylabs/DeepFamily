@@ -147,11 +147,7 @@ export function createShieldedPolicyDescriptor(
 }
 
 const ZERO_TEMPLATE_WITNESS: ShieldedWitness = {
-  oldBudgetKind: "0",
   oldBudgetIsClaim: "0",
-  oldKeyMode: "0",
-  oldHeirOwnerCommitment: "0",
-  oldBudgetRemaining: "0",
   oldBudgetRemainingPeriods: "0",
   oldBudgetNonce: "0",
   oldBudgetCiphertextHash: "0",
@@ -766,7 +762,6 @@ async function prepareInitialFunding(input: InitialFundingInput): Promise<Prepar
   });
   const witness: ShieldedWitness = {
     ...publicInputs(SHIELDED_POOL_ACTION.Fund, ctx.chainId, ctx.poolAddress, data),
-    receiveBindings: ["0", "0"],
     receiveAuthorizationAlias: "0",
     receiveSalt: "0",
     ...ZERO_TEMPLATE_WITNESS,
@@ -777,7 +772,6 @@ async function prepareInitialFunding(input: InitialFundingInput): Promise<Prepar
     donorDepth: donor.path.proofDepth,
     donorIndex: String(donor.path.proofIndex),
     donorSiblings: decimal(donor.path.siblings),
-    rootIdentityCommitment: String(policy.rootIdentityCommitment),
     rootVersionIndex: String(policy.rootVersionIndex),
     rate: String(policy.amountPerPeriod),
     periodDays: String(policy.periodDays),
@@ -953,7 +947,6 @@ async function prepareContinuationFunding(
   });
   const witness: ShieldedWitness = {
     ...publicInputs(SHIELDED_POOL_ACTION.Fund, ctx.chainId, ctx.poolAddress, data),
-    receiveBindings: ["0", "0"],
     receiveAuthorizationAlias: "0",
     receiveSalt: "0",
     ...lineage.witness,
@@ -965,7 +958,6 @@ async function prepareContinuationFunding(
     donorDepth: donor.path.proofDepth,
     donorIndex: String(donor.path.proofIndex),
     donorSiblings: decimal(donor.path.siblings),
-    rootIdentityCommitment: String(old.rootIdentityCommitment),
     rootVersionIndex: String(old.rootVersionIndex),
     rate: String(rate),
     periodDays: String(periodDays),
@@ -982,12 +974,8 @@ async function prepareContinuationFunding(
       : "0",
     eligibleFrom: String(old.eligibleFrom),
     enrollmentSalt: String(ruleOpening.enrollmentSalt),
-    oldBudgetKind: old.binding === "identity" ? "1" : "0",
     oldBudgetIsClaim:
       old.binding === "identity" ? "0" : String(normalizeShieldedBudgetOrigin(old.budgetOrigin)),
-    oldKeyMode: String(normalizeShieldedKeyMode(old.keyMode, old.binding)),
-    oldHeirOwnerCommitment: old.binding === "identity" ? "0" : String(old.heirOwnerCommitment),
-    oldBudgetRemaining: String(oldRemaining),
     oldBudgetRemainingPeriods: String(oldRemaining / rate),
     oldBudgetNonce: String(old.nonce),
     oldBudgetCiphertextHash: String(template.ciphertextHash),

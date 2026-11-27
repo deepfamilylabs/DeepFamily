@@ -34,27 +34,23 @@ export function fixtureFundReceive(witness) {
   const enabled = BigInt(witness.budgetKind) === 0n;
   const alias = enabled ? 99101n : 0n;
   const salt = enabled ? 99102n : 0n;
+  const binding = enabled
+    ? poseidon3([
+        202610220102n,
+        fixtureReceiveBinding(
+          alias,
+          witness.heirOwnerCommitment,
+          witness.keyMode,
+          witness.heirViewKeyLo,
+          witness.heirViewKeyHi,
+          salt,
+        ),
+        BigInt(witness.heirIdentityCommitment),
+      ])
+    : 0n;
   return {
     receiveAuthorizationAlias: String(alias),
     receiveSalt: String(salt),
-    receiveBindings: [
-      String(
-        enabled
-          ? poseidon3([
-              202610220102n,
-              fixtureReceiveBinding(
-                alias,
-                witness.heirOwnerCommitment,
-                witness.keyMode,
-                witness.heirViewKeyLo,
-                witness.heirViewKeyHi,
-                salt,
-              ),
-              BigInt(witness.heirIdentityCommitment),
-            ])
-          : 0n,
-      ),
-      "0",
-    ],
+    receiveBinding: String(binding),
   };
 }

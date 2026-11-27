@@ -60,12 +60,12 @@ interface IGroth16Verifier14 {
   ) external view returns (bool);
 }
 
-interface IGroth16Verifier27 {
+interface IGroth16Verifier26 {
   function verifyProof(
     uint256[2] calldata a,
     uint256[2][2] calldata b,
     uint256[2] calldata c,
-    uint256[27] calldata publicSignals
+    uint256[26] calldata publicSignals
   ) external view returns (bool);
 }
 
@@ -249,10 +249,10 @@ contract Groth16VerifierAdapter is IProofVerifierAdapter {
       for (uint256 i = 0; i < length; ++i) signals10[i] = publicSignals[i];
       return IGroth16Verifier10(verifier).verifyProof(a, b, c, signals10);
     }
-    if (length == 27) {
-      uint256[27] memory signals27;
-      for (uint256 i = 0; i < length; ++i) signals27[i] = publicSignals[i];
-      return IGroth16Verifier27(verifier).verifyProof(a, b, c, signals27);
+    if (length == 26) {
+      uint256[26] memory signals26;
+      for (uint256 i = 0; i < length; ++i) signals26[i] = publicSignals[i];
+      return IGroth16Verifier26(verifier).verifyProof(a, b, c, signals26);
     }
     if (length == 16) {
       uint256[16] memory signals16;

@@ -131,8 +131,8 @@ describe("Shielded public-signal layout generation", function () {
   it("rejects a hand-edited Solidity proof length", async function () {
     await replace(
       CONSTANTS,
+      "SHIELDED_FUND_PUBLIC_SIGNALS_LEN = 26;",
       "SHIELDED_FUND_PUBLIC_SIGNALS_LEN = 27;",
-      "SHIELDED_FUND_PUBLIC_SIGNALS_LEN = 28;",
     );
     await assert.rejects(
       synchronizeShieldedSignalLayout({ root, check: true }),
@@ -323,32 +323,32 @@ describe("Shielded public-signal layout generation", function () {
   it("rejects a fixed-array verifier ABI width change", async function () {
     await replace(
       ADAPTER,
+      "uint256[26] calldata publicSignals",
       "uint256[27] calldata publicSignals",
-      "uint256[28] calldata publicSignals",
     );
     await assert.rejects(
       verifyShieldedCircuitLayouts({ root }),
-      /adapter ABI width 27 differs from schema/u,
+      /adapter ABI width 26 differs from schema/u,
     );
   });
 
   it("rejects a dispatch condition that no longer selects its matching fixed-array ABI", async function () {
-    await replace(ADAPTER, "if (length == 27)", "if (length == 28)");
+    await replace(ADAPTER, "if (length == 26)", "if (length == 27)");
     await assert.rejects(
       verifyShieldedCircuitLayouts({ root }),
-      /adapter dispatch width 28 differs from schema/u,
+      /adapter dispatch width 27 differs from schema/u,
     );
   });
 
   it("rejects an adapter branch routed to another width", async function () {
     await replace(
       ADAPTER,
-      "return IGroth16Verifier27(verifier).verifyProof",
+      "return IGroth16Verifier26(verifier).verifyProof",
       "return IGroth16Verifier16(verifier).verifyProof",
     );
     await assert.rejects(
       verifyShieldedCircuitLayouts({ root }),
-      /adapter dispatch width 27 differs from schema/u,
+      /adapter dispatch width 26 differs from schema/u,
     );
   });
 
