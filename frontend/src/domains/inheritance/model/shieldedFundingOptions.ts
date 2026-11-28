@@ -1,6 +1,8 @@
 import type {
   ShieldedFundingChild,
   ShieldedFundingEntry,
+  ShieldedPolicySummary,
+  ShieldedTemplateSummary,
 } from "../../../shared/workers/shieldedAssetWorkerTypes";
 
 export const SHIELDED_PERIOD_DAY_PRESETS = [1, 7, 14, 21, 30, 90, 180, 365] as const;
@@ -21,12 +23,26 @@ export function listShieldedFundingHeirs(
   family: { children: readonly ShieldedFundingChild[] } | null | undefined,
   fundingVersion: string,
   labels?: ReadonlyMap<string, string>,
+  funding?: {
+    policy?: ShieldedPolicySummary;
+    templates?: readonly ShieldedTemplateSummary[];
+  },
 ): ShieldedFundingHeir[] {
+  let refillHeirs: Set<string> | undefined;
+  if (funding?.policy?.refillOnly) {
+    const handle = funding.policy.handle;
+    refillHeirs = new Set(
+      funding.templates
+        ?.filter((template) => template.policyHandle === handle)
+        .map((template) => template.personHash.toLowerCase()),
+    );
+  }
   const children =
     family?.children.filter(
       (child) =>
         child.eligible &&
-        String(child.rootVersionIndex) === fundingVersion,
+        String(child.rootVersionIndex) === fundingVersion &&
+        (!refillHeirs || refillHeirs.has(child.personHash.toLowerCase())),
     ) ?? [];
   return children.map(({ personHash, identitySuiteId }) => ({
     personHash,

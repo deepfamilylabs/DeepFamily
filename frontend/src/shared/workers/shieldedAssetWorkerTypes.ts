@@ -79,6 +79,8 @@ export type ShieldedPolicySummary = {
   rootVersionIndex: string;
   amountPerPeriod: string;
   periodDays: string;
+  /** A template is available, but opening a new enrollment requires the allocation key. */
+  refillOnly?: true;
 };
 export type ShieldedTemplateSummary = {
   handle: string;

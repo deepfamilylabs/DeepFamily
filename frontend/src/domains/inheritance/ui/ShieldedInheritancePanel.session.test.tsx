@@ -1084,6 +1084,35 @@ describe("Shielded budget flow with a real identity session", () => {
     expect(mocks.call.mock.calls.map(([method]) => method)).toEqual(["unlockIdentity", "recover", "receiveCode"]);
   });
 
+  it("lets the identity balance refill a recovered plan for its enrolled child", async () => {
+    const enrolled = "0x" + "31".repeat(32);
+    const otherChild = "0x" + "42".repeat(32);
+    const defaultCall = mocks.call.getMockImplementation();
+    mocks.call.mockImplementation(async (method, params) => method === "recover" ? {
+      ...emptyWallet,
+      notes: [{ commitment: "100", ownerCommitment: "1", slot: "identity", kind: "value", amount: "30" }],
+      parentVersions: [1],
+      children: [enrolled, otherChild].map((personHash) => ({
+        personHash, rootVersionIndex: 1, eligible: true,
+      })),
+      policies: [{
+        handle: "101", rootPersonHash: identity.personHash, rootVersionIndex: "1",
+        amountPerPeriod: "10", periodDays: "7", refillOnly: true,
+      }],
+      templates: [{ handle: "102", policyHandle: "101", personHash: enrolled, bindingKind: 1, keyMode: 0 }],
+    } : defaultCall?.(method, params));
+    renderPanel();
+    await unlockIdentity();
+    chooseTask("fund");
+    fireEvent.click(screen.getByRole("button", { name: /^shielded.fields.fundingRule/ }));
+    fireEvent.click(screen.getByRole("option", { name: "shielded.policyOption" }));
+    const heirs = screen.getAllByRole<HTMLInputElement>("radio", { name: /^shielded.recipientPicker.childFallback/ });
+    expect(heirs.map((heir) => heir.value)).toEqual([enrolled]);
+    fireEvent.click(heirs[0]);
+    expect(sessionState().independentKey).toBeNull();
+    expect(screen.getByRole<HTMLButtonElement>("button", { name: submitLabel }).disabled).toBe(false);
+  });
+
   it("restores independent key without terminating the already unlocked identity", async () => {
     renderPanel();
     await unlockIdentity();

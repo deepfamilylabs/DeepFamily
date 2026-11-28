@@ -1969,16 +1969,17 @@ export function ShieldedInheritancePanel({
     }
     if (!currentParent()) return;
     setOtherFamilyState({ scope: fundingFamilyScope, family });
-    const version = selectedPolicy?.rootVersionIndex ?? rootVersion;
+    const policy = refreshedWallet?.policies.find((item) => item.handle === policyHandle);
+    const version = policy?.rootVersionIndex ?? rootVersion;
     if (
       !refreshedWallet ||
       (version && !family.parentVersions.includes(Number(version))) ||
-      (policyHandle && !refreshedWallet.policies.some((item) => item.handle === policyHandle))
+      (policyHandle && !policy)
     ) {
       resetFundingParentSelection();
     } else if (
       personHash &&
-      !listShieldedFundingHeirs(family, version)
+      !listShieldedFundingHeirs(family, version, undefined, { policy, templates: refreshedWallet.templates })
         .some((heir) => heir.personHash.toLowerCase() === personHash.toLowerCase())
     ) {
       setPersonHash("");
@@ -2545,7 +2546,10 @@ export function ShieldedInheritancePanel({
     receipt = null;
   } else if (action === "fund") {
     const fundingVersion = selectedPolicy?.rootVersionIndex ?? rootVersion;
-    const heirs = listShieldedFundingHeirs(fundingFamily, fundingVersion, localRecipientLabels);
+    const heirs = listShieldedFundingHeirs(fundingFamily, fundingVersion, localRecipientLabels, {
+      policy: selectedPolicy,
+      templates: wallet?.templates,
+    });
     const heirIndex = heirs.findIndex(
       (heir) => heir.personHash.toLowerCase() === personHash.toLowerCase(),
     );
@@ -2622,9 +2626,12 @@ export function ShieldedInheritancePanel({
         policyHandle={policyHandle}
         onPolicyChange={(handle) => {
           if (handle === policyHandle) return;
-          const nextVersion = fundingPolicies.find(item => item.handle === handle)?.rootVersionIndex ?? rootVersion;
-          const sameChildAvailable = listShieldedFundingHeirs(fundingFamily, nextVersion)
-            .some(heir => heir.personHash.toLowerCase() === personHash.toLowerCase());
+          const policy = fundingPolicies.find((item) => item.handle === handle);
+          const nextVersion = policy?.rootVersionIndex ?? rootVersion;
+          const sameChildAvailable = listShieldedFundingHeirs(fundingFamily, nextVersion, undefined, {
+            policy,
+            templates: wallet?.templates,
+          }).some((heir) => heir.personHash.toLowerCase() === personHash.toLowerCase());
           setPolicyHandle(handle);
           if (!sameChildAvailable) {
             setPersonHash("");

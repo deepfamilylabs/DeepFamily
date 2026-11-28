@@ -713,6 +713,69 @@ describe("asset Worker preview and proof boundary", () => {
     expect(mocks.selectedQuery).not.toHaveBeenCalled();
     expect(mocks.authorizationMode).not.toHaveBeenCalled();
   });
+
+  it("lists and refills a recovered enrollment without its allocation key", async () => {
+    const session = await unlocked();
+    mocks.notes = [value(1n, 30n, secretKeys.ownerSecret)];
+    const note = {
+      binding: "identity" as const,
+      rootIdentityCommitment: 31n,
+      rootVersionIndex: 1n,
+      heirIdentityCommitment: 41n,
+      amountPerPeriod: 10n,
+      periodDays: 7n,
+      eligibleFrom: 1000n,
+      policyCommitment: 101n,
+      enrollmentCommitment: 102n,
+      remaining: 10n,
+      nonce: 103n,
+    };
+    const template = {
+      note,
+      commitment: 104n,
+      shardId: 0n,
+      ciphertext: encodePublicShieldedBudgetEnvelope(note, { chainId: 31337n, poolAddress: context.poolAddress }),
+    };
+    const recover = mocks.recover.getMockImplementation()!;
+    mocks.recover.mockImplementation(async (...args) => {
+      const snapshot = await recover(...args);
+      snapshot.fundingTemplates.set(template.commitment, template);
+      return snapshot;
+    });
+    const summary = await session.call("recover", { context });
+    expect(summary.policies).toEqual([{
+      handle: "101",
+      rootPersonHash: wrapIdentityCommitmentAsPersonHash(31n).toLowerCase(),
+      rootVersionIndex: "1",
+      amountPerPeriod: "10",
+      periodDays: "7",
+      refillOnly: true,
+    }]);
+    const request = {
+      context,
+      slot: "identity" as const,
+      action: "fund" as const,
+      fundingEntry: "public" as const,
+      periods: "2",
+      policyHandle: "101",
+      publicRecipient: wrapIdentityCommitmentAsPersonHash(41n),
+      candidates: ["1"],
+    };
+    const preview = await session.call("preview", request);
+    expect(preview).toMatchObject({ action: "fund", amount: "20", policyHandle: "101" });
+    expect(mocks.fund).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({
+      fundMode: 1, budget: template, budgetPeriods: 2n, donorCommitment: "1",
+    }));
+
+    await expect(session.call("preview", {
+      ...request, publicRecipient: wrapIdentityCommitmentAsPersonHash(42n),
+    })).rejects.toThrow("The original funding policy is unavailable");
+    await expect(session.call("preview", {
+      ...request, rootIdentityCommitment: "43",
+    })).rejects.toThrow("belongs to a different parent");
+    expect(mocks.fund).toHaveBeenCalledTimes(1);
+  });
+
   it("rejects the final transfer destination before making a preparatory merge", async () => {
     const session = await unlocked();
     mocks.verify.mockResolvedValue({ ok: false });

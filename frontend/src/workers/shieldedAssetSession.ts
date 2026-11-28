@@ -5,8 +5,6 @@ import {
   ProtocolError,
   initializeShieldedReceiveEncryption,
   buildShieldedPoolPublicSignals,
-  computeShieldedAllocationKeyCommitment,
-  computeShieldedPolicyCommitment,
   computeShieldedValueOwnerCommitment,
   deriveIdentityMaterial,
   deriveShieldedHeirKeyMaterial,
@@ -32,6 +30,7 @@ import {
   decodeShieldedIndependentKeyMnemonic,
   encodeShieldedIndependentKey,
   decodeShieldedIndependentKey,
+  type ShieldedBudgetNotePayload,
 } from "@deepfamily/protocol-core";
 import { normalizeShieldedStateReadMode, type ShieldedStateReadMode } from "../shared/config/shieldedStateReadMode";
 import { JsonRpcProvider, getAddress, getBigInt, getBytes, hexlify, randomBytes, type BigNumberish } from "ethers";
@@ -51,6 +50,7 @@ import type {
   ShieldedWorkerContext,
   ShieldedKeySlot,
   ShieldedWalletSummary,
+  ShieldedPolicySummary,
   ShieldedAssetActionRequest,
   ShieldedActionPreview,
   ShieldedProvenAction,
@@ -93,6 +93,7 @@ import { prepareShieldedShield } from "../domains/inheritance/services/shieldedN
 import {
   createShieldedPolicyDescriptor,
   prepareShieldedFund,
+  shieldedPolicyCommitment,
   validateShieldedFundingDestination,
 } from "../domains/inheritance/services/shieldedFundingPreparation";
 import { prepareShieldedClaim } from "../domains/inheritance/services/shieldedClaimPreparation";
@@ -171,6 +172,21 @@ function fundingRootIdentity(value: string): bigint {
   const identity = BigInt(value);
   requireValue(identity < SNARK_SCALAR_FIELD, "Choose the parent whose children qualify.");
   return identity;
+}
+function summarizeFundingPolicy(
+  handle: string,
+  terms: Pick<
+    ShieldedBudgetNotePayload,
+    "rootIdentityCommitment" | "rootVersionIndex" | "amountPerPeriod" | "periodDays"
+  >,
+): ShieldedPolicySummary {
+  return {
+    handle,
+    rootPersonHash: wrapIdentityCommitmentAsPersonHash(terms.rootIdentityCommitment).toLowerCase(),
+    rootVersionIndex: String(terms.rootVersionIndex),
+    amountPerPeriod: String(terms.amountPerPeriod),
+    periodDays: String(terms.periodDays),
+  };
 }
 function serializeIdentity(material: IdentityMaterial): IdentityMaterialV1Result {
   return {
@@ -846,6 +862,7 @@ export class ShieldedAssetSession {
       notes: ReturnType<typeof listUnspentRecoveredShieldedNotes>;
     }> = [];
     const seenNotes = new Set<string>();
+    const policies = new Map<string, ShieldedPolicySummary>();
     this.wallets.clear();
     for (const slot of ["identity", "independent"] as const) {
       if ((slot === "identity" && !this.identity) || (slot === "independent" && !this.independentKeyMaterial))
@@ -909,39 +926,20 @@ export class ShieldedAssetSession {
           pendingIdentity: true,
         });
       }
-      // A wallet may fund under any parent, so every recovered arrangement is listed with its parent.
+      // A recovered allocation key also allows enrolling new children under this policy.
       for (const policy of listRecoveredShieldedPolicies(wallet)) {
         if (!this.identity) continue;
-        const handle = String(
-          computeShieldedPolicyCommitment(
-            {
-              ...policy,
-              allocationKeyCommitment: computeShieldedAllocationKeyCommitment(
-                policy.allocationKey,
-                wallet,
-              ),
-            },
-            wallet,
-          ),
-        );
-        if (!summary.policies.some((item) => item.handle === handle))
-          summary.policies.push({
-            handle,
-            rootPersonHash: wrapIdentityCommitmentAsPersonHash(
-              policy.rootIdentityCommitment,
-            ).toLowerCase(),
-            rootVersionIndex: String(policy.rootVersionIndex),
-            amountPerPeriod: String(policy.amountPerPeriod),
-            periodDays: String(policy.periodDays),
-          });
+        const handle = String(shieldedPolicyCommitment(policy, wallet));
+        policies.set(handle, summarizeFundingPolicy(handle, policy));
       }
       for (const template of listRecoveredFundingTemplates(wallet)) {
         if (!this.identity) continue;
+        const handle = String(getShieldedBudgetCommitments(template.note, wallet).policyCommitment);
+        if (!policies.has(handle))
+          policies.set(handle, { ...summarizeFundingPolicy(handle, template.note), refillOnly: true });
         summary.templates.push({
           handle: String(template.commitment),
-          policyHandle: String(
-            getShieldedBudgetCommitments(template.note, wallet).policyCommitment,
-          ),
+          policyHandle: handle,
           personHash: wrapIdentityCommitmentAsPersonHash(template.note.heirIdentityCommitment),
           bindingKind: template.note.binding === "identity" ? 1 : 0,
           keyMode: Number(template.note.keyMode ?? 0) as 0 | 1,
@@ -951,6 +949,7 @@ export class ShieldedAssetSession {
         });
       }
     }
+    summary.policies = [...policies.values()];
     const lineage = this.identity
       ? await (normalizeShieldedStateReadMode(ctx.stateReadMode) === "chain"
           ? loadTargetedLineageSnapshot(lineageIndex, family, {
@@ -1221,35 +1220,40 @@ export class ShieldedAssetSession {
           : fundingRootIdentity(request.rootIdentityCommitment);
       const draftScope = `${scope.chainId}:${scope.poolAddress.toLowerCase()}:`;
       const sourceWallets = [...this.wallets.values()];
-      const policy = request.policyHandle
-        ? (sourceWallets
-            .flatMap((snapshot) => listRecoveredShieldedPolicies(snapshot))
-            .find(
-              (candidate) =>
-                String(
-                  computeShieldedPolicyCommitment(
-                    {
-                      ...candidate,
-                      allocationKeyCommitment: computeShieldedAllocationKeyCommitment(
-                        candidate.allocationKey,
-                        scope,
-                      ),
-                    },
-                    scope,
-                  ),
-                ) === request.policyHandle,
-            ) ?? this.policyDrafts.get(`${draftScope}${request.policyHandle}`))
-        : createShieldedPolicyDescriptor(
-            {
-              rootIdentityCommitment,
-              rootVersionIndex: request.rootVersionIndex!,
-              amountPerPeriod: amount,
-              periodDays: request.periodDays!,
-            },
-            scope,
-          );
+      const personHash = request.publicRecipient;
+      requireValue(personHash, "Select a registered child person hash.");
+      const requestedPolicyHandle = request.policyHandle;
+      // Refills use the historical enrollment; only an initial funding opens the allocation key.
+      const template = requestedPolicyHandle
+        ? sourceWallets.flatMap(listRecoveredFundingTemplates).find(
+            (candidate) =>
+              String(getShieldedBudgetCommitments(candidate.note, scope).policyCommitment) ===
+                requestedPolicyHandle &&
+              wrapIdentityCommitmentAsPersonHash(candidate.note.heirIdentityCommitment).toLowerCase() ===
+                personHash.toLowerCase(),
+          )
+        : undefined;
+      const initialPolicy = template
+        ? undefined
+        : requestedPolicyHandle
+          ? (sourceWallets.flatMap(listRecoveredShieldedPolicies).find(
+              (candidate) => String(shieldedPolicyCommitment(candidate, scope)) === requestedPolicyHandle,
+            ) ?? this.policyDrafts.get(`${draftScope}${requestedPolicyHandle}`))
+          : createShieldedPolicyDescriptor(
+              {
+                rootIdentityCommitment,
+                rootVersionIndex: request.rootVersionIndex!,
+                amountPerPeriod: amount,
+                periodDays: request.periodDays!,
+              },
+              scope,
+            );
+      const funding = template
+        ? { fundMode: 1 as const, budget: template }
+        : initialPolicy && { fundMode: 0 as const, policy: initialPolicy };
+      const terms = template?.note ?? initialPolicy;
       requireValue(
-        policy && getBigInt(policy.rootIdentityCommitment) === rootIdentityCommitment,
+        funding && terms && getBigInt(terms.rootIdentityCommitment) === rootIdentityCommitment,
         "The original funding policy is unavailable or belongs to a different parent.",
       );
       const periods = BigInt(request.periods ?? "0");
@@ -1257,32 +1261,13 @@ export class ShieldedAssetSession {
         periods > 0n && periods < 1n << 64n,
         "Choose a positive uint64 number of funded periods.",
       );
-      amount = getBigInt(policy.amountPerPeriod) * periods;
-      policyHandle = String(
-        computeShieldedPolicyCommitment(
-          {
-            ...policy,
-            allocationKeyCommitment: computeShieldedAllocationKeyCommitment(
-              policy.allocationKey,
-              wallet,
-            ),
-          },
-          wallet,
-        ),
-      );
+      const rate = getBigInt(terms.amountPerPeriod);
+      amount = rate * periods;
+      policyHandle = funding.fundMode === 0
+        ? String(shieldedPolicyCommitment(funding.policy, scope))
+        : requestedPolicyHandle;
       current();
-      this.policyDrafts.set(`${draftScope}${policyHandle}`, policy);
-      requireValue(request.publicRecipient, "Select a registered child person hash.");
-      const template = sourceWallets
-        .flatMap((snapshot) => listRecoveredFundingTemplates(snapshot))
-        .find(
-          (candidate) =>
-            String(getShieldedBudgetCommitments(candidate.note, wallet).policyCommitment) ===
-              policyHandle &&
-            wrapIdentityCommitmentAsPersonHash(
-              candidate.note.heirIdentityCommitment,
-            ).toLowerCase() === request.publicRecipient!.toLowerCase(),
-        );
+      if (funding.fundMode === 0) this.policyDrafts.set(`${draftScope}${policyHandle}`, funding.policy);
       const kind = request.fundingEntry === "public" ? (1 as const) : (0 as const);
       const mode = request.fundingEntry === "privateIndependent" ? (1 as const) : (0 as const);
       requireValue(
@@ -1306,7 +1291,7 @@ export class ShieldedAssetSession {
         requireValue(
           kind === 0 &&
             verified.keyMode === mode &&
-            verified.purpose === "fund" && verified.personHash?.toLowerCase() === request.publicRecipient.toLowerCase(),
+            verified.purpose === "fund" && verified.personHash?.toLowerCase() === personHash.toLowerCase(),
           "The receiving code does not match the selected child and funding entry.",
         );
       if (verified) {
@@ -1325,8 +1310,8 @@ export class ShieldedAssetSession {
         );
       }
       const root = {
-        rootIdentityCommitment: policy.rootIdentityCommitment,
-        rootVersionIndex: Number(policy.rootVersionIndex),
+        rootIdentityCommitment,
+        rootVersionIndex: Number(terms.rootVersionIndex),
       };
       const knownHeir = verified?.identityCommitment ??
         (template ? getBigInt(template.note.heirIdentityCommitment) : undefined);
@@ -1335,25 +1320,24 @@ export class ShieldedAssetSession {
         ? await loadTargetedLineageSnapshot(env.lineageIndex, env.family, {
             eligibility: [{
               ...root,
-              heirIdentityCommitment: knownHeir ?? await env.lineageIndex.identityCommitmentOf(request.publicRecipient),
+              heirIdentityCommitment: knownHeir ?? await env.lineageIndex.identityCommitmentOf(personHash),
             }],
           })
         : await loadLineageSnapshot(env.lineageIndex, env.family, {
             selection: knownHeir !== undefined
               ? { eligibility: [{ ...root, heirIdentityCommitment: knownHeir }] }
-              : { publicEligibility: [{ ...root, heirPersonHash: request.publicRecipient }] },
+              : { publicEligibility: [{ ...root, heirPersonHash: personHash }] },
           });
       current();
       // Bound the funded periods and the selected refill template before consolidation.
-      const templateRate = template ? getBigInt(template.note.amountPerPeriod) : 0n;
       const templatePeriods =
-        template && templateRate > 0n ? getBigInt(template.note.remaining) / templateRate : 0n;
+        template && rate > 0n ? getBigInt(template.note.remaining) / rate : 0n;
       requireValue(
         shieldedPeriodsMatureInTime(
           template
             ? getBigInt(template.note.eligibleFrom)
             : lineage.timestamp + SHIELDED_FUNDING_START_DELAY_SECONDS,
-          getBigInt(template ? template.note.periodDays : policy.periodDays),
+          getBigInt(terms.periodDays),
           periods + templatePeriods,
         ),
         SHIELDED_PERIODS_BEYOND_TIME_LIMIT_MESSAGE,
@@ -1364,7 +1348,7 @@ export class ShieldedAssetSession {
         const metadataQuery = {
           family: env.family,
           chainId: scope.chainId,
-          personHash: request.publicRecipient,
+          personHash,
         };
         const publicTree = chain
           ? await findPublicTreeIdentityEvidence({ ...metadataQuery, blockTag: lineage.blockNumber })
@@ -1379,15 +1363,13 @@ export class ShieldedAssetSession {
         donorCommitment: 0n,
         recipient: verified,
         budgetKind: kind,
-        publicRecipientPersonHash: request.publicRecipient,
+        publicRecipientPersonHash: personHash,
         lineageIndex: env.lineageIndex,
         lineage,
         budgetPeriods: periods,
       };
-      fundArgs = template
-        ? { ...common, fundMode: 1, budget: template }
-        : { ...common, fundMode: 0, policy };
-      recipient = request.publicRecipient;
+      fundArgs = { ...common, ...funding };
+      recipient = personHash;
     }
     if (request.action === "shield") {
       requireValue(
